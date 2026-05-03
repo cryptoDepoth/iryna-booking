@@ -10,10 +10,37 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background: #faf8f6;
-            color: #1a1a1a;
-            line-height: 1.6;
+            background: linear-gradient(180deg, #fdf6f3 0%, #faf8f6 60%);
+            color: #2a1f1f;
+            line-height: 1.65;
+            min-height: 100vh;
         }
+        .greeting {
+            background: linear-gradient(135deg, #fff5f0 0%, #fce4ec 100%);
+            border-radius: 18px;
+            padding: 22px 26px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            box-shadow: 0 2px 12px rgba(217, 122, 138, 0.08);
+        }
+        .greeting .avatar {
+            width: 54px; height: 54px;
+            border-radius: 50%;
+            background: #d97a8a;
+            color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Playfair Display', serif;
+            font-size: 1.3rem; font-weight: 600;
+            flex-shrink: 0;
+        }
+        .greeting p {
+            font-size: 0.95rem;
+            color: #5a4a4a;
+            margin: 0;
+        }
+        .greeting strong { color: #2a1f1f; }
         .container {
             max-width: 640px;
             margin: 0 auto;
@@ -90,7 +117,7 @@
             font-family: 'Playfair Display', serif;
             font-size: 2.5rem;
             font-weight: 700;
-            color: #c41e3a;
+            color: #d97a8a;
             text-align: center;
             margin: 24px 0 8px;
         }
@@ -118,12 +145,12 @@
             text-align: center;
         }
         .slot-btn:hover {
-            border-color: #c41e3a;
+            border-color: #d97a8a;
             background: #fff5f7;
         }
         .slot-btn.selected {
-            border-color: #c41e3a;
-            background: #c41e3a;
+            border-color: #d97a8a;
+            background: #d97a8a;
             color: white;
         }
         .slot-btn.disabled {
@@ -174,7 +201,7 @@
         .form-group input:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #c41e3a;
+            border-color: #d97a8a;
         }
         .form-group textarea {
             resize: vertical;
@@ -208,13 +235,13 @@
         }
         .email-copy {
             background: white;
-            border: 2px dashed #c41e3a;
+            border: 2px dashed #d97a8a;
             border-radius: 12px;
             padding: 16px;
             margin: 16px 0;
             font-size: 1.1rem;
             font-weight: 600;
-            color: #c41e3a;
+            color: #d97a8a;
             cursor: pointer;
             user-select: all;
         }
@@ -244,7 +271,7 @@
             color: #888;
             font-size: 0.9rem;
         }
-        .footer a { color: #c41e3a; text-decoration: none; }
+        .footer a { color: #d97a8a; text-decoration: none; }
         @media (max-width: 480px) {
             .slots-grid { grid-template-columns: repeat(2, 1fr); }
             .photo-grid { grid-template-columns: 1fr; }
@@ -259,6 +286,12 @@
             <h1>{{ title }}</h1>
             <p class="subtitle">Capture your family's most beautiful season</p>
             <p class="date">📅 {{ date }} &nbsp;|&nbsp; 🕐 {{ session_length }} minutes &nbsp;|&nbsp; 📍 Calgary</p>
+        </div>
+
+        <!-- Friendly greeting from photographer -->
+        <div class="greeting">
+            <div class="avatar">I</div>
+            <p>Hi, I'm <strong>Iryna</strong> ✨ I'd love to capture your family among the lilacs. Choose a time below — booking takes about 2 minutes.</p>
         </div>
 
         <!-- Photos -->
@@ -306,6 +339,18 @@
                 <div class="form-group">
                     <label for="instagram">Instagram Handle * <span style="color:#888; font-weight:400;">(@yourhandle)</span></label>
                     <input type="text" id="instagram" name="instagram" required placeholder="@yourhandle">
+                </div>
+                <div class="form-group">
+                    <label for="session_type">Session Type *</label>
+                    <select id="session_type" name="session_type" required style="width:100%; padding:14px 16px; border:2px solid #e8e8e8; border-radius:12px; font-size:1rem; font-family:inherit; background:white;">
+                        <option value="">Choose a session type…</option>
+                        <option value="Family">Family</option>
+                        <option value="Portrait">Portrait</option>
+                        <option value="Couple">Couple</option>
+                        <option value="Maternity">Maternity</option>
+                        <option value="Branding">Branding</option>
+                        <option value="Other">Other</option>
+                    </select>
                 </div>
 
                 <label style="font-weight:500; margin-bottom:12px; display:block;">Available Time Slots</label>
@@ -439,7 +484,8 @@
                 name: document.getElementById('name').value,
                 email: document.getElementById('email').value,
                 phone: document.getElementById('phone').value,
-                instagram: document.getElementById('instagram').value
+                instagram: document.getElementById('instagram').value,
+                session_type: document.getElementById('session_type').value
             };
 
             // Go to payment page with data in URL
