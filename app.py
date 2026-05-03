@@ -4,6 +4,21 @@ Iryna Pashynska Photography — Mini Session Booking System
 Flask app with SQLite database, 20-min sessions + 10-min breaks, Instagram field.
 """
 
+# Load .env file before any imports that use env vars
+import os as _os
+_env_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".env")
+if _os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _key, _, _val = _line.partition("=")
+                _key = _key.strip()
+                _val = _val.strip().strip('"').strip("'")
+                if _key not in _os.environ:
+                    _os.environ[_key] = _val
+    print(f"[env] Loaded {_env_path}")
+
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory
 from datetime import datetime, timedelta
 from functools import wraps
@@ -76,6 +91,57 @@ def _notify_admin(message):
         log.info("[notify] Telegram message sent")
     except Exception as e:
         log.error(f"[notify] Telegram failed: {e}")
+
+
+def _send_client_email(to_email, client_name, event_date, slot_time, event_title, booking_id):
+    """Send confirmation email to client via Himalaya CLI."""
+    if not to_email:
+        return
+    try:
+        import subprocess
+        date_nice = datetime.strptime(event_date, "%Y-%m-%d").strftime("%B %d, %Y")
+        subject = f"Booking Confirmed — {event_title} on {date_nice}"
+        body = f"""Hi {client_name},
+
+Your mini photo session is confirmed! Here are the details:
+
+Event: {event_title}
+Date: {date_nice}
+Time: {slot_time}
+Booking ID: #{booking_id}
+
+What's included:
+• 20-minute photo session
+• 15 professionally edited photos
+• All original photos
+• Quick turnaround (within 48 hours)
+
+Location details will be sent closer to the session date.
+
+If you need to reschedule, please DM me on Instagram @pashynska.photo.
+
+Looking forward to our session!
+
+Warmly,
+Iryna Pashynska
+@pashynska.photo
+"""
+        template = f"""From: Iryna Pashynska <iryna.pashynska@gmail.com>
+To: {client_name} <{to_email}>
+Subject: {subject}
+Content-Type: text/plain; charset=utf-8
+
+{body}"""
+        result = subprocess.run(
+            ["himalaya", "template", "send", "-a", "iryna"],
+            input=template, capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            log.info(f"[email] Confirmation sent to {to_email}")
+        else:
+            log.error(f"[email] Himalaya failed: {result.stderr[:200]}")
+    except Exception as e:
+        log.error(f"[email] Send failed: {e}")
 
 # Serve static images
 @app.route('/images/<path:filename>')
@@ -711,11 +777,27 @@ def admin_confirm():
     c.execute("UPDATE bookings SET confirmed=1, paid=1, status='confirmed', paid_amount=? WHERE id=?",
               (paid_amount, booking_id))
     conn.commit()
+    # Fetch booking details for email notification
+    c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+    row = c.fetchone()
+    booking = dict(row) if row else {}
     conn.close()
 
     # Side-effects: GCal event first (so Notion can include the link), then Notion
     event_url = create_calendar_event_for_booking(booking_id)
     sync_to_notion(booking_id)
+
+    # Send confirmation email to client
+    ev = get_event_by_id(booking.get("event_id"))
+    if ev and booking:
+        _send_client_email(
+            to_email=booking.get("email", ""),
+            client_name=booking.get("name", "Client"),
+            event_date=ev["date"],
+            slot_time=booking.get("time", ""),
+            event_title=ev.get("title", "Mini Session"),
+            booking_id=booking_id
+        )
 
     log.info(f"[admin] Booking #{booking_id} confirmed, paid ${paid_amount}")
 
