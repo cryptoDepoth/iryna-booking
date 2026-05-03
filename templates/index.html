@@ -432,7 +432,14 @@
                 const res = await fetch('/reserve', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({time: time})
+                    body: JSON.stringify({
+                        time: time,
+                        name: document.getElementById('name').value,
+                        email: document.getElementById('email').value,
+                        phone: document.getElementById('phone').value,
+                        instagram: document.getElementById('instagram').value,
+                        session_type: document.getElementById('session_type').value
+                    })
                 });
                 const data = await res.json();
 

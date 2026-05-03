@@ -6,14 +6,27 @@ Flask app with SQLite database, 20-min sessions + 10-min breaks, Instagram field
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory
 from datetime import datetime, timedelta
+from functools import wraps
 import json
+import logging
 import os
 import sqlite3
 import requests
 import time
 
+# ===== LOGGING =====
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(os.path.dirname(__file__), 'booking.log')),
+        logging.StreamHandler()
+    ]
+)
+log = logging.getLogger(__name__)
+
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24).hex())
 
 # ===== RATE LIMITING =====
 # Simple IP-based rate limit: 10 requests per 10 minutes per IP
@@ -31,6 +44,37 @@ def record_request(ip):
     if ip not in _rate_limits:
         _rate_limits[ip] = []
     _rate_limits[ip].append(time.time())
+
+# ===== ADMIN AUTH =====
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
+
+def admin_required(f):
+    """Require X-Admin-Key header for admin endpoints."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if ADMIN_KEY and request.headers.get("X-Admin-Key") != ADMIN_KEY:
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+# ===== NOTIFICATIONS =====
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+def _notify_admin(message):
+    """Send notification to photographer via Telegram."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        log.info(f"[notify] Telegram not configured. Message: {message[:80]}...")
+        return
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"},
+            timeout=10
+        )
+        log.info("[notify] Telegram message sent")
+    except Exception as e:
+        log.error(f"[notify] Telegram failed: {e}")
 
 # Serve static images
 @app.route('/images/<path:filename>')
@@ -261,22 +305,47 @@ def db_conn():
     return conn
 
 def expire_reservations():
-    """Delete expired reserved/pending_payment rows so slots open back up. Returns count."""
+    """Mark expired reserved/pending_payment rows as 'expired' so slots open back up.
+    Returns count of expired bookings."""
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     now = datetime.now().isoformat()
     c.execute("""
-        DELETE FROM bookings
+        SELECT id, notion_page_id FROM bookings
         WHERE confirmed = 0
           AND paid = 0
           AND reserved_until IS NOT NULL
           AND reserved_until <= ?
           AND status IN ('reserved', 'pending_payment')
     """, (now,))
-    deleted = c.rowcount
+    rows = c.fetchall()
+
+    for row in rows:
+        booking_id = row["id"]
+        notion_page_id = row["notion_page_id"]
+
+        # Update status to 'expired' instead of deleting
+        c.execute("UPDATE bookings SET status='expired', reserved_until=NULL WHERE id=?",
+                  (booking_id,))
+        log.info(f"[expire] Booking #{booking_id} marked as expired")
+
+        # Sync status to Notion
+        if notion_page_id and NOTION_API_KEY:
+            try:
+                requests.patch(
+                    f"https://api.notion.com/v1/pages/{notion_page_id}",
+                    headers=NOTION_HEADERS,
+                    json={"properties": {"Status": {"select": {"name": "Expired"}}}},
+                    timeout=10
+                )
+            except Exception as e:
+                log.error(f"[expire] Notion update failed for #{booking_id}: {e}")
+
+    expired_count = len(rows)
     conn.commit()
     conn.close()
-    return deleted
+    return expired_count
 
 # Generate time slots with breaks
 def generate_slots():
@@ -345,8 +414,16 @@ def get_slots(date_str):
 
 @app.route("/reserve", methods=["POST"])
 def reserve_slot():
-    data = request.json
-    time = data.get("time")
+    data = request.json or {}
+    slot_time = data.get("time")
+    client_name = data.get("name", "")
+    client_email = data.get("email", "")
+    client_phone = data.get("phone", "")
+    client_ig = data.get("instagram", "")
+    session_type = data.get("session_type", "")
+
+    if not slot_time:
+        return jsonify({"success": False, "error": "No time slot specified"}), 400
 
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     if isinstance(ip, str) and ',' in ip:
@@ -371,7 +448,7 @@ def reserve_slot():
         SELECT id FROM bookings
         WHERE date=? AND time=?
           AND (confirmed=1 OR reserved_until > ?)
-    """, (DATE, time, now.isoformat()))
+    """, (DATE, slot_time, now.isoformat()))
     if c.fetchone():
         conn.rollback()
         conn.close()
@@ -383,7 +460,7 @@ def reserve_slot():
         INSERT OR IGNORE INTO bookings
             (date, time, name, email, phone, instagram, session_type, status, reserved_until)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?)
-    """, (DATE, time, "", "", "", "", "", expires.isoformat()))
+    """, (DATE, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat()))
 
     if c.rowcount == 0:
         conn.rollback()
@@ -393,6 +470,15 @@ def reserve_slot():
     booking_id = c.lastrowid
     conn.commit()
     conn.close()
+
+    # Notify photographer via Telegram
+    _notify_admin(f"🆕 New reservation #{booking_id}\n"
+                  f"👤 {client_name or '(no name)'}\n"
+                  f"📅 {DATE} @ {slot_time}\n"
+                  f"📧 {client_email}\n"
+                  f"📸 @{client_ig or 'N/A'}\n"
+                  f"🏷️ {session_type or 'N/A'}\n"
+                  f"⏱️ Expires in 15 min")
 
     return jsonify({
         "success": True,
@@ -465,6 +551,17 @@ def confirm_payment():
     # Sync to Notion
     if booking_id:
         sync_to_notion(booking_id)
+
+    # Notify photographer
+    _notify_admin(f"💰 Payment submitted for #{booking_id}\n"
+                  f"👤 {client_name}\n"
+                  f"📅 {DATE} @ {time}\n"
+                  f"📧 {client_email}\n"
+                  f"📸 @{client_ig or 'N/A'}\n"
+                  f"🏷️ {session_type or 'N/A'}\n"
+                  f"⏳ Awaiting e-Transfer confirmation")
+
+    log.info(f"[confirm] Booking #{booking_id} — {client_name} @ {time} — payment submitted")
     
     return jsonify({
         "success": True,
@@ -492,6 +589,7 @@ def success():
     )
 
 @app.route("/admin")
+@admin_required
 def admin():
     """Simple admin view of all bookings"""
     conn = db_conn()
@@ -506,11 +604,13 @@ def admin():
         "confirmed": sum(1 for b in rows if b["confirmed"]),
         "pending": sum(1 for b in rows if not b["confirmed"] and b["status"] in ("pending", "pending_payment")),
         "reserved": sum(1 for b in rows if b["status"] == "reserved"),
-        "total_expected": sum(SESSION_PRICE for b in rows if b["date"] == DATE),
+        "expired": sum(1 for b in rows if b["status"] == "expired"),
+        "total_expected": sum(SESSION_PRICE for b in rows if b["date"] == DATE and b["status"] not in ("expired", "cancelled")),
         "total_paid": sum(b.get("paid_amount", 0) or 0 for b in rows)
     })
 
 @app.route("/admin/confirm", methods=["POST"])
+@admin_required
 def admin_confirm():
     data = request.json
     booking_id = data.get("booking_id")
@@ -526,7 +626,26 @@ def admin_confirm():
     event_url = create_calendar_event_for_booking(booking_id)
     sync_to_notion(booking_id)
 
+    log.info(f"[admin] Booking #{booking_id} confirmed, paid ${paid_amount}")
+
     return jsonify({"success": True, "calendar_event": event_url})
+
+@app.route("/admin/cancel", methods=["POST"])
+@admin_required
+def admin_cancel():
+    """Cancel a booking — frees the slot."""
+    data = request.json
+    booking_id = data.get("booking_id")
+    if not booking_id:
+        return jsonify({"error": "booking_id required"}), 400
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("UPDATE bookings SET status='cancelled', reserved_until=NULL WHERE id=?", (booking_id,))
+    conn.commit()
+    conn.close()
+    sync_to_notion(booking_id)
+    log.info(f"[admin] Booking #{booking_id} cancelled")
+    return jsonify({"success": True})
 
 # ===== RUN =====
 if __name__ == "__main__":
