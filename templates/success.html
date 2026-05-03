@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmed! | Pashynska Photography</title>
+    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📷%3C/text%3E%3C/svg%3E">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #faf8f6;
+            color: #1a1a1a;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 520px;
+            width: 100%;
+            padding: 40px 24px;
+            text-align: center;
+        }
+        .success-icon {
+            width: 100px;
+            height: 100px;
+            background: #e8f5e9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 28px;
+            font-size: 3rem;
+        }
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 32px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+            text-align: left;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-row .label { color: #888; }
+        .detail-row .value { font-weight: 500; }
+        .message {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 16px 20px;
+            border-radius: 0 10px 10px 0;
+            margin: 24px 0;
+            text-align: left;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .instagram {
+            color: #c41e3a;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .footer {
+            margin-top: 40px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">🔄</div>
+        <h1>Payment Verification in Progress</h1>
+        <p class="subtitle">Thank you! We're checking for your e-Transfer now.</p>
+
+        <div class="card">
+            <div class="detail-row">
+                <span class="label">Status</span>
+                <span class="value" style="color:#1976d2;">⏳ Payment Verification in Progress</span>
+            </div>
+            {% if booking %}
+            <div class="detail-row">
+                <span class="label">Booking ID</span>
+                <span class="value">#{{ booking.id }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Name</span>
+                <span class="value">{{ booking.name }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Time</span>
+                <span class="value">{{ booking.time }}</span>
+            </div>
+            {% if booking.instagram %}
+            <div class="detail-row">
+                <span class="label">Instagram</span>
+                <span class="value">{{ booking.instagram }}</span>
+            </div>
+            {% endif %}
+            {% endif %}
+            <div class="detail-row">
+                <span class="label">Date</span>
+                <span class="value">{{ date }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Payment Method</span>
+                <span class="value">Interac e-Transfer</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Amount</span>
+                <span class="value">${{ price }} CAD</span>
+            </div>
+        </div>
+
+        <div class="message">
+            📧 <strong>What happens next?</strong><br><br>
+            Our system is checking for your e-Transfer. You will receive an automatic confirmation email within a few minutes with your exact location and preparation tips.<br><br>
+            <strong>Please do not resend the payment.</strong> If we don't detect your transfer within 15 minutes, your reservation will be released automatically.
+        </div>
+
+        <div class="message" style="background:#fff3cd; border-color:#ffc107;">
+            ⚠️ <strong>Important:</strong> Your time slot is still reserved while we verify. If payment is not received within 15 minutes, the slot will become available for others. Need help? DM me on <a href="https://instagram.com/pashynska.photo" class="instagram" target="_blank">Instagram</a>.
+        </div>
+
+        <!-- HOW TO PREPARE GUIDE -->
+        <div class="card" style="margin-top: 28px;">
+            <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;margin-bottom:20px;text-align:center;">🪻 How to Prepare for Your Photoshoot</h2>
+
+            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
+                <span style="font-size:1.4rem;margin-right:12px;">👗</span>
+                <div style="text-align:left;">
+                    <strong>Wardrobe</strong><br>
+                    <span style="color:#666;font-size:0.95rem;">Wear soft, coordinating tones — lilac, cream, pastels, or white look stunning against the blossoms. Avoid busy patterns, logos, and neon colors.</span>
+                </div>
+            </div>
+
+            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
+                <span style="font-size:1.4rem;margin-right:12px;">💇‍♀️</span>
+                <div style="text-align:left;">
+                    <strong>Hair & Makeup</strong><br>
+                    <span style="color:#666;font-size:0.95rem;">Natural, dewy makeup photographs best. Style your hair as you normally would, but avoid brand-new hairstyles you've never tried before.</span>
+                </div>
+            </div>
+
+            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
+                <span style="font-size:1.4rem;margin-right:12px;">👟</span>
+                <div style="text-align:left;">
+                    <strong>Footwear</strong><br>
+                    <span style="color:#666;font-size:0.95rem;">Grass may be damp in May. Bring a second pair of shoes and be ready to go barefoot for some romantic shots if you're comfortable.</span>
+                </div>
+            </div>
+
+            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
+                <span style="font-size:1.4rem;margin-right:12px;">🧒</span>
+                <div style="text-align:left;">
+                    <strong>Kids & Family</strong><br>
+                    <span style="color:#666;font-size:0.95rem;">Feed children before the session. Bring snacks, water, and a small comfort toy. A well-rested child = magical photos.</span>
+                </div>
+            </div>
+
+            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
+                <span style="font-size:1.4rem;margin-right:12px;">⏰</span>
+                <div style="text-align:left;">
+                    <strong>Arrive 5 Min Early</strong><br>
+                    <span style="color:#666;font-size:0.95rem;">Your slot is exactly 20 minutes. Arriving early maximizes your shoot time. Location details will be sent via DM once payment is confirmed.</span>
+                </div>
+            </div>
+
+            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
+                <span style="font-size:1.4rem;margin-right:12px;">🌸</span>
+                <div style="text-align:left;">
+                    <strong>Bonus Tip</strong><br>
+                    <span style="color:#666;font-size:0.95rem;">The lilac backdrop is beautiful but attracts bees. Stay calm — we can work around them, and I always bring a backup location plan.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>📷 Pashynska Photography — Calgary, AB</p>
+            <p style="margin-top:8px;">Questions? <a href="https://instagram.com/pashynska.photo" class="instagram" target="_blank">DM on Instagram</a></p>
+        </div>
+    </div>
+</body>
+</html>

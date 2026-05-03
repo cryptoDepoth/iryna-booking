@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} | Pashynska Photography</title>
+    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📷%3C/text%3E%3C/svg%3E">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #faf8f6;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        .header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.2rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        .header .subtitle {
+            font-size: 1.05rem;
+            color: #666;
+            font-weight: 400;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        .header .date {
+            font-size: 1.1rem;
+            color: #666;
+            font-weight: 400;
+            margin-top: 8px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+        }
+        .photo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 28px;
+        }
+        .photo-grid img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 12px;
+        }
+        .features {
+            list-style: none;
+            margin: 24px 0;
+        }
+        .features li {
+            padding: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .features li:last-child { border-bottom: none; }
+        .features .icon {
+            width: 32px;
+            height: 32px;
+            background: #ffe4ec;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .price {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #c41e3a;
+            text-align: center;
+            margin: 24px 0 8px;
+        }
+        .price-note {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+        .slots-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .slot-btn {
+            padding: 14px 8px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .slot-btn:hover {
+            border-color: #c41e3a;
+            background: #fff5f7;
+        }
+        .slot-btn.selected {
+            border-color: #c41e3a;
+            background: #c41e3a;
+            color: white;
+        }
+        .slot-btn.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .btn-primary {
+            display: block;
+            width: 100%;
+            padding: 18px;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 28px;
+            text-align: center;
+            text-decoration: none;
+        }
+        .btn-primary:hover { background: #333; }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #c41e3a;
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .timer {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: 500;
+        }
+        .timer.warning {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+        .payment-box {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 28px;
+            margin: 24px 0;
+            text-align: center;
+        }
+        .payment-box h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.4rem;
+            margin-bottom: 16px;
+        }
+        .email-copy {
+            background: white;
+            border: 2px dashed #c41e3a;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #c41e3a;
+            cursor: pointer;
+            user-select: all;
+        }
+        .copy-hint {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 4px;
+        }
+        .hidden { display: none; }
+        .badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+        .badge.sold-out {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .footer {
+            text-align: center;
+            padding: 40px 24px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+        .footer a { color: #c41e3a; text-decoration: none; }
+        @media (max-width: 480px) {
+            .slots-grid { grid-template-columns: repeat(2, 1fr); }
+            .photo-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .price { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ title }}</h1>
+            <p class="subtitle">Capture your family's most beautiful season</p>
+            <p class="date">📅 {{ date }} &nbsp;|&nbsp; 🕐 {{ session_length }} minutes &nbsp;|&nbsp; 📍 Calgary</p>
+        </div>
+
+        <!-- Photos -->
+        <div class="card">
+            <div class="photo-grid">
+                <img src="/images/lilac_1.jpg" alt="Spring mini session among blooming lilacs in Calgary">
+                <img src="/images/pregnancy_1.jpg" alt="Natural light family portrait in Calgary">
+            </div>
+        </div>
+
+        <!-- Info -->
+        <div class="card">
+            <h2 style="font-family:'Playfair Display',serif; font-size:1.5rem; margin-bottom:16px;">What's Included</h2>
+            <ul class="features">
+                <li><span class="icon">🪻</span> {{ session_length }} minutes among blooming lilacs</li>
+                <li><span class="icon">📸</span> 15 professionally edited photos</li>
+                <li><span class="icon">✨</span> All original photos included</li>
+                <li><span class="icon">⚡</span> Quick turnaround (within 48 hours)</li>
+                <li><span class="icon">📍</span> Location: Calgary — exact spot sent after booking</li>
+            </ul>
+            <div class="price">${{ total }} CAD</div>
+            <p class="price-note"><strong>Pay $95 deposit now to book</strong> — remaining $95 due on session day</p>
+            <p class="price-note" style="font-size:0.85rem;">+GST | Limited spots available</p>
+            <span class="badge" id="availability-badge">Loading slots...</span>
+        </div>
+
+        <!-- Booking Form -->
+        <div class="card">
+            <h2 style="font-family:'Playfair Display',serif; font-size:1.5rem; margin-bottom:8px;">Book Your Session</h2>
+            <p style="color:#666; margin-bottom:24px;">Select your preferred time slot below</p>
+
+            <form id="booking-form">
+                <div class="form-group">
+                    <label for="name">Your Name *</label>
+                    <input type="text" id="name" name="name" required placeholder="Jane Doe">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required placeholder="jane@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="phone">Phone Number *</label>
+                    <input type="tel" id="phone" name="phone" required placeholder="+1 (403) 555-1234">
+                </div>
+                <div class="form-group">
+                    <label for="instagram">Instagram Handle * <span style="color:#888; font-weight:400;">(@yourhandle)</span></label>
+                    <input type="text" id="instagram" name="instagram" required placeholder="@yourhandle">
+                </div>
+
+                <label style="font-weight:500; margin-bottom:12px; display:block;">Available Time Slots</label>
+                <div class="slots-grid" id="slots-container">
+                    <p style="grid-column:1/-1; text-align:center; color:#888;">Loading...</p>
+                </div>
+
+                <input type="hidden" id="selected-time" name="time">
+
+                <div class="timer hidden" id="timer-box">
+                    ⏱️ Your slot is reserved for <strong id="timer-count">15:00</strong>.<br>
+                    Complete payment before it expires!
+                </div>
+
+                <button type="submit" class="btn-primary" id="submit-btn" disabled>
+                    Continue to Payment →
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>📷 <strong>Pashynska Photography</strong> — Calgary, AB</p>
+        <p style="margin-top:8px;">Questions? DM me on <a href="https://instagram.com/pashynska.photo" target="_blank">Instagram</a></p>
+    </div>
+
+    <script>
+        let selectedSlot = null;
+        let timerInterval = null;
+        let expiresAt = null;
+
+        // Load slots
+        async function loadSlots() {
+            try {
+                const res = await fetch('/slots/{{ date }}');
+                const data = await res.json();
+                const container = document.getElementById('slots-container');
+                const badge = document.getElementById('availability-badge');
+
+                if (data.slots.length === 0) {
+                    container.innerHTML = '<p style="grid-column:1/-1; text-align:center; color:#c62828; font-weight:500;">All slots are booked! DM me on Instagram for waitlist.</p>';
+                    badge.textContent = 'SOLD OUT';
+                    badge.classList.add('sold-out');
+                    return;
+                }
+
+                badge.textContent = `${data.available} of ${data.total} slots available`;
+                container.innerHTML = '';
+
+                data.slots.forEach(slot => {
+                    const btn = document.createElement('button');
+                    btn.className = 'slot-btn';
+                    btn.textContent = slot.label;
+                    btn.dataset.time = slot.time;
+                    btn.onclick = () => selectSlot(slot.time, btn);
+                    container.appendChild(btn);
+                });
+            } catch (err) {
+                console.error('Failed to load slots:', err);
+                document.getElementById('slots-container').innerHTML =
+                    '<p style="grid-column:1/-1; text-align:center; color:#c62828;">Error loading slots. Please refresh.</p>';
+            }
+        }
+
+        function selectSlot(time, btnElement) {
+            // Deselect others
+            document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+            btnElement.classList.add('selected');
+            selectedSlot = time;
+            document.getElementById('selected-time').value = time;
+            document.getElementById('submit-btn').disabled = false;
+
+            // Reserve via API
+            reserveSlot(time);
+        }
+
+        async function reserveSlot(time) {
+            try {
+                const res = await fetch('/reserve', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({time: time})
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    expiresAt = new Date(data.expires_at);
+                    startTimer();
+                    document.getElementById('timer-box').classList.remove('hidden');
+                } else {
+                    alert(data.error || 'Slot not available');
+                }
+            } catch (err) {
+                console.error('Reserve error:', err);
+            }
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            const timerEl = document.getElementById('timer-count');
+            const box = document.getElementById('timer-box');
+
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const diff = Math.max(0, Math.floor((expiresAt - now) / 1000));
+                const mins = Math.floor(diff / 60);
+                const secs = diff % 60;
+                timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+                if (diff <= 300) { // under 5 min
+                    box.classList.add('warning');
+                }
+                if (diff <= 0) {
+                    clearInterval(timerInterval);
+                    alert('Your reservation expired. Please select a new slot.');
+                    location.reload();
+                }
+            }, 1000);
+        }
+
+        // Form submit
+        document.getElementById('booking-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!selectedSlot) {
+                alert('Please select a time slot');
+                return;
+            }
+
+            const formData = {
+                time: selectedSlot,
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                instagram: document.getElementById('instagram').value
+            };
+
+            // Go to payment page with data in URL
+            const params = new URLSearchParams(formData);
+            window.location.href = '/payment?' + params.toString();
+        });
+
+        // Load on page load
+        loadSlots();
+    </script>
+</body>
+</html>

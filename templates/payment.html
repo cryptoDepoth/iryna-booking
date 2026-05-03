@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💳 Complete Your Booking | Pashynska Photography</title>
+    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📷%3C/text%3E%3C/svg%3E">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #faf8f6;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 560px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+        .header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+        .header p { color: #666; }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+        }
+        .summary {
+            background: #f8f9fa;
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .summary-row:last-child {
+            border-bottom: 2px solid #1a1a1a;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding-top: 12px;
+        }
+        .payment-box {
+            background: linear-gradient(135deg, #fff5f7 0%, #ffe4ec 100%);
+            border-radius: 16px;
+            padding: 28px;
+            margin: 24px 0;
+            text-align: center;
+            border: 2px solid #ffcdd2;
+        }
+        .payment-box h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+        }
+        .price-tag {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            font-weight: 700;
+            color: #7c3aed;
+            margin: 16px 0;
+        }
+        .email-box {
+            background: white;
+            border: 2px dashed #7c3aed;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .email-box:hover {
+            background: #f5f3ff;
+            border-style: solid;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #7c3aed;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: #6d28d9; }
+        .email-box .label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .email-box .value {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #c41e3a;
+            font-family: 'Courier New', monospace;
+        }
+        .email-box .copied {
+            color: #2e7d32;
+            font-size: 0.9rem;
+            margin-top: 8px;
+            display: none;
+        }
+        .instructions {
+            text-align: left;
+            margin: 20px 0;
+        }
+        .instructions ol {
+            padding-left: 24px;
+        }
+        .instructions li {
+            padding: 8px 0;
+            font-size: 0.95rem;
+        }
+        .timer {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 14px;
+            padding: 18px;
+            margin: 24px 0;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        .timer.warning {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .btn-primary {
+            display: block;
+            width: 100%;
+            padding: 18px;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .btn-primary:hover { background: #333; }
+        .btn-secondary {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: transparent;
+            color: #666;
+            border: 2px solid #ddd;
+            border-radius: 14px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 12px;
+            text-align: center;
+        }
+        .note {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 16px 20px;
+            border-radius: 0 10px 10px 0;
+            margin: 20px 0;
+            font-size: 0.95rem;
+        }
+        .stripe-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #635bff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-top: 12px;
+        }
+        @media (max-width: 480px) {
+            .header h1 { font-size: 1.5rem; }
+            .price-tag { font-size: 2.2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Complete Your Booking</h1>
+            <p>One step away from your mini session ✨</p>
+        </div>
+
+        <div class="card">
+            <!-- Summary -->
+            <div class="summary">
+                <div class="summary-row">
+                    <span>Session Type</span>
+                    <span>Mini Photo Session ({{ session_length }} min)</span>
+                </div>
+                <div class="summary-row">
+                    <span>Date</span>
+                    <span>{{ date }}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Time</span>
+                    <span id="time-display">{{ time }}</span>
+                </div>
+                <div class="summary-row">
+                    <span>What's Included</span>
+                    <span>15 edited photos + all originals</span>
+                </div>
+                <div class="summary-row">
+                    <span>Session Price</span>
+                    <span>$190 + GST</span>
+                </div>
+                <div class="summary-row">
+                    <span>Deposit Due Now</span>
+                    <span><strong style="color:#8b5cf6;">${{ price }} CAD</strong></span>
+                </div>
+                <div class="summary-row">
+                    <span>Balance Due at Session</span>
+                    <span>$95 + GST</span>
+                </div>
+            </div>
+
+            <!-- Timer -->
+            <div class="timer" id="timer-box">
+                ⏱️ Your slot is reserved: <strong id="timer-count">15:00</strong> remaining
+            </div>
+
+            <!-- Payment Instructions -->
+            <div class="payment-box">
+                <h3>💳 Send e-Transfer</h3>
+                <div class="price-tag">${{ price }}</div>
+                <p style="color:#666; margin-bottom:16px;">CAD — Canadian Dollars</p>
+
+                <div class="email-box" id="email-box">
+                    <button class="copy-btn" onclick="copyEmail(event)">📋 Copy</button>
+                    <div class="label">Send e-Transfer to</div>
+                    <div class="value" id="email-value">{{ email }}</div>
+                    <div class="copied" id="copied-msg">✓ Copied to clipboard!</div>
+                </div>
+
+                <div style="background:#f5f3ff; border-radius:12px; padding:20px; margin:20px 0; text-align:left;">
+                    <p style="font-weight:600; margin-bottom:12px; color:#5b21b6;">📝 Ready-to-use bank message (tap to copy):</p>
+                    <div id="bank-msg" onclick="copyBankMsg()" style="background:white; border:2px dashed #ddd; border-radius:10px; padding:16px; cursor:pointer; font-family:monospace; font-size:0.9rem; position:relative;">
+                        <button class="copy-btn" onclick="copyBankMsg(event)" style="position:absolute; top:8px; right:8px;">📋 Copy</button>
+                        Blossom Mini Session — {{ date }} {{ time }}
+                        <br>Deposit for {{ name }}
+                    </div>
+                    <p style="font-size:0.85rem; color:#666; margin-top:10px;">Paste this in the "Message" field when sending e-Transfer.</p>
+                </div>
+
+                <div class="instructions">
+                    <p style="font-weight:600; margin-bottom:12px;">How to send e-Transfer:</p>
+                    <ol>
+                        <li>Open your banking app (RBC, TD, Scotiabank, etc.)</li>
+                        <li>Select "Send Interac e-Transfer"</li>
+                        <li>Click the email box above to copy the address</li>
+                        <li>Paste it as the recipient</li>
+                        <li>Enter amount: <strong>${{ price }}.00</strong></li>
+                        <li>Add message: "Blossom Mini Session — {{ date }} {{ time }}"</li>
+                        <li>Send the transfer</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="note">
+                💡 <strong>No password needed!</strong> This is an auto-deposit enabled email. The money will arrive instantly.
+            </div>
+
+            <!-- Stripe option (future) -->
+            <div style="text-align:center; margin:20px 0;">
+                <p style="color:#888; font-size:0.9rem;">Prefer card payment?</p>
+                <div class="stripe-badge">
+                    💳 Stripe — Coming soon
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="font-family:'Playfair Display',serif; margin-bottom:16px;">✅ I've Sent the Payment</h3>
+            <p style="color:#666; margin-bottom:20px;">Once you've sent the e-Transfer, click below. I'll confirm your booking within a few minutes.</p>
+
+            <form id="confirm-form">
+                <div style="display:none;">
+                    <input type="hidden" id="time" value="{{ time }}">
+                    <input type="hidden" id="name" value="{{ name }}">
+                    <input type="hidden" id="email" value="{{ client_email }}">
+                    <input type="hidden" id="phone" value="{{ phone }}">
+                    <input type="hidden" id="instagram" value="{{ instagram }}">
+                    <input type="hidden" id="session_type" value="{{ session_type }}">
+                </div>
+
+                <button type="submit" class="btn-primary" id="confirm-btn">
+                    ✅ Yes, I've Sent $95 — Confirm My Booking
+                </button>
+            </form>
+
+            <button class="btn-secondary" onclick="window.location.href='/'">
+                ← Back to Change Time
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Hidden fields are pre-populated from Jinja; URL params override as fallback
+        const urlParams = new URLSearchParams(window.location.search);
+        ['time','name','email','phone','instagram','session_type'].forEach(k => {
+            const v = urlParams.get(k);
+            if (v) document.getElementById(k).value = v;
+        });
+
+        let timerInterval = null;
+        let expiresAt = null;
+
+        // Get timer from sessionStorage or start fresh
+        function initTimer() {
+            const saved = sessionStorage.getItem('reservationExpiry');
+            if (saved) {
+                expiresAt = new Date(saved);
+            } else {
+                expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+                sessionStorage.setItem('reservationExpiry', expiresAt.toISOString());
+            }
+            startTimer();
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            const timerEl = document.getElementById('timer-count');
+            const box = document.getElementById('timer-box');
+
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const diff = Math.max(0, Math.floor((expiresAt - now) / 1000));
+                const mins = Math.floor(diff / 60);
+                const secs = diff % 60;
+                timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+                if (diff <= 300) box.classList.add('warning');
+                if (diff <= 0) {
+                    clearInterval(timerInterval);
+                    alert('Your reservation expired. Please select a new time slot.');
+                    window.location.href = '/';
+                }
+            }, 1000);
+        }
+
+        function copyEmail(e) {
+            e && e.stopPropagation();
+            const email = document.getElementById('email-value').textContent;
+            navigator.clipboard.writeText(email).then(() => {
+                const msg = document.getElementById('copied-msg');
+                msg.style.display = 'block';
+                setTimeout(() => msg.style.display = 'none', 3000);
+            });
+        }
+
+        function copyBankMsg(e) {
+            e && e.stopPropagation();
+            const msg = "Blossom Mini Session — {{ date }} {{ time }}\nDeposit for {{ name }}";
+            navigator.clipboard.writeText(msg).then(() => {
+                const btn = e ? e.target : null;
+                if (btn) {
+                    const old = btn.textContent;
+                    btn.textContent = '✓ Copied!';
+                    setTimeout(() => btn.textContent = old, 2000);
+                }
+            });
+        }
+
+        // Confirm payment
+        document.getElementById('confirm-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('confirm-btn');
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            const data = {
+                time: document.getElementById('time').value,
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                instagram: document.getElementById('instagram').value,
+                session_type: document.getElementById('session_type').value
+            };
+
+            try {
+                const res = await fetch('/confirm', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    sessionStorage.removeItem('reservationExpiry');
+                    window.location.href = '/success?booking_id=' + result.booking_id;
+                } else {
+                    alert(result.error || 'Something went wrong');
+                    btn.disabled = false;
+                    btn.textContent = "✅ Yes, I've Sent $95 — Confirm My Booking";
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error. Please try again.');
+                btn.disabled = false;
+            }
+        });
+
+        initTimer();
+    </script>
+</body>
+</html>
