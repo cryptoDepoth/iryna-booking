@@ -13,6 +13,7 @@ import os
 import sqlite3
 import requests
 import time
+import yaml
 
 # ===== LOGGING =====
 logging.basicConfig(
@@ -104,11 +105,12 @@ NOTION_STATUS_MAP = {
 }
 
 
-def _slot_label(t):
-    """Turn '10:00' into '10:00–10:20' using SESSION_LENGTH."""
+def _slot_label(t, event=None):
+    """Turn '10:00' into '10:00–10:20' using session_length from event."""
+    sl = (event or _active).get("session_length", SESSION_LENGTH)
     try:
         start = datetime.strptime(t, "%H:%M")
-        end = start + timedelta(minutes=SESSION_LENGTH)
+        end = start + timedelta(minutes=sl)
         return f"{start.strftime('%H:%M')}–{end.strftime('%H:%M')}"
     except Exception:
         return t
@@ -245,17 +247,50 @@ def create_calendar_event_for_booking(booking_id):
         print(f"Calendar error: {e}")
         return None
 
-# ===== CONFIG =====
-EVENT_TITLE = "🪻 Blossom Mini Sessions"
-SESSION_LENGTH = 20      # minutes of actual shooting
-BREAK_LENGTH = 10        # minutes break between sessions
-SLOT_INTERVAL = 30       # total interval (20 + 10)
-SESSION_PRICE = 95       # CAD — half deposit ($190/2)
-SESSION_TOTAL = 190      # CAD — full price before GST
-EMAIL = "iryna.pashynska@gmail.com"
-DATE = "2026-05-03"      # TODAY — May 3 Blossom Mini Session
-START_TIME = "10:00"
-END_TIME = "16:00"
+# ===== EVENTS CONFIG (YAML) =====
+_EVENTS_PATH = os.path.join(os.path.dirname(__file__), "events.yaml")
+
+def _load_events():
+    """Load events from YAML, return list of event dicts."""
+    with open(_EVENTS_PATH, "r") as f:
+        data = yaml.safe_load(f)
+    return data.get("events", []), data.get("settings", {})
+
+EVENTS, SETTINGS = _load_events()
+
+def get_active_event():
+    """Return the first active event, or None."""
+    for ev in EVENTS:
+        if ev.get("status") == "active":
+            return ev
+    return EVENTS[0] if EVENTS else None
+
+def get_event_by_date(date_str):
+    """Find an event by its date."""
+    for ev in EVENTS:
+        if ev["date"] == date_str:
+            return ev
+    return None
+
+def get_event_by_id(event_id):
+    """Find an event by its id."""
+    for ev in EVENTS:
+        if ev["id"] == event_id:
+            return ev
+    return None
+
+# Convenience accessors (backward-compatible)
+_active = get_active_event() or {}
+EVENT_TITLE = _active.get("title", "Mini Sessions")
+SESSION_LENGTH = _active.get("session_length", 20)
+BREAK_LENGTH = _active.get("break_length", 10)
+SLOT_INTERVAL = _active.get("slot_interval", 30)
+SESSION_PRICE = _active.get("deposit", 95)
+SESSION_TOTAL = _active.get("full_price", 190)
+EMAIL = SETTINGS.get("photographer_email", "")
+DATE = _active.get("date", "")
+START_TIME = _active.get("start_time", "10:00")
+END_TIME = _active.get("end_time", "16:00")
 
 # ===== DATABASE =====
 DB_PATH = os.path.join(os.path.dirname(__file__), "bookings.db")
@@ -289,6 +324,7 @@ def init_db():
         ("notion_page_id",      "ALTER TABLE bookings ADD COLUMN notion_page_id TEXT"),
         ("calendar_event_id",   "ALTER TABLE bookings ADD COLUMN calendar_event_id TEXT"),
         ("calendar_event_url",  "ALTER TABLE bookings ADD COLUMN calendar_event_url TEXT"),
+        ("event_id",            "ALTER TABLE bookings ADD COLUMN event_id TEXT"),
     ]:
         try:
             c.execute(ddl)
@@ -347,21 +383,27 @@ def expire_reservations():
     conn.close()
     return expired_count
 
-# Generate time slots with breaks
-def generate_slots():
+# Generate time slots for a specific event
+def generate_slots(event=None):
+    """Generate time slots based on event config."""
+    ev = event or _active
+    if not ev:
+        return []
+    start = datetime.strptime(ev.get("start_time", START_TIME), "%H:%M")
+    end = datetime.strptime(ev.get("end_time", END_TIME), "%H:%M")
+    interval = ev.get("slot_interval", SLOT_INTERVAL)
+    sl = ev.get("session_length", SESSION_LENGTH)
     slots = []
-    start = datetime.strptime(START_TIME, "%H:%M")
-    end = datetime.strptime(END_TIME, "%H:%M")
     current = start
     while current < end:
         slot_str = current.strftime("%H:%M")
-        session_end = current + timedelta(minutes=SESSION_LENGTH)
+        session_end = current + timedelta(minutes=sl)
         slots.append({
             "time": slot_str,
             "label": f"{slot_str} – {session_end.strftime('%H:%M')}",
             "reserved_until": None
         })
-        current += timedelta(minutes=SLOT_INTERVAL)
+        current += timedelta(minutes=interval)
     return slots
 
 SLOTS = generate_slots()
@@ -370,31 +412,61 @@ SLOTS = generate_slots()
 
 @app.route("/")
 def index():
+    """Landing page — shows the active event or event list."""
+    event_id = request.args.get("event")
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    if not ev:
+        return "No events available", 404
+    slots = generate_slots(ev)
     return render_template("index.html",
-        title=EVENT_TITLE,
-        date=DATE,
-        price=SESSION_PRICE,
-        total=SESSION_TOTAL,
+        title=ev.get("title", EVENT_TITLE),
+        date=ev["date"],
+        price=ev.get("deposit", SESSION_PRICE),
+        total=ev.get("full_price", SESSION_TOTAL),
         email=EMAIL,
-        session_length=SESSION_LENGTH,
-        break_length=BREAK_LENGTH,
-        slots=SLOTS
+        session_length=ev.get("session_length", SESSION_LENGTH),
+        break_length=ev.get("break_length", BREAK_LENGTH),
+        event_id=ev["id"],
+        subtitle=ev.get("subtitle", ""),
+        location=ev.get("location", ""),
+        included=ev.get("included", []),
+        slots=slots
     )
+
+@app.route("/events")
+def list_events():
+    """API: list all events with status."""
+    result = []
+    for ev in EVENTS:
+        if ev.get("status") in ("active", "upcoming"):
+            result.append({
+                "id": ev["id"],
+                "title": ev.get("title", ""),
+                "subtitle": ev.get("subtitle", ""),
+                "date": ev["date"],
+                "start_time": ev.get("start_time", ""),
+                "end_time": ev.get("end_time", ""),
+                "deposit": ev.get("deposit", SESSION_PRICE),
+                "full_price": ev.get("full_price", SESSION_TOTAL),
+                "status": ev.get("status", ""),
+            })
+    return jsonify({"events": result})
 
 @app.route("/slots/<date_str>")
 def get_slots(date_str):
-    if date_str != DATE:
-        return jsonify({"slots": [], "message": "Only May 3 available"})
+    ev = get_event_by_date(date_str)
+    if not ev:
+        return jsonify({"slots": [], "message": f"No event on {date_str}"})
     
+    slots = generate_slots(ev)
     now = datetime.now()
     conn = db_conn()
     c = conn.cursor()
     
     available_slots = []
-    for slot in SLOTS:
-        # Check if confirmed booking exists
-        c.execute("SELECT * FROM bookings WHERE date=? AND time=? AND (confirmed=1 OR reserved_until > ?)", 
-                  (DATE, slot["time"], now.isoformat()))
+    for slot in slots:
+        c.execute("SELECT * FROM bookings WHERE date=? AND time=? AND (confirmed=1 OR reserved_until > ?)",
+                  (ev["date"], slot["time"], now.isoformat()))
         existing = c.fetchone()
         
         if not existing:
@@ -407,8 +479,10 @@ def get_slots(date_str):
     
     return jsonify({
         "date": date_str,
+        "event_id": ev["id"],
+        "event_title": ev.get("title", ""),
         "slots": available_slots,
-        "total": len(SLOTS),
+        "total": len(slots),
         "available": len(available_slots)
     })
 
@@ -416,6 +490,7 @@ def get_slots(date_str):
 def reserve_slot():
     data = request.json or {}
     slot_time = data.get("time")
+    event_id = data.get("event_id") or data.get("date")  # accept either
     client_name = data.get("name", "")
     client_email = data.get("email", "")
     client_phone = data.get("phone", "")
@@ -424,6 +499,12 @@ def reserve_slot():
 
     if not slot_time:
         return jsonify({"success": False, "error": "No time slot specified"}), 400
+
+    # Resolve event
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    if not ev:
+        return jsonify({"success": False, "error": "Event not found"}), 404
+    event_date = ev["date"]
 
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     if isinstance(ip, str) and ',' in ip:
@@ -448,19 +529,17 @@ def reserve_slot():
         SELECT id FROM bookings
         WHERE date=? AND time=?
           AND (confirmed=1 OR reserved_until > ?)
-    """, (DATE, slot_time, now.isoformat()))
+    """, (event_date, slot_time, now.isoformat()))
     if c.fetchone():
         conn.rollback()
         conn.close()
         return jsonify({"success": False, "error": "Slot is no longer available"})
 
-    # INSERT OR IGNORE so a duplicate constraint never silently overwrites another
-    # reservation that slipped in between the check and here (belt-and-suspenders).
     c.execute("""
         INSERT OR IGNORE INTO bookings
-            (date, time, name, email, phone, instagram, session_type, status, reserved_until)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?)
-    """, (DATE, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat()))
+            (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?)
+    """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"]))
 
     if c.rowcount == 0:
         conn.rollback()
@@ -474,7 +553,8 @@ def reserve_slot():
     # Notify photographer via Telegram
     _notify_admin(f"🆕 New reservation #{booking_id}\n"
                   f"👤 {client_name or '(no name)'}\n"
-                  f"📅 {DATE} @ {slot_time}\n"
+                  f"📅 {event_date} @ {slot_time}\n"
+                  f"🎉 {ev.get('title', '')}\n"
                   f"📧 {client_email}\n"
                   f"📸 @{client_ig or 'N/A'}\n"
                   f"🏷️ {session_type or 'N/A'}\n"
@@ -483,6 +563,7 @@ def reserve_slot():
     return jsonify({
         "success": True,
         "booking_id": booking_id,
+        "event_id": ev["id"],
         "expires_at": expires.isoformat(),
         "message": f"Reserved for 15 minutes. Complete payment before {expires.strftime('%H:%M')}."
     })
@@ -490,8 +571,10 @@ def reserve_slot():
 @app.route("/payment")
 def payment():
     time = request.args.get("time")
+    event_id = request.args.get("event_id")
     if not time:
         return redirect(url_for("index"))
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
     return render_template("payment.html",
         time=time,
         name=request.args.get("name", ""),
@@ -499,10 +582,11 @@ def payment():
         phone=request.args.get("phone", ""),
         instagram=request.args.get("instagram", ""),
         session_type=request.args.get("session_type", ""),
-        date=DATE,
-        price=SESSION_PRICE,
+        date=ev["date"] if ev else DATE,
+        price=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
         email=EMAIL,
-        session_length=SESSION_LENGTH
+        session_length=ev.get("session_length", SESSION_LENGTH) if ev else SESSION_LENGTH,
+        event_id=ev["id"] if ev else ""
     )
 
 
@@ -517,19 +601,23 @@ def expired_endpoint():
 def confirm_payment():
     data = request.json
     time = data.get("time")
+    event_id = data.get("event_id")
     client_name = data.get("name", "")
     client_email = data.get("email", "")
     client_phone = data.get("phone", "")
     client_ig = data.get("instagram", "")
     session_type = data.get("session_type", "")
+
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    event_date = ev["date"] if ev else DATE
     
     conn = db_conn()
     c = conn.cursor()
     
     # Update or insert booking as pending
     c.execute('''
-        INSERT INTO bookings (date, time, name, email, phone, instagram, session_type, status, reserved_until)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?)
+        INSERT INTO bookings (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?)
         ON CONFLICT(date, time) DO UPDATE SET
             name=excluded.name,
             email=excluded.email,
@@ -537,13 +625,14 @@ def confirm_payment():
             instagram=excluded.instagram,
             session_type=excluded.session_type,
             status='pending_payment',
-            reserved_until=excluded.reserved_until
-    ''', (DATE, time, client_name, client_email, client_phone, client_ig, session_type,
-          (datetime.now() + timedelta(minutes=15)).isoformat()))
+            reserved_until=excluded.reserved_until,
+            event_id=excluded.event_id
+    ''', (event_date, time, client_name, client_email, client_phone, client_ig, session_type,
+          (datetime.now() + timedelta(minutes=15)).isoformat(), ev["id"] if ev else None))
     conn.commit()
     
     # Get booking ID
-    c.execute("SELECT id FROM bookings WHERE date=? AND time=?", (DATE, time))
+    c.execute("SELECT id FROM bookings WHERE date=? AND time=?", (event_date, time))
     row = c.fetchone()
     booking_id = row["id"] if row else None
     conn.close()
@@ -555,7 +644,8 @@ def confirm_payment():
     # Notify photographer
     _notify_admin(f"💰 Payment submitted for #{booking_id}\n"
                   f"👤 {client_name}\n"
-                  f"📅 {DATE} @ {time}\n"
+                  f"📅 {event_date} @ {time}\n"
+                  f"🎉 {ev.get('title', '') if ev else ''}\n"
                   f"📧 {client_email}\n"
                   f"📸 @{client_ig or 'N/A'}\n"
                   f"🏷️ {session_type or 'N/A'}\n"
@@ -581,10 +671,11 @@ def success():
         if row:
             booking = dict(row)
         conn.close()
+    ev = get_event_by_id(booking["event_id"]) if booking and booking.get("event_id") else get_active_event()
     return render_template("success.html",
         email=EMAIL,
-        date=DATE,
-        price=SESSION_PRICE,
+        date=ev["date"] if ev else DATE,
+        price=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
         booking=booking
     )
 

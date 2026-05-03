@@ -284,8 +284,8 @@
     <div class="container">
         <div class="header">
             <h1>{{ title }}</h1>
-            <p class="subtitle">Capture your family's most beautiful season</p>
-            <p class="date">📅 {{ date }} &nbsp;|&nbsp; 🕐 {{ session_length }} minutes &nbsp;|&nbsp; 📍 Calgary</p>
+            <p class="subtitle">{{ subtitle or "Capture your family's most beautiful season" }}</p>
+            <p class="date">📅 {{ date }} &nbsp;|&nbsp; 🕐 {{ session_length }} minutes &nbsp;|&nbsp; 📍 {{ location or "Calgary" }}</p>
         </div>
 
         <!-- Friendly greeting from photographer -->
@@ -381,6 +381,7 @@
         let selectedSlot = null;
         let timerInterval = null;
         let expiresAt = null;
+        const EVENT_ID = "{{ event_id }}";
 
         // Load slots
         async function loadSlots() {
@@ -434,6 +435,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         time: time,
+                        event_id: EVENT_ID,
                         name: document.getElementById('name').value,
                         email: document.getElementById('email').value,
                         phone: document.getElementById('phone').value,
@@ -488,6 +490,7 @@
 
             const formData = {
                 time: selectedSlot,
+                event_id: EVENT_ID,
                 name: document.getElementById('name').value,
                 email: document.getElementById('email').value,
                 phone: document.getElementById('phone').value,

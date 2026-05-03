@@ -306,6 +306,7 @@
                     <input type="hidden" id="phone" value="{{ phone }}">
                     <input type="hidden" id="instagram" value="{{ instagram }}">
                     <input type="hidden" id="session_type" value="{{ session_type }}">
+                    <input type="hidden" id="event_id" value="{{ event_id }}">
                 </div>
 
                 <button type="submit" class="btn-primary" id="confirm-btn">
@@ -322,7 +323,7 @@
     <script>
         // Hidden fields are pre-populated from Jinja; URL params override as fallback
         const urlParams = new URLSearchParams(window.location.search);
-        ['time','name','email','phone','instagram','session_type'].forEach(k => {
+        ['time','name','email','phone','instagram','session_type','event_id'].forEach(k => {
             const v = urlParams.get(k);
             if (v) document.getElementById(k).value = v;
         });
@@ -395,6 +396,7 @@
 
             const data = {
                 time: document.getElementById('time').value,
+                event_id: document.getElementById('event_id').value,
                 name: document.getElementById('name').value,
                 email: document.getElementById('email').value,
                 phone: document.getElementById('phone').value,
