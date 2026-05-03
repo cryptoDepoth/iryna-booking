@@ -39,60 +39,167 @@ def serve_image(filename):
 
 # ===== NOTION CONFIG =====
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY", "")
-NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "355510b9-cc5b-818c-aec6-d764f116e2b2")
+# New Bookings v2 database (improved schema, Status field, Calendar Event link, etc.)
+NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "d722613f-a8b5-438f-bcf0-0ef9f84c3d78")
 NOTION_HEADERS = {
     "Authorization": f"Bearer {NOTION_API_KEY}",
-    "Notion-Version": "2022-06-28",  # stable version
+    "Notion-Version": "2022-06-28",
     "Content-Type": "application/json"
 }
 
-def sync_to_notion(booking_id):
-    """Sync a single booking to Notion"""
+# Map internal SQLite status → Notion select option
+NOTION_STATUS_MAP = {
+    "reserved": "Reserved",
+    "pending": "Pending Payment",
+    "pending_payment": "Pending Payment",
+    "underpaid": "Underpaid",
+    "confirmed": "Confirmed",
+    "completed": "Completed",
+    "expired": "Expired",
+    "cancelled": "Cancelled",
+}
+
+
+def _slot_label(t):
+    """Turn '10:00' into '10:00–10:20' using SESSION_LENGTH."""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
+        start = datetime.strptime(t, "%H:%M")
+        end = start + timedelta(minutes=SESSION_LENGTH)
+        return f"{start.strftime('%H:%M')}–{end.strftime('%H:%M')}"
+    except Exception:
+        return t
+
+
+def sync_to_notion(booking_id):
+    """Sync a single SQLite booking to the Bookings v2 Notion DB.
+    Stores the Notion page_id back in SQLite so subsequent calls patch in place."""
+    if not NOTION_API_KEY:
+        return  # silently skip when no key configured
+    try:
+        conn = db_conn()
         c = conn.cursor()
         c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
         row = c.fetchone()
-        conn.close()
         if not row:
+            conn.close()
             return
         booking = dict(row)
-        
-        status_map = {"reserved": "Reserved", "pending": "Pending Payment", "pending_payment": "Awaiting Payment", "confirmed": "Confirmed", "expired": "Expired"}
-        status = "Confirmed" if booking["confirmed"] else status_map.get(booking["status"], "Pending Payment")
-        
-        properties = {
-            "Name": {"title": [{"text": {"content": booking["name"] or "(no name)"}}]},
-            "Date": {"date": {"start": booking["date"]}},
-            "Time": {"rich_text": [{"text": {"content": booking["time"]}}]},
-            "Status": {"select": {"name": status}},
-            "Instagram": {"rich_text": [{"text": {"content": booking.get("instagram","") or ""}}]},
-            "Email": {"email": booking["email"] or None},
-            "Phone": {"phone_number": booking["phone"] or None},
-            "Session Type": {"rich_text": [{"text": {"content": booking.get("session_type","") or ""}}]},
-            "Amount": {"number": booking.get("paid_amount") or SESSION_PRICE},
-            "Paid": {"checkbox": bool(booking["paid"])},
-            "Booking ID": {"number": booking["id"]},
-        }
-        
-        # Check if already exists
-        query_url = f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query"
-        q = requests.post(query_url, headers=NOTION_HEADERS, json={
-            "filter": {"property": "Booking ID", "number": {"equals": booking["id"]}}
-        }).json()
-        
-        if q.get("results"):
-            page_id = q["results"][0]["id"]
-            requests.patch(f"https://api.notion.com/v1/pages/{page_id}",
-                          headers=NOTION_HEADERS, json={"properties": properties})
+
+        if booking["confirmed"]:
+            status_name = "Confirmed"
         else:
-            requests.post("https://api.notion.com/v1/pages", headers=NOTION_HEADERS, json={
-                "parent": {"database_id": NOTION_DATABASE_ID},
-                "properties": properties
-            })
+            status_name = NOTION_STATUS_MAP.get(booking["status"], "Pending Payment")
+
+        properties = {
+            "Client Name": {"title": [{"text": {"content": booking["name"] or "(awaiting details)"}}]},
+            "Status": {"select": {"name": status_name}},
+            "Date": {"date": {"start": booking["date"]}},
+            "Time Slot": {"rich_text": [{"text": {"content": _slot_label(booking["time"])}}]},
+            "Instagram": {"rich_text": [{"text": {"content": booking.get("instagram") or ""}}]},
+            "Deposit (CAD)": {"number": booking.get("paid_amount") or SESSION_PRICE},
+            "Total (CAD)": {"number": SESSION_TOTAL},
+            "Paid": {"checkbox": bool(booking["paid"])},
+            "Booking ID (legacy)": {"number": booking["id"]},
+        }
+        # Notion rejects empty strings for email/phone — only set when present
+        if booking.get("email"):
+            properties["Email"] = {"email": booking["email"]}
+        if booking.get("phone"):
+            properties["Phone"] = {"phone_number": booking["phone"]}
+        if booking.get("session_type"):
+            properties["Session Type"] = {"select": {"name": booking["session_type"]}}
+        if booking.get("paid"):
+            properties["Payment Method"] = {"select": {"name": "e-Transfer"}}
+        if booking.get("calendar_event_url"):
+            properties["Calendar Event"] = {"url": booking["calendar_event_url"]}
+        if booking.get("reserved_until"):
+            properties["Reserved Until"] = {"date": {"start": booking["reserved_until"]}}
+
+        page_id = booking.get("notion_page_id")
+        if page_id:
+            r = requests.patch(f"https://api.notion.com/v1/pages/{page_id}",
+                               headers=NOTION_HEADERS,
+                               json={"properties": properties}, timeout=15)
+            if r.status_code >= 400:
+                print(f"Notion patch failed ({r.status_code}): {r.text[:200]}")
+        else:
+            r = requests.post("https://api.notion.com/v1/pages",
+                              headers=NOTION_HEADERS,
+                              json={"parent": {"database_id": NOTION_DATABASE_ID},
+                                    "properties": properties}, timeout=15)
+            if r.status_code < 300:
+                page_id = r.json().get("id")
+                c.execute("UPDATE bookings SET notion_page_id=? WHERE id=?", (page_id, booking_id))
+                conn.commit()
+            else:
+                print(f"Notion create failed ({r.status_code}): {r.text[:200]}")
+        conn.close()
     except Exception as e:
         print(f"Notion sync error: {e}")
+
+
+# ===== GOOGLE CALENDAR CONFIG =====
+CALENDAR_ID = os.environ.get("BOOKING_CALENDAR_ID", "iryna.pashynska@gmail.com")
+CALENDAR_TZ = os.environ.get("BOOKING_CALENDAR_TZ", "America/Edmonton")
+# Filled in by run-calendar-helper.py via env at runtime; left empty here so import never fails
+_calendar_helper = None  # type: ignore
+
+
+def create_calendar_event_for_booking(booking_id):
+    """Create a Google Calendar event by shelling out to the GCal MCP helper script.
+    Stored event URL goes back into SQLite so Notion can render the link.
+    Falls back gracefully if no helper is configured."""
+    helper = os.environ.get("GCAL_HELPER")  # path to a CLI that wraps create_event
+    if not helper:
+        return None
+    try:
+        conn = db_conn()
+        c = conn.cursor()
+        c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return None
+        b = dict(row)
+
+        start_dt = datetime.strptime(f"{b['date']} {b['time']}", "%Y-%m-%d %H:%M")
+        end_dt = start_dt + timedelta(minutes=SESSION_LENGTH)
+        summary = f"📸 {b['name'] or 'Mini Session'} — {EVENT_TITLE}"
+        description = (
+            f"Mini Photo Session ({SESSION_LENGTH} min)\n"
+            f"Client: {b['name']}\n"
+            f"Phone: {b['phone']}\n"
+            f"Email: {b['email']}\n"
+            f"Instagram: {b.get('instagram') or ''}\n"
+            f"Session type: {b.get('session_type') or ''}\n"
+            f"Booking #{b['id']}"
+        )
+        import subprocess as _sp
+        result = _sp.run(
+            [helper, "create",
+             "--calendar", CALENDAR_ID,
+             "--summary", summary,
+             "--start", start_dt.isoformat(),
+             "--end", end_dt.isoformat(),
+             "--tz", CALENDAR_TZ,
+             "--description", description],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            print(f"GCal helper failed: {result.stderr[:200]}")
+            conn.close()
+            return None
+        out = json.loads(result.stdout.strip())
+        event_id = out.get("id")
+        event_url = out.get("htmlLink") or out.get("url")
+        c.execute("UPDATE bookings SET calendar_event_id=?, calendar_event_url=? WHERE id=?",
+                  (event_id, event_url, booking_id))
+        conn.commit()
+        conn.close()
+        return event_url
+    except Exception as e:
+        print(f"Calendar error: {e}")
+        return None
 
 # ===== CONFIG =====
 EVENT_TITLE = "🪻 Blossom Mini Sessions"
@@ -132,12 +239,17 @@ def init_db():
             UNIQUE(date, time)
         )
     ''')
-    # Migrate: add paid_amount if missing (for existing databases)
-    try:
-        c.execute("ALTER TABLE bookings ADD COLUMN paid_amount REAL DEFAULT NULL")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass  # column already exists
+    # Lightweight migrations for columns added over time.
+    for col, ddl in [
+        ("paid_amount",         "ALTER TABLE bookings ADD COLUMN paid_amount REAL"),
+        ("notion_page_id",      "ALTER TABLE bookings ADD COLUMN notion_page_id TEXT"),
+        ("calendar_event_id",   "ALTER TABLE bookings ADD COLUMN calendar_event_id TEXT"),
+        ("calendar_event_url",  "ALTER TABLE bookings ADD COLUMN calendar_event_url TEXT"),
+    ]:
+        try:
+            c.execute(ddl)
+        except sqlite3.OperationalError:
+            pass  # column already exists
     conn.commit()
     conn.close()
 
@@ -402,16 +514,19 @@ def admin():
 def admin_confirm():
     data = request.json
     booking_id = data.get("booking_id")
+    paid_amount = data.get("paid_amount") or SESSION_PRICE
     conn = db_conn()
     c = conn.cursor()
-    c.execute("UPDATE bookings SET confirmed=1, paid=1, status='confirmed' WHERE id=?", (booking_id,))
+    c.execute("UPDATE bookings SET confirmed=1, paid=1, status='confirmed', paid_amount=? WHERE id=?",
+              (paid_amount, booking_id))
     conn.commit()
     conn.close()
-    
-    # Sync to Notion
+
+    # Side-effects: GCal event first (so Notion can include the link), then Notion
+    event_url = create_calendar_event_for_booking(booking_id)
     sync_to_notion(booking_id)
-    
-    return jsonify({"success": True})
+
+    return jsonify({"success": True, "calendar_event": event_url})
 
 # ===== RUN =====
 if __name__ == "__main__":
