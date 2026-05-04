@@ -802,23 +802,22 @@ def success():
 @app.route("/admin")
 @admin_required
 def admin():
-    """Simple admin view of all bookings"""
+    """Admin dashboard — HTML view with Confirm/Cancel buttons."""
     conn = db_conn()
     c = conn.cursor()
-    c.execute("SELECT * FROM bookings ORDER BY created_at DESC")
+    c.execute("SELECT * FROM bookings ORDER BY date DESC, time ASC")
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
-    
-    return jsonify({
-        "bookings": rows,
+
+    stats = {
         "total": len(rows),
-        "confirmed": sum(1 for b in rows if b["confirmed"]),
-        "pending": sum(1 for b in rows if not b["confirmed"] and b["status"] in ("pending", "pending_payment")),
-        "reserved": sum(1 for b in rows if b["status"] == "reserved"),
+        "confirmed": sum(1 for b in rows if b["status"] == "confirmed"),
+        "pending": sum(1 for b in rows if b["status"] in ("pending_payment", "reserved")),
+        "cancelled": sum(1 for b in rows if b["status"] == "cancelled"),
         "expired": sum(1 for b in rows if b["status"] == "expired"),
-        "total_expected": sum(SESSION_PRICE for b in rows if b["date"] == DATE and b["status"] not in ("expired", "cancelled")),
-        "total_paid": sum(b.get("paid_amount", 0) or 0 for b in rows)
-    })
+        "total_expected": sum(b.get("paid_amount", 0) or 0 for b in rows if b["status"] == "confirmed"),
+    }
+    return render_template("admin.html", bookings=rows, stats=stats, admin_key=request.headers.get("X-Admin-Key", ""))
 
 @app.route("/admin/confirm", methods=["POST"])
 @admin_required

@@ -1,127 +1,365 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin · Pashynska Booking</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Inter',sans-serif; background:#fafafa; color:#1a1a1a; padding:24px; }
-  h1 { font-size:1.6rem; margin-bottom:6px; }
-  .muted { color:#888; font-size:0.9rem; }
-  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:20px 0; }
-  .stat { background:white; border-radius:12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.05); }
-  .stat .v { font-size:1.8rem; font-weight:600; color:#d97a8a; }
-  .stat .l { font-size:0.85rem; color:#666; text-transform:uppercase; letter-spacing:0.5px; }
-  table { width:100%; background:white; border-radius:12px; border-collapse:collapse; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.05); }
-  th, td { text-align:left; padding:10px 14px; font-size:0.92rem; border-bottom:1px solid #f0f0f0; }
-  th { background:#f7f0ee; font-weight:600; }
-  tr:last-child td { border-bottom:none; }
-  .badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.78rem; font-weight:500; }
-  .b-confirmed { background:#dcfce7; color:#166534; }
-  .b-pending_payment, .b-pending { background:#fef3c7; color:#92400e; }
-  .b-reserved { background:#fef9c3; color:#854d0e; }
-  .b-cancelled, .b-expired { background:#f3f4f6; color:#6b7280; }
-  button { font-family:inherit; padding:6px 12px; border-radius:8px; border:1px solid #ddd; background:white; cursor:pointer; font-size:0.85rem; }
-  button:hover { border-color:#d97a8a; color:#d97a8a; }
-  button.confirm { background:#d97a8a; color:white; border-color:#d97a8a; }
-  button.confirm:hover { background:#c5687a; color:white; }
-  details { background:white; border-radius:12px; padding:16px 20px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,0.05); }
-  details summary { cursor:pointer; font-weight:600; font-size:1.05rem; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:16px; }
-  .grid label { display:block; font-size:0.82rem; color:#666; margin-bottom:4px; }
-  .grid input { width:100%; padding:8px 10px; border:1px solid #ddd; border-radius:8px; font-size:0.92rem; font-family:inherit; }
-  .save-btn { margin-top:14px; background:#1a1a1a; color:white; border:none; padding:10px 18px; }
-  .save-btn:hover { background:#333; color:white; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 Admin | Pashynska Photography</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #faf8f6;
+            color: #2a1f1f;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+        .header p { color: #888; }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+        }
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #d97a8a;
+            font-family: 'Playfair Display', serif;
+        }
+        .stat-card .label {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .filters button {
+            padding: 8px 18px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .filters button.active {
+            background: #d97a8a;
+            border-color: #d97a8a;
+            color: white;
+        }
+        .filters button:hover:not(.active) {
+            border-color: #d97a8a;
+            color: #d97a8a;
+        }
+        .filters input {
+            padding: 8px 14px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        /* Table */
+        .table-wrap {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th {
+            background: #fdf6f3;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            border-bottom: 2px solid #f0e6e0;
+        }
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f5f5f5;
+            vertical-align: middle;
+        }
+        tr:hover td { background: #fdf9f7; }
+        tr.pending-row td { background: #fffbeb; }
+        tr.confirmed-row td { background: #f0fdf4; }
+        tr.cancelled-row td { background: #fef2f2; opacity: 0.7; }
+
+        /* Status badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-reserved { background: #fef3c7; color: #92400e; }
+        .badge-pending { background: #fffbeb; color: #b45309; }
+        .badge-confirmed { background: #dcfce7; color: #166534; }
+        .badge-cancelled { background: #fee2e2; color: #991b1b; }
+        .badge-expired { background: #f3f4f6; color: #4b5563; }
+
+        /* Buttons in table */
+        .btn-sm {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .btn-confirm {
+            background: #16a34a;
+            color: white;
+        }
+        .btn-confirm:hover { background: #15803d; }
+        .btn-cancel {
+            background: #dc2626;
+            color: white;
+            margin-left: 6px;
+        }
+        .btn-cancel:hover { background: #b91c1c; }
+        .btn-done {
+            background: #e5e7eb;
+            color: #6b7280;
+            cursor: default;
+        }
+
+        /* Auto-confirm note */
+        .note-box {
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .note-box strong { color: #0369a1; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container { padding: 20px 16px; }
+            th, td { padding: 10px 12px; font-size: 0.8rem; }
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .filters input { width: 100%; }
+            table { display: block; overflow-x: auto; }
+        }
+    </style>
 </head>
 <body>
-  <h1>📊 Admin Dashboard</h1>
-  <p class="muted">Active event: <strong>{{ event.title }}</strong> · {{ event.date }} · {{ event.start_time }}–{{ event.end_time }} · ${{ event.deposit_due|money }} {{ event.currency }} deposit · ${{ event.total_with_tax|money }} total incl. {{ event.tax_label }}</p>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Booking Admin</h1>
+            <p>Pashynska Photography — Manage all sessions</p>
+        </div>
 
-  <div class="stats">
-    <div class="stat"><div class="v">{{ stats.total }}</div><div class="l">Total</div></div>
-    <div class="stat"><div class="v">{{ stats.confirmed }}</div><div class="l">Confirmed</div></div>
-    <div class="stat"><div class="v">{{ stats.pending }}</div><div class="l">Pending</div></div>
-    <div class="stat"><div class="v">{{ stats.reserved }}</div><div class="l">Reserved</div></div>
-    <div class="stat"><div class="v">${{ '%.0f'|format(stats.total_paid) }}</div><div class="l">Paid (CAD)</div></div>
-  </div>
+        <div class="note-box">
+            <strong>💡 How confirmation works:</strong><br>
+            <strong>Option 1 — Automatic:</strong> Himalaya checks emails from <code>notify@payments.interac.ca</code> every minute. When e-Transfer arrives → auto-confirms.<br>
+            <strong>Option 2 — Manual:</strong> Click "Confirm" below if you already received payment (cash, other method, or e-Transfer before auto-check).
+            <strong>Manual confirmation has priority.</strong>
+        </div>
 
-  <details>
-    <summary>⚙️ Edit event (date, price, hours, location)</summary>
-    <p class="muted" style="margin-top:8px;">Changes apply immediately to the public booking page. Use this to reuse the system for your next session — no code changes needed.</p>
-    <form id="event-form" class="grid">
-      <div><label>Title</label><input name="title" value="{{ event.title }}"></div>
-      <div><label>Date (YYYY-MM-DD)</label><input name="date" value="{{ event.date }}"></div>
-      <div><label>Start time</label><input name="start_time" value="{{ event.start_time }}"></div>
-      <div><label>End time</label><input name="end_time" value="{{ event.end_time }}"></div>
-      <div><label>Session length (min)</label><input name="session_length" value="{{ event.session_length }}"></div>
-      <div><label>Slot interval (min)</label><input name="slot_interval" value="{{ event.slot_interval }}"></div>
-      <div><label>Deposit now (CAD)</label><input name="deposit" value="{{ event.deposit }}"></div>
-      <div><label>Total price before GST (CAD)</label><input name="total" value="{{ event.total }}"></div>
-      <div><label>GST rate (Alberta)</label><input name="tax_rate" value="{{ event.tax_rate }}"></div>
-      <div><label>Tax label</label><input name="tax_label" value="{{ event.tax_label }}"></div>
-      <div><label>e-Transfer email</label><input name="etransfer_email" value="{{ event.etransfer_email }}"></div>
-      <div><label>Location</label><input name="location" value="{{ event.location }}"></div>
-      <div style="grid-column:1/-1;"><label>Subtitle</label><input name="subtitle" value="{{ event.subtitle }}"></div>
-    </form>
-    <button class="save-btn" onclick="saveEvent()">Save event config</button>
-    <span id="event-saved" style="margin-left:12px; color:#166534; display:none;">✓ Saved</span>
-  </details>
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="number">{{ stats.total }}</div>
+                <div class="label">Total</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ stats.confirmed }}</div>
+                <div class="label">Confirmed</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ stats.pending }}</div>
+                <div class="label">Pending</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">${{ "%.0f"|format(stats.total_expected) }}</div>
+                <div class="label">Revenue</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ stats.cancelled }}</div>
+                <div class="label">Cancelled</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ stats.expired }}</div>
+                <div class="label">Expired</div>
+            </div>
+        </div>
 
-  <table>
-    <thead><tr>
-      <th>#</th><th>Date</th><th>Time</th><th>Name</th><th>Email</th><th>Phone</th>
-      <th>IG</th><th>Status</th><th>Paid</th><th>Actions</th>
-    </tr></thead>
-    <tbody>
-      {% for b in bookings %}
-      <tr>
-        <td>{{ b.id }}</td>
-        <td>{{ b.date }}</td>
-        <td>{{ b.time }}</td>
-        <td>{{ b.name or '—' }}</td>
-        <td>{{ b.email or '—' }}</td>
-        <td>{{ b.phone or '—' }}</td>
-        <td>{{ b.instagram or '—' }}</td>
-        <td><span class="badge b-{{ b.status }}">{{ b.status }}</span></td>
-        <td>{% if b.paid %}${{ '%.0f'|format(b.paid_amount or 0) }}{% else %}—{% endif %}</td>
-        <td>
-          {% if not b.confirmed %}
-            <button class="confirm" onclick="confirmBooking({{ b.id }})">Confirm</button>
-          {% endif %}
-          {% if b.status != 'cancelled' %}
-            <button onclick="cancelBooking({{ b.id }})">Cancel</button>
-          {% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="10" style="text-align:center; color:#888; padding:30px;">No bookings yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        <!-- Filters -->
+        <div class="filters">
+            <button class="active" onclick="filterRows('all')">All</button>
+            <button onclick="filterRows('pending')">⏳ Pending</button>
+            <button onclick="filterRows('confirmed')">✅ Confirmed</button>
+            <button onclick="filterRows('cancelled')">❌ Cancelled</button>
+            <input type="text" id="search" placeholder="🔍 Search by name, email, Instagram..." oninput="searchRows(this.value)">
+        </div>
 
-<script>
-async function confirmBooking(id) {
-  if (!confirm('Confirm booking #' + id + '?')) return;
-  const r = await fetch('/admin/confirm', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({booking_id:id}) });
-  if (r.ok) location.reload(); else alert('Failed: ' + (await r.text()));
-}
-async function cancelBooking(id) {
-  if (!confirm('Cancel booking #' + id + '? The slot will become bookable again.')) return;
-  const r = await fetch('/admin/cancel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({booking_id:id}) });
-  if (r.ok) location.reload(); else alert('Failed: ' + (await r.text()));
-}
-async function saveEvent() {
-  const fd = new FormData(document.getElementById('event-form'));
-  const data = Object.fromEntries(fd.entries());
-  const r = await fetch('/admin/event', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
-  if (r.ok) {
-    document.getElementById('event-saved').style.display = 'inline';
-    setTimeout(() => location.reload(), 800);
-  } else alert('Save failed: ' + (await r.text()));
-}
-</script>
+        <!-- Table -->
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Instagram</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Deposit</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="bookings-body">
+                    {% for b in bookings %}
+                    <tr class="booking-row {{ b.status }}-row" data-status="{{ b.status }}" data-search="{{ b.name|lower }} {{ b.email|lower }} {{ b.instagram|lower }} {{ b.phone|lower }}">
+                        <td>#{{ b.id }}</td>
+                        <td>{{ b.date }}</td>
+                        <td><strong>{{ b.time }}</strong></td>
+                        <td>{{ b.name or '—' }}</td>
+                        <td><a href="mailto:{{ b.email }}" style="color:#d97a8a;">{{ b.email or '—' }}</a></td>
+                        <td>{{ b.phone or '—' }}</td>
+                        <td>{% if b.instagram %}<a href="https://instagram.com/{{ b.instagram.lstrip('@') }}" target="_blank" style="color:#c41e3a;">@{{ b.instagram.lstrip('@') }}</a>{% else %}—{% endif %}</td>
+                        <td>{{ b.session_type or '—' }}</td>
+                        <td>
+                            <span class="badge badge-{{ b.status }}">
+                                {% if b.status == 'reserved' %}⏳ Reserved{% elif b.status == 'pending_payment' %}⏳ Pending{% elif b.status == 'confirmed' %}✅ Confirmed{% elif b.status == 'cancelled' %}❌ Cancelled{% elif b.status == 'expired' %}⌛ Expired{% else %}{{ b.status }}{% endif %}
+                            </span>
+                        </td>
+                        <td>{% if b.paid_amount %}${{ "%.2f"|format(b.paid_amount) }}{% else %}—{% endif %}</td>
+                        <td>
+                            {% if b.status in ('reserved', 'pending_payment') %}
+                                <button class="btn-sm btn-confirm" onclick="confirmBooking({{ b.id }}, '{{ b.name|e }}')">✓ Confirm</button>
+                                <button class="btn-sm btn-cancel" onclick="cancelBooking({{ b.id }}, '{{ b.name|e }}')">✕ Cancel</button>
+                            {% elif b.status == 'confirmed' %}
+                                <button class="btn-sm btn-done" disabled>✓ Done</button>
+                            {% else %}
+                                <span style="color:#888;font-size:0.8rem;">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const ADMIN_KEY = '{{ admin_key }}';
+
+        async function confirmBooking(id, name) {
+            if (!confirm(`Confirm booking #${id} for ${name}?\n\nThis will:\n• Mark as paid & confirmed\n• Create Google Calendar event\n• Sync to Notion\n• Send confirmation email to client`)) return;
+
+            try {
+                const res = await fetch('/admin/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Key': ADMIN_KEY
+                    },
+                    body: JSON.stringify({ booking_id: id, paid_amount: 95 })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ Booking confirmed!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown'));
+                }
+            } catch (err) {
+                alert('Network error: ' + err.message);
+            }
+        }
+
+        async function cancelBooking(id, name) {
+            if (!confirm(`Cancel booking #${id} for ${name}?\n\nThis will free the slot for others.`)) return;
+
+            try {
+                const res = await fetch('/admin/cancel', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Key': ADMIN_KEY
+                    },
+                    body: JSON.stringify({ booking_id: id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('❌ Booking cancelled');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown'));
+                }
+            } catch (err) {
+                alert('Network error: ' + err.message);
+            }
+        }
+
+        function filterRows(status) {
+            document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.booking-row').forEach(row => {
+                if (status === 'all' || row.dataset.status === status || (status === 'pending' && row.dataset.status === 'reserved')) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function searchRows(query) {
+            const q = query.toLowerCase();
+            document.querySelectorAll('.booking-row').forEach(row => {
+                row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+            });
+        }
+    </script>
 </body>
 </html>

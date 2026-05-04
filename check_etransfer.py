@@ -46,18 +46,28 @@ def get_emails():
         print(f"Error: {e}")
         return []
 
+# Allowed senders for Interac e-Transfer (whitelist — only these are trusted)
+ALLOWED_SENDERS = ["notify@payments.interac.ca"]
+
 def is_etransfer_email(email):
-    """Check if email is an Interac e-Transfer notification"""
+    """Check if email is a VALID Interac e-Transfer notification from trusted sender."""
     subject = email.get("subject", "").lower()
     sender = email.get("from", {}).get("addr", "").lower()
     
-    keywords = ["interac", "e-transfer", "etransfer", "transfer received", "deposit received"]
-    sender_domains = ["interac.ca", "payments.interac.ca", "notify.interac.ca"]
+    keywords = ["interac", "e-transfer", "etransfer", "transfer received", "deposit received", "funds deposited"]
     
     has_keyword = any(kw in subject for kw in keywords)
-    from_interac = any(domain in sender for domain in sender_domains)
+    from_allowed = any(s.lower() in sender for s in ALLOWED_SENDERS)
     
-    return has_keyword or from_interac
+    # Must have keyword AND be from allowed sender
+    if has_keyword and from_allowed:
+        return True
+    
+    # Log ignored emails for debugging
+    if has_keyword and not from_allowed:
+        print(f"[WARN] Ignored e-Transfer-like email from untrusted sender: {sender}")
+    
+    return False
 
 def read_email_body(email_id):
     """Read full email body using Himalaya.
