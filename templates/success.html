@@ -1,406 +1,450 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booking Status | Pashynska Photography</title>
-    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📷%3C/text%3E%3C/svg%3E">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #faf8f6;
-            color: #1a1a1a;
-            line-height: 1.6;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
-            max-width: 520px;
-            width: 100%;
-            padding: 40px 24px;
-            text-align: center;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Status | Pashynska Photography</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* ===== STATUS ICON ===== */
-        .status-icon {
-            width: 110px;
-            height: 110px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 28px;
-            font-size: 3.2rem;
-            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .status-icon.pending {
-            background: #fff3cd;
-            animation: pulse-pending 2s ease-in-out infinite;
-        }
-        .status-icon.confirmed {
-            background: #e8f5e9;
-            animation: pop-in 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .status-icon.cancelled {
-            background: #fce4ec;
-        }
-        @keyframes pulse-pending {
-            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,193,7,0.3); }
-            50% { transform: scale(1.05); box-shadow: 0 0 20px 8px rgba(255,193,7,0.15); }
-        }
-        @keyframes pop-in {
-            0% { transform: scale(0.5); opacity: 0; }
-            60% { transform: scale(1.15); }
-            100% { transform: scale(1); opacity: 1; }
-        }
+    :root {
+      --nude:       #f5ede8;
+      --rose:       #c4857a;
+      --rose-deep:  #a3685e;
+      --ink:        #1c1917;
+      --ink-2:      #44403c;
+      --ink-3:      #78716c;
+      --ink-4:      #a8a29e;
+      --ink-5:      #e7e5e4;
+      --page-bg:    #faf7f5;
+      --surface:    #ffffff;
+      --green:      #3d6b4f;
+      --green-bg:   #edf5f0;
+      --amber:      #92722a;
+      --amber-bg:   #fdf5e4;
+      --red:        #8b3535;
+      --red-bg:     #fdf0f0;
+      --font-d:     'Cormorant Garamond', Georgia, serif;
+      --font-b:     'DM Sans', system-ui, sans-serif;
+    }
 
-        /* ===== CONFETTI ===== */
-        .confetti-container {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 999;
-            overflow: hidden;
-        }
-        .confetti-piece {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
-            animation: confetti-fall linear forwards;
-        }
-        @keyframes confetti-fall {
-            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-        }
+    html { font-size: 16px; }
+    body {
+      font-family: var(--font-b);
+      background: var(--page-bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
 
-        h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: 2rem;
-            margin-bottom: 12px;
-            transition: all 0.4s ease;
-        }
-        .subtitle {
-            color: #666;
-            font-size: 1.05rem;
-            margin-bottom: 32px;
-            transition: all 0.4s ease;
-        }
+    /* ── Sticky header ── */
+    .top-bar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,247,245,0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--ink-5);
+      padding: 14px 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .top-bar-title { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
+    .progress-dots { margin-left: auto; display: flex; gap: 5px; align-items: center; }
+    .pdot { height: 6px; border-radius: 3px; background: var(--rose); }
 
-        /* ===== CARD ===== */
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 32px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
-            text-align: left;
-        }
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .detail-row:last-child { border-bottom: none; }
-        .detail-row .label { color: #888; }
-        .detail-row .value { font-weight: 500; }
+    /* ── Confetti ── */
+    .confetti-container {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 999;
+      overflow: hidden; display: none;
+    }
+    .confetti-piece {
+      position: absolute; width: 9px; height: 9px;
+      border-radius: 2px;
+      animation: confetti-fall linear forwards;
+    }
+    @keyframes confetti-fall {
+      0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
 
-        /* ===== STATUS BADGE ===== */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            transition: all 0.4s ease;
-        }
-        .status-badge.pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-        .status-badge.confirmed {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-        .status-badge.cancelled {
-            background: #fce4ec;
-            color: #c62828;
-        }
-        .status-badge .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-        }
-        .status-badge.pending .dot {
-            background: #ffc107;
-            animation: blink 1.5s ease-in-out infinite;
-        }
-        .status-badge.confirmed .dot { background: #4caf50; }
-        .status-badge.cancelled .dot { background: #ef5350; }
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
+    /* ── Container ── */
+    .container {
+      max-width: 520px; margin: 0 auto;
+      padding: 36px 20px 64px;
+    }
 
-        /* ===== MESSAGES ===== */
-        .message {
-            border-left: 4px solid;
-            padding: 16px 20px;
-            border-radius: 0 10px 10px 0;
-            margin: 24px 0;
-            text-align: left;
-            transition: all 0.4s ease;
-        }
-        .message.info { background: #e3f2fd; border-color: #1976d2; }
-        .message.warning { background: #fff3cd; border-color: #ffc107; }
-        .message.success { background: #e8f5e9; border-color: #4caf50; }
+    /* ── Status hero ── */
+    .status-hero {
+      text-align: center; margin-bottom: 32px;
+    }
+    .status-icon {
+      width: 88px; height: 88px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px; font-size: 2.6rem;
+      transition: all 0.6s cubic-bezier(0.4,0,0.2,1);
+    }
+    .status-icon.pending  { background: var(--amber-bg); animation: pulse-pending 2s ease-in-out infinite; }
+    .status-icon.confirmed { background: var(--green-bg); animation: pop-in 0.5s cubic-bezier(0.4,0,0.2,1); }
+    .status-icon.cancelled { background: var(--red-bg); }
+    @keyframes pulse-pending {
+      0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(146,114,42,0.25); }
+      50%     { transform:scale(1.04); box-shadow:0 0 20px 8px rgba(146,114,42,0.1); }
+    }
+    @keyframes pop-in {
+      0%   { transform:scale(0.5); opacity:0; }
+      60%  { transform:scale(1.12); }
+      100% { transform:scale(1); opacity:1; }
+    }
 
-        /* ===== HOW TO PREPARE ===== */
-        .prep-card {
-            background: white;
-            border-radius: 20px;
-            padding: 32px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
-            text-align: left;
-            margin-top: 28px;
-        }
-        .prep-card h2 {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.4rem;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .prep-item {
-            display: flex;
-            align-items: flex-start;
-            padding: 10px 0;
-        }
-        .prep-item .emoji { font-size: 1.4rem; margin-right: 12px; flex-shrink: 0; }
-        .prep-item .text strong { display: block; }
-        .prep-item .text span { color: #666; font-size: 0.95rem; }
+    .status-title {
+      font-family: var(--font-d);
+      font-size: 2rem; font-weight: 400;
+      color: var(--ink); margin-bottom: 8px;
+      transition: all 0.4s ease;
+    }
+    .status-sub {
+      font-size: 0.9rem; color: var(--ink-3);
+      max-width: 340px; margin: 0 auto;
+      transition: all 0.4s ease;
+    }
 
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 16px;
-            background: #1a1a1a;
-            color: white;
-            border: none;
-            border-radius: 14px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            text-align: center;
-            margin-top: 20px;
-            transition: background 0.3s ease;
-        }
-        .btn:hover { background: #333; }
-        .btn.instagram-btn { background: #c41e3a; }
-        .btn.instagram-btn:hover { background: #a01830; }
+    /* ── Status badge ── */
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 16px; border-radius: 20px;
+      font-size: 0.82rem; font-weight: 600;
+      margin-top: 16px;
+      transition: all 0.4s ease;
+    }
+    .status-badge.pending  { background: var(--amber-bg); color: var(--amber); }
+    .status-badge.confirmed { background: var(--green-bg); color: var(--green); }
+    .status-badge.cancelled { background: var(--red-bg); color: var(--red); }
+    .badge-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor;
+    }
+    .status-badge.pending .badge-dot { animation: blink 1.5s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
 
-        .instagram {
-            color: #c41e3a;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .footer {
-            margin-top: 40px;
-            color: #888;
-            font-size: 0.9rem;
-        }
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+      padding: 22px 20px; margin-bottom: 16px;
+    }
+    .card-title {
+      font-family: var(--font-d);
+      font-size: 1.3rem; font-weight: 500;
+      color: var(--ink); margin-bottom: 16px;
+    }
 
-        /* ===== PENDING → CONFIRMED TRANSITION ===== */
-        body.just-confirmed { animation: bg-flash 1s ease; }
-        @keyframes bg-flash {
-            0% { background: #faf8f6; }
-            30% { background: #f1f8e9; }
-            100% { background: #faf8f6; }
-        }
-    </style>
+    /* ── Detail rows ── */
+    .detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 11px 0; border-bottom: 1px solid var(--ink-5);
+      font-size: 0.9rem;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row .key { color: var(--ink-3); }
+    .detail-row .val { font-weight: 500; color: var(--ink); }
+
+    /* ── Message boxes ── */
+    .msg {
+      border-radius: 0 12px 12px 0;
+      padding: 14px 18px; margin-bottom: 14px;
+      font-size: 0.875rem; line-height: 1.6;
+      border-left: 3px solid;
+    }
+    .msg.info     { background: #eef4fb; border-color: #5b9bd5; color: #1e3a5f; }
+    .msg.warning  { background: var(--amber-bg); border-color: var(--amber); color: #5c4516; }
+    .msg.success  { background: var(--green-bg); border-color: var(--green); color: #1e3d2a; }
+
+    /* ── Prep guide ── */
+    .prep-card {
+      background: var(--nude);
+      border-radius: 18px; padding: 22px 20px;
+      margin-bottom: 16px;
+    }
+    .prep-title {
+      font-family: var(--font-d);
+      font-size: 1.4rem; font-weight: 400;
+      text-align: center; margin-bottom: 18px;
+      color: var(--ink);
+    }
+    .prep-item {
+      display: flex; gap: 14px;
+      padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .prep-item:last-child { border-bottom: none; }
+    .prep-emoji { font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }
+    .prep-text strong { display: block; font-size: 0.88rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .prep-text span   { font-size: 0.82rem; color: var(--ink-3); line-height: 1.5; }
+
+    /* ── Instagram CTA ── */
+    .ig-cta {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: var(--surface);
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 14px; padding: 16px;
+      text-decoration: none; color: var(--ink);
+      font-size: 0.9rem; font-weight: 500;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      margin-bottom: 16px;
+    }
+    .ig-cta:hover { border-color: var(--rose); box-shadow: 0 2px 12px var(--rose-glow, rgba(196,133,122,0.15)); }
+    .ig-cta span  { color: var(--rose); }
+
+    footer {
+      text-align: center; padding: 20px 24px 32px;
+      font-size: 0.82rem; color: var(--ink-4);
+    }
+    footer a { color: var(--rose); text-decoration: none; font-weight: 500; }
+  </style>
 </head>
 <body>
-    <div class="confetti-container" id="confetti" style="display:none;"></div>
 
-    <div class="container">
-        <div class="status-icon pending" id="status-icon">🔄</div>
-        <h1 id="main-title">Payment Verification in Progress</h1>
-        <p class="subtitle" id="subtitle">Thank you! We're checking for your e-Transfer now.</p>
+  <!-- Confetti -->
+  <div class="confetti-container" id="confetti"></div>
 
-        <div class="card">
-            <div class="detail-row">
-                <span class="label">Status</span>
-                <span class="value">
-                    <span class="status-badge pending" id="status-badge">
-                        <span class="dot"></span>
-                        <span id="status-text">Verifying payment…</span>
-                    </span>
-                </span>
-            </div>
-            {% if booking %}
-            <div class="detail-row">
-                <span class="label">Booking ID</span>
-                <span class="value">#{{ booking.id }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Name</span>
-                <span class="value">{{ booking.name }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Time</span>
-                <span class="value">{{ booking.time }}</span>
-            </div>
-            {% if booking.instagram %}
-            <div class="detail-row">
-                <span class="label">Instagram</span>
-                <span class="value">{{ booking.instagram }}</span>
-            </div>
-            {% endif %}
-            {% endif %}
-            <div class="detail-row">
-                <span class="label">Date</span>
-                <span class="value">{{ date }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Payment Method</span>
-                <span class="value">Interac e-Transfer</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Amount</span>
-                <span class="value">${{ "%.2f"|format(price) }} CAD</span>
-            </div>
-        </div>
+  <!-- Sticky header -->
+  <div class="top-bar">
+    <div class="top-bar-title">Booking Status</div>
+    <div class="progress-dots">
+      <div class="pdot" style="width:6px;opacity:0.4"></div>
+      <div class="pdot" style="width:6px;opacity:0.4"></div>
+      <div class="pdot" style="width:18px"></div>
+    </div>
+  </div>
 
-        <!-- PENDING MESSAGE (shown initially) -->
-        <div class="message info" id="msg-pending">
-            📧 <strong>What happens next?</strong><br><br>
-            Our system is checking for your e-Transfer. Once confirmed, this page will update automatically.<br><br>
-            <strong>Please do not resend the payment.</strong>
-        </div>
+  <div class="container">
 
-        <!-- CONFIRMED MESSAGE (hidden initially) -->
-        <div class="message success" id="msg-confirmed" style="display:none;">
-            🎉 <strong>Your booking is confirmed!</strong><br><br>
-            A confirmation email has been sent to your inbox with all the details. See you at the session!
-        </div>
-
-        <div class="message warning" id="msg-warning">
-            ⚠️ <strong>Important:</strong> Your time slot is reserved while we verify. Need help? DM me on <a href="https://instagram.com/pashynska.photo" class="instagram" target="_blank">Instagram</a>.
-        </div>
-
-        <!-- HOW TO PREPARE GUIDE -->
-        <div class="prep-card">
-            <h2>🪻 How to Prepare for Your Photoshoot</h2>
-            <div class="prep-item"><span class="emoji">👗</span><div class="text"><strong>Wardrobe</strong><span>Soft, coordinating tones — lilac, cream, pastels, or white. Avoid busy patterns and neon.</span></div></div>
-            <div class="prep-item"><span class="emoji">💇‍♀️</span><div class="text"><strong>Hair & Makeup</strong><span>Natural, dewy makeup photographs best. Stick with your usual hairstyle.</span></div></div>
-            <div class="prep-item"><span class="emoji">👟</span><div class="text"><strong>Footwear</strong><span>Grass may be damp. Bring a second pair and be ready to go barefoot for some shots.</span></div></div>
-            <div class="prep-item"><span class="emoji">🧒</span><div class="text"><strong>Kids & Family</strong><span>Feed children before the session. Bring snacks, water, and a comfort toy.</span></div></div>
-            <div class="prep-item"><span class="emoji">⏰</span><div class="text"><strong>Arrive 5 Min Early</strong><span>Your slot is exactly 20 minutes. Location details will be sent via DM.</span></div></div>
-            <div class="prep-item"><span class="emoji">🌸</span><div class="text"><strong>Bonus Tip</strong><span>The lilac backdrop attracts bees — stay calm, we can work around them.</span></div></div>
-        </div>
-
-        <div class="footer">
-            <p>📷 Pashynska Photography — Calgary, AB</p>
-            <p style="margin-top:8px;">Questions? <a href="https://instagram.com/pashynska.photo" class="instagram" target="_blank">DM on Instagram</a></p>
-        </div>
+    <!-- Status hero -->
+    <div class="status-hero">
+      <div class="status-icon pending" id="status-icon">⏳</div>
+      <div class="status-title" id="main-title">Verifying Payment…</div>
+      <p class="status-sub" id="subtitle">Your e-Transfer is being verified. This usually takes under a minute.</p>
+      <span class="status-badge pending" id="status-badge">
+        <span class="badge-dot"></span>
+        <span id="status-text">Checking payment…</span>
+      </span>
     </div>
 
-    <script>
-    (function() {
-        const bookingId = '{{ booking.id if booking else "" }}';
-        if (!bookingId) return;
+    <!-- Booking details card -->
+    <div class="card">
+      {% if booking %}
+      <div class="detail-row">
+        <span class="key">Booking ID</span>
+        <span class="val">#{{ booking.id }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="key">Name</span>
+        <span class="val">{{ booking.name }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="key">Time</span>
+        <span class="val">{{ booking.time }}</span>
+      </div>
+      {% if booking.instagram %}
+      <div class="detail-row">
+        <span class="key">Instagram</span>
+        <span class="val">{{ booking.instagram }}</span>
+      </div>
+      {% endif %}
+      {% endif %}
+      <div class="detail-row">
+        <span class="key">Date</span>
+        <span class="val">{{ date }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="key">Payment</span>
+        <span class="val">Interac e-Transfer</span>
+      </div>
+      <div class="detail-row">
+        <span class="key">Amount</span>
+        <span class="val">${{ "%.2f"|format(price) }} CAD</span>
+      </div>
+      <div class="detail-row">
+        <span class="key">Status</span>
+        <span class="val" id="detail-status">Pending verification</span>
+      </div>
+    </div>
 
-        let pollInterval = 3000;  // every 3 seconds
-        let isConfirmed = false;
-        let pollTimer;
+    <!-- Pending message -->
+    <div class="msg info" id="msg-pending">
+      📧 <strong>What happens next?</strong><br><br>
+      Our system checks for your e-Transfer automatically. Once confirmed, this page updates instantly.<br><br>
+      <strong>Please do not resend the payment.</strong>
+    </div>
 
-        function updateUI(data) {
-            const icon = document.getElementById('status-icon');
-            const title = document.getElementById('main-title');
-            const subtitle = document.getElementById('subtitle');
-            const badge = document.getElementById('status-badge');
-            const statusText = document.getElementById('status-text');
-            const msgPending = document.getElementById('msg-pending');
-            const msgConfirmed = document.getElementById('msg-confirmed');
-            const msgWarning = document.getElementById('msg-warning');
+    <!-- Confirmed message (hidden initially) -->
+    <div class="msg success" id="msg-confirmed" style="display:none">
+      🎉 <strong>Your booking is confirmed!</strong><br><br>
+      Payment received. A confirmation has been noted. See you at the session!
+    </div>
 
-            if (data.confirmed && !isConfirmed) {
-                isConfirmed = true;
-                // Confirmed!
-                icon.className = 'status-icon confirmed';
-                icon.textContent = '✅';
-                title.textContent = 'Booking Confirmed!';
-                subtitle.textContent = 'Your payment has been received. See you at the session!';
-                badge.className = 'status-badge confirmed';
-                statusText.textContent = 'Confirmed ✅';
+    <!-- Warning -->
+    <div class="msg warning" id="msg-warning">
+      ⚠️ <strong>Your slot is reserved</strong> while payment verifies. Questions?
+      <a href="https://instagram.com/pashynska.photo" style="color:var(--rose);text-decoration:none;font-weight:600" target="_blank">DM @pashynska.photo</a>
+    </div>
 
-                msgPending.style.display = 'none';
-                msgConfirmed.style.display = 'block';
-                msgWarning.style.display = 'none';
+    <!-- Instagram CTA -->
+    <a class="ig-cta" href="https://instagram.com/pashynska.photo" target="_blank">
+      <span>@pashynska.photo</span>
+      <span style="color:var(--ink-3)">· Questions or changes? DM me</span>
+    </a>
 
-                document.body.classList.add('just-confirmed');
-                document.title = '✅ Booking Confirmed! | Pashynska Photography';
-                launchConfetti();
-                stopPolling();
+    <!-- Prep guide -->
+    <div class="prep-card">
+      <div class="prep-title">How to Prepare</div>
+      <div class="prep-item">
+        <span class="prep-emoji">👗</span>
+        <div class="prep-text">
+          <strong>Wardrobe</strong>
+          <span>Soft, coordinating tones — lilac, cream, pastels, or white. Avoid busy patterns and neon.</span>
+        </div>
+      </div>
+      <div class="prep-item">
+        <span class="prep-emoji">💇‍♀️</span>
+        <div class="prep-text">
+          <strong>Hair & Makeup</strong>
+          <span>Natural, dewy makeup photographs best. Stick with your usual hairstyle.</span>
+        </div>
+      </div>
+      <div class="prep-item">
+        <span class="prep-emoji">👟</span>
+        <div class="prep-text">
+          <strong>Footwear</strong>
+          <span>Grass may be damp. Bring a spare pair and be ready to go barefoot for some shots.</span>
+        </div>
+      </div>
+      <div class="prep-item">
+        <span class="prep-emoji">🧒</span>
+        <div class="prep-text">
+          <strong>Kids & Family</strong>
+          <span>Feed children before the session. Bring snacks, water, and a comfort toy.</span>
+        </div>
+      </div>
+      <div class="prep-item">
+        <span class="prep-emoji">⏰</span>
+        <div class="prep-text">
+          <strong>Arrive 5 min early</strong>
+          <span>Your slot is exactly 20 minutes. Location details sent via DM closer to the date.</span>
+        </div>
+      </div>
+      <div class="prep-item">
+        <span class="prep-emoji">🌸</span>
+        <div class="prep-text">
+          <strong>Bonus tip</strong>
+          <span>The lilac backdrop attracts bees — stay calm, we can always work around them.</span>
+        </div>
+      </div>
+    </div>
 
-            } else if (data.status === 'cancelled' && !isConfirmed) {
-                icon.className = 'status-icon cancelled';
-                icon.textContent = '❌';
-                title.textContent = 'Booking Cancelled';
-                subtitle.textContent = 'This booking has been cancelled.';
-                badge.className = 'status-badge cancelled';
-                statusText.textContent = 'Cancelled';
-                msgPending.style.display = 'none';
-                msgWarning.style.display = 'none';
-                stopPolling();
-            }
-        }
+  </div><!-- /container -->
 
-        function poll() {
-            fetch('/booking-status?booking_id=' + bookingId)
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data.confirmed || data.status === 'confirmed' || data.status === 'cancelled') {
-                        updateUI(data);
-                    }
-                })
-                .catch(function() {});
-        }
+  <footer>
+    <p>Pashynska Photography — Calgary, AB</p>
+    <p style="margin-top:6px">
+      Questions? <a href="https://instagram.com/pashynska.photo" target="_blank">DM @pashynska.photo on Instagram</a>
+    </p>
+  </footer>
 
-        function stopPolling() {
-            if (pollTimer) clearInterval(pollTimer);
-        }
+  <script>
+  (function () {
+    const bookingId = '{{ booking.id if booking else "" }}';
+    if (!bookingId) return;
 
-        function launchConfetti() {
-            var container = document.getElementById('confetti');
-            container.style.display = 'block';
-            var colors = ['#4caf50','#81c784','#ffc107','#ff9800','#e91e63','#9c27b0','#2196f3'];
-            for (var i = 0; i < 60; i++) {
-                var piece = document.createElement('div');
-                piece.className = 'confetti-piece';
-                piece.style.left = Math.random() * 100 + '%';
-                piece.style.background = colors[Math.floor(Math.random() * colors.length)];
-                piece.style.animationDuration = (2 + Math.random() * 3) + 's';
-                piece.style.animationDelay = Math.random() * 1.5 + 's';
-                piece.style.width = (6 + Math.random() * 8) + 'px';
-                piece.style.height = (6 + Math.random() * 8) + 'px';
-                container.appendChild(piece);
-            }
-            setTimeout(function() { container.style.display = 'none'; }, 6000);
-        }
+    let pollInterval = 3000;
+    let isConfirmed  = false;
+    let pollTimer;
 
-        // Start polling
-        pollTimer = setInterval(poll, pollInterval);
-        // First check immediately
-        poll();
-    })();
-    </script>
+    function updateUI(data) {
+      if (data.confirmed && !isConfirmed) {
+        isConfirmed = true;
+
+        // Status icon
+        const icon = document.getElementById('status-icon');
+        icon.className = 'status-icon confirmed';
+        icon.textContent = '✅';
+
+        // Title
+        document.getElementById('main-title').textContent = 'Booking Confirmed!';
+        document.getElementById('subtitle').textContent   = 'Your payment has been received. See you at the session! 🌸';
+
+        // Badge
+        const badge = document.getElementById('status-badge');
+        badge.className = 'status-badge confirmed';
+        document.getElementById('status-text').textContent = 'Confirmed ✓';
+
+        // Detail status
+        document.getElementById('detail-status').textContent = 'Confirmed ✓';
+
+        // Messages
+        document.getElementById('msg-pending').style.display   = 'none';
+        document.getElementById('msg-confirmed').style.display = 'block';
+        document.getElementById('msg-warning').style.display   = 'none';
+
+        // Page title
+        document.title = '✅ Booking Confirmed! | Pashynska Photography';
+
+        launchConfetti();
+        stopPolling();
+
+      } else if (data.status === 'cancelled' && !isConfirmed) {
+        const icon = document.getElementById('status-icon');
+        icon.className   = 'status-icon cancelled';
+        icon.textContent = '❌';
+        document.getElementById('main-title').textContent = 'Booking Cancelled';
+        document.getElementById('subtitle').textContent   = 'This booking has been cancelled.';
+        const badge = document.getElementById('status-badge');
+        badge.className = 'status-badge cancelled';
+        document.getElementById('status-text').textContent = 'Cancelled';
+        document.getElementById('msg-pending').style.display = 'none';
+        document.getElementById('msg-warning').style.display = 'none';
+        stopPolling();
+      }
+    }
+
+    function poll() {
+      fetch('/booking-status?booking_id=' + bookingId)
+        .then(r  => r.json())
+        .then(data => {
+          if (data.confirmed || data.status === 'confirmed' || data.status === 'cancelled') {
+            updateUI(data);
+          }
+        })
+        .catch(() => {});
+    }
+
+    function stopPolling() { if (pollTimer) clearInterval(pollTimer); }
+
+    function launchConfetti() {
+      const container = document.getElementById('confetti');
+      container.style.display = 'block';
+      const colors = ['#3d6b4f','#a8d5b5','#ffc107','#f97316','#c4857a','#7c3aed','#60a5fa'];
+      for (let i = 0; i < 70; i++) {
+        const piece       = document.createElement('div');
+        piece.className   = 'confetti-piece';
+        piece.style.left  = Math.random() * 100 + '%';
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.animationDuration = (2 + Math.random() * 3) + 's';
+        piece.style.animationDelay   = Math.random() * 1.5 + 's';
+        piece.style.width  = (6 + Math.random() * 8) + 'px';
+        piece.style.height = (6 + Math.random() * 8) + 'px';
+        container.appendChild(piece);
+      }
+      setTimeout(() => { container.style.display = 'none'; }, 7000);
+    }
+
+    pollTimer = setInterval(poll, pollInterval);
+    poll(); // immediate first check
+  })();
+  </script>
 </body>
 </html>

@@ -1,60 +1,54 @@
-# Booking events configuration
-# Add new events here — the system supports multiple simultaneous events.
-
 events:
-  # Active event
-  - id: lilac-jun7
-    title: "🪻 Lilac Mini Sessions"
-    subtitle: "Soft spring moments you'll want to keep forever"
-    date: "2026-06-07"
-    start_time: "10:00"
-    end_time: "13:00"       # 6 spots × 30 min = 3 hours
-    session_length: 20
-    break_length: 10
-    slot_interval: 30
-    deposit: 95
-    full_price: 190
-    location: "Calgary — exact spot sent after booking"
-    included:
-      - "20 minutes among blooming lilacs"
-      - "15 professionally edited photos"
-      - "All original photos included"
-      - "Quick turnaround (within 48 hours)"
-    photos:
-      - "/images/lilac_1.jpg"
-      - "/images/pregnancy_1.jpg"
-    status: active
-
-  # Past event (kept for history)
-  - id: blossom-may3
-    title: "🪻 Blossom Mini Sessions"
-    subtitle: "Capture your family's most beautiful season"
-    date: "2026-05-03"
-    start_time: "10:00"
-    end_time: "16:00"
-    session_length: 20
-    break_length: 10
-    slot_interval: 30
-    deposit: 95
-    full_price: 190
-    location: "Calgary — exact spot sent after booking"
-    included:
-      - "20 minutes among blooming lilacs"
-      - "15 professionally edited photos"
-      - "All original photos included"
-      - "Quick turnaround (within 48 hours)"
-    photos:
-      - "/images/lilac_1.jpg"
-      - "/images/pregnancy_1.jpg"
-    status: completed
-
-# Global settings
+- id: lilac-jun7
+  title: 🪻 Lilac Mini Sessions
+  subtitle: Soft spring moments you'll want to keep forever
+  date: '2026-06-07'
+  start_time: '10:00'
+  end_time: '13:00'
+  session_length: 20
+  break_length: 10
+  slot_interval: 30
+  deposit: 95
+  full_price: 190
+  location: Calgary — exact spot sent after booking
+  included:
+  - 20 minutes among blooming lilacs
+  - 15 professionally edited photos
+  - All original photos included
+  - Quick turnaround (within 48 hours)
+  photos:
+  - /images/lilac_1.jpg
+  - /images/pregnancy_1.jpg
+  - /images/lilac-jun7_48004fd0.jpg
+  - /images/lilac-jun7_fc0f222e.jpg
+  status: active
+- id: blossom-may3
+  title: 🪻 Blossom Mini Sessions
+  subtitle: Capture your family's most beautiful season
+  date: '2026-05-03'
+  start_time: '10:00'
+  end_time: '16:00'
+  session_length: 20
+  break_length: 10
+  slot_interval: 30
+  deposit: 95
+  full_price: 190
+  location: Calgary — exact spot sent after booking
+  included:
+  - 20 minutes among blooming lilacs
+  - 15 professionally edited photos
+  - All original photos included
+  - Quick turnaround (within 48 hours)
+  photos:
+  - /images/lilac_1.jpg
+  - /images/pregnancy_1.jpg
+  status: completed
 settings:
-  photographer_email: "iryna.pashynska@gmail.com"
-  photographer_name: "Iryna"
-  photographer_instagram: "@pashynska.photo"
-  photographer_instagram_url: "https://instagram.com/pashynska.photo"
+  photographer_email: iryna.pashynska@gmail.com
+  photographer_name: Iryna
+  photographer_instagram: '@pashynska.photo'
+  photographer_instagram_url: https://instagram.com/pashynska.photo
   reservation_minutes: 15
-  currency: "CAD"
-  tax_label: "+GST"
-  timezone: "America/Edmonton"
+  currency: CAD
+  tax_label: +GST
+  timezone: America/Edmonton
