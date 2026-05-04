@@ -55,7 +55,7 @@ def _start_etransfer_checker(booking_id):
         cron_script = os.path.join(os.path.dirname(__file__) or ".", "timed_cron.py")
         _sp.Popen(
             [PYTHON_BIN, cron_script, "--booking-id", str(booking_id), "--interval", "30", "--minutes", "20"],
-            stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"),
+            stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
             cwd=os.path.dirname(__file__) or "."
         )
         log.info(f"[etransfer-checker] Started for booking #{booking_id} (30s interval, 20min max)")
@@ -68,94 +68,237 @@ _rate_limits = {}
 
 def check_rate_limit(ip):
     now = time.time()
-    if ip not in _rate_limits:
-        _rate_limits[ip] = []
-    # Clean old entries
-    _rate_limits[ip] = [t for t in _rate_limits[ip] if now - t < 600]
-    return len(_rate_limits[ip]) < 5   # 5 requests per 10 min (matches README)
+    window = [t for t in _rate_limits.get(ip, []) if now - t < 600]
+    _rate_limits[ip] = window
+    return len(window) < 5  # 5 requests per 10 min (matches README)
 
 def record_request(ip):
-    if ip not in _rate_limits:
-        _rate_limits[ip] = []
-    _rate_limits[ip].append(time.time())
+    now = time.time()
+    _rate_limits.setdefault(ip, []).append(now)
+    # Evict stale IPs when the dict grows large to prevent unbounded memory use
+    if len(_rate_limits) > 10_000:
+        cutoff = now - 600
+        stale = [k for k, v in _rate_limits.items() if not v or v[-1] < cutoff]
+        for k in stale:
+            del _rate_limits[k]
 
 # ===== ADMIN AUTH =====
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
 
 def admin_required(f):
-    """Require X-Admin-Key header for admin endpoints."""
+    """Require X-Admin-Key header OR ?key= query param for admin endpoints."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if ADMIN_KEY and request.headers.get("X-Admin-Key") != ADMIN_KEY:
-            return jsonify({"error": "Unauthorized"}), 401
+        if ADMIN_KEY:
+            provided = (
+                request.headers.get("X-Admin-Key")
+                or request.args.get("key")
+                or (request.json.get("key") if request.is_json else None)
+            )
+            if provided != ADMIN_KEY:
+                return jsonify({"error": "Unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated
 
 # ===== NOTIFICATIONS =====
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "792920251")  # Andrzej — always gets copies
+BASE_URL = os.environ.get("BOOKING_BASE_URL", "")
+
+
+def _tg_send(chat_id, text, reply_markup=None):
+    """Low-level: send a Telegram message to a specific chat."""
+    if not TELEGRAM_BOT_TOKEN:
+        log.info(f"[tg] No token. Would send to {chat_id}: {text[:80]}...")
+        return None
+    if not chat_id:
+        return None
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json=payload, timeout=10
+        )
+        if r.status_code == 200:
+            log.info(f"[tg] Message sent to {chat_id}")
+            return r.json().get("result", {})
+        else:
+            log.error(f"[tg] Send failed ({r.status_code}): {r.text[:200]}")
+    except Exception as e:
+        log.error(f"[tg] Send error: {e}")
+    return None
+
 
 def _notify_admin(message):
-    """Send notification to photographer via Telegram."""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        log.info(f"[notify] Telegram not configured. Message: {message[:80]}...")
-        return
+    """Send notification to both Iryna and Andrzej via Telegram."""
+    _tg_send(TELEGRAM_CHAT_ID, message)
+    _tg_send(TELEGRAM_ADMIN_CHAT_ID, message)
+
+
+def _notify_payment_pending(booking_id, client_name, client_email, event_date,
+                            slot_time, event_title, session_type, client_ig,
+                            expected_deposit=None, client_phone=None):
+    """Send payment notification with inline confirm/cancel buttons to Iryna + Andrzej."""
+    deposit = expected_deposit or SESSION_PRICE
+    slot_end = ""
     try:
-        requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"},
-            timeout=10
-        )
-        log.info("[notify] Telegram message sent")
-    except Exception as e:
-        log.error(f"[notify] Telegram failed: {e}")
+        from datetime import datetime, timedelta
+        t = datetime.strptime(slot_time, "%H:%M")
+        slot_end = (t + timedelta(minutes=SESSION_LENGTH)).strftime("%H:%M")
+    except Exception:
+        pass
+
+    admin_url = f"{BASE_URL}/admin" if BASE_URL else "/admin"
+    success_url = f"{BASE_URL}/success?booking_id={booking_id}" if BASE_URL else f"/success?booking_id={booking_id}"
+
+    ig_clean = (client_ig or "").lstrip("@")
+    phone_display = client_phone or "N/A"
+
+    text = (
+        f"💰 <b>Payment marked as sent</b>\n\n"
+        f"📋 Booking #{booking_id}\n"
+        f"👤 {client_name or '(no name)'}\n"
+        f"📧 {client_email}\n"
+        f"📞 {phone_display}\n"
+        f"📱 Instagram: @{ig_clean or 'N/A'}\n\n"
+        f"📅 {event_date} · {slot_time}{'–' + slot_end if slot_end else ''}\n"
+        f"🏷 Session: {event_title}\n"
+        f"💵 Expected deposit: ${deposit:.2f} CAD\n\n"
+        f"⏳ <b>Check e-Transfer, then press a button below:</b>\n\n"
+        f"🔗 <a href=\"{admin_url}\">Admin panel</a>  |  "
+        f"<a href=\"{success_url}\">Client page</a>"
+    )
+
+    action_row = [
+        {"text": "✅ Payment Received", "callback_data": f"confirm:{booking_id}"},
+        {"text": "❌ Cancel", "callback_data": f"cancel:{booking_id}"},
+    ]
+    link_row = [
+        {"text": "🔗 Admin Panel", "url": admin_url},
+        {"text": "📄 Client Page", "url": success_url},
+    ]
+    if ig_clean:
+        link_row.append({"text": "📸 Instagram", "url": f"https://instagram.com/{ig_clean}"})
+
+    keyboard = {"inline_keyboard": [action_row, link_row]}
+    _tg_send(TELEGRAM_CHAT_ID, text, reply_markup=keyboard)
+    _tg_send(TELEGRAM_ADMIN_CHAT_ID, text, reply_markup=keyboard)
 
 
 def _send_client_email(to_email, client_name, event_date, slot_time, event_title, booking_id):
-    """Send confirmation email to client via Himalaya CLI."""
+    """Send HTML confirmation email to client via Himalaya CLI (multipart/alternative)."""
     if not to_email:
         return
     try:
         import subprocess
+        import email.utils
         date_nice = datetime.strptime(event_date, "%Y-%m-%d").strftime("%B %d, %Y")
         subject = f"Booking Confirmed — {event_title} on {date_nice}"
-        body = f"""Hi {client_name},
 
-Your mini photo session is confirmed! Here are the details:
+        plain = (
+            f"Hi {client_name},\n\n"
+            f"Your mini photo session is confirmed!\n\n"
+            f"Event: {event_title}\n"
+            f"Date: {date_nice}\n"
+            f"Time: {slot_time}\n"
+            f"Booking ID: #{booking_id}\n\n"
+            f"What's included:\n"
+            f"• 20-minute photo session\n"
+            f"• 15 professionally edited photos\n"
+            f"• All original photos included\n"
+            f"• Quick turnaround (within 48 hours)\n\n"
+            f"Location details will be sent closer to the session date.\n\n"
+            f"Need to reschedule? DM me on Instagram @pashynska.photo.\n\n"
+            f"Looking forward to our session!\n\n"
+            f"Warmly,\nIryna Pashynska\n@pashynska.photo"
+        )
 
-Event: {event_title}
-Date: {date_nice}
-Time: {slot_time}
-Booking ID: #{booking_id}
+        html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
+  <tr><td style="background:linear-gradient(135deg,#c084a8 0%,#9b5e8a 100%);padding:40px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:32px;">🪻</p>
+    <h1 style="margin:0;color:#fff;font-size:26px;font-weight:normal;letter-spacing:1px;">Booking Confirmed</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+  </td></tr>
+  <tr><td style="padding:36px 40px 24px;">
+    <p style="margin:0 0 20px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{client_name}</strong>,</p>
+    <p style="margin:0 0 28px;font-size:15px;color:#7a5a6a;line-height:1.7;">Your mini photo session is confirmed! ✨ I'm so excited to capture beautiful moments with you.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;border-radius:12px;margin-bottom:28px;">
+      <tr><td style="padding:24px 28px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">🎉 &nbsp;Event</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{event_title}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">🗓 &nbsp;Date</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{date_nice}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">⏰ &nbsp;Time</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{slot_time}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#7a5a6a;font-size:14px;">🆔 &nbsp;Booking ID</td>
+            <td style="padding:8px 0;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">#{booking_id}</strong></td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+    <h3 style="margin:0 0 12px;color:#5a3d4a;font-size:15px;">What's included:</h3>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr><td style="padding:3px 0;color:#7a5a6a;font-size:14px;">🌸 &nbsp;20-minute photo session</td></tr>
+      <tr><td style="padding:3px 0;color:#7a5a6a;font-size:14px;">📸 &nbsp;15 professionally edited photos</td></tr>
+      <tr><td style="padding:3px 0;color:#7a5a6a;font-size:14px;">🖼 &nbsp;All original photos included</td></tr>
+      <tr><td style="padding:3px 0;color:#7a5a6a;font-size:14px;">⚡ &nbsp;Quick turnaround (within 48 hours)</td></tr>
+    </table>
+    <p style="margin:0 0 12px;font-size:14px;color:#7a5a6a;line-height:1.7;">📍 Exact location will be sent closer to your session date.</p>
+    <p style="margin:0 0 28px;font-size:14px;color:#7a5a6a;line-height:1.7;">Need to reschedule? DM me on Instagram <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
+  </td></tr>
+  <tr><td style="padding:0 40px 36px;">
+    <p style="margin:0;font-size:15px;color:#5a3d4a;">Looking forward to our session! 🌸</p>
+    <p style="margin:12px 0 0;font-size:14px;color:#9b5e8a;"><strong>Iryna Pashynska</strong><br>
+    <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
+  </td></tr>
+  <tr><td style="background:#f9f1f5;padding:20px 40px;text-align:center;border-top:1px solid #f0e0e8;">
+    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada<br>
+    <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">instagram.com/pashynska.photo</a></p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>"""
 
-What's included:
-• 20-minute photo session
-• 15 professionally edited photos
-• All original photos
-• Quick turnaround (within 48 hours)
+        boundary = f"====boundary_{booking_id}===="
+        template = (
+            f"From: Iryna Pashynska <iryna.pashynska@gmail.com>\r\n"
+            f"To: {client_name} <{to_email}>\r\n"
+            f"Subject: {subject}\r\n"
+            f"MIME-Version: 1.0\r\n"
+            f"Content-Type: multipart/alternative; boundary=\"{boundary}\"\r\n"
+            f"\r\n"
+            f"--{boundary}\r\n"
+            f"Content-Type: text/plain; charset=utf-8\r\n\r\n"
+            f"{plain}\r\n"
+            f"--{boundary}\r\n"
+            f"Content-Type: text/html; charset=utf-8\r\n\r\n"
+            f"{html}\r\n"
+            f"--{boundary}--\r\n"
+        )
 
-Location details will be sent closer to the session date.
-
-If you need to reschedule, please DM me on Instagram @pashynska.photo.
-
-Looking forward to our session!
-
-Warmly,
-Iryna Pashynska
-@pashynska.photo
-"""
-        template = f"""From: Iryna Pashynska <iryna.pashynska@gmail.com>
-To: {client_name} <{to_email}>
-Subject: {subject}
-Content-Type: text/plain; charset=utf-8
-
-{body}"""
         result = subprocess.run(
-            ["himalaya", "template", "send"],
+            ["himalaya", "template", "send", "-a", "iryna"],
             input=template, capture_output=True, text=True, timeout=30
         )
         if result.returncode == 0:
-            log.info(f"[email] Confirmation sent to {to_email}")
+            log.info(f"[email] HTML confirmation sent to {to_email}")
         else:
             log.error(f"[email] Himalaya failed: {result.stderr[:200]}")
     except Exception as e:
@@ -399,6 +542,7 @@ SLOT_INTERVAL = _active.get("slot_interval", 30)
 SESSION_PRICE = _active.get("deposit", 95)
 SESSION_TOTAL = _active.get("full_price", 190)
 EMAIL = SETTINGS.get("photographer_email", "")
+RESERVATION_MINUTES = SETTINGS.get("reservation_minutes", 15)
 DATE = _active.get("date", "")
 START_TIME = _active.get("start_time", "10:00")
 END_TIME = _active.get("end_time", "16:00")
@@ -454,8 +598,7 @@ def db_conn():
 def expire_reservations():
     """Mark expired reserved/pending_payment rows as 'expired' so slots open back up.
     Returns count of expired bookings."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = db_conn()
     c = conn.cursor()
     now = datetime.now().isoformat()
     c.execute("""
@@ -541,6 +684,7 @@ def index():
         subtitle=ev.get("subtitle", ""),
         location=ev.get("location", ""),
         included=ev.get("included", []),
+        photos=ev.get("photos", []),
         slots=slots
     )
 
@@ -568,26 +712,28 @@ def get_slots(date_str):
     ev = get_event_by_date(date_str)
     if not ev:
         return jsonify({"slots": [], "message": f"No event on {date_str}"})
-    
+
     slots = generate_slots(ev)
     now = datetime.now()
     conn = db_conn()
     c = conn.cursor()
-    
-    available_slots = []
-    for slot in slots:
-        c.execute("SELECT * FROM bookings WHERE date=? AND time=? AND status NOT IN ('cancelled', 'expired') AND (confirmed=1 OR reserved_until > ?)",
-                  (ev["date"], slot["time"], now.isoformat()))
-        existing = c.fetchone()
-        
-        if not existing:
-            available_slots.append({
-                "time": slot["time"],
-                "label": slot["label"]
-            })
-    
+
+    # Single query instead of one per slot (N+1 → 1)
+    c.execute("""
+        SELECT time FROM bookings
+        WHERE date=?
+          AND status NOT IN ('cancelled', 'expired')
+          AND (confirmed=1 OR reserved_until > ?)
+    """, (ev["date"], now.isoformat()))
+    booked_times = {row["time"] for row in c.fetchall()}
     conn.close()
-    
+
+    available_slots = [
+        {"time": s["time"], "label": s["label"]}
+        for s in slots
+        if s["time"] not in booked_times
+    ]
+
     return jsonify({
         "date": date_str,
         "event_id": ev["id"],
@@ -626,45 +772,58 @@ def reserve_slot():
     record_request(ip)
 
     now = datetime.now()
-    expires = now + timedelta(minutes=15)
+    expires = now + timedelta(minutes=RESERVATION_MINUTES)
 
     conn = db_conn()
     c = conn.cursor()
+    booking_id = None
 
-    # BEGIN IMMEDIATE acquires a write lock up-front, serialising concurrent
-    # reserve attempts so the check-then-insert is atomic.
-    c.execute("BEGIN IMMEDIATE")
+    try:
+        # BEGIN IMMEDIATE acquires a write lock up-front, serialising concurrent
+        # reserve attempts so the check-then-insert is atomic.
+        c.execute("BEGIN IMMEDIATE")
 
-    # Slot is taken if there is a confirmed booking OR an active reservation
-    c.execute("""
-        SELECT id FROM bookings
-        WHERE date=? AND time=?
-          AND status NOT IN ('cancelled', 'expired')
-          AND (confirmed=1 OR reserved_until > ?)
-    """, (event_date, slot_time, now.isoformat()))
-    if c.fetchone():
+        # Slot is taken if there is a confirmed booking OR an active (non-expired) reservation
+        c.execute("""
+            SELECT id FROM bookings
+            WHERE date=? AND time=?
+              AND status NOT IN ('cancelled', 'expired')
+              AND (confirmed=1 OR reserved_until > ?)
+        """, (event_date, slot_time, now.isoformat()))
+        if c.fetchone():
+            conn.rollback()
+            conn.close()
+            return jsonify({"success": False, "error": "Slot is no longer available"})
+
+        # Remove stale rows: cancelled, expired, and past-deadline reserved/pending
+        # so the INSERT doesn't hit the UNIQUE(date, time) constraint.
+        c.execute("""
+            DELETE FROM bookings
+            WHERE date=? AND time=?
+              AND (
+                status IN ('cancelled', 'expired')
+                OR (status IN ('reserved', 'pending_payment') AND reserved_until <= ?)
+              )
+        """, (event_date, slot_time, now.isoformat()))
+
+        c.execute("""
+            INSERT INTO bookings
+                (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?)
+        """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"]))
+
+        if c.rowcount == 0:
+            conn.rollback()
+            conn.close()
+            return jsonify({"success": False, "error": "Slot just taken"})
+
+        booking_id = c.lastrowid
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         conn.close()
-        return jsonify({"success": False, "error": "Slot is no longer available"})
-
-    # Delete any previous cancelled/expired booking for this slot to avoid UNIQUE conflict
-    c.execute("DELETE FROM bookings WHERE date=? AND time=? AND status IN ('cancelled', 'expired')",
-              (event_date, slot_time))
-
-    c.execute("""
-        INSERT INTO bookings
-            (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?)
-    """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"]))
-
-    if c.rowcount == 0:
-        conn.rollback()
-        conn.close()
-        return jsonify({"success": False, "error": "Slot just taken"})
-
-    booking_id = c.lastrowid
-    conn.commit()
-    conn.close()
 
     # Notify photographer via Telegram
     _notify_admin(f"🆕 New reservation #{booking_id}\n"
@@ -674,14 +833,14 @@ def reserve_slot():
                   f"📧 {client_email}\n"
                   f"📸 @{client_ig or 'N/A'}\n"
                   f"🏷️ {session_type or 'N/A'}\n"
-                  f"⏱️ Expires in 15 min")
+                  f"⏱️ Expires in {RESERVATION_MINUTES} min")
 
     return jsonify({
         "success": True,
         "booking_id": booking_id,
         "event_id": ev["id"],
         "expires_at": expires.isoformat(),
-        "message": f"Reserved for 15 minutes. Complete payment before {expires.strftime('%H:%M')}."
+        "message": f"Reserved for {RESERVATION_MINUTES} minutes. Complete payment before {expires.strftime('%H:%M')}."
     })
 
 @app.route("/payment")
@@ -744,7 +903,7 @@ def confirm_payment():
             reserved_until=excluded.reserved_until,
             event_id=excluded.event_id
     ''', (event_date, time, client_name, client_email, client_phone, client_ig, session_type,
-          (datetime.now() + timedelta(minutes=15)).isoformat(), ev["id"] if ev else None))
+          (datetime.now() + timedelta(minutes=RESERVATION_MINUTES)).isoformat(), ev["id"] if ev else None))
     conn.commit()
     
     # Get booking ID
@@ -757,15 +916,20 @@ def confirm_payment():
     if booking_id:
         sync_to_notion(booking_id)
 
-    # Notify photographer
-    _notify_admin(f"💰 Payment submitted for #{booking_id}\n"
-                  f"👤 {client_name}\n"
-                  f"📅 {event_date} @ {time}\n"
-                  f"🎉 {ev.get('title', '') if ev else ''}\n"
-                  f"📧 {client_email}\n"
-                  f"📸 @{client_ig or 'N/A'}\n"
-                  f"🏷️ {session_type or 'N/A'}\n"
-                  f"⏳ Awaiting e-Transfer confirmation")
+    # Notify with inline confirm/cancel buttons
+    if booking_id:
+        _notify_payment_pending(
+            booking_id=booking_id,
+            client_name=client_name,
+            client_email=client_email,
+            event_date=event_date,
+            slot_time=time,
+            event_title=ev.get("title", "Mini Session") if ev else "Mini Session",
+            session_type=session_type,
+            client_ig=client_ig,
+            expected_deposit=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
+            client_phone=client_phone,
+        )
 
     # Start automatic e-Transfer checker
     if booking_id:
@@ -817,7 +981,8 @@ def admin():
         "expired": sum(1 for b in rows if b["status"] == "expired"),
         "total_expected": sum(b.get("paid_amount", 0) or 0 for b in rows if b["status"] == "confirmed"),
     }
-    return render_template("admin.html", bookings=rows, stats=stats, admin_key=request.headers.get("X-Admin-Key", ""))
+    key = request.args.get("key") or request.headers.get("X-Admin-Key", "")
+    return render_template("admin.html", bookings=rows, stats=stats, admin_key=key, events=EVENTS)
 
 @app.route("/admin/confirm", methods=["POST"])
 @admin_required
@@ -874,6 +1039,118 @@ def admin_cancel():
     return jsonify({"success": True})
 
 
+EVENTS_YAML_PATH = os.path.join(os.path.dirname(__file__), "events.yaml")
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+
+def _allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route("/admin/photos/<event_id>", methods=["GET"])
+@admin_required
+def admin_get_photos(event_id):
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"error": "Event not found"}), 404
+    return jsonify({"photos": ev.get("photos", [])})
+
+@app.route("/admin/photos/<event_id>/upload", methods=["POST"])
+@admin_required
+def admin_upload_photo(event_id):
+    """Upload a new photo for an event (replaces slot index if provided)."""
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"error": "Event not found"}), 404
+
+    f = request.files.get("photo")
+    if not f or not _allowed_file(f.filename):
+        return jsonify({"error": "Invalid file. Allowed: jpg, jpeg, png, webp"}), 400
+
+    slot_index = request.form.get("slot_index")  # optional — which photo slot to replace
+
+    import uuid
+    ext = f.filename.rsplit(".", 1)[1].lower()
+    filename = f"{event_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    images_dir = os.path.join(app.root_path, "static", "images")
+    os.makedirs(images_dir, exist_ok=True)
+    save_path = os.path.join(images_dir, filename)
+    f.save(save_path)
+    url = f"/images/{filename}"
+
+    # Update events.yaml
+    with open(EVENTS_YAML_PATH) as fh:
+        data = yaml.safe_load(fh)
+
+    for ev_data in data.get("events", []):
+        if ev_data["id"] == event_id:
+            photos = ev_data.get("photos") or []
+            if slot_index is not None:
+                idx = int(slot_index)
+                if 0 <= idx < len(photos):
+                    # delete old file if it lives in our images dir
+                    old = photos[idx].lstrip("/")
+                    old_path = os.path.join(app.root_path, "static", old)
+                    if os.path.exists(old_path) and old_path != save_path:
+                        try: os.remove(old_path)
+                        except Exception: pass
+                    photos[idx] = url
+                else:
+                    photos.append(url)
+            else:
+                photos.append(url)
+            ev_data["photos"] = photos
+            break
+
+    with open(EVENTS_YAML_PATH, "w") as fh:
+        yaml.dump(data, fh, allow_unicode=True, sort_keys=False)
+
+    # Reload events in memory
+    global EVENTS, SETTINGS
+    _cfg = yaml.safe_load(open(EVENTS_YAML_PATH))
+    EVENTS = _cfg.get("events", [])
+    SETTINGS = _cfg.get("settings", {})
+
+    log.info(f"[admin] Photo uploaded for {event_id}: {url}")
+    return jsonify({"success": True, "url": url})
+
+@app.route("/admin/photos/<event_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_photo(event_id):
+    """Remove a photo from an event's list."""
+    slot_index = (request.json or {}).get("slot_index")
+    if slot_index is None:
+        return jsonify({"error": "slot_index required"}), 400
+
+    with open(EVENTS_YAML_PATH) as fh:
+        data = yaml.safe_load(fh)
+
+    deleted_url = None
+    for ev_data in data.get("events", []):
+        if ev_data["id"] == event_id:
+            photos = ev_data.get("photos") or []
+            idx = int(slot_index)
+            if 0 <= idx < len(photos):
+                deleted_url = photos.pop(idx)
+            ev_data["photos"] = photos
+            break
+
+    with open(EVENTS_YAML_PATH, "w") as fh:
+        yaml.dump(data, fh, allow_unicode=True, sort_keys=False)
+
+    # delete file from disk if it's ours
+    if deleted_url:
+        old_path = os.path.join(app.root_path, "static", deleted_url.lstrip("/"))
+        if os.path.exists(old_path):
+            try: os.remove(old_path)
+            except Exception: pass
+
+    global EVENTS, SETTINGS
+    _cfg = yaml.safe_load(open(EVENTS_YAML_PATH))
+    EVENTS = _cfg.get("events", [])
+    SETTINGS = _cfg.get("settings", {})
+
+    return jsonify({"success": True})
+
+
 @app.route("/booking-status")
 def booking_status():
     """API for live client page polling — returns booking status + paid_amount."""
@@ -881,7 +1158,6 @@ def booking_status():
     if not booking_id:
         return jsonify({"error": "booking_id required"}), 400
     conn = db_conn()
-    conn.row_factory = sqlite3.Row
     row = conn.execute("SELECT status, confirmed, paid, paid_amount, name FROM bookings WHERE id=?", (booking_id,)).fetchone()
     conn.close()
     if not row:
@@ -894,6 +1170,117 @@ def booking_status():
         "paid_amount": b.get("paid_amount"),
         "name": b.get("name", "")
     })
+
+# ===== TELEGRAM WEBHOOK =====
+@app.route("/telegram/webhook", methods=["POST"])
+def telegram_webhook():
+    """Handle inline button presses from Telegram bot (confirm/cancel bookings)."""
+    data = request.json
+    if not data or "callback_query" not in data:
+        return jsonify({"ok": True})
+
+    cb = data["callback_query"]
+    cb_data = cb.get("data", "")
+    chat_id = cb["message"]["chat"]["id"]
+    message_id = cb["message"]["message_id"]
+    from_user = cb.get("from", {}).get("first_name", "Admin")
+
+    # Acknowledge immediately (removes spinner on button)
+    requests.post(
+        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery",
+        json={"callback_query_id": cb["id"]},
+        timeout=5
+    )
+
+    if not cb_data:
+        return jsonify({"ok": True})
+
+    action, _, booking_id_str = cb_data.partition(":")
+    try:
+        booking_id = int(booking_id_str)
+    except (ValueError, TypeError):
+        return jsonify({"ok": True})
+
+    if action == "confirm":
+        conn = db_conn()
+        c = conn.cursor()
+        c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            _tg_send(chat_id, f"❌ Booking #{booking_id} not found.")
+            return jsonify({"ok": True})
+
+        booking = dict(row)
+        if booking["confirmed"]:
+            conn.close()
+            _tg_send(chat_id, f"ℹ️ Booking #{booking_id} already confirmed.")
+            return jsonify({"ok": True})
+
+        c.execute(
+            "UPDATE bookings SET confirmed=1, paid=1, status='confirmed', paid_amount=? WHERE id=?",
+            (SESSION_PRICE, booking_id)
+        )
+        conn.commit()
+        conn.close()
+
+        ev = get_event_by_id(booking.get("event_id"))
+        event_title = ev.get("title", "Mini Session") if ev else "Mini Session"
+        event_date = ev["date"] if ev else booking["date"]
+
+        create_calendar_event_for_booking(booking_id)
+        sync_to_notion(booking_id)
+        if ev and booking:
+            _send_client_email(
+                to_email=booking.get("email", ""),
+                client_name=booking.get("name", "Client"),
+                event_date=event_date,
+                slot_time=booking.get("time", ""),
+                event_title=event_title,
+                booking_id=booking_id
+            )
+
+        log.info(f"[tg-webhook] Booking #{booking_id} confirmed by {from_user}")
+        updated_text = (
+            f"✅ <b>CONFIRMED</b> by {from_user}\n\n"
+            f"👤 {booking.get('name', 'Client')}\n"
+            f"📅 {booking.get('date')} @ {booking.get('time')}\n"
+            f"🎉 {event_title}\n"
+            f"📋 Booking #{booking_id}\n"
+            f"📧 Email sent to client"
+        )
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
+            json={"chat_id": chat_id, "message_id": message_id,
+                  "text": updated_text, "parse_mode": "HTML"},
+            timeout=5
+        )
+        other_chat = TELEGRAM_ADMIN_CHAT_ID if str(chat_id) != TELEGRAM_ADMIN_CHAT_ID else TELEGRAM_CHAT_ID
+        if other_chat:
+            _tg_send(other_chat, updated_text)
+
+    elif action == "cancel":
+        conn = db_conn()
+        c = conn.cursor()
+        c.execute("UPDATE bookings SET status='cancelled', reserved_until=NULL WHERE id=?", (booking_id,))
+        conn.commit()
+        conn.close()
+        sync_to_notion(booking_id)
+
+        log.info(f"[tg-webhook] Booking #{booking_id} cancelled by {from_user}")
+        updated_text = f"❌ <b>CANCELLED</b> by {from_user}\n📋 Booking #{booking_id}"
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
+            json={"chat_id": chat_id, "message_id": message_id,
+                  "text": updated_text, "parse_mode": "HTML"},
+            timeout=5
+        )
+        other_chat = TELEGRAM_ADMIN_CHAT_ID if str(chat_id) != TELEGRAM_ADMIN_CHAT_ID else TELEGRAM_CHAT_ID
+        if other_chat:
+            _tg_send(other_chat, updated_text)
+
+    return jsonify({"ok": True})
+
 
 # ===== RUN =====
 if __name__ == "__main__":

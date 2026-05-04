@@ -3,363 +3,736 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📋 Admin | Pashynska Photography</title>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <title>Admin · Pashynska Photography</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --surface-2: #f7f8fa;
+            --border: #e4e7ec;
+            --border-strong: #d1d5db;
+            --text: #111827;
+            --text-2: #6b7280;
+            --text-3: #9ca3af;
+            --accent: #f97316;
+            --accent-light: #fff7ed;
+            --green: #16a34a;
+            --green-light: #dcfce7;
+            --green-text: #15803d;
+            --red: #dc2626;
+            --red-light: #fee2e2;
+            --red-text: #991b1b;
+            --yellow: #d97706;
+            --yellow-light: #fef3c7;
+            --yellow-text: #92400e;
+            --blue: #2563eb;
+            --blue-light: #eff6ff;
+            --blue-text: #1d4ed8;
+            --gray-light: #f3f4f6;
+            --gray-text: #4b5563;
+            --radius: 10px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Inter', sans-serif;
-            background: #faf8f6;
-            color: #2a1f1f;
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-        .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
-        .header {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-        .header h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: 2rem;
-            font-weight: 600;
-        }
-        .header p { color: #888; }
-
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 16px;
-            margin-bottom: 28px;
-        }
-        .stat-card {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-        }
-        .stat-card .number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #d97a8a;
-            font-family: 'Playfair Display', serif;
-        }
-        .stat-card .label {
-            font-size: 0.85rem;
-            color: #888;
-            margin-top: 4px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.5;
         }
 
-        /* Filters */
-        .filters {
+        /* ── TOP BAR ── */
+        .topbar {
+            background: #111827;
+            padding: 0 24px;
+            height: 56px;
             display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
             align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .filters button {
-            padding: 8px 18px;
-            border: 2px solid #e8e8e8;
-            border-radius: 10px;
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .topbar-brand .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .topbar-badge {
+            background: rgba(249,115,22,0.15);
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(249,115,22,0.3);
+        }
+        .topbar-link {
+            color: #9ca3af;
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+        .topbar-link:hover { color: white; }
+
+        /* ── PAGE ── */
+        .page { max-width: 1280px; margin: 0 auto; padding: 28px 24px 60px; }
+
+        /* ── PAGE HEADER ── */
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .page-title h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .page-title p { color: var(--text-2); font-size: 13px; margin-top: 2px; }
+        .page-actions { display: flex; gap: 10px; }
+        .btn-outline {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 16px;
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
             background: white;
-            cursor: pointer;
+            color: var(--text-2);
             font-family: inherit;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.15s;
         }
-        .filters button.active {
-            background: #d97a8a;
-            border-color: #d97a8a;
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── STATS ── */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .stat {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            box-shadow: var(--shadow);
+        }
+        .stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-3);
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+        }
+        .stat-value.green { color: var(--green); }
+        .stat-value.orange { color: var(--accent); }
+        .stat-value.red { color: var(--red); }
+        .stat-value.blue { color: var(--blue); }
+
+        /* ── NOTICE BOX ── */
+        .notice {
+            background: var(--blue-light);
+            border: 1px solid #bfdbfe;
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: var(--blue-text);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .notice-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+        /* ── TOOLBAR ── */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: white;
+            color: var(--text-2);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .filter-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
             color: white;
         }
-        .filters button:hover:not(.active) {
-            border-color: #d97a8a;
-            color: #d97a8a;
+        .search-wrap {
+            margin-left: auto;
+            position: relative;
         }
-        .filters input {
-            padding: 8px 14px;
-            border: 2px solid #e8e8e8;
-            border-radius: 10px;
-            font-family: inherit;
-            font-size: 0.9rem;
-            flex: 1;
-            min-width: 200px;
+        .search-icon {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: var(--text-3); font-size: 14px; pointer-events: none;
         }
-
-        /* Table */
-        .table-wrap {
-            background: white;
+        .search-input {
+            padding: 7px 12px 7px 34px;
+            border: 1px solid var(--border);
             border-radius: 20px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+            font-family: inherit;
+            font-size: 13px;
+            width: 260px;
+            background: white;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .search-input:focus { border-color: var(--accent); }
+
+        /* ── TABLE ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
             overflow: hidden;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.9rem;
         }
-        th {
-            background: #fdf6f3;
-            padding: 14px 16px;
+        thead th {
+            background: var(--surface-2);
+            padding: 10px 16px;
             text-align: left;
+            font-size: 11px;
             font-weight: 600;
-            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: #888;
-            border-bottom: 2px solid #f0e6e0;
+            color: var(--text-2);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
         }
-        td {
-            padding: 14px 16px;
-            border-bottom: 1px solid #f5f5f5;
+        tbody td {
+            padding: 13px 16px;
+            border-bottom: 1px solid var(--border);
             vertical-align: middle;
         }
-        tr:hover td { background: #fdf9f7; }
-        tr.pending-row td { background: #fffbeb; }
-        tr.confirmed-row td { background: #f0fdf4; }
-        tr.cancelled-row td { background: #fef2f2; opacity: 0.7; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: #fafbfc; }
 
-        /* Status badges */
+        /* row tints */
+        tbody tr.row-pending_payment td { background: #fffdf4; }
+        tbody tr.row-pending_payment:hover td { background: #fffae8; }
+        tbody tr.row-confirmed td { background: #f9fffe; }
+        tbody tr.row-confirmed:hover td { background: #f0fdf4; }
+        tbody tr.row-cancelled td, tbody tr.row-expired td { opacity: 0.55; }
+
+        /* ── BADGES ── */
         .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px;
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 11px;
             font-weight: 600;
+            white-space: nowrap;
         }
-        .badge-reserved { background: #fef3c7; color: #92400e; }
-        .badge-pending { background: #fffbeb; color: #b45309; }
-        .badge-confirmed { background: #dcfce7; color: #166534; }
-        .badge-cancelled { background: #fee2e2; color: #991b1b; }
-        .badge-expired { background: #f3f4f6; color: #4b5563; }
+        .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+        .b-reserved { background: var(--yellow-light); color: var(--yellow-text); }
+        .b-reserved .badge-dot { background: var(--yellow); animation: blink 1.5s infinite; }
+        .b-pending_payment { background: var(--yellow-light); color: var(--yellow-text); }
+        .b-pending_payment .badge-dot { background: #f59e0b; animation: blink 1.5s infinite; }
+        .b-confirmed { background: var(--green-light); color: var(--green-text); }
+        .b-confirmed .badge-dot { background: var(--green); }
+        .b-cancelled { background: var(--red-light); color: var(--red-text); }
+        .b-cancelled .badge-dot { background: var(--red); }
+        .b-expired { background: var(--gray-light); color: var(--gray-text); }
+        .b-expired .badge-dot { background: #9ca3af; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-        /* Buttons in table */
-        .btn-sm {
-            padding: 6px 14px;
+        /* ── CELL HELPERS ── */
+        .cell-id { color: var(--text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+        .cell-name { font-weight: 600; }
+        .cell-email a { color: var(--accent); text-decoration: none; }
+        .cell-email a:hover { text-decoration: underline; }
+        .cell-ig a { color: #e1306c; text-decoration: none; font-size: 13px; }
+        .cell-ig a:hover { text-decoration: underline; }
+        .cell-time { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .cell-amount { font-weight: 600; color: var(--green-text); font-variant-numeric: tabular-nums; }
+        .cell-amount.none { color: var(--text-3); font-weight: 400; }
+
+        /* ── ACTION BUTTONS ── */
+        .actions { display: flex; gap: 6px; }
+        .btn-confirm {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px;
+            background: var(--green);
+            color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 0.8rem;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
-            font-family: inherit;
+            transition: background 0.15s;
+            white-space: nowrap;
         }
-        .btn-confirm {
-            background: #16a34a;
-            color: white;
-        }
-        .btn-confirm:hover { background: #15803d; }
+        .btn-confirm:hover { background: var(--green-text); }
         .btn-cancel {
-            background: #dc2626;
-            color: white;
-            margin-left: 6px;
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px;
+            background: transparent;
+            color: var(--red);
+            border: 1px solid #fca5a5;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
         }
-        .btn-cancel:hover { background: #b91c1c; }
+        .btn-cancel:hover { background: var(--red-light); border-color: var(--red); }
         .btn-done {
-            background: #e5e7eb;
-            color: #6b7280;
+            padding: 6px 12px;
+            background: var(--gray-light);
+            color: var(--text-3);
+            border: none;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 12px;
             cursor: default;
         }
 
-        /* Auto-confirm note */
-        .note-box {
-            background: #e0f2fe;
-            border-left: 4px solid #0284c7;
-            padding: 16px 20px;
-            border-radius: 0 12px 12px 0;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
+        /* ── EMPTY STATE ── */
+        .empty {
+            padding: 60px 24px;
+            text-align: center;
+            color: var(--text-3);
         }
-        .note-box strong { color: #0369a1; }
+        .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
+        .empty p { font-size: 14px; }
 
-        /* Responsive */
+        /* ── TOAST ── */
+        #toast {
+            position: fixed; bottom: 28px; right: 28px;
+            background: #111827; color: white;
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: var(--shadow-md);
+            opacity: 0;
+            transform: translateY(8px);
+            transition: all 0.25s;
+            z-index: 999;
+            pointer-events: none;
+        }
+        #toast.show { opacity: 1; transform: translateY(0); }
+        #toast.success { background: var(--green); }
+        #toast.error { background: var(--red); }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 1100px) {
+            .stats { grid-template-columns: repeat(3, 1fr); }
+        }
         @media (max-width: 768px) {
-            .container { padding: 20px 16px; }
-            th, td { padding: 10px 12px; font-size: 0.8rem; }
-            .stats-grid { grid-template-columns: repeat(3, 1fr); }
-            .filters input { width: 100%; }
-            table { display: block; overflow-x: auto; }
+            .page { padding: 20px 16px; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .topbar { padding: 0 16px; }
+            .search-input { width: 180px; }
+            table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            thead th, tbody td { padding: 10px 12px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📋 Booking Admin</h1>
-            <p>Pashynska Photography — Manage all sessions</p>
-        </div>
 
-        <div class="note-box">
-            <strong>💡 How confirmation works:</strong><br>
-            <strong>Option 1 — Automatic:</strong> Himalaya checks emails from <code>notify@payments.interac.ca</code> every minute. When e-Transfer arrives → auto-confirms.<br>
-            <strong>Option 2 — Manual:</strong> Click "Confirm" below if you already received payment (cash, other method, or e-Transfer before auto-check).
-            <strong>Manual confirmation has priority.</strong>
-        </div>
+<!-- TOP BAR -->
+<nav class="topbar">
+    <div class="topbar-brand">
+        <div class="dot"></div>
+        Pashynska Photography
+        <span style="color:#4b5563; font-weight:400;">/ Admin</span>
+    </div>
+    <div class="topbar-right">
+        <span class="topbar-badge">Admin</span>
+        <a href="/" class="topbar-link" target="_blank">↗ Booking site</a>
+    </div>
+</nav>
 
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="number">{{ stats.total }}</div>
-                <div class="label">Total</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">{{ stats.confirmed }}</div>
-                <div class="label">Confirmed</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">{{ stats.pending }}</div>
-                <div class="label">Pending</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">${{ "%.0f"|format(stats.total_expected) }}</div>
-                <div class="label">Revenue</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">{{ stats.cancelled }}</div>
-                <div class="label">Cancelled</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">{{ stats.expired }}</div>
-                <div class="label">Expired</div>
-            </div>
-        </div>
+<div class="page">
 
-        <!-- Filters -->
-        <div class="filters">
-            <button class="active" onclick="filterRows('all')">All</button>
-            <button onclick="filterRows('pending')">⏳ Pending</button>
-            <button onclick="filterRows('confirmed')">✅ Confirmed</button>
-            <button onclick="filterRows('cancelled')">❌ Cancelled</button>
-            <input type="text" id="search" placeholder="🔍 Search by name, email, Instagram..." oninput="searchRows(this.value)">
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+        <div class="page-title">
+            <h1>Bookings</h1>
+            <p>All sessions · Lilac Mini Sessions · June 7, 2026</p>
         </div>
-
-        <!-- Table -->
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Instagram</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Deposit</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="bookings-body">
-                    {% for b in bookings %}
-                    <tr class="booking-row {{ b.status }}-row" data-status="{{ b.status }}" data-search="{{ b.name|lower }} {{ b.email|lower }} {{ b.instagram|lower }} {{ b.phone|lower }}">
-                        <td>#{{ b.id }}</td>
-                        <td>{{ b.date }}</td>
-                        <td><strong>{{ b.time }}</strong></td>
-                        <td>{{ b.name or '—' }}</td>
-                        <td><a href="mailto:{{ b.email }}" style="color:#d97a8a;">{{ b.email or '—' }}</a></td>
-                        <td>{{ b.phone or '—' }}</td>
-                        <td>{% if b.instagram %}<a href="https://instagram.com/{{ b.instagram.lstrip('@') }}" target="_blank" style="color:#c41e3a;">@{{ b.instagram.lstrip('@') }}</a>{% else %}—{% endif %}</td>
-                        <td>{{ b.session_type or '—' }}</td>
-                        <td>
-                            <span class="badge badge-{{ b.status }}">
-                                {% if b.status == 'reserved' %}⏳ Reserved{% elif b.status == 'pending_payment' %}⏳ Pending{% elif b.status == 'confirmed' %}✅ Confirmed{% elif b.status == 'cancelled' %}❌ Cancelled{% elif b.status == 'expired' %}⌛ Expired{% else %}{{ b.status }}{% endif %}
-                            </span>
-                        </td>
-                        <td>{% if b.paid_amount %}${{ "%.2f"|format(b.paid_amount) }}{% else %}—{% endif %}</td>
-                        <td>
-                            {% if b.status in ('reserved', 'pending_payment') %}
-                                <button class="btn-sm btn-confirm" onclick="confirmBooking({{ b.id }}, '{{ b.name|e }}')">✓ Confirm</button>
-                                <button class="btn-sm btn-cancel" onclick="cancelBooking({{ b.id }}, '{{ b.name|e }}')">✕ Cancel</button>
-                            {% elif b.status == 'confirmed' %}
-                                <button class="btn-sm btn-done" disabled>✓ Done</button>
-                            {% else %}
-                                <span style="color:#888;font-size:0.8rem;">—</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="page-actions">
+            <button class="btn-outline" onclick="location.reload()">↻ Refresh</button>
         </div>
     </div>
 
-    <script>
-        const ADMIN_KEY = '{{ admin_key }}';
+    <!-- NOTICE -->
+    <div class="notice">
+        <span class="notice-icon">💡</span>
+        <span>
+            <strong>Confirmation options:</strong>
+            Payments are verified automatically via email every minute when e-Transfer arrives from <code>notify@payments.interac.ca</code>.
+            Use the <strong>Confirm</strong> button below for manual confirmation (cash, early e-Transfer, etc).
+        </span>
+    </div>
 
-        async function confirmBooking(id, name) {
-            if (!confirm(`Confirm booking #${id} for ${name}?\n\nThis will:\n• Mark as paid & confirmed\n• Create Google Calendar event\n• Sync to Notion\n• Send confirmation email to client`)) return;
+    <!-- STATS -->
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-label">Total</div>
+            <div class="stat-value">{{ stats.total }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Confirmed</div>
+            <div class="stat-value green">{{ stats.confirmed }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Pending</div>
+            <div class="stat-value orange">{{ stats.pending }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Revenue</div>
+            <div class="stat-value blue">${{ "%.0f"|format(stats.total_expected) }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Cancelled</div>
+            <div class="stat-value red">{{ stats.cancelled }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Expired</div>
+            <div class="stat-value" style="color:var(--text-3)">{{ stats.expired }}</div>
+        </div>
+    </div>
 
-            try {
-                const res = await fetch('/admin/confirm', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Key': ADMIN_KEY
-                    },
-                    body: JSON.stringify({ booking_id: id, paid_amount: 95 })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert('✅ Booking confirmed!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Unknown'));
-                }
-            } catch (err) {
-                alert('Network error: ' + err.message);
-            }
-        }
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+        <button class="filter-btn" data-filter="pending" onclick="setFilter('pending', this)">⏳ Pending</button>
+        <button class="filter-btn" data-filter="confirmed" onclick="setFilter('confirmed', this)">✅ Confirmed</button>
+        <button class="filter-btn" data-filter="cancelled" onclick="setFilter('cancelled', this)">❌ Cancelled</button>
+        <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" type="text" id="search" placeholder="Search by name, email, Instagram…" oninput="doSearch(this.value)">
+        </div>
+    </div>
 
-        async function cancelBooking(id, name) {
-            if (!confirm(`Cancel booking #${id} for ${name}?\n\nThis will free the slot for others.`)) return;
+    <!-- TABLE -->
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Date &amp; Time</th>
+                    <th>Client</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Instagram</th>
+                    <th>Status</th>
+                    <th>Deposit paid</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tbody">
+                {% for b in bookings %}
+                <tr class="brow row-{{ b.status }}"
+                    data-status="{{ b.status }}"
+                    data-search="{{ (b.name or '') | lower }} {{ (b.email or '') | lower }} {{ (b.instagram or '') | lower }} {{ (b.phone or '') | lower }}">
 
-            try {
-                const res = await fetch('/admin/cancel', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Key': ADMIN_KEY
-                    },
-                    body: JSON.stringify({ booking_id: id })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert('❌ Booking cancelled');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Unknown'));
-                }
-            } catch (err) {
-                alert('Network error: ' + err.message);
-            }
-        }
+                    <td class="cell-id">#{{ b.id }}</td>
 
-        function filterRows(status) {
-            document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
+                    <td>
+                        <div class="cell-time">{{ b.time }}</div>
+                        <div style="color:var(--text-3);font-size:12px;">{{ b.date }}</div>
+                    </td>
 
-            document.querySelectorAll('.booking-row').forEach(row => {
-                if (status === 'all' || row.dataset.status === status || (status === 'pending' && row.dataset.status === 'reserved')) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
+                    <td class="cell-name">{{ b.name or '—' }}</td>
+
+                    <td class="cell-email">
+                        {% if b.email %}<a href="mailto:{{ b.email }}">{{ b.email }}</a>{% else %}—{% endif %}
+                    </td>
+
+                    <td style="color:var(--text-2);">{{ b.phone or '—' }}</td>
+
+                    <td class="cell-ig">
+                        {% if b.instagram %}
+                        <a href="https://instagram.com/{{ b.instagram.lstrip('@') }}" target="_blank">@{{ b.instagram.lstrip('@') }}</a>
+                        {% else %}—{% endif %}
+                    </td>
+
+                    <td>
+                        <span class="badge b-{{ b.status }}">
+                            <span class="badge-dot"></span>
+                            {% if b.status == 'reserved' %}Reserved
+                            {% elif b.status == 'pending_payment' %}Pending payment
+                            {% elif b.status == 'confirmed' %}Confirmed
+                            {% elif b.status == 'cancelled' %}Cancelled
+                            {% elif b.status == 'expired' %}Expired
+                            {% else %}{{ b.status }}{% endif %}
+                        </span>
+                    </td>
+
+                    <td>
+                        {% if b.paid_amount %}
+                        <span class="cell-amount">${{ "%.2f"|format(b.paid_amount) }} CAD</span>
+                        {% else %}
+                        <span class="cell-amount none">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="actions">
+                        {% if b.status in ('reserved', 'pending_payment') %}
+                            <button class="btn-confirm" onclick="confirmBooking({{ b.id }}, '{{ b.name | e }}')">✓ Confirm</button>
+                            <button class="btn-cancel" onclick="cancelBooking({{ b.id }}, '{{ b.name | e }}')">✕ Cancel</button>
+                        {% elif b.status == 'confirmed' %}
+                            <button class="btn-done" disabled>✓ Done</button>
+                        {% else %}
+                            <span style="color:var(--text-3);font-size:12px;">—</span>
+                        {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9">
+                    <div class="empty">
+                        <div class="empty-icon">📋</div>
+                        <p>No bookings yet.</p>
+                    </div>
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- PHOTO MANAGEMENT -->
+    <div style="margin-top:36px;">
+        <div class="page-header" style="margin-bottom:16px;">
+            <div class="page-title">
+                <h1>Photos</h1>
+                <p>Manage preview photos shown on the booking page — per event</p>
+            </div>
+        </div>
+
+        {% for ev in events %}
+        {% if ev.status in ('active', 'upcoming') or loop.index == 1 %}
+        <div class="card" style="margin-bottom:20px; padding:24px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+                <div>
+                    <div style="font-weight:700; font-size:15px;">{{ ev.title }}</div>
+                    <div style="color:var(--text-3); font-size:12px; margin-top:2px;">{{ ev.id }} · {{ ev.date }} · status: <strong>{{ ev.status }}</strong></div>
+                </div>
+                <label class="btn-outline" style="cursor:pointer; color:var(--accent); border-color:var(--accent);">
+                    + Add photo
+                    <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
+                        onchange="uploadPhoto('{{ ev.id }}', null, this)">
+                </label>
+            </div>
+
+            <div class="photo-slots" id="slots-{{ ev.id }}" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px;">
+                {% set photos = ev.photos or [] %}
+                {% if photos %}
+                    {% for photo in photos %}
+                    <div class="photo-slot" data-index="{{ loop.index0 }}" style="position:relative; border-radius:10px; overflow:hidden; background:var(--surface-2); border:1px solid var(--border); aspect-ratio:4/3;">
+                        <img src="{{ photo }}" style="width:100%; height:100%; object-fit:cover; display:block;">
+                        <div style="position:absolute; inset:0; background:rgba(0,0,0,0); transition:background 0.2s;"
+                             onmouseover="this.style.background='rgba(0,0,0,0.35)'; this.nextElementSibling.style.opacity='1'"
+                             onmouseout="this.style.background='rgba(0,0,0,0)'; this.nextElementSibling.style.opacity='0'">
+                        </div>
+                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; opacity:0; transition:opacity 0.2s; pointer-events:none;" class="photo-actions">
+                            <label style="background:white; color:#111; border:none; border-radius:7px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; pointer-events:all;">
+                                ↑ Replace
+                                <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
+                                    onchange="uploadPhoto('{{ ev.id }}', {{ loop.index0 }}, this)">
+                            </label>
+                            <button onclick="deletePhoto('{{ ev.id }}', {{ loop.index0 }})"
+                                style="background:var(--red); color:white; border:none; border-radius:7px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; pointer-events:all;">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div id="empty-{{ ev.id }}" style="grid-column:1/-1; padding:40px; text-align:center; color:var(--text-3); border:2px dashed var(--border); border-radius:10px;">
+                        No photos yet — click <strong>+ Add photo</strong> to upload
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+    const ADMIN_KEY = '{{ admin_key }}';
+
+    /* ── toast ── */
+    function toast(msg, type) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'show ' + (type || '');
+        setTimeout(() => el.className = '', 3000);
+    }
+
+    /* ── confirm ── */
+    async function confirmBooking(id, name) {
+        if (!confirm(`Confirm booking #${id} for ${name}?\n\nThis will mark the deposit as paid and send a confirmation email to the client.`)) return;
+        try {
+            const res = await fetch('/admin/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+                body: JSON.stringify({ booking_id: id, paid_amount: 95, key: ADMIN_KEY })
             });
+            const data = await res.json();
+            if (data.success) {
+                toast('✅ Booking confirmed!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
         }
+    }
 
-        function searchRows(query) {
-            const q = query.toLowerCase();
-            document.querySelectorAll('.booking-row').forEach(row => {
-                row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+    /* ── cancel ── */
+    async function cancelBooking(id, name) {
+        if (!confirm(`Cancel booking #${id} for ${name}?\n\nThe slot will be freed for other clients.`)) return;
+        try {
+            const res = await fetch('/admin/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+                body: JSON.stringify({ booking_id: id, key: ADMIN_KEY })
             });
+            const data = await res.json();
+            if (data.success) {
+                toast('Booking cancelled', 'error');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
         }
-    </script>
+    }
+
+    /* ── filter ── */
+    function setFilter(f, btn) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.brow').forEach(row => {
+            const s = row.dataset.status;
+            const show = f === 'all'
+                || (f === 'pending' && (s === 'pending_payment' || s === 'reserved'))
+                || s === f;
+            row.style.display = show ? '' : 'none';
+        });
+    }
+
+    /* ── search ── */
+    function doSearch(q) {
+        const lq = q.toLowerCase();
+        document.querySelectorAll('.brow').forEach(row => {
+            row.style.display = row.dataset.search.includes(lq) ? '' : 'none';
+        });
+    }
+
+    /* ── photos ── */
+    async function uploadPhoto(eventId, slotIndex, input) {
+        const file = input.files[0];
+        if (!file) return;
+        const label = input.closest('label');
+        const origText = label ? label.childNodes[0].textContent.trim() : '';
+        if (label) label.childNodes[0].textContent = ' Uploading…';
+        toast('Uploading…');
+
+        const fd = new FormData();
+        fd.append('photo', file);
+        if (slotIndex !== null) fd.append('slot_index', slotIndex);
+
+        try {
+            const res = await fetch(`/admin/photos/${eventId}/upload`, {
+                method: 'POST',
+                headers: { 'X-Admin-Key': ADMIN_KEY },
+                body: fd
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('✅ Photo saved!', 'success');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+                if (label) label.childNodes[0].textContent = origText;
+            }
+        } catch (err) {
+            toast('Upload failed: ' + err.message, 'error');
+            if (label) label.childNodes[0].textContent = origText;
+        }
+        input.value = '';
+    }
+
+    async function deletePhoto(eventId, slotIndex) {
+        if (!confirm('Remove this photo from the event?')) return;
+        try {
+            const res = await fetch(`/admin/photos/${eventId}/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+                body: JSON.stringify({ slot_index: slotIndex, key: ADMIN_KEY })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('Photo removed', 'error');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Error: ' + err.message, 'error');
+        }
+    }
+</script>
 </body>
 </html>

@@ -295,12 +295,15 @@
         </div>
 
         <!-- Photos -->
+        {% if photos %}
         <div class="card">
             <div class="photo-grid">
-                <img src="/images/lilac_1.jpg" alt="Spring mini session among blooming lilacs in Calgary">
-                <img src="/images/pregnancy_1.jpg" alt="Natural light family portrait in Calgary">
+                {% for photo in photos %}
+                <img src="{{ photo }}" alt="{{ title }}">
+                {% endfor %}
             </div>
         </div>
+        {% endif %}
 
         <!-- Info -->
         <div class="card">
@@ -339,18 +342,6 @@
                 <div class="form-group">
                     <label for="instagram">Instagram Handle * <span style="color:#888; font-weight:400;">(@yourhandle)</span></label>
                     <input type="text" id="instagram" name="instagram" required placeholder="@yourhandle">
-                </div>
-                <div class="form-group">
-                    <label for="session_type">Session Type *</label>
-                    <select id="session_type" name="session_type" required style="width:100%; padding:14px 16px; border:2px solid #e8e8e8; border-radius:12px; font-size:1rem; font-family:inherit; background:white;">
-                        <option value="">Choose a session type…</option>
-                        <option value="Family">Family</option>
-                        <option value="Portrait">Portrait</option>
-                        <option value="Couple">Couple</option>
-                        <option value="Maternity">Maternity</option>
-                        <option value="Branding">Branding</option>
-                        <option value="Other">Other</option>
-                    </select>
                 </div>
 
                 <label style="font-weight:500; margin-bottom:12px; display:block;">Available Time Slots</label>
@@ -433,7 +424,7 @@
                 email: document.getElementById('email').value.trim(),
                 phone: document.getElementById('phone').value.trim(),
                 instagram: document.getElementById('instagram').value.trim(),
-                session_type: document.getElementById('session_type').value
+                session_type: ''
             };
 
             // Basic validation
@@ -441,7 +432,6 @@
             if (!formData.email) return {success: false, error: 'Please enter your email'};
             if (!formData.phone) return {success: false, error: 'Please enter your phone number'};
             if (!formData.instagram) return {success: false, error: 'Please enter your Instagram handle'};
-            if (!formData.session_type) return {success: false, error: 'Please choose a session type'};
 
             try {
                 const res = await fetch('/reserve', {
@@ -507,7 +497,7 @@
                     email: document.getElementById('email').value.trim(),
                     phone: document.getElementById('phone').value.trim(),
                     instagram: document.getElementById('instagram').value.trim(),
-                    session_type: document.getElementById('session_type').value
+                    session_type: ''
                 };
                 const params = new URLSearchParams(formData);
                 window.location.href = '/payment?' + params.toString();
