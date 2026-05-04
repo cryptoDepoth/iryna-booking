@@ -60,7 +60,11 @@ def is_etransfer_email(email):
     return has_keyword or from_interac
 
 def read_email_body(email_id):
-    """Read full email body using Himalaya"""
+    """Read full email body using Himalaya.
+
+    Himalaya may return either a JSON object or a JSON string when `-o json` is
+    used. Normalize both into plain body text so Interac parsing is stable.
+    """
     try:
         result = subprocess.run(
             ["himalaya", "message", "read", email_id, "-o", "json"],
@@ -68,12 +72,32 @@ def read_email_body(email_id):
         )
         if result.returncode != 0:
             return None
-        lines = result.stdout.strip().split('\n')
-        for line in lines:
+        raw = result.stdout.strip()
+        if not raw:
+            return None
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, str):
+                return parsed
+            if isinstance(parsed, dict):
+                return parsed.get("text", {}).get("plain", "") or parsed.get("body", "") or str(parsed)
+        except json.JSONDecodeError:
+            pass
+        # Fallback for warn-prefixed or plain output.
+        for line in raw.split('\n'):
             line = line.strip()
-            if line.startswith('{'):
-                return json.loads(line)
-        return None
+            if not line:
+                continue
+            if line.startswith('"') or line.startswith('{'):
+                try:
+                    parsed = json.loads(line)
+                    if isinstance(parsed, str):
+                        return parsed
+                    if isinstance(parsed, dict):
+                        return parsed.get("text", {}).get("plain", "") or parsed.get("body", "") or str(parsed)
+                except json.JSONDecodeError:
+                    continue
+        return raw
     except Exception as e:
         print(f"Error reading email {email_id}: {e}")
         return None
@@ -105,9 +129,10 @@ def extract_payment_info(body_text):
     # Sender name
     sender = None
     sender_patterns = [
-        r'from\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
-        r'([A-Z][a-z]+\s+[A-Z][a-z]+)\s+sent you',
-        r'name\s*[:=]\s*([A-Za-z\s]+)',
+        r'Sent From:\s*([^\n\r]+)',
+        r'Interac e-Transfer: You[^\n]+ from\s+(.+?)\s+and it has been automatically deposited',
+        r'([A-Z][A-Z\' -]+)\s+sent you',
+        r'name\s*[:=]\s*([A-Za-z\s\'-]+)',
     ]
     for pattern in sender_patterns:
         match = re.search(pattern, body_text, re.I)
@@ -172,13 +197,13 @@ def expire_unpaid_bookings():
         # Delete from SQLite (free up the slot)
         c.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
         
-        # Update Notion status to "Expired"
+        # Update Notion status to "Expired" — v2 schema uses "Client Name" + "Booking ID (legacy)".
         try:
             from app import NOTION_HEADERS, NOTION_DATABASE_ID
             query_url = f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query"
             q = requests.post(query_url, headers=NOTION_HEADERS, json={
-                "filter": {"property": "Booking ID", "number": {"equals": booking_id}}
-            }).json()
+                "filter": {"property": "Booking ID (legacy)", "number": {"equals": booking_id}}
+            }, timeout=15).json()
             if q.get("results"):
                 page_id = q["results"][0]["id"]
                 requests.patch(
@@ -186,10 +211,11 @@ def expire_unpaid_bookings():
                     headers=NOTION_HEADERS,
                     json={"properties": {
                         "Status": {"select": {"name": "Expired"}},
-                        "Name": {"title": [{"text": {"content": f"{name or '(expired)'} — RELEASED"}}]}
-                    }}
+                        "Client Name": {"title": [{"text": {"content": f"{name or '(expired)'} — RELEASED"}}]},
+                    }},
+                    timeout=15,
                 )
-                print(f"   🔄 Notion updated: Status = Expired")
+                print("   🔄 Notion updated: Status = Expired")
         except Exception as e:
             print(f"   ⚠️ Notion update failed: {e}")
         
@@ -301,7 +327,7 @@ def main():
             continue
         
         # Extract info
-        body_text = body.get("text", {}).get("plain", "") or str(body)
+        body_text = body if isinstance(body, str) else (body.get("text", {}).get("plain", "") or str(body))
         payment_info = extract_payment_info(body_text)
         
         if not payment_info or not payment_info.get("amount"):

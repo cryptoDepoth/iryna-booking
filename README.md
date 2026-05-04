@@ -60,7 +60,7 @@ Copy the `trycloudflare.com` URL to share.
 
 - **Slots:** Every 20 min from 10:00 to 16:00
 - **Session types:** Blossom Mini, Lilac, Maternity, Wedding
-- **Pricing:** CAD $190 + GST = $199.50 total, **deposit $95** via e-Transfer
+- **Pricing:** Admin enters the pre-tax session price. Alberta GST is added automatically in the UI. Default: CAD $190 + $9.50 GST = $199.50 total, **$95.00 deposit now**, **$104.50 balance later**.
 - **e-Transfer email:** `iryna.pashynska@gmail.com`
 - **Auto-expire:** 15-minute reservation window (unpaid = slot freed)
 - **Rate limit:** Max 5 reserve attempts / 10 min per IP

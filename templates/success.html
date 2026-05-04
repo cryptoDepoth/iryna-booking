@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booking Confirmed! | Pashynska Photography</title>
+    <title>Booking Status | Pashynska Photography</title>
     <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📷%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -24,27 +24,75 @@
             padding: 40px 24px;
             text-align: center;
         }
-        .success-icon {
-            width: 100px;
-            height: 100px;
-            background: #e8f5e9;
+
+        /* ===== STATUS ICON ===== */
+        .status-icon {
+            width: 110px;
+            height: 110px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 28px;
-            font-size: 3rem;
+            font-size: 3.2rem;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        .status-icon.pending {
+            background: #fff3cd;
+            animation: pulse-pending 2s ease-in-out infinite;
+        }
+        .status-icon.confirmed {
+            background: #e8f5e9;
+            animation: pop-in 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .status-icon.cancelled {
+            background: #fce4ec;
+        }
+        @keyframes pulse-pending {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,193,7,0.3); }
+            50% { transform: scale(1.05); box-shadow: 0 0 20px 8px rgba(255,193,7,0.15); }
+        }
+        @keyframes pop-in {
+            0% { transform: scale(0.5); opacity: 0; }
+            60% { transform: scale(1.15); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ===== CONFETTI ===== */
+        .confetti-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 999;
+            overflow: hidden;
+        }
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            animation: confetti-fall linear forwards;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
         h1 {
             font-family: 'Playfair Display', serif;
             font-size: 2rem;
             margin-bottom: 12px;
+            transition: all 0.4s ease;
         }
         .subtitle {
             color: #666;
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             margin-bottom: 32px;
+            transition: all 0.4s ease;
         }
+
+        /* ===== CARD ===== */
         .card {
             background: white;
             border-radius: 20px;
@@ -61,14 +109,83 @@
         .detail-row:last-child { border-bottom: none; }
         .detail-row .label { color: #888; }
         .detail-row .value { font-weight: 500; }
+
+        /* ===== STATUS BADGE ===== */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.4s ease;
+        }
+        .status-badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-badge.confirmed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status-badge.cancelled {
+            background: #fce4ec;
+            color: #c62828;
+        }
+        .status-badge .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .status-badge.pending .dot {
+            background: #ffc107;
+            animation: blink 1.5s ease-in-out infinite;
+        }
+        .status-badge.confirmed .dot { background: #4caf50; }
+        .status-badge.cancelled .dot { background: #ef5350; }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* ===== MESSAGES ===== */
         .message {
-            background: #e3f2fd;
-            border-left: 4px solid #1976d2;
+            border-left: 4px solid;
             padding: 16px 20px;
             border-radius: 0 10px 10px 0;
             margin: 24px 0;
             text-align: left;
+            transition: all 0.4s ease;
         }
+        .message.info { background: #e3f2fd; border-color: #1976d2; }
+        .message.warning { background: #fff3cd; border-color: #ffc107; }
+        .message.success { background: #e8f5e9; border-color: #4caf50; }
+
+        /* ===== HOW TO PREPARE ===== */
+        .prep-card {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+            text-align: left;
+            margin-top: 28px;
+        }
+        .prep-card h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .prep-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 10px 0;
+        }
+        .prep-item .emoji { font-size: 1.4rem; margin-right: 12px; flex-shrink: 0; }
+        .prep-item .text strong { display: block; }
+        .prep-item .text span { color: #666; font-size: 0.95rem; }
+
         .btn {
             display: block;
             width: 100%;
@@ -83,7 +200,12 @@
             text-decoration: none;
             text-align: center;
             margin-top: 20px;
+            transition: background 0.3s ease;
         }
+        .btn:hover { background: #333; }
+        .btn.instagram-btn { background: #c41e3a; }
+        .btn.instagram-btn:hover { background: #a01830; }
+
         .instagram {
             color: #c41e3a;
             text-decoration: none;
@@ -94,18 +216,33 @@
             color: #888;
             font-size: 0.9rem;
         }
+
+        /* ===== PENDING → CONFIRMED TRANSITION ===== */
+        body.just-confirmed { animation: bg-flash 1s ease; }
+        @keyframes bg-flash {
+            0% { background: #faf8f6; }
+            30% { background: #f1f8e9; }
+            100% { background: #faf8f6; }
+        }
     </style>
 </head>
 <body>
+    <div class="confetti-container" id="confetti" style="display:none;"></div>
+
     <div class="container">
-        <div class="success-icon">🔄</div>
-        <h1>Payment Verification in Progress</h1>
-        <p class="subtitle">Thank you! We're checking for your e-Transfer now.</p>
+        <div class="status-icon pending" id="status-icon">🔄</div>
+        <h1 id="main-title">Payment Verification in Progress</h1>
+        <p class="subtitle" id="subtitle">Thank you! We're checking for your e-Transfer now.</p>
 
         <div class="card">
             <div class="detail-row">
                 <span class="label">Status</span>
-                <span class="value" style="color:#1976d2;">⏳ Payment Verification in Progress</span>
+                <span class="value">
+                    <span class="status-badge pending" id="status-badge">
+                        <span class="dot"></span>
+                        <span id="status-text">Verifying payment…</span>
+                    </span>
+                </span>
             </div>
             {% if booking %}
             <div class="detail-row">
@@ -137,71 +274,36 @@
             </div>
             <div class="detail-row">
                 <span class="label">Amount</span>
-                <span class="value">${{ price }} CAD</span>
+                <span class="value">${{ price|money }} {{ currency }}</span>
             </div>
         </div>
 
-        <div class="message">
+        <!-- PENDING MESSAGE (shown initially) -->
+        <div class="message info" id="msg-pending">
             📧 <strong>What happens next?</strong><br><br>
-            Our system is checking for your e-Transfer. You will receive an automatic confirmation email within a few minutes with your exact location and preparation tips.<br><br>
-            <strong>Please do not resend the payment.</strong> If we don't detect your transfer within 15 minutes, your reservation will be released automatically.
+            Our system is checking for your e-Transfer. Once confirmed, this page will update automatically.<br><br>
+            <strong>Please do not resend the payment.</strong>
         </div>
 
-        <div class="message" style="background:#fff3cd; border-color:#ffc107;">
-            ⚠️ <strong>Important:</strong> Your time slot is still reserved while we verify. If payment is not received within 15 minutes, the slot will become available for others. Need help? DM me on <a href="https://instagram.com/pashynska.photo" class="instagram" target="_blank">Instagram</a>.
+        <!-- CONFIRMED MESSAGE (hidden initially) -->
+        <div class="message success" id="msg-confirmed" style="display:none;">
+            🎉 <strong>Your booking is confirmed!</strong><br><br>
+            A confirmation email has been sent to your inbox with all the details. See you at the session!
+        </div>
+
+        <div class="message warning" id="msg-warning">
+            ⚠️ <strong>Important:</strong> Your time slot is reserved while we verify. Need help? DM me on <a href="https://instagram.com/pashynska.photo" class="instagram" target="_blank">Instagram</a>.
         </div>
 
         <!-- HOW TO PREPARE GUIDE -->
-        <div class="card" style="margin-top: 28px;">
-            <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;margin-bottom:20px;text-align:center;">🪻 How to Prepare for Your Photoshoot</h2>
-
-            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
-                <span style="font-size:1.4rem;margin-right:12px;">👗</span>
-                <div style="text-align:left;">
-                    <strong>Wardrobe</strong><br>
-                    <span style="color:#666;font-size:0.95rem;">Wear soft, coordinating tones — lilac, cream, pastels, or white look stunning against the blossoms. Avoid busy patterns, logos, and neon colors.</span>
-                </div>
-            </div>
-
-            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
-                <span style="font-size:1.4rem;margin-right:12px;">💇‍♀️</span>
-                <div style="text-align:left;">
-                    <strong>Hair & Makeup</strong><br>
-                    <span style="color:#666;font-size:0.95rem;">Natural, dewy makeup photographs best. Style your hair as you normally would, but avoid brand-new hairstyles you've never tried before.</span>
-                </div>
-            </div>
-
-            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
-                <span style="font-size:1.4rem;margin-right:12px;">👟</span>
-                <div style="text-align:left;">
-                    <strong>Footwear</strong><br>
-                    <span style="color:#666;font-size:0.95rem;">Grass may be damp in May. Bring a second pair of shoes and be ready to go barefoot for some romantic shots if you're comfortable.</span>
-                </div>
-            </div>
-
-            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
-                <span style="font-size:1.4rem;margin-right:12px;">🧒</span>
-                <div style="text-align:left;">
-                    <strong>Kids & Family</strong><br>
-                    <span style="color:#666;font-size:0.95rem;">Feed children before the session. Bring snacks, water, and a small comfort toy. A well-rested child = magical photos.</span>
-                </div>
-            </div>
-
-            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
-                <span style="font-size:1.4rem;margin-right:12px;">⏰</span>
-                <div style="text-align:left;">
-                    <strong>Arrive 5 Min Early</strong><br>
-                    <span style="color:#666;font-size:0.95rem;">Your slot is exactly 20 minutes. Arriving early maximizes your shoot time. Location details will be sent via DM once payment is confirmed.</span>
-                </div>
-            </div>
-
-            <div class="detail-row" style="border-bottom:none;align-items:flex-start;padding:10px 0;">
-                <span style="font-size:1.4rem;margin-right:12px;">🌸</span>
-                <div style="text-align:left;">
-                    <strong>Bonus Tip</strong><br>
-                    <span style="color:#666;font-size:0.95rem;">The lilac backdrop is beautiful but attracts bees. Stay calm — we can work around them, and I always bring a backup location plan.</span>
-                </div>
-            </div>
+        <div class="prep-card">
+            <h2>🪻 How to Prepare for Your Photoshoot</h2>
+            <div class="prep-item"><span class="emoji">👗</span><div class="text"><strong>Wardrobe</strong><span>Soft, coordinating tones — lilac, cream, pastels, or white. Avoid busy patterns and neon.</span></div></div>
+            <div class="prep-item"><span class="emoji">💇‍♀️</span><div class="text"><strong>Hair & Makeup</strong><span>Natural, dewy makeup photographs best. Stick with your usual hairstyle.</span></div></div>
+            <div class="prep-item"><span class="emoji">👟</span><div class="text"><strong>Footwear</strong><span>Grass may be damp. Bring a second pair and be ready to go barefoot for some shots.</span></div></div>
+            <div class="prep-item"><span class="emoji">🧒</span><div class="text"><strong>Kids & Family</strong><span>Feed children before the session. Bring snacks, water, and a comfort toy.</span></div></div>
+            <div class="prep-item"><span class="emoji">⏰</span><div class="text"><strong>Arrive 5 Min Early</strong><span>Your slot is exactly 20 minutes. Location details will be sent via DM.</span></div></div>
+            <div class="prep-item"><span class="emoji">🌸</span><div class="text"><strong>Bonus Tip</strong><span>The lilac backdrop attracts bees — stay calm, we can work around them.</span></div></div>
         </div>
 
         <div class="footer">
@@ -209,5 +311,96 @@
             <p style="margin-top:8px;">Questions? <a href="https://instagram.com/pashynska.photo" class="instagram" target="_blank">DM on Instagram</a></p>
         </div>
     </div>
+
+    <script>
+    (function() {
+        const bookingId = '{{ booking.id if booking else "" }}';
+        if (!bookingId) return;
+
+        let pollInterval = 3000;  // every 3 seconds
+        let isConfirmed = false;
+        let pollTimer;
+
+        function updateUI(data) {
+            const icon = document.getElementById('status-icon');
+            const title = document.getElementById('main-title');
+            const subtitle = document.getElementById('subtitle');
+            const badge = document.getElementById('status-badge');
+            const statusText = document.getElementById('status-text');
+            const msgPending = document.getElementById('msg-pending');
+            const msgConfirmed = document.getElementById('msg-confirmed');
+            const msgWarning = document.getElementById('msg-warning');
+
+            if (data.confirmed && !isConfirmed) {
+                isConfirmed = true;
+                // Confirmed!
+                icon.className = 'status-icon confirmed';
+                icon.textContent = '✅';
+                title.textContent = 'Booking Confirmed!';
+                subtitle.textContent = 'Your payment has been received. See you at the session!';
+                badge.className = 'status-badge confirmed';
+                statusText.textContent = 'Confirmed ✅';
+
+                msgPending.style.display = 'none';
+                msgConfirmed.style.display = 'block';
+                msgWarning.style.display = 'none';
+
+                document.body.classList.add('just-confirmed');
+                document.title = '✅ Booking Confirmed! | Pashynska Photography';
+                launchConfetti();
+                stopPolling();
+
+            } else if (data.status === 'cancelled' && !isConfirmed) {
+                icon.className = 'status-icon cancelled';
+                icon.textContent = '❌';
+                title.textContent = 'Booking Cancelled';
+                subtitle.textContent = 'This booking has been cancelled.';
+                badge.className = 'status-badge cancelled';
+                statusText.textContent = 'Cancelled';
+                msgPending.style.display = 'none';
+                msgWarning.style.display = 'none';
+                stopPolling();
+            }
+        }
+
+        function poll() {
+            fetch('/booking-status?booking_id=' + bookingId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.confirmed || data.status === 'confirmed' || data.status === 'cancelled') {
+                        updateUI(data);
+                    }
+                })
+                .catch(function() {});
+        }
+
+        function stopPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+        }
+
+        function launchConfetti() {
+            var container = document.getElementById('confetti');
+            container.style.display = 'block';
+            var colors = ['#4caf50','#81c784','#ffc107','#ff9800','#e91e63','#9c27b0','#2196f3'];
+            for (var i = 0; i < 60; i++) {
+                var piece = document.createElement('div');
+                piece.className = 'confetti-piece';
+                piece.style.left = Math.random() * 100 + '%';
+                piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+                piece.style.animationDuration = (2 + Math.random() * 3) + 's';
+                piece.style.animationDelay = Math.random() * 1.5 + 's';
+                piece.style.width = (6 + Math.random() * 8) + 'px';
+                piece.style.height = (6 + Math.random() * 8) + 'px';
+                container.appendChild(piece);
+            }
+            setTimeout(function() { container.style.display = 'none'; }, 6000);
+        }
+
+        // Start polling
+        pollTimer = setInterval(poll, pollInterval);
+        // First check immediately
+        poll();
+    })();
+    </script>
 </body>
 </html>

@@ -1,0 +1,19 @@
+{
+  "title": "🪻 Blossom Mini Sessions",
+  "subtitle": "Capture your family's most beautiful season",
+  "date": "2026-05-03",
+  "start_time": "10:00",
+  "end_time": "16:00",
+  "session_length": 20,
+  "break_length": 10,
+  "slot_interval": 30,
+  "deposit": 95,
+  "total": 190,
+  "tax_rate": 0.05,
+  "tax_label": "GST",
+  "currency": "CAD",
+  "etransfer_email": "iryna.pashynska@gmail.com",
+  "location": "Calgary, AB",
+  "instagram": "pashynska.photo",
+  "active": true
+}
