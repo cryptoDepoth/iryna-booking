@@ -1039,6 +1039,24 @@ def admin_cancel():
     return jsonify({"success": True})
 
 
+@app.route("/admin/delete", methods=["POST"])
+@admin_required
+def admin_delete():
+    """Delete a booking — permanent removal from database."""
+    data = request.json
+    booking_id = data.get("booking_id")
+    if not booking_id:
+        return jsonify({"error": "booking_id required"}), 400
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("DELETE FROM bookings WHERE id=?", (booking_id,))
+    conn.commit()
+    conn.close()
+    sync_to_notion(booking_id)
+    log.info(f"[admin] Booking #{booking_id} permanently deleted")
+    return jsonify({"success": True})
+
+
 EVENTS_YAML_PATH = os.path.join(os.path.dirname(__file__), "events.yaml")
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
