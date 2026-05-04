@@ -423,42 +423,43 @@
             selectedSlot = time;
             document.getElementById('selected-time').value = time;
             document.getElementById('submit-btn').disabled = false;
-
-            // Reserve via API
-            reserveSlot(time);
         }
 
         async function reserveSlot(time) {
+            const formData = {
+                time: time,
+                event_id: EVENT_ID,
+                name: document.getElementById('name').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                phone: document.getElementById('phone').value.trim(),
+                instagram: document.getElementById('instagram').value.trim(),
+                session_type: document.getElementById('session_type').value
+            };
+
+            // Basic validation
+            if (!formData.name) return {success: false, error: 'Please enter your name'};
+            if (!formData.email) return {success: false, error: 'Please enter your email'};
+            if (!formData.phone) return {success: false, error: 'Please enter your phone number'};
+            if (!formData.instagram) return {success: false, error: 'Please enter your Instagram handle'};
+            if (!formData.session_type) return {success: false, error: 'Please choose a session type'};
+
             try {
                 const res = await fetch('/reserve', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        time: time,
-                        event_id: EVENT_ID,
-                        name: document.getElementById('name').value,
-                        email: document.getElementById('email').value,
-                        phone: document.getElementById('phone').value,
-                        instagram: document.getElementById('instagram').value,
-                        session_type: document.getElementById('session_type').value
-                    })
+                    body: JSON.stringify(formData)
                 });
                 const data = await res.json();
-
-                if (data.success) {
-                    expiresAt = new Date(data.expires_at);
-                    startTimer();
-                    document.getElementById('timer-box').classList.remove('hidden');
-                } else {
-                    alert(data.error || 'Slot not available');
-                }
+                return data;
             } catch (err) {
                 console.error('Reserve error:', err);
+                return {success: false, error: 'Network error. Please try again.'};
             }
         }
 
-        function startTimer() {
+        function startTimer(expiresIso) {
             if (timerInterval) clearInterval(timerInterval);
+            expiresAt = new Date(expiresIso);
             const timerEl = document.getElementById('timer-count');
             const box = document.getElementById('timer-box');
 
@@ -480,7 +481,7 @@
             }, 1000);
         }
 
-        // Form submit
+        // Form submit — reserve first, then go to payment
         document.getElementById('booking-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!selectedSlot) {
@@ -488,19 +489,33 @@
                 return;
             }
 
-            const formData = {
-                time: selectedSlot,
-                event_id: EVENT_ID,
-                name: document.getElementById('name').value,
-                email: document.getElementById('email').value,
-                phone: document.getElementById('phone').value,
-                instagram: document.getElementById('instagram').value,
-                session_type: document.getElementById('session_type').value
-            };
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.textContent = 'Reserving...';
 
-            // Go to payment page with data in URL
-            const params = new URLSearchParams(formData);
-            window.location.href = '/payment?' + params.toString();
+            const data = await reserveSlot(selectedSlot);
+
+            if (data.success) {
+                startTimer(data.expires_at);
+                document.getElementById('timer-box').classList.remove('hidden');
+
+                // Navigate to payment page with data in URL
+                const formData = {
+                    time: selectedSlot,
+                    event_id: EVENT_ID,
+                    name: document.getElementById('name').value.trim(),
+                    email: document.getElementById('email').value.trim(),
+                    phone: document.getElementById('phone').value.trim(),
+                    instagram: document.getElementById('instagram').value.trim(),
+                    session_type: document.getElementById('session_type').value
+                };
+                const params = new URLSearchParams(formData);
+                window.location.href = '/payment?' + params.toString();
+            } else {
+                alert(data.error || 'Slot not available');
+                btn.disabled = false;
+                btn.textContent = 'Continue to Payment →';
+            }
         });
 
         // Load on page load

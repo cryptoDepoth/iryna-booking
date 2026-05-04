@@ -27,6 +27,7 @@ import logging
 import os
 import sqlite3
 import requests
+import sys
 import time
 import yaml
 
@@ -44,6 +45,23 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24).hex())
 
+PYTHON_BIN = os.environ.get("PYTHON_BIN", sys.executable)
+
+
+def _start_etransfer_checker(booking_id):
+    """Launch timed_cron.py in background to auto-detect e-Transfer for this booking."""
+    try:
+        import subprocess as _sp
+        cron_script = os.path.join(os.path.dirname(__file__) or ".", "timed_cron.py")
+        _sp.Popen(
+            [PYTHON_BIN, cron_script, "--booking-id", str(booking_id), "--interval", "30", "--minutes", "20"],
+            stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"),
+            cwd=os.path.dirname(__file__) or "."
+        )
+        log.info(f"[etransfer-checker] Started for booking #{booking_id} (30s interval, 20min max)")
+    except Exception as e:
+        log.error(f"[etransfer-checker] Failed to start: {e}")
+
 # ===== RATE LIMITING =====
 # Simple IP-based rate limit: 10 requests per 10 minutes per IP
 _rate_limits = {}
@@ -54,7 +72,7 @@ def check_rate_limit(ip):
         _rate_limits[ip] = []
     # Clean old entries
     _rate_limits[ip] = [t for t in _rate_limits[ip] if now - t < 600]
-    return len(_rate_limits[ip]) < 10  # 10 requests per 10 min
+    return len(_rate_limits[ip]) < 5   # 5 requests per 10 min (matches README)
 
 def record_request(ip):
     if ip not in _rate_limits:
@@ -133,7 +151,7 @@ Content-Type: text/plain; charset=utf-8
 
 {body}"""
         result = subprocess.run(
-            ["himalaya", "template", "send", "-a", "iryna"],
+            ["himalaya", "template", "send"],
             input=template, capture_output=True, text=True, timeout=30
         )
         if result.returncode == 0:
@@ -142,6 +160,33 @@ Content-Type: text/plain; charset=utf-8
             log.error(f"[email] Himalaya failed: {result.stderr[:200]}")
     except Exception as e:
         log.error(f"[email] Send failed: {e}")
+
+
+def notify_payment_confirmed(booking_id, paid_amount=None):
+    """Send Telegram notification to admin: booking was auto-confirmed by e-Transfer checker."""
+    try:
+        conn = db_conn()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        conn.close()
+        if not row:
+            return
+        b = dict(row)
+        amount_str = f"${paid_amount:.2f}" if paid_amount else "deposit"
+        msg = (
+            f"✅ <b>Auto-Confirmed: Payment Received!</b>\n\n"
+            f"👤 {b.get('name','?')}\n"
+            f"📧 {b.get('email','?')}\n"
+            f"📱 {b.get('phone','N/A')}\n"
+            f"📸 @{b.get('instagram','N/A')}\n"
+            f"📅 {b.get('date','?')} @ {b.get('time','?')}\n"
+            f"💰 <b>Received: {amount_str}</b>\n"
+            f"🆔 Booking #{booking_id}\n\n"
+            f"Email confirmation sent to client."
+        )
+        _notify_admin(msg)
+    except Exception as e:
+        log.error(f"[notify_confirmed] Failed: {e}")
 
 # Serve static images
 @app.route('/images/<path:filename>')
@@ -531,7 +576,7 @@ def get_slots(date_str):
     
     available_slots = []
     for slot in slots:
-        c.execute("SELECT * FROM bookings WHERE date=? AND time=? AND (confirmed=1 OR reserved_until > ?)",
+        c.execute("SELECT * FROM bookings WHERE date=? AND time=? AND status NOT IN ('cancelled', 'expired') AND (confirmed=1 OR reserved_until > ?)",
                   (ev["date"], slot["time"], now.isoformat()))
         existing = c.fetchone()
         
@@ -594,6 +639,7 @@ def reserve_slot():
     c.execute("""
         SELECT id FROM bookings
         WHERE date=? AND time=?
+          AND status NOT IN ('cancelled', 'expired')
           AND (confirmed=1 OR reserved_until > ?)
     """, (event_date, slot_time, now.isoformat()))
     if c.fetchone():
@@ -601,8 +647,12 @@ def reserve_slot():
         conn.close()
         return jsonify({"success": False, "error": "Slot is no longer available"})
 
+    # Delete any previous cancelled/expired booking for this slot to avoid UNIQUE conflict
+    c.execute("DELETE FROM bookings WHERE date=? AND time=? AND status IN ('cancelled', 'expired')",
+              (event_date, slot_time))
+
     c.execute("""
-        INSERT OR IGNORE INTO bookings
+        INSERT INTO bookings
             (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?)
     """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"]))
@@ -717,7 +767,11 @@ def confirm_payment():
                   f"🏷️ {session_type or 'N/A'}\n"
                   f"⏳ Awaiting e-Transfer confirmation")
 
-    log.info(f"[confirm] Booking #{booking_id} — {client_name} @ {time} — payment submitted")
+    # Start automatic e-Transfer checker
+    if booking_id:
+        _start_etransfer_checker(booking_id)
+
+    log.info(f"[confirm] Booking #{booking_id} — {client_name} @ {time} — payment submitted, checker started")
     
     return jsonify({
         "success": True,
@@ -819,6 +873,28 @@ def admin_cancel():
     sync_to_notion(booking_id)
     log.info(f"[admin] Booking #{booking_id} cancelled")
     return jsonify({"success": True})
+
+
+@app.route("/booking-status")
+def booking_status():
+    """API for live client page polling — returns booking status + paid_amount."""
+    booking_id = request.args.get("booking_id")
+    if not booking_id:
+        return jsonify({"error": "booking_id required"}), 400
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT status, confirmed, paid, paid_amount, name FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    b = dict(row)
+    return jsonify({
+        "status": b["status"],
+        "confirmed": bool(b["confirmed"]),
+        "paid": bool(b["paid"]),
+        "paid_amount": b.get("paid_amount"),
+        "name": b.get("name", "")
+    })
 
 # ===== RUN =====
 if __name__ == "__main__":

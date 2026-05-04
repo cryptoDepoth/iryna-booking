@@ -301,8 +301,9 @@ def match_payment_to_booking(payment_info, bookings):
 
 
 def confirm_booking(booking_id, paid_amount=None):
-    """Confirm booking and set paid amount"""
+    """Confirm booking, send email + Telegram notification."""
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("""
         UPDATE bookings 
@@ -314,6 +315,13 @@ def confirm_booking(booking_id, paid_amount=None):
     conn.close()
     
     if updated > 0:
+        print(f"      📧 Sending confirmation email to client...")
+        try:
+            from app import send_confirmation_email, notify_payment_confirmed
+            send_confirmation_email(booking_id)
+            notify_payment_confirmed(booking_id, paid_amount)
+        except Exception as e:
+            print(f"      ⚠️ Email/Telegram notification error: {e}")
         # Sync to Notion
         sync_to_notion(booking_id)
         return True
@@ -451,13 +459,17 @@ def main(max_minutes=20, interval_seconds=60, booking_id=None):
                 print("      ⚠️ No matching booking found.")
                 continue
             
-            # Check amount
+            # Check amount with ±$3 tolerance
             expected = expected_amount
-            if amount < expected:
+            tolerance = 3.0
+            if amount < expected - tolerance:
                 diff = expected - amount
-                print(f"      ⚠️ UNDERPAID: ${amount:.2f} (expected ${expected:.2f})")
+                print(f"      ⚠️ UNDERPAID: ${amount:.2f} (expected ${expected:.2f}, short ${diff:.2f})")
                 print("      ⏳ Will wait for additional payment.")
                 continue
+            if amount > expected + tolerance:
+                print(f"      ⚠️ OVERPAID: ${amount:.2f} (expected ${expected:.2f}, over ${amount - expected:.2f})")
+                print("      ⏳ Will still confirm — overpayment is OK.")
             
             # Confirm booking
             print(f"      ✅ Payment confirmed: ${amount:.2f}")

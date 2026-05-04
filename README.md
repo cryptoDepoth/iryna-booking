@@ -4,7 +4,7 @@ Flask-based booking system for **Blossom Mini Sessions** (and future events).
 Live date: **May 3, 2026**
 
 ## 🌐 Live URLs
-- **Public (Cloudflare tunnel):** `https://boundary-pickup-connectivity-wealth.trycloudflare.com`
+- **Public (Cloudflare tunnel):** `https://sherman-remain-interracial-simplified.trycloudflare.com`
 - **Local:** `http://localhost:5001`
 
 ## 📁 Structure
@@ -32,14 +32,18 @@ NOTION_DATABASE_ID="355510b9-cc5b-818c-aec6-d764f116e2b2"
 ```
 
 | Variable | Source |
-|---|------|
+|---|---|
 | `NOTION_API_KEY` | Notion Integration Token |
 | `NOTION_DATABASE_ID` | Database URL → extract ID |
+| `FLASK_SECRET_KEY` | Generate: `openssl rand -hex 32` |
+| `ADMIN_KEY` | Admin dashboard secret — generate random string |
+| `TELEGRAM_BOT_TOKEN` | BotFather |
+| `TELEGRAM_CHAT_ID` | Get from @userinfobot |
 
 ## 🚀 How to Run Locally
 
 ```bash
-cd ~/business/iryna/booking
+cd ~/business/iryna/iryna-booking
 python3 -m venv venv
 source venv/bin/activate
 pip install flask requests

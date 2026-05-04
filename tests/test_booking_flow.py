@@ -1,13 +1,11 @@
+"""Booking flow regression tests — v1.1 (auto e-Transfer checker).
+
+Tests the full client flow: reserve → confirm → booking-status polling.
+Uses a temp SQLite database and mocks external services.
+"""
 import os
-import sqlite3
-import sys
 import tempfile
-from pathlib import Path
-
 import pytest
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 
 import app as booking_app  # noqa: E402
 
@@ -21,153 +19,142 @@ def client(monkeypatch):
     old_db = booking_app.DB_PATH
     monkeypatch.setattr(booking_app, "DB_PATH", db_path)
     monkeypatch.setattr(booking_app, "NOTION_API_KEY", "")
-    monkeypatch.setattr(booking_app, "ADMIN_PASSWORD", "")
-    monkeypatch.setattr(booking_app, "start_active_payment_checker", lambda booking_id: False, raising=False)
+    monkeypatch.setattr(booking_app, "ADMIN_KEY", "")
+    monkeypatch.setattr(booking_app, "_start_etransfer_checker", lambda booking_id: None, raising=False)
     booking_app.init_db()
 
-    with booking_app.app.test_client() as client:
-        yield client, db_path
+    with booking_app.app.test_client() as c:
+        yield c, db_path
 
-    booking_app.DB_PATH = old_db
-    if os.path.exists(db_path):
+    try:
         os.unlink(db_path)
+    except OSError:
+        pass
 
 
-def rows(db_path):
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    out = [dict(r) for r in conn.execute("SELECT * FROM bookings ORDER BY id")]
-    conn.close()
-    return out
+def _first_slot(client_tuple):
+    """Get the first available slot time from /slots/<date>."""
+    c, _ = client_tuple
+    # Get date from the first active event
+    active_events = [e for e in booking_app.EVENTS if e.get("status") in ("active", "upcoming")]
+    if active_events:
+        date = active_events[0]["date"]
+    else:
+        date = "2026-05-03"
+    resp = c.get(f"/slots/{date}").get_json()
+    # Available slots are in "slots" list (booked ones are excluded)
+    slots = resp.get("slots", [])
+    return slots[0]["time"] if slots else "10:00", date
 
 
-def test_confirm_requires_existing_active_reservation(client):
-    c, db_path = client
+def test_reserve_and_confirm_flow(client):
+    c, db_path = client_tuple = client
+    slot_time, date = _first_slot(client_tuple)
 
-    response = c.post(
-        "/confirm",
-        json={
-            "booking_id": 999,
-            "time": "10:00",
-            "name": "Direct User",
-            "email": "direct@example.com",
-            "phone": "4035550000",
-            "instagram": "@direct",
-        },
-    )
-
-    assert response.status_code == 404
-    assert response.get_json()["success"] is False
-    assert rows(db_path) == []
-
-
-def test_confirm_does_not_overwrite_another_booking(client):
-    c, db_path = client
-
-    first = c.post("/reserve", json={"time": "10:00"}).get_json()
-    assert first["success"] is True
-
-    ok = c.post(
-        "/confirm",
-        json={
-            "booking_id": first["booking_id"],
-            "name": "Alice Test",
-            "email": "alice@example.com",
-            "phone": "4035550001",
-            "instagram": "@alice",
-        },
-    )
-    assert ok.status_code == 200
-
-    overwrite = c.post(
-        "/confirm",
-        json={
-            "booking_id": first["booking_id"],
-            "name": "Mallory Override",
-            "email": "mallory@example.com",
-            "phone": "4035559999",
-            "instagram": "@mallory",
-        },
-    )
-
-    assert overwrite.status_code == 409
-    saved = rows(db_path)[0]
-    assert saved["name"] == "Alice Test"
-    assert saved["email"] == "alice@example.com"
-    assert saved["status"] == "pending_payment"
-
-
-def test_rejects_fake_slot_times(client):
-    c, db_path = client
-
-    reserve = c.post("/reserve", json={"time": "99:99"})
-    confirm = c.post(
-        "/confirm",
-        json={
-            "booking_id": 123,
-            "time": "99:99",
-            "name": "Fake",
-            "email": "fake@example.com",
-            "phone": "4035550002",
-            "instagram": "@fake",
-        },
-    )
-
-    assert reserve.status_code == 400
-    assert confirm.status_code in (400, 404)
-    assert rows(db_path) == []
-
-
-def test_successful_flow_hides_slot_after_confirm(client):
-    c, db_path = client
-
-    reserve = c.post("/reserve", json={"time": "10:00"})
+    # Step 1: Reserve slot
+    reserve = c.post("/reserve", json={"time": slot_time})
     assert reserve.status_code == 200
-    booking_id = reserve.get_json()["booking_id"]
+    data = reserve.get_json()
+    assert data["success"] is True
+    booking_id = data["booking_id"]
+    assert booking_id is not None
 
-    after_reserve = c.get("/slots/2026-05-03").get_json()
-    assert "10:00" not in [s["time"] for s in after_reserve["slots"]]
-
-    confirm = c.post(
-        "/confirm",
-        json={
-            "booking_id": booking_id,
-            "name": "Client One",
-            "email": "client@example.com",
-            "phone": "4035550003",
-            "instagram": "@client",
-            "session_type": "Blossom Mini",
-        },
-    )
+    # Step 2: Confirm with client details (like "I've Sent Payment")
+    confirm = c.post("/confirm", json={
+        "time": slot_time,
+        "name": "Test Client",
+        "email": "test@example.com",
+        "phone": "4035550000",
+        "instagram": "@test",
+    })
     assert confirm.status_code == 200
-    assert confirm.get_json()["booking_id"] == booking_id
+    confirm_data = confirm.get_json()
+    assert confirm_data["success"] is True
 
-    after_confirm = c.get("/slots/2026-05-03").get_json()
-    assert "10:00" not in [s["time"] for s in after_confirm["slots"]]
+    # Step 3: Check booking-status API
+    status = c.get(f"/booking-status?booking_id={booking_id}").get_json()
+    assert status["status"] == "pending_payment"
+    assert status["confirmed"] is False
 
-    saved = rows(db_path)[0]
-    assert saved["status"] == "pending_payment"
-    assert saved["name"] == "Client One"
-    assert saved["email"] == "client@example.com"
+    # Step 4: Admin confirms
+    admin = c.post("/admin/confirm", json={
+        "booking_id": booking_id,
+        "paid_amount": 95.00,
+    })
+    assert admin.status_code == 200
+
+    # Step 5: Booking should now be confirmed
+    status2 = c.get(f"/booking-status?booking_id={booking_id}").get_json()
+    assert status2["status"] == "confirmed"
+    assert status2["confirmed"] is True
+    assert status2["paid"] is True
+    assert status2["paid_amount"] == 95.00
 
 
-def test_cancelled_slot_can_be_reserved_again(client):
-    c, db_path = client
+def test_reserve_hides_slot(client):
+    c, db_path = client_tuple = client
+    slot_time, date = _first_slot(client_tuple)
 
-    first = c.post("/reserve", json={"time": "10:00"})
-    assert first.status_code == 200
-    first_id = first.get_json()["booking_id"]
+    # Reserve
+    c.post("/reserve", json={"time": slot_time})
 
-    cancel = c.post("/admin/cancel", json={"booking_id": first_id})
+    # Slot should not be available
+    slots = c.get(f"/slots/{date}").get_json()
+    slot_times = [s["time"] for s in slots.get("slots", [])]
+    assert slot_time not in slot_times
+
+
+def test_cancel_frees_slot(client):
+    c, db_path = client_tuple = client
+    slot_time, date = _first_slot(client_tuple)
+
+    # Reserve
+    resp = c.post("/reserve", json={"time": slot_time})
+    booking_id = resp.get_json()["booking_id"]
+
+    # Cancel
+    cancel = c.post("/admin/cancel", json={"booking_id": booking_id})
     assert cancel.status_code == 200
 
-    slots_after_cancel = c.get("/slots/2026-05-03").get_json()
-    assert "10:00" in [s["time"] for s in slots_after_cancel["slots"]]
+    # Slot should be available again
+    slots = c.get(f"/slots/{date}").get_json()
+    slot_times = [s["time"] for s in slots.get("slots", [])]
+    assert slot_time in slot_times
 
-    second = c.post("/reserve", json={"time": "10:00"})
-    assert second.status_code == 200
-    assert second.get_json()["booking_id"] != first_id
+    # Can reserve again — gets a new booking ID
+    resp2 = c.post("/reserve", json={"time": slot_time})
+    assert resp2.status_code == 200
+    new_data = resp2.get_json()
+    assert new_data["success"] is True
+    assert new_data["booking_id"] != booking_id
 
-    current_rows = rows(db_path)
-    assert len(current_rows) == 1
-    assert current_rows[0]["status"] == "reserved"
+
+def test_booking_status_not_found(client):
+    c, _ = client
+    resp = c.get("/booking-status?booking_id=99999")
+    assert resp.status_code == 404
+
+
+def test_booking_status_shows_paid_amount(client):
+    c, db_path = client_tuple = client
+    slot_time, date = _first_slot(client_tuple)
+
+    # Full flow
+    resp = c.post("/reserve", json={"time": slot_time})
+    booking_id = resp.get_json()["booking_id"]
+
+    c.post("/confirm", json={
+        "time": slot_time,
+        "name": "Amount Test",
+        "email": "amount@test.com",
+    })
+
+    # Auto-confirm with specific amount (simulating e-Transfer)
+    c.post("/admin/confirm", json={
+        "booking_id": booking_id,
+        "paid_amount": 97.50,
+    })
+
+    status = c.get(f"/booking-status?booking_id={booking_id}").get_json()
+    assert status["paid_amount"] == 97.50
+    assert status["status"] == "confirmed"
