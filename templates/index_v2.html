@@ -718,10 +718,14 @@ function showSuccess(name) {
   const e = eventsData.find(x => x.id === currentBooking?.event_id);
   document.getElementById('dbody').innerHTML = `
     <div class="success-state">
-      <div class="check">✓</div>
-      <h3>Thanks${name ? ', ' + name.split(' ')[0] : ''}!</h3>
-      <p>I'm watching for your e-Transfer.</p>
+      <div style="font-size:40px;margin-bottom:8px">⏳</div>
+      <h3>Payment Pending</h3>
+      <p>Thanks${name ? ', ' + name.split(' ')[0] : ''}! <strong>Your payment is being reviewed.</strong></p>
       <p>You'll get an email + Instagram DM the moment it's confirmed (usually within 5 minutes).</p>
+      <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;margin:14px 0;font-size:.85rem">
+        <strong>Status:</strong> Pending ⏳<br>
+        <strong>Booking ID:</strong> #${currentBooking?.booking_id || ''}
+      </div>
       <p style="margin-top:18px;font-size:.85rem">${e?.title || 'Session'}<br><strong>${fmtDate(e?.date || '')} · ${currentBooking?.time || ''}</strong></p>
       <button class="btn" style="margin-top:24px" onclick="closeDrawer(); currentBooking=null;">Done</button>
     </div>`;
