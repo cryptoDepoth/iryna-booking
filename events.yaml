@@ -11,6 +11,8 @@ events:
   deposit: 95
   full_price: 190
   location: Calgary — exact spot sent after booking
+  session_type: mini
+  featured: true
   included:
   - 20 minutes among blooming lilacs
   - 15 professionally edited photos
@@ -19,7 +21,6 @@ events:
   photos:
   - /images/lilac_1.jpg
   - /images/pregnancy_1.jpg
-  - /images/lilac-jun7_48004fd0.jpg
   - /images/lilac-jun7_fc0f222e.jpg
   status: active
 - id: blossom-may3
@@ -34,6 +35,8 @@ events:
   deposit: 95
   full_price: 190
   location: Calgary — exact spot sent after booking
+  session_type: mini
+  featured: false
   included:
   - 20 minutes among blooming lilacs
   - 15 professionally edited photos

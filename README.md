@@ -4,7 +4,8 @@ Flask-based booking system for **Blossom Mini Sessions** (and future events).
 Live date: **May 3, 2026**
 
 ## 🌐 Live URLs
-- **Public (Cloudflare tunnel):** `https://sherman-remain-interracial-simplified.trycloudflare.com`
+- **Public:** `https://pashynska.agency`
+- **Public (www):** `https://www.pashynska.agency`
 - **Local:** `http://localhost:5001`
 
 ## 📁 Structure
@@ -55,10 +56,14 @@ Server runs on `0.0.0.0:5001`.
 
 ## 🌍 Public Tunnel (Cloudflare)
 
+Production runs through the named Cloudflare Tunnel `pashynska-booking`.
+Both `pashynska.agency` and `www.pashynska.agency` route to `http://127.0.0.1:5001`.
+
+Local launchd jobs:
+
 ```bash
-cloudflared tunnel --url http://localhost:5001
+launchctl list | grep com.pashynska.booking
 ```
-Copy the `trycloudflare.com` URL to share.
 
 ## 🧠 Business Logic
 

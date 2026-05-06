@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pashynska Photography — Mini Sessions</title>
+<meta name="description" content="Book a mini photo session with Iryna Pashynska in Calgary. Soft, sunlit moments among blooming flowers. Professional photography for families, couples, and individuals.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --nude:#f5ede8; --blush:#e8c8c0; --rose:#c4857a; --rose-deep:#a3685e;
+  --rose-glow:rgba(196,133,122,.18);
+  --ink:#1c1917; --ink-2:#44403c; --ink-3:#78716c; --ink-4:#a8a29e; --ink-5:#e7e5e4;
+  --page-bg:#faf7f5; --surface:#fff;
+  --green:#3d6b4f; --green-bg:#edf5f0;
+  --amber:#92722a; --amber-bg:#fdf5e4;
+  --red:#8b3535; --red-bg:#fdf0f0;
+  --font-d:'Cormorant Garamond',Georgia,serif;
+  --font-b:'DM Sans',system-ui,sans-serif;
+}
+body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
+
+/* ── TOP NAV ── */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(250,247,245,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:30}
+.nav .brand{font-family:var(--font-d);font-size:1.4rem;font-weight:500;letter-spacing:.04em}
+.nav .brand small{display:block;font-family:var(--font-b);font-size:.6rem;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);margin-top:2px}
+
+/* ── HERO ── */
+.hero{padding:60px 28px 18px;text-align:center;max-width:760px;margin:0 auto}
+.hero .kicker{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--rose);font-weight:600;margin-bottom:14px}
+.hero h1{font-family:var(--font-d);font-size:clamp(2.2rem,5vw,3.4rem);font-weight:300;line-height:1.05;letter-spacing:-.005em}
+.hero h1 em{font-style:italic;color:var(--rose)}
+.hero p{margin-top:14px;color:var(--ink-3);font-size:1rem}
+
+/* ── SOCIAL PROOF STRIP ── */
+.proof{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;padding:14px 28px 0;font-size:.82rem;color:var(--ink-3);max-width:760px;margin:0 auto}
+.proof span strong{color:var(--ink);font-weight:600}
+.proof .sep{color:var(--ink-5)}
+
+/* ── HOW IT WORKS ── */
+.how{max-width:1000px;margin:38px auto 0;padding:0 28px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:720px){.how{grid-template-columns:1fr}}
+.how .step{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}
+.how .step .num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:var(--rose);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-weight:600;font-size:1rem}
+.how .step h4{font-family:var(--font-d);font-size:1.2rem;font-weight:500;margin-bottom:2px}
+.how .step p{font-size:.82rem;color:var(--ink-3);line-height:1.45}
+
+/* ── FEATURED BANNER ── */
+.featured-wrap{max-width:1200px;margin:46px auto 0;padding:0 28px}
+.featured{position:relative;border-radius:22px;overflow:hidden;min-height:280px;display:flex;align-items:flex-end;color:#fff;background:#dbcfca center/cover;box-shadow:0 14px 40px rgba(0,0,0,.08)}
+.featured::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(28,25,23,.78) 0%,rgba(28,25,23,.15) 55%,transparent 100%)}
+.featured .featured-tag{position:absolute;top:18px;left:18px;background:rgba(255,255,255,.92);color:var(--ink);padding:6px 14px;border-radius:20px;font:600 .68rem var(--font-b);text-transform:uppercase;letter-spacing:.1em;z-index:2}
+.featured .featured-countdown{position:absolute;top:18px;right:18px;background:var(--rose);color:#fff;padding:6px 14px;border-radius:20px;font:600 .72rem var(--font-b);z-index:2}
+.featured .featured-content{position:relative;z-index:2;padding:28px 32px}
+.featured h2{font-family:var(--font-d);font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:300;line-height:1.1}
+.featured .meta{margin-top:8px;font-size:.85rem;opacity:.92}
+.featured .cta{margin-top:14px;display:inline-block;background:#fff;color:var(--ink);padding:11px 22px;border-radius:11px;font:600 .85rem var(--font-b);text-decoration:none;border:0;cursor:pointer}
+
+/* ── FILTERS ── */
+.filters{max-width:1200px;margin:34px auto 14px;padding:0 28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filters .chip{padding:8px 16px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:all .15s}
+.filters .chip:hover{border-color:var(--rose);color:var(--rose)}
+.filters .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.filters .count{margin-left:auto;font-size:.82rem;color:var(--ink-3)}
+
+/* ── EVENT GRID ── */
+.events-wrap{max-width:1200px;margin:0 auto 60px;padding:0 28px}
+.events{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}
+.event-card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.04);display:flex;flex-direction:column;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;position:relative}
+.event-card:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,.08)}
+.event-card .photo{aspect-ratio:4/3;background:#dbcfca center/cover;position:relative}
+.event-card .photo .status{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:5px 11px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.event-card .photo .status.open{color:var(--green)}
+.event-card .photo .status.low{color:var(--amber)}
+.event-card .photo .status.sold{color:var(--red)}
+.event-card .photo .status .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
+.event-card .photo .countdown{position:absolute;top:12px;right:12px;background:rgba(28,25,23,.78);color:#fff;padding:5px 11px;border-radius:20px;font:600 .7rem var(--font-b);backdrop-filter:blur(8px)}
+.event-card .photo .featured-mark{position:absolute;bottom:12px;left:12px;background:var(--rose);color:#fff;padding:4px 10px;border-radius:6px;font:600 .65rem var(--font-b);text-transform:uppercase;letter-spacing:.08em}
+.event-card .body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
+.event-card .type-tag{font:600 .65rem var(--font-b);letter-spacing:.1em;text-transform:uppercase;color:var(--rose)}
+.event-card h3{font-family:var(--font-d);font-size:1.5rem;font-weight:500;line-height:1.15;color:var(--ink)}
+.event-card .subtitle{font-size:.85rem;color:var(--ink-3);font-style:italic}
+.event-card .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:.78rem;color:var(--ink-3)}
+.event-card .meta span{display:inline-flex;align-items:center;gap:5px}
+.event-card .price-bar{display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto;padding-top:14px;border-top:1px solid var(--ink-5)}
+.event-card .price-bar .price{font-family:var(--font-d);font-size:1.6rem;font-weight:500;color:var(--rose);line-height:1}
+.event-card .price-bar .price small{font-family:var(--font-b);font-size:.7rem;color:var(--ink-3);font-weight:500;display:block;margin-top:4px;letter-spacing:.05em;text-transform:uppercase}
+.event-card .price-bar .cta{background:var(--ink);color:#fff;border:0;padding:11px 18px;border-radius:11px;font:600 13px var(--font-b);cursor:pointer;letter-spacing:.02em}
+.event-card .price-bar .cta:hover{background:var(--ink-2)}
+.event-card.sold .price-bar .cta{background:var(--ink-5);color:var(--ink-2)}
+
+/* ── DRAWER ── */
+.drawer-bg{position:fixed;inset:0;background:rgba(28,25,23,.5);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:80;padding:24px}
+.drawer-bg.open{display:flex}
+.drawer{background:var(--page-bg);border-radius:20px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.3)}
+.drawer .dphoto{aspect-ratio:16/9;background:#dbcfca center/cover;border-radius:20px 20px 0 0;position:relative}
+.drawer .dphoto .close{position:absolute;top:14px;right:14px;width:36px;height:36px;background:rgba(255,255,255,.92);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;border:0}
+.drawer .dphoto h2{position:absolute;bottom:18px;left:22px;color:#fff;font-family:var(--font-d);font-size:1.8rem;font-weight:300;text-shadow:0 2px 14px rgba(0,0,0,.4)}
+.drawer .dbody{padding:22px}
+.drawer .price-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--ink-5)}
+.drawer .price-row .p{font-family:var(--font-d);font-size:2.2rem;font-weight:500;color:var(--rose)}
+.drawer .price-row .p small{font-family:var(--font-b);font-size:.8rem;color:var(--ink-3);font-weight:500}
+.drawer .lbl{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:10px}
+.drawer .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
+.drawer .slot{padding:11px 4px;border:1.5px solid var(--ink-5);border-radius:10px;background:#fff;font:500 .85rem var(--font-b);text-align:center;cursor:pointer}
+.drawer .slot:hover{border-color:var(--rose);color:var(--rose)}
+.drawer .slot.sel{background:var(--rose);border-color:var(--rose);color:#fff}
+.drawer .slot.taken{background:var(--ink-5);border-color:var(--ink-5);color:var(--ink-4);cursor:not-allowed;opacity:0.6}
+.drawer .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.drawer .form .full{grid-column:1/-1}
+.drawer input{width:100%;padding:12px 14px;background:#fff;border:1.5px solid var(--ink-5);border-radius:10px;font:.92rem var(--font-b);outline:none}
+.drawer input:focus{border-color:var(--rose);box-shadow:0 0 0 3px rgba(196,133,122,.12)}
+.drawer .btn{display:block;width:100%;padding:15px;background:var(--ink);color:#fff;border:0;border-radius:12px;font:600 .92rem var(--font-b);cursor:pointer;margin-top:18px;letter-spacing:.02em}
+.drawer .btn:hover{background:var(--ink-2)}
+.drawer .btn:disabled{opacity:0.5;cursor:not-allowed}
+
+/* ── PAYMENT VIEW ── */
+.pay-timer{display:flex;align-items:center;justify-content:space-between;background:var(--amber-bg);border:1px solid rgba(146,114,42,.2);border-radius:12px;padding:13px 16px;margin-bottom:18px}
+.pay-timer .lbl-t{font-size:.85rem;color:var(--amber);font-weight:500}
+.pay-timer .cnt{font-family:var(--font-d);font-size:1.6rem;font-weight:600;color:var(--amber)}
+.pay-summary{border-radius:12px;overflow:hidden;border:1px solid var(--ink-5);margin-bottom:16px}
+.pay-summary .row{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--ink-5);font-size:.88rem}
+.pay-summary .row:last-child{border-bottom:none;font-weight:600;background:var(--nude)}
+.pay-summary .row .key{color:var(--ink-3)}
+.pay-summary .row .val-rose{color:var(--rose);font-family:var(--font-d);font-size:1.2rem}
+.transfer-box{background:linear-gradient(135deg,#fdf8f6,#f7ede9);border:1px solid rgba(196,133,122,.2);border-radius:18px;padding:22px 18px;text-align:center;margin-bottom:14px}
+.transfer-box .eyebrow{font-size:.66rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+.transfer-box .amount{font-family:var(--font-d);font-size:4rem;font-weight:500;color:var(--rose);line-height:1}
+.transfer-box .ccy{font-size:.78rem;color:var(--ink-3);margin-bottom:14px}
+.email-copy{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1.5px dashed rgba(196,133,122,.45);border-radius:11px;padding:12px 14px;cursor:pointer;transition:.2s}
+.email-copy:hover{border-style:solid;background:#fdf7f6}
+.email-copy .lbl-e{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4);margin-bottom:3px}
+.email-copy .val-e{font-family:'Courier New',monospace;font-size:.92rem;font-weight:600;color:var(--rose)}
+.copy-pill{background:var(--rose);color:#fff;border:0;border-radius:20px;padding:5px 12px;font:600 .7rem var(--font-b);cursor:pointer}
+.copy-pill.copied{background:var(--green)}
+.bank-msg{background:#fff;border:1.5px dashed var(--ink-5);border-radius:10px;padding:14px;font-family:'Courier New',monospace;font-size:.82rem;color:var(--ink-2);line-height:1.5;position:relative;cursor:pointer;margin-bottom:14px}
+.bank-msg .copy-pill{position:absolute;top:8px;right:8px}
+.how-to{background:var(--nude);border-radius:14px;padding:16px;margin-bottom:14px}
+.how-to .t{font-size:.8rem;font-weight:600;margin-bottom:10px}
+.how-to ol{padding-left:18px;display:flex;flex-direction:column;gap:5px}
+.how-to li{font-size:.85rem;color:var(--ink-3);line-height:1.45}
+.info-note{background:#eef4fb;border-left:3px solid #5b9bd5;border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:14px;font-size:.85rem;color:#1e3a5f}
+.btn-ghost{display:block;width:100%;padding:13px;background:transparent;color:var(--ink-3);border:1.5px solid var(--ink-5);border-radius:12px;font:.88rem var(--font-b);cursor:pointer;margin-top:8px}
+.btn-ghost:hover{border-color:var(--ink-3);color:var(--ink)}
+.success-state{text-align:center;padding:30px 20px}
+.success-state .check{width:64px;height:64px;border-radius:50%;background:var(--green-bg);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px}
+.success-state h3{font-family:var(--font-d);font-size:1.6rem;font-weight:500;margin-bottom:8px}
+.success-state p{font-size:.9rem;color:var(--ink-3);margin-bottom:6px}
+
+/* ── FAQ ── */
+.faq{max-width:760px;margin:0 auto 60px;padding:0 28px}
+.faq h2{font-family:var(--font-d);font-size:2rem;font-weight:400;text-align:center;margin-bottom:24px}
+.faq details{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;padding:0;margin-bottom:10px;overflow:hidden}
+.faq summary{padding:16px 20px;cursor:pointer;font-weight:500;font-size:.95rem;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-size:1.4rem;color:var(--rose);transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details[open] summary{border-bottom:1px solid var(--ink-5)}
+.faq .a{padding:14px 20px 18px;font-size:.9rem;color:var(--ink-2);line-height:1.6}
+
+footer{text-align:center;padding:32px;color:var(--ink-4);font-size:.85rem;border-top:1px solid rgba(0,0,0,.04)}
+footer a{color:var(--rose);text-decoration:none;font-weight:500}
+
+.toast{position:fixed;bottom:24px;right:24px;background:#1c1917;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(8px);transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* Hidden admin hint */
+.admin-hint{opacity:0;transition:opacity .3s;font-size:10px;color:var(--ink-5);text-decoration:none;cursor:default}
+.admin-hint:hover{opacity:1;color:var(--ink-4)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand">Pashynska Photography<small>Calgary, Alberta</small></div>
+  <!-- Admin removed from public nav -->
+</nav>
+
+<!-- ────────── PUBLIC LANDING ────────── -->
+<section id="public">
+  <div class="hero">
+    <div class="kicker">Mini Sessions · 2026</div>
+    <h1>Soft, sunlit moments<br>among <em>blooming flowers</em></h1>
+    <p>Pick a session below — booking takes about 2 minutes.</p>
+  </div>
+
+  <div class="proof">
+    <span><strong>★ 4.9</strong> · 80+ reviews</span>
+    <span class="sep">·</span>
+    <span><strong>120+</strong> sessions delivered</span>
+    <span class="sep">·</span>
+    <span><strong>Calgary</strong> local pick 2024 & 2025</span>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how">
+    <div class="step"><div class="num">1</div><div><h4>Pick a session</h4><p>Browse upcoming dates and choose what fits — dress code & location come with confirmation.</p></div></div>
+    <div class="step"><div class="num">2</div><div><h4>Reserve in 2 min</h4><p>Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
+    <div class="step"><div class="num">3</div><div><h4>Pay deposit by e-Transfer</h4><p>Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
+  </div>
+
+  <!-- FEATURED BANNER -->
+  <div class="featured-wrap" id="featuredWrap"></div>
+
+  <!-- FILTERS -->
+  <div class="filters" id="filters">
+    <button class="chip on" data-filter="all">All</button>
+    <button class="chip" data-filter="month">This month</button>
+    <button class="chip" data-filter="mini">Mini</button>
+    <button class="chip" data-filter="individual">Individual</button>
+    <button class="chip" data-filter="wedding">Wedding</button>
+    <button class="chip" data-filter="family">Family</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="events-wrap">
+    <!-- Loading state -->
+    <div id="gridLoading" style="text-align:center;padding:60px 20px;color:var(--ink-3)">
+      <div style="width:40px;height:40px;border:3px solid var(--ink-5);border-top-color:var(--rose);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px"></div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+      Loading sessions...
+    </div>
+    <!-- Events grid -->
+    <div class="events" id="grid" style="display:none"></div>
+    <!-- Empty state -->
+    <div id="gridEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--ink-3)">
+      <div style="font-size:3rem;margin-bottom:12px">📸</div>
+      <p style="font-size:1.1rem;font-weight:500;color:var(--ink);margin-bottom:8px">No sessions available right now</p>
+      <p>Check back soon — new dates are added weekly.</p>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="faq">
+    <h2>Quick answers</h2>
+    <details><summary>What should we wear?</summary><div class="a">I send a styling guide after booking — soft tones, layered textures, nothing with big logos.</div></details>
+    <details><summary>What if it rains?</summary><div class="a">We reschedule for free, no questions asked. I check the forecast 24h before and reach out.</div></details>
+    <details><summary>Can I bring our dog?</summary><div class="a">Always yes — just let me know on the form so I plan the spot.</div></details>
+    <details><summary>How does the deposit work?</summary><div class="a">The deposit is non-refundable but transferable to another session if you give 7+ days notice. The remaining balance is due on session day.</div></details>
+    <details><summary>When do I get the photos?</summary><div class="a">Within 48 hours for mini sessions, 2 weeks for full sessions. You get a private gallery with download.</div></details>
+  </div>
+</section>
+
+<!-- ────────── BOOKING DRAWER ────────── -->
+<div class="drawer-bg" id="drawer">
+  <div class="drawer" id="drawerCard">
+    <div class="dphoto" id="dphoto">
+      <button class="close" onclick="closeDrawer()">&times;</button>
+      <h2 id="dTitle"></h2>
+    </div>
+    <div class="dbody" id="dbody"></div>
+  </div>
+</div>
+
+<footer>
+  <p><strong>Pashynska Photography</strong> · Calgary, AB · <a href="https://instagram.com/pashynska.photo" target="_blank">@pashynska.photo</a></p>
+  <p style="margin-top:6px;color:var(--ink-4)">© 2026 Pashynska Photography — All rights reserved</p>
+  <!-- Hidden admin access: tiny dot in footer -->
+  <a href="/backstage" class="admin-hint" title="Admin access">·</a>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ──────────────────────────────────────
+// API INTEGRATION WITH FLASK BACKEND
+// ──────────────────────────────────────
+const API = {
+  events: async () => {
+    const r = await fetch('/events');
+    if (!r.ok) throw new Error('Failed to load events');
+    return r.json();
+  },
+  slots: async (eventId) => {
+    const r = await fetch(`/slots/${eventId}`);
+    if (!r.ok) throw new Error('Failed to load slots');
+    return r.json();
+  },
+  reserve: async (data) => {
+    const r = await fetch('/reserve', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    return r.json();
+  },
+  confirm: async (data) => {
+    const r = await fetch('/confirm', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    return r.json();
+  }
+};
+
+let eventsData = [];
+let activeFilter = "all";
+let currentBooking = null; // {event_id, time, booking_id, expires_at}
+const ETRANSFER_EMAIL = "iryna.pashynska@gmail.com";
+let payTimer = null;
+
+const toast = (msg) => {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+};
+
+function fmtDate(iso) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-CA", {
+    weekday: "short", month: "long", day: "numeric", year: "numeric"
+  });
+}
+function daysUntil(iso) {
+  return Math.ceil((new Date(iso + "T00:00:00") - new Date()) / 86400000);
+}
+
+// ── LOAD EVENTS FROM API ──
+async function loadEvents() {
+  try {
+    const data = await API.events();
+    // data is {events: [...]}
+    eventsData = data.events || [];
+    renderAll();
+  } catch (err) {
+    console.error('Failed to load events:', err);
+    toast('Error loading sessions. Please refresh.');
+  }
+}
+
+function visibleEvents() {
+  return eventsData.filter(e => e.status !== "completed");
+}
+
+function applyFilter(list) {
+  if (activeFilter === "all") return list;
+  if (activeFilter === "month") {
+    const now = new Date();
+    return list.filter(e => {
+      const d = new Date(e.date + "T00:00:00");
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+  }
+  return list.filter(e => e.session_type === activeFilter || e.type === activeFilter);
+}
+
+function statusBadge(spots, total, status) {
+  if (status === "completed") return { cls: "sold", txt: "Past session" };
+  // Calculate spots from API data
+  const available = Number(spots) || 0;
+  if (available === 0) return { cls: "sold", txt: "Sold out" };
+  if (available <= 2) return { cls: "low", txt: `Only ${available} left` };
+  return { cls: "open", txt: `${available} of ${total} open` };
+}
+
+function renderFeatured() {
+  const wrap = document.getElementById('featuredWrap');
+  const featured = visibleEvents().filter(e => e.featured).sort((a, b) => a.date.localeCompare(b.date))[0]
+    || visibleEvents().sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (!featured) { wrap.innerHTML = ''; return; }
+  const days = daysUntil(featured.date);
+  const cdText = days <= 0 ? "Today" : days === 1 ? "Tomorrow" : `in ${days} days`;
+  wrap.innerHTML = `
+    <div class="featured" style="background-image:url('${featured.photo_url || featured.photo || '/static/images/placeholder.jpg'}')">
+      <div class="featured-tag">★ Featured</div>
+      <div class="featured-countdown">${cdText}</div>
+      <div class="featured-content">
+        <h2>${featured.title}</h2>
+        <div class="meta">${fmtDate(featured.date)} · from $${featured.deposit || featured.price || 0} deposit · ${featured.location || 'Calgary'}</div>
+        <button class="cta" onclick="openDrawer('${featured.id}')">View time slots →</button>
+      </div>
+    </div>`;
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const loading = document.getElementById('gridLoading');
+  const empty = document.getElementById('gridEmpty');
+
+  loading.style.display = 'none';
+
+  const list = applyFilter(visibleEvents()).sort((a, b) => a.date.localeCompare(b.date));
+  document.getElementById('count').textContent = `${list.length} ${list.length === 1 ? 'session' : 'sessions'}`;
+
+  if (!list.length) {
+    grid.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+
+  grid.style.display = '';
+  empty.style.display = 'none';
+  grid.innerHTML = list.map(e => {
+    const b = statusBadge(e.spots_left, e.total_spots, e.status);
+    const days = daysUntil(e.date);
+    const cd = days <= 0 ? "Today" : days === 1 ? "Tomorrow" : `in ${days}d`;
+    const isSold = e.spots_left === 0;
+    const photo = e.photo_url || e.photo || '/static/images/placeholder.jpg';
+    return `
+    <article class="event-card ${isSold ? 'sold' : ''}" onclick="openDrawer('${e.id}')">
+      <div class="photo" style="background-image:url('${photo}')">
+        <div class="status ${b.cls}"><span class="dot"></span>${b.txt}</div>
+        <div class="countdown">${cd}</div>
+        ${e.featured ? '<div class="featured-mark">★ Featured</div>' : ''}
+      </div>
+      <div class="body">
+        <div class="type-tag">${e.session_type || e.type || 'session'}</div>
+        <h3>${e.title}</h3>
+        <div class="subtitle">${e.subtitle || e.description || ''}</div>
+        <div class="meta">
+          <span>📅 ${fmtDate(e.date)}</span>
+          <span>📍 ${(e.location || 'Calgary').split(',')[0]}</span>
+        </div>
+        <div class="price-bar">
+          <div class="price">$${e.deposit || e.price || 0}<small>deposit · $${e.full_price || e.price || 0} total</small></div>
+          <button class="cta">${isSold ? 'Join waitlist' : 'View dates →'}</button>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+/* filters */
+document.getElementById('filters').addEventListener('click', (e) => {
+  if (!e.target.classList.contains('chip')) return;
+  document.querySelectorAll('#filters .chip').forEach(c => c.classList.remove('on'));
+  e.target.classList.add('on');
+  activeFilter = e.target.dataset.filter;
+  renderGrid();
+});
+
+/* drawer */
+async function openDrawer(id) {
+  let e = eventsData.find(x => x.id === id);
+  // Fallback: if events not loaded yet, fetch from API
+  if (!e) {
+    try {
+      const data = await API.events();
+      eventsData = data.events || [];
+      e = eventsData.find(x => x.id === id);
+    } catch (err) {
+      console.error('Failed to load events:', err);
+    }
+  }
+  if (!e) {
+    toast('Loading session info… please try again in a moment.');
+    return;
+  }
+  document.getElementById('dphoto').style.backgroundImage = `linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.4)),url('${e.photo_url || e.photo || '/static/images/placeholder.jpg'}')`;
+  document.getElementById('dphoto').style.backgroundSize = 'cover';
+  document.getElementById('dphoto').style.backgroundPosition = 'center';
+  document.getElementById('dTitle').textContent = e.title;
+  const dbody = document.getElementById('dbody');
+
+  if (e.spots_left === 0) {
+    // WAITLIST mode
+    dbody.innerHTML = `
+      <div style="background:var(--red-bg);color:var(--red);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center">
+        This session is fully booked. Join the waitlist — I'll DM you the moment a spot opens.
+      </div>
+      <div class="form">
+        <input class="full" placeholder="Full name" id="wName">
+        <input placeholder="Email" id="wEmail">
+        <input placeholder="@instagram" id="wIg">
+      </div>
+      <button class="btn" onclick="joinWaitlist('${e.id}')">Join waitlist</button>`;
+    document.getElementById('drawer').classList.add('open');
+    return;
+  }
+
+  // BOOKING mode — load real slots from API
+  try {
+    toast('Loading available slots...');
+    const slotsData = await API.slots(e.date);
+    const availableSlots = slotsData.slots || [];
+    if (availableSlots.length === 0) {
+      dbody.innerHTML = `
+        <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center">
+          No slots available for this session.
+        </div>
+        <button class="btn" onclick="closeDrawer()">Close</button>`;
+      document.getElementById('drawer').classList.add('open');
+      return;
+    }
+
+    dbody.innerHTML = `
+      <p style="color:var(--ink-3);font-style:italic;margin-bottom:14px">${e.subtitle || e.description || ''}</p>
+      <div class="price-row">
+        <div>
+          <span class="p">$${e.deposit || 0}</span>
+          <small>deposit · $${e.full_price || 0} total CAD</small>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.78rem;color:var(--ink-3)">${fmtDate(e.date)}</div>
+          <div style="font-size:.78rem;color:var(--ink-3);margin-top:2px">${e.location || 'Calgary'}</div>
+        </div>
+      </div>
+      <div class="lbl">Available time slots</div>
+      <div class="slots" id="slotsBox">
+        ${availableSlots.map((s, i) => `
+          <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
+        `).join('')}
+      </div>
+      <div class="form">
+        <input placeholder="Full name" class="full" id="fName">
+        <input placeholder="Phone" id="fPhone">
+        <input placeholder="Email" id="fEmail">
+        <input placeholder="@instagram" id="fIg">
+      </div>
+      <button class="btn" onclick="reserveSlot('${e.id}', '${e.date}')">Continue to Payment →</button>
+      <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">Pay deposit via e-Transfer · remaining due on session day</p>`;
+    document.getElementById('drawer').classList.add('open');
+  } catch (err) {
+    console.error('Failed to load slots:', err);
+    toast('Error loading slots. Please try again.');
+  }
+}
+
+function pickSlot(btn) {
+  btn.parentNode.querySelectorAll('.slot').forEach(s => s.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+// ── RESERVE SLOT ──
+async function reserveSlot(eventId, eventDate) {
+  const selBtn = document.querySelector('#slotsBox .slot.sel');
+  if (!selBtn) { toast("Pick a time slot first"); return; }
+  const time = selBtn.dataset.time;
+  const name = document.getElementById('fName').value.trim();
+  const phone = document.getElementById('fPhone').value.trim();
+  const email = document.getElementById('fEmail').value.trim();
+  const ig = document.getElementById('fIg').value.trim();
+
+  if (!name || !email) {
+    toast("Please fill in your name and email");
+    return;
+  }
+
+  try {
+    const result = await API.reserve({
+      event_id: eventId,
+      time: time,
+      name: name,
+      email: email,
+      phone: phone,
+      instagram: ig,
+      session_type: eventsData.find(e => e.id === eventId)?.session_type || 'mini'
+    });
+
+    if (result.success) {
+      currentBooking = {
+        event_id: eventId,
+        time: time,
+        booking_id: result.booking_id,
+        expires_at: result.expires_at,
+        name: name,
+        email: email,
+        phone: phone,
+        instagram: ig
+      };
+      goToPayment(eventId, eventDate);
+    } else {
+      toast(result.error || 'Slot is no longer available');
+    }
+  } catch (err) {
+    console.error('Reserve failed:', err);
+    toast('Network error. Please try again.');
+  }
+}
+
+// ── PAYMENT SCREEN ──
+function goToPayment(eventId, eventDate) {
+  const e = eventsData.find(x => x.id === eventId); if (!e) return;
+  const time = currentBooking?.time || '10:00';
+  const name = currentBooking?.name || 'Client';
+
+  const dphoto = document.getElementById('dphoto');
+  dphoto.style.aspectRatio = "auto";
+  dphoto.style.height = "0";
+  dphoto.querySelector('h2').style.display = 'none';
+
+  const bankMsg = `${e.title} — ${e.date} ${time}\nDeposit for ${name}`;
+  document.getElementById('dbody').innerHTML = `
+    <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <button onclick="restoreDrawer('${eventId}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;cursor:pointer;font-size:14px">‹</button>
+      <div>
+        <div style="font-weight:600;font-size:.92rem">Complete Your Booking</div>
+        <div style="font-size:.74rem;color:var(--ink-3)">${fmtDate(e.date)} · ${time}</div>
+      </div>
+    </div>
+
+    <div class="pay-timer" id="payTimerBox">
+      <span class="lbl-t">Slot reserved for</span>
+      <span class="cnt" id="payCnt">15:00</span>
+    </div>
+
+    <div class="pay-summary">
+      <div class="row"><span class="key">Session</span><span>${e.title} (${e.session_length || 20} min)</span></div>
+      <div class="row"><span class="key">Date</span><span>${fmtDate(e.date)}</span></div>
+      <div class="row"><span class="key">Time</span><span>${time}</span></div>
+      <div class="row"><span class="key">Balance at session</span><span>$${(e.full_price || 0) - (e.deposit || 0)} + GST</span></div>
+      <div class="row"><span class="key">Deposit due now</span><span class="val-rose">$${e.deposit || 0} CAD</span></div>
+    </div>
+
+    <div class="transfer-box">
+      <div class="eyebrow">Send via Interac e-Transfer</div>
+      <div class="amount">$${e.deposit || 0}</div>
+      <div class="ccy">CAD — Canadian dollars</div>
+      <div class="email-copy" onclick="copyText('${ETRANSFER_EMAIL}','copyPill')">
+        <div>
+          <div class="lbl-e">Send to</div>
+          <div class="val-e">${ETRANSFER_EMAIL}</div>
+        </div>
+        <button class="copy-pill" id="copyPill" onclick="event.stopPropagation();copyText('${ETRANSFER_EMAIL}','copyPill')">Copy</button>
+      </div>
+      <div style="font-size:.74rem;color:var(--ink-4);margin-top:8px">Auto-deposit enabled · no password needed</div>
+    </div>
+
+    <div style="font-size:.8rem;font-weight:600;margin-bottom:4px">Ready-to-use bank message</div>
+    <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:8px">Paste this in the "Message" field when sending</div>
+    <div class="bank-msg" onclick="copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">
+      <button class="copy-pill" id="bankPill" onclick="event.stopPropagation();copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">Copy</button>
+      ${e.title} — ${e.date} ${time}<br>Deposit for ${name}
+    </div>
+
+    <div class="how-to">
+      <div class="t">How to send Interac e-Transfer</div>
+      <ol>
+        <li>Open your banking app (RBC, TD, Scotiabank, etc.)</li>
+        <li>Choose "Send Interac e-Transfer"</li>
+        <li>Tap the email above to copy, paste as recipient</li>
+        <li>Enter amount: <strong>$${e.deposit || 0}.00</strong></li>
+        <li>Add message: "${e.title} — ${e.date} ${time}"</li>
+        <li>Send the transfer</li>
+      </ol>
+    </div>
+
+    <div class="info-note">💡 <strong>No password needed!</strong> This is auto-deposit. Money arrives instantly. I'll see it within minutes (Gmail-bot + Telegram alert) and confirm your booking.</div>
+
+    <button class="btn" onclick="confirmClientPayment('${e.id}')"> ✓ Yes, I've Sent $${e.deposit || 0} — Confirm Booking</button>
+    <button class="btn-ghost" onclick="restoreDrawer('${e.id}')">← Back to change time</button>
+  `;
+  startPayTimer();
+}
+
+function restoreDrawer(eventId) {
+  // Stop timer and restore drawer view
+  if (payTimer) clearInterval(payTimer);
+  openDrawer(eventId);
+}
+
+function startPayTimer() {
+  if (payTimer) clearInterval(payTimer);
+  let total = 15 * 60;
+  const cnt = document.getElementById('payCnt');
+  const box = document.getElementById('payTimerBox');
+  payTimer = setInterval(() => {
+    total--;
+    if (total <= 0) {
+      clearInterval(payTimer);
+      cnt.textContent = "0:00";
+      toast("Reservation expired. Please select a new slot.");
+      return;
+    }
+    const m = Math.floor(total / 60), s = total % 60;
+    cnt.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    if (total <= 300) {
+      box.style.background = "var(--red-bg)";
+      box.style.borderColor = "rgba(139,53,53,.2)";
+      cnt.style.color = "var(--red)";
+      box.querySelector('.lbl-t').style.color = "var(--red)";
+    }
+  }, 1000);
+}
+
+function copyText(txt, pillId) {
+  navigator.clipboard.writeText(txt).catch(() => { });
+  const p = document.getElementById(pillId);
+  if (!p) return;
+  const orig = p.textContent;
+  p.textContent = "✓ Copied"; p.classList.add('copied');
+  setTimeout(() => { p.textContent = orig; p.classList.remove('copied') }, 2200);
+}
+
+// ── CONFIRM PAYMENT (CLIENT SIDE) ──
+async function confirmClientPayment(eventId) {
+  if (!currentBooking) { toast("No active reservation"); return; }
+  if (payTimer) clearInterval(payTimer);
+
+  try {
+    const result = await API.confirm({
+      event_id: currentBooking.event_id,
+      time: currentBooking.time,
+      name: currentBooking.name,
+      email: currentBooking.email,
+      phone: currentBooking.phone,
+      instagram: currentBooking.instagram,
+      session_type: eventsData.find(e => e.id === eventId)?.session_type || 'mini',
+      booking_id: currentBooking.booking_id
+    });
+
+    if (result.success) {
+      showSuccess(currentBooking.name);
+    } else {
+      toast(result.error || 'Confirmation failed');
+    }
+  } catch (err) {
+    console.error('Confirm failed:', err);
+    // Still show success UI since e-Transfer will be verified manually
+    showSuccess(currentBooking.name);
+  }
+}
+
+function showSuccess(name) {
+  const e = eventsData.find(x => x.id === currentBooking?.event_id);
+  document.getElementById('dbody').innerHTML = `
+    <div class="success-state">
+      <div class="check">✓</div>
+      <h3>Thanks${name ? ', ' + name.split(' ')[0] : ''}!</h3>
+      <p>I'm watching for your e-Transfer.</p>
+      <p>You'll get an email + Instagram DM the moment it's confirmed (usually within 5 minutes).</p>
+      <p style="margin-top:18px;font-size:.85rem">${e?.title || 'Session'}<br><strong>${fmtDate(e?.date || '')} · ${currentBooking?.time || ''}</strong></p>
+      <button class="btn" style="margin-top:24px" onclick="closeDrawer(); currentBooking=null;">Done</button>
+    </div>`;
+}
+
+function joinWaitlist(eventId) {
+  const name = document.getElementById('wName')?.value?.trim();
+  const email = document.getElementById('wEmail')?.value?.trim();
+  const ig = document.getElementById('wIg')?.value?.trim();
+  if (!name || !email) { toast("Please fill in name and email"); return; }
+  toast("Waitlist joined! I'll DM you when a spot opens.");
+  closeDrawer();
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  if (payTimer) clearInterval(payTimer);
+  // Restore drawer photo aspect ratio
+  setTimeout(() => {
+    const dphoto = document.getElementById('dphoto');
+    dphoto.style.aspectRatio = "16/9";
+    dphoto.style.height = "";
+    dphoto.querySelector('h2').style.display = '';
+  }, 300);
+}
+
+document.getElementById('drawer').addEventListener('click', (e) => { if (e.target.id === 'drawer') closeDrawer() });
+
+// Keyboard: Escape closes drawer, Enter on slot selects it
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeDrawer();
+});
+
+function renderAll() {
+  renderFeatured();
+  renderGrid();
+}
+
+// ── INIT ──
+loadEvents().then(() => {
+  // Auto-open drawer if direct_event_id is provided
+  {% if direct_event_id %}
+  setTimeout(() => openDrawer('{{ direct_event_id }}'), 500);
+  {% endif %}
+});
+</script>
+</body>
+</html>

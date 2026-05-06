@@ -25,6 +25,7 @@ from functools import wraps
 import json
 import logging
 import os
+import hmac
 import sqlite3
 import requests
 import sys
@@ -43,7 +44,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24).hex())
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.environ.get("SECRET_KEY") or os.urandom(24).hex()
 
 PYTHON_BIN = os.environ.get("PYTHON_BIN", sys.executable)
 
@@ -63,8 +64,20 @@ def _start_etransfer_checker(booking_id):
         log.error(f"[etransfer-checker] Failed to start: {e}")
 
 # ===== RATE LIMITING =====
-# Simple IP-based rate limit: 10 requests per 10 minutes per IP
+# Simple IP-based rate limit: 5 booking requests per 10 minutes per IP
 _rate_limits = {}
+# Separate counter for admin login attempts (brute-force protection)
+_login_attempts = {}
+
+def check_login_rate_limit(ip):
+    now = time.time()
+    window = [t for t in _login_attempts.get(ip, []) if now - t < 900]  # 15-min window
+    _login_attempts[ip] = window
+    return len(window) < 10  # max 10 login attempts per 15 min
+
+def record_login_attempt(ip):
+    now = time.time()
+    _login_attempts.setdefault(ip, []).append(now)
 
 def check_rate_limit(ip):
     now = time.time()
@@ -84,19 +97,35 @@ def record_request(ip):
 
 # ===== ADMIN AUTH =====
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
+ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+
+def _admin_key_from_request():
+    return (
+        request.headers.get("X-Admin-Key")
+        or request.args.get("key")
+        or (request.json.get("key") if request.is_json else None)
+        or ""
+    )
+
+def _admin_authorized():
+    # Browser session (logged in via /admin/login)
+    if session.get("admin_authenticated"):
+        return True
+    # Programmatic API access via X-Admin-Key header or ?key= param
+    if ADMIN_KEY and _admin_key_from_request() == ADMIN_KEY:
+        return True
+    # SECURITY: never allow open access — admin MUST have credentials set
+    return False
 
 def admin_required(f):
-    """Require X-Admin-Key header OR ?key= query param for admin endpoints."""
+    """Require a browser login, X-Admin-Key header, or ?key= query param."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if ADMIN_KEY:
-            provided = (
-                request.headers.get("X-Admin-Key")
-                or request.args.get("key")
-                or (request.json.get("key") if request.is_json else None)
-            )
-            if provided != ADMIN_KEY:
-                return jsonify({"error": "Unauthorized"}), 401
+        if not _admin_authorized():
+            if request.method == "GET" and request.path == "/admin":
+                return redirect(url_for("admin_login", next=request.path))
+            return jsonify({"error": "Unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated
 
@@ -664,15 +693,69 @@ SLOTS = generate_slots()
 
 # ===== ROUTES =====
 
+def _public_visible_events():
+    """Events shown on the public landing — active or upcoming, not hidden."""
+    out = []
+    for ev in EVENTS:
+        if ev.get("hidden"):
+            continue
+        if ev.get("status") not in ("active", "upcoming"):
+            continue
+        out.append(ev)
+    return out
+
+def _enrich_event_for_landing(ev):
+    """Add computed fields used by the landing template (date_pretty, days_until, spots)."""
+    from datetime import date as _date
+    e = dict(ev)
+    e.setdefault("type", "mini")
+    e.setdefault("featured", False)
+    e.setdefault("subtitle", "")
+    try:
+        d = datetime.strptime(ev["date"], "%Y-%m-%d").date()
+        e["date_pretty"] = d.strftime("%a, %B %-d, %Y") if hasattr(d, "strftime") else str(d)
+        e["days_until"] = (d - _date.today()).days
+    except Exception:
+        e["date_pretty"] = ev.get("date", "")
+        e["days_until"] = 0
+    # spots accounting from the actual DB
+    total = int(ev.get("total_spots") or len(generate_slots(ev)))
+    booked = 0
+    try:
+        conn = db_conn()
+        c = conn.cursor()
+        c.execute("""
+            SELECT COUNT(*) FROM bookings
+            WHERE date=? AND status NOT IN ('cancelled','expired')
+        """, (ev["date"],))
+        booked = c.fetchone()[0] or 0
+        conn.close()
+    except Exception:
+        pass
+    e["spots"] = {"total": total, "booked": booked, "left": max(0, total - booked)}
+    return e
+
 @app.route("/")
 def index():
-    """Landing page — shows the active event or event list."""
+    """Landing — new v2 design with event grid, featured banner, and booking drawer."""
     event_id = request.args.get("event")
-    ev = get_event_by_id(event_id) if event_id else get_active_event()
-    if not ev:
-        return "No events available", 404
+
+    # ── Direct event link: still render v2 landing, but could auto-open drawer in future ──
+    if event_id:
+        ev = get_event_by_id(event_id)
+        if not ev:
+            return "Event not found", 404
+        # Always use v2 landing; JavaScript will handle direct event linking if needed
+        return render_template("index_v2.html", direct_event_id=event_id)
+
+    # ── Render the new landing grid (v2 design) for all cases ──
+    return render_template("index_v2.html")
+
+
+def _render_single_event(ev):
     slots = generate_slots(ev)
-    return render_template("index.html",
+    return render_template(
+        "index.html",
         title=ev.get("title", EVENT_TITLE),
         date=ev["date"],
         price=ev.get("deposit", SESSION_PRICE),
@@ -685,31 +768,73 @@ def index():
         location=ev.get("location", ""),
         included=ev.get("included", []),
         photos=ev.get("photos", []),
-        slots=slots
+        slots=slots,
     )
 
 @app.route("/events")
 def list_events():
-    """API: list all events with status."""
+    """API: list all events with full details including available spots."""
     result = []
+    now = datetime.now()
+    conn = db_conn()
+    c = conn.cursor()
+
     for ev in EVENTS:
-        if ev.get("status") in ("active", "upcoming"):
+        if ev.get("status") in ("active", "upcoming", "completed"):
+            # Calculate total and available spots
+            slots = generate_slots(ev)
+            total_spots = len(slots)
+
+            c.execute("""
+                SELECT time FROM bookings
+                WHERE date=?
+                  AND status NOT IN ('cancelled', 'expired')
+                  AND (confirmed=1 OR reserved_until > ?)
+            """, (ev["date"], now.isoformat()))
+            booked_times = {row["time"] for row in c.fetchall()}
+            available_spots = len([s for s in slots if s["time"] not in booked_times])
+
+            # Get first photo URL
+            photos = ev.get("photos", [])
+            photo_url = photos[0] if photos else "/static/images/placeholder.jpg"
+
             result.append({
                 "id": ev["id"],
                 "title": ev.get("title", ""),
                 "subtitle": ev.get("subtitle", ""),
+                "description": ev.get("subtitle", ""),
                 "date": ev["date"],
                 "start_time": ev.get("start_time", ""),
                 "end_time": ev.get("end_time", ""),
+                "session_length": ev.get("session_length", 20),
+                "break_length": ev.get("break_length", 10),
+                "slot_interval": ev.get("slot_interval", 30),
                 "deposit": ev.get("deposit", SESSION_PRICE),
                 "full_price": ev.get("full_price", SESSION_TOTAL),
+                "price": ev.get("deposit", SESSION_PRICE),
+                "location": ev.get("location", "Calgary"),
                 "status": ev.get("status", ""),
+                "session_type": ev.get("session_type", "mini"),
+                "type": ev.get("session_type", "mini"),
+                "featured": ev.get("featured", False),
+                "hidden": ev.get("hidden", False),
+                "total_spots": total_spots,
+                "spots_left": available_spots,
+                "photo_url": photo_url,
+                "photo": photo_url,
+                "included": ev.get("included", []),
             })
+    conn.close()
     return jsonify({"events": result})
 
 @app.route("/slots/<date_str>")
 def get_slots(date_str):
-    ev = get_event_by_date(date_str)
+    # Support looking up by event_id via query param too
+    event_id = request.args.get("event_id")
+    if event_id:
+        ev = get_event_by_id(event_id)
+    else:
+        ev = get_event_by_date(date_str)
     if not ev:
         return jsonify({"slots": [], "message": f"No event on {date_str}"})
 
@@ -963,17 +1088,136 @@ def success():
         booking=booking
     )
 
+@app.route("/backstage")
+def backstage():
+    """Hidden admin access — redirects to admin login or dashboard if already authenticated."""
+    if _admin_authorized():
+        return redirect(url_for("admin"))
+    return redirect(url_for("admin_login", next=url_for("admin")))
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    """Browser login for the admin dashboard."""
+    next_url = request.values.get("next") or url_for("admin")
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = url_for("admin")
+
+    # Already logged in — skip straight to admin
+    if session.get("admin_authenticated"):
+        return redirect(next_url)
+
+    if request.method == "POST":
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+        if isinstance(ip, str) and "," in ip:
+            ip = ip.split(",")[0].strip()
+
+        # Brute-force protection: max 10 login attempts per IP per 15 min
+        if not check_login_rate_limit(ip):
+            return render_template(
+                "admin_login.html",
+                error="Too many login attempts. Please wait 15 minutes.",
+                next_url=next_url,
+            ), 429
+
+        record_login_attempt(ip)
+
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+        valid_user = hmac.compare_digest(username, ADMIN_USER)
+        valid_password = bool(ADMIN_PASSWORD) and hmac.compare_digest(password, ADMIN_PASSWORD)
+
+        if valid_user and valid_password:
+            session["admin_authenticated"] = True
+            session.permanent = True  # respect PERMANENT_SESSION_LIFETIME
+            log.info(f"[admin] Successful login from {ip}")
+            return redirect(next_url)
+
+        log.warning(f"[admin] Failed login attempt from {ip} (user={username!r})")
+        return render_template(
+            "admin_login.html",
+            error="Incorrect username or password.",
+            next_url=next_url,
+        ), 401
+
+    return render_template("admin_login.html", error=None, next_url=next_url)
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_authenticated", None)
+    return redirect(url_for("admin_login"))
+
 @app.route("/admin")
 @admin_required
 def admin():
     """Admin dashboard — HTML view with Confirm/Cancel buttons."""
+    # Get filter parameters
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+    session_type = request.args.get("session_type", "")
+    status = request.args.get("status", "")
+    search = request.args.get("search", "").strip()
+    page = request.args.get("page", "1")
+    limit = request.args.get("limit", "50")
+
+    try:
+        page_num = int(page)
+        if page_num < 1:
+            page_num = 1
+    except ValueError:
+        page_num = 1
+
+    try:
+        limit_num = int(limit)
+        if limit_num < 1 or limit_num > 1000:
+            limit_num = 50
+    except ValueError:
+        limit_num = 50
+
+    offset = (page_num - 1) * limit_num
+
     conn = db_conn()
     c = conn.cursor()
-    c.execute("SELECT * FROM bookings ORDER BY date DESC, time ASC")
+
+    # Build WHERE clause
+    conditions = []
+    params = []
+
+    if date_from:
+        conditions.append("date >= ?")
+        params.append(date_from)
+    if date_to:
+        conditions.append("date <= ?")
+        params.append(date_to)
+    if session_type:
+        conditions.append("session_type = ?")
+        params.append(session_type)
+    if status and status != "all":
+        if status == "pending":
+            conditions.append("status IN ('pending_payment', 'reserved')")
+        else:
+            conditions.append("status = ?")
+            params.append(status)
+    if search:
+        conditions.append("(name LIKE ? OR email LIKE ? OR phone LIKE ? OR instagram LIKE ?)")
+        search_term = f"%{search}%"
+        params.extend([search_term, search_term, search_term, search_term])
+
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+    # Get total count for pagination
+    c.execute(f"SELECT COUNT(*) as total FROM bookings WHERE {where_clause}", params)
+    total_count = c.fetchone()["total"]
+
+    # Get filtered bookings
+    order_clause = "ORDER BY date DESC, time ASC"
+    sql = f"SELECT * FROM bookings WHERE {where_clause} {order_clause} LIMIT ? OFFSET ?"
+    params_with_limit = params + [limit_num, offset]
+    c.execute(sql, params_with_limit)
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
 
-    stats = {
+    # Calculate stats based on filtered results
+    filtered_stats = {
         "total": len(rows),
         "confirmed": sum(1 for b in rows if b["status"] == "confirmed"),
         "pending": sum(1 for b in rows if b["status"] in ("pending_payment", "reserved")),
@@ -981,8 +1225,117 @@ def admin():
         "expired": sum(1 for b in rows if b["status"] == "expired"),
         "total_expected": sum(b.get("paid_amount", 0) or 0 for b in rows if b["status"] == "confirmed"),
     }
-    key = request.args.get("key") or request.headers.get("X-Admin-Key", "")
-    return render_template("admin.html", bookings=rows, stats=stats, admin_key=key, events=EVENTS)
+
+    # Get overall stats (unfiltered) for summary
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) as total, "
+              "SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as confirmed, "
+              "SUM(CASE WHEN status IN ('pending_payment', 'reserved') THEN 1 ELSE 0 END) as pending, "
+              "SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled, "
+              "SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as expired, "
+              "SUM(CASE WHEN status = 'confirmed' THEN paid_amount ELSE 0 END) as total_expected FROM bookings")
+    overall_row = c.fetchone()
+    overall_stats = {
+        "total": overall_row["total"] or 0,
+        "confirmed": overall_row["confirmed"] or 0,
+        "pending": overall_row["pending"] or 0,
+        "cancelled": overall_row["cancelled"] or 0,
+        "expired": overall_row["expired"] or 0,
+        "total_expected": overall_row["total_expected"] or 0,
+    }
+    conn.close()
+
+    # Get unique session types for dropdown
+    conn = db_conn()
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT session_type FROM bookings WHERE session_type IS NOT NULL AND session_type != '' ORDER BY session_type")
+    session_types = [row["session_type"] for row in c.fetchall()]
+    conn.close()
+
+    return render_template("admin.html",
+                           bookings=rows,
+                           filtered_stats=filtered_stats,
+                           overall_stats=overall_stats,
+                           events=EVENTS,
+                           session_types=session_types,
+                           filters={
+                               "date_from": date_from,
+                               "date_to": date_to,
+                               "session_type": session_type,
+                               "status": status,
+                               "search": search,
+                               "page": page_num,
+                               "limit": limit_num,
+                               "total_count": total_count,
+                               "total_pages": (total_count + limit_num - 1) // limit_num if limit_num > 0 else 1
+                           })
+
+@app.route("/admin/export")
+@admin_required
+def admin_export():
+    """Export bookings as CSV."""
+    # Get filter parameters (same as admin dashboard)
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+    session_type = request.args.get("session_type", "")
+    status = request.args.get("status", "")
+    search = request.args.get("search", "").strip()
+
+    conn = db_conn()
+    c = conn.cursor()
+
+    conditions = []
+    params = []
+
+    if date_from:
+        conditions.append("date >= ?")
+        params.append(date_from)
+    if date_to:
+        conditions.append("date <= ?")
+        params.append(date_to)
+    if session_type:
+        conditions.append("session_type = ?")
+        params.append(session_type)
+    if status and status != "all":
+        if status == "pending":
+            conditions.append("status IN ('pending_payment', 'reserved')")
+        else:
+            conditions.append("status = ?")
+            params.append(status)
+    if search:
+        conditions.append("(name LIKE ? OR email LIKE ? OR phone LIKE ? OR instagram LIKE ?)")
+        search_term = f"%{search}%"
+        params.extend([search_term, search_term, search_term, search_term])
+
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+    sql = f"SELECT * FROM bookings WHERE {where_clause} ORDER BY date DESC, time ASC"
+    c.execute(sql, params)
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+
+    # Generate CSV
+    import io
+    import csv
+    output = io.StringIO()
+    if rows:
+        fieldnames = rows[0].keys()
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    else:
+        # Write header only
+        writer = csv.writer(output)
+        writer.writerow(["No data matching filters"])
+
+    # Create response
+    from flask import Response
+    filename = f"bookings-{datetime.now().strftime('%Y-%m-%d')}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @app.route("/admin/confirm", methods=["POST"])
 @admin_required
@@ -1062,6 +1415,96 @@ ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 def _allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route("/admin/events/<event_id>/update", methods=["POST"])
+@admin_required
+def admin_update_event(event_id):
+    """Update event time/schedule settings and save to events.yaml."""
+    data = request.json or {}
+
+    with open(EVENTS_YAML_PATH) as fh:
+        yaml_data = yaml.safe_load(fh)
+
+    event = next((e for e in yaml_data.get("events", []) if e["id"] == event_id), None)
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+
+    # Validate and apply time fields
+    try:
+        if "start_time" in data:
+            datetime.strptime(data["start_time"], "%H:%M")
+            event["start_time"] = data["start_time"]
+        if "end_time" in data:
+            datetime.strptime(data["end_time"], "%H:%M")
+            event["end_time"] = data["end_time"]
+        if "session_length" in data:
+            sl = int(data["session_length"])
+            if not (5 <= sl <= 120):
+                return jsonify({"error": "session_length must be 5–120 minutes"}), 400
+            event["session_length"] = sl
+        if "break_length" in data:
+            bl = int(data["break_length"])
+            if not (0 <= bl <= 60):
+                return jsonify({"error": "break_length must be 0–60 minutes"}), 400
+            event["break_length"] = bl
+        # slot_interval is always session_length + break_length
+        event["slot_interval"] = event.get("session_length", 20) + event.get("break_length", 10)
+        if "title" in data:
+            event["title"] = str(data["title"])[:120]
+        if "subtitle" in data:
+            event["subtitle"] = str(data["subtitle"])[:200]
+        if "deposit" in data:
+            event["deposit"] = float(data["deposit"])
+        if "full_price" in data:
+            event["full_price"] = float(data["full_price"])
+        if "status" in data and data["status"] in ("active", "upcoming", "completed"):
+            event["status"] = data["status"]
+        if "location" in data:
+            event["location"] = str(data["location"])[:300]
+    except ValueError as e:
+        return jsonify({"error": f"Invalid value: {e}"}), 400
+
+    # Validate that start < end
+    try:
+        s = datetime.strptime(event["start_time"], "%H:%M")
+        e_ = datetime.strptime(event["end_time"], "%H:%M")
+        if s >= e_:
+            return jsonify({"error": "start_time must be before end_time"}), 400
+    except Exception:
+        pass
+
+    with open(EVENTS_YAML_PATH, "w") as fh:
+        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+
+    # Reload events in memory
+    global EVENTS, SETTINGS, _active, EVENT_TITLE, SESSION_LENGTH, BREAK_LENGTH, SLOT_INTERVAL, SESSION_PRICE, SESSION_TOTAL, DATE, START_TIME, END_TIME, SLOTS
+    EVENTS, SETTINGS = _load_events()
+    _active = get_active_event() or {}
+    EVENT_TITLE = _active.get("title", "Mini Sessions")
+    SESSION_LENGTH = _active.get("session_length", 20)
+    BREAK_LENGTH = _active.get("break_length", 10)
+    SLOT_INTERVAL = _active.get("slot_interval", 30)
+    SESSION_PRICE = _active.get("deposit", 95)
+    SESSION_TOTAL = _active.get("full_price", 190)
+    DATE = _active.get("date", "")
+    START_TIME = _active.get("start_time", "10:00")
+    END_TIME = _active.get("end_time", "16:00")
+    SLOTS = generate_slots()
+
+    # Compute slot preview for the response
+    updated_event = next((e for e in EVENTS if e["id"] == event_id), event)
+    slots_preview = generate_slots(updated_event)
+
+    log.info(f"[admin] Event {event_id} settings updated: {data}")
+    return jsonify({"success": True, "slots_count": len(slots_preview), "event": {
+        "id": updated_event["id"],
+        "start_time": updated_event.get("start_time"),
+        "end_time": updated_event.get("end_time"),
+        "session_length": updated_event.get("session_length"),
+        "break_length": updated_event.get("break_length"),
+        "slot_interval": updated_event.get("slot_interval"),
+    }})
+
 
 @app.route("/admin/photos/<event_id>", methods=["GET"])
 @admin_required

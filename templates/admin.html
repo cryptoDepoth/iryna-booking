@@ -364,6 +364,96 @@
         #toast.success { background: var(--green); }
         #toast.error { background: var(--red); }
 
+        /* ── EVENT SETTINGS ── */
+        .event-settings-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .event-settings-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .event-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-2);
+            margin-bottom: 6px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-strong);
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 14px;
+            color: var(--text);
+            background: white;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+        .slots-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--accent-light);
+            border: 1px solid rgba(249,115,22,0.25);
+            border-radius: 7px;
+            font-size: 13px;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+        .slots-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .slot-chip {
+            padding: 3px 10px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--text-2);
+            font-variant-numeric: tabular-nums;
+        }
+        .btn-save {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 18px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-save:hover { background: #ea6c0a; }
+        .btn-save:disabled { opacity: 0.6; cursor: default; }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 1100px) {
             .stats { grid-template-columns: repeat(3, 1fr); }
@@ -375,10 +465,45 @@
             .search-input { width: 180px; }
             table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
             thead th, tbody td { padding: 10px 12px; }
+            .event-settings-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        /* ── PAGINATION ── */
+        .pagination {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+        .pagination a {
+            text-decoration: none;
+            padding: 6px 12px;
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
+            background: white;
+            color: var(--text-2);
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+        .pagination a:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .pagination span {
+            color: var(--text-2);
+            font-size: 13px;
         }
     </style>
 </head>
 <body>
+{% macro update_query(page=none) %}
+    {% set params = request.args.to_dict() %}
+    {% if page %}
+        {% set _ = params.update({'page': page}) %}
+    {% endif %}
+    {{ url_for('admin', **params) }}
+{% endmacro %}
 
 <!-- TOP BAR -->
 <nav class="topbar">
@@ -420,36 +545,130 @@
     <div class="stats">
         <div class="stat">
             <div class="stat-label">Total</div>
-            <div class="stat-value">{{ stats.total }}</div>
+            <div class="stat-value">{{ filtered_stats.total }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">Confirmed</div>
-            <div class="stat-value green">{{ stats.confirmed }}</div>
+            <div class="stat-value green">{{ filtered_stats.confirmed }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">Pending</div>
-            <div class="stat-value orange">{{ stats.pending }}</div>
+            <div class="stat-value orange">{{ filtered_stats.pending }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">Revenue</div>
-            <div class="stat-value blue">${{ "%.0f"|format(stats.total_expected) }}</div>
+            <div class="stat-value blue">${{ "%.0f"|format(filtered_stats.total_expected) }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">Cancelled</div>
-            <div class="stat-value red">{{ stats.cancelled }}</div>
+            <div class="stat-value red">{{ filtered_stats.cancelled }}</div>
         </div>
         <div class="stat">
             <div class="stat-label">Expired</div>
-            <div class="stat-value" style="color:var(--text-3)">{{ stats.expired }}</div>
+            <div class="stat-value" style="color:var(--text-3)">{{ filtered_stats.expired }}</div>
         </div>
     </div>
+    <div style="margin-bottom:20px; font-size:12px; color:var(--text-3);">
+        Showing {{ filtered_stats.total }} of {{ overall_stats.total }} total bookings.
+    </div>
 
-    <!-- TOOLBAR -->
+    <!-- FILTERS -->
+    <div class="card" style="margin-bottom:20px; padding:20px;">
+        <form id="filter-form" method="get" action="/admin">
+            <input type="hidden" id="page" name="page" value="{{ filters.page }}">
+            <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; align-items:end;">
+                <div class="form-group">
+                    <label for="date_from">Date from</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ filters.date_from }}">
+                </div>
+                <div class="form-group">
+                    <label for="date_to">Date to</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ filters.date_to }}">
+                </div>
+                <div class="form-group">
+                    <label for="session_type">Session type</label>
+                    <select id="session_type" name="session_type">
+                        <option value="">All types</option>
+                        {% for st in session_types %}
+                        <option value="{{ st }}" {% if filters.session_type == st %}selected{% endif %}>{{ st }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select id="status" name="status">
+                        <option value="">All statuses</option>
+                        <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All</option>
+                        <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>⏳ Pending</option>
+                        <option value="confirmed" {% if filters.status == 'confirmed' %}selected{% endif %}>✅ Confirmed</option>
+                        <option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>❌ Cancelled</option>
+                        <option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expired</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="search">Search</label>
+                    <input type="text" id="search" name="search" placeholder="Name, email, phone, Instagram…" value="{{ filters.search }}">
+                </div>
+                <div class="form-group">
+                    <label for="limit">Rows per page</label>
+                    <select id="limit" name="limit">
+                        <option value="10" {% if filters.limit == 10 %}selected{% endif %}>10</option>
+                        <option value="25" {% if filters.limit == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if filters.limit == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if filters.limit == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn-save" style="padding:8px 16px; font-size:14px;">Apply filters</button>
+                    <a href="/admin" class="btn-outline" style="margin-left:8px; padding:8px 16px; font-size:14px; text-decoration:none;">Reset</a>
+                    <a href="/admin/export?{{ request.query_string.decode() }}" class="btn-outline" style="margin-left:8px; padding:8px 16px; font-size:14px; text-decoration:none;">📥 Export CSV</a>
+                </div>
+            </div>
+        </form>
+        {% if filters.date_from or filters.date_to or filters.session_type or filters.status or filters.search %}
+        <div style="margin-top:16px; padding:12px 16px; background:var(--surface-2); border-radius:var(--radius); border:1px solid var(--border); font-size:13px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span style="font-weight:600;">Active filters:</span>
+                <a href="/admin" style="margin-left:auto; font-size:12px; color:var(--accent); text-decoration:none;">Clear all</a>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                {% if filters.date_from %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    📅 From: {{ filters.date_from }}
+                </span>
+                {% endif %}
+                {% if filters.date_to %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    📅 To: {{ filters.date_to }}
+                </span>
+                {% endif %}
+                {% if filters.session_type %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    🏷️ Type: {{ filters.session_type }}
+                </span>
+                {% endif %}
+                {% if filters.status and filters.status != 'all' %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    📊 Status: {{ filters.status }}
+                </span>
+                {% endif %}
+                {% if filters.search %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    🔍 Search: "{{ filters.search }}"
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- QUICK STATUS FILTERS -->
     <div class="toolbar">
-        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
-        <button class="filter-btn" data-filter="pending" onclick="setFilter('pending', this)">⏳ Pending</button>
-        <button class="filter-btn" data-filter="confirmed" onclick="setFilter('confirmed', this)">✅ Confirmed</button>
-        <button class="filter-btn" data-filter="cancelled" onclick="setFilter('cancelled', this)">❌ Cancelled</button>
+        <button class="filter-btn {% if not filters.status %}active{% endif %}" onclick="setStatusFilter('')">All</button>
+        <button class="filter-btn {% if filters.status == 'pending' %}active{% endif %}" onclick="setStatusFilter('pending')">⏳ Pending</button>
+        <button class="filter-btn {% if filters.status == 'confirmed' %}active{% endif %}" onclick="setStatusFilter('confirmed')">✅ Confirmed</button>
+        <button class="filter-btn {% if filters.status == 'cancelled' %}active{% endif %}" onclick="setStatusFilter('cancelled')">❌ Cancelled</button>
+        <button class="filter-btn {% if filters.status == 'expired' %}active{% endif %}" onclick="setStatusFilter('expired')">Expired</button>
         <div class="search-wrap">
             <span class="search-icon">🔍</span>
             <input class="search-input" type="text" id="search" placeholder="Search by name, email, Instagram…" oninput="doSearch(this.value)">
@@ -546,6 +765,97 @@
         </table>
     </div>
 
+    <!-- PAGINATION -->
+    {% if filters.total_pages > 1 %}
+    <div class="pagination" style="margin-top:20px; display:flex; justify-content:center; align-items:center; gap:8px;">
+        {% if filters.page > 1 %}
+        <a href="{{ update_query(page=1) }}" class="btn-outline" style="text-decoration:none; padding:6px 12px;">&laquo; First</a>
+        <a href="{{ update_query(page=filters.page-1) }}" class="btn-outline" style="text-decoration:none; padding:6px 12px;">&lsaquo; Prev</a>
+        {% endif %}
+        <span style="color:var(--text-2); font-size:13px;">Page {{ filters.page }} of {{ filters.total_pages }}</span>
+        {% if filters.page < filters.total_pages %}
+        <a href="{{ update_query(page=filters.page+1) }}" class="btn-outline" style="text-decoration:none; padding:6px 12px;">Next &rsaquo;</a>
+        <a href="{{ update_query(page=filters.total_pages) }}" class="btn-outline" style="text-decoration:none; padding:6px 12px;">Last &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- EVENT SCHEDULE SETTINGS -->
+    <div style="margin-top:36px;">
+        <div class="page-header" style="margin-bottom:16px;">
+            <div class="page-title">
+                <h1>Event Settings</h1>
+                <p>Set shooting hours, session length and break time — slots are computed automatically</p>
+            </div>
+        </div>
+
+        {% for ev in events %}
+        <div class="event-settings-card">
+            <div class="event-settings-header">
+                <div>
+                    <div style="font-weight:700; font-size:15px;">{{ ev.title }}</div>
+                    <div style="color:var(--text-3); font-size:12px; margin-top:3px;">
+                        {{ ev.id }} · {{ ev.date }} ·
+                        <span id="status-badge-{{ ev.id }}" style="color:{% if ev.status == 'active' %}var(--green){% elif ev.status == 'upcoming' %}var(--blue){% else %}var(--text-3){% endif %}; font-weight:600;">{{ ev.status }}</span>
+                    </div>
+                </div>
+                <button class="btn-save" onclick="saveEventSettings('{{ ev.id }}')" id="save-btn-{{ ev.id }}">
+                    💾 Save changes
+                </button>
+            </div>
+
+            <div class="event-settings-grid">
+                <div class="form-group">
+                    <label>Start time</label>
+                    <input type="time" id="start-{{ ev.id }}" value="{{ ev.start_time }}"
+                           oninput="updateSlotsPreview('{{ ev.id }}')">
+                </div>
+                <div class="form-group">
+                    <label>End time</label>
+                    <input type="time" id="end-{{ ev.id }}" value="{{ ev.end_time }}"
+                           oninput="updateSlotsPreview('{{ ev.id }}')">
+                </div>
+                <div class="form-group">
+                    <label>Session length (min)</label>
+                    <input type="number" id="session-{{ ev.id }}" value="{{ ev.session_length }}"
+                           min="5" max="120" oninput="updateSlotsPreview('{{ ev.id }}')">
+                </div>
+                <div class="form-group">
+                    <label>Break between sessions (min)</label>
+                    <input type="number" id="break-{{ ev.id }}" value="{{ ev.break_length }}"
+                           min="0" max="60" oninput="updateSlotsPreview('{{ ev.id }}')">
+                </div>
+                <div class="form-group">
+                    <label>Deposit (CAD)</label>
+                    <input type="number" id="deposit-{{ ev.id }}" value="{{ ev.deposit }}"
+                           min="0" step="5">
+                </div>
+                <div class="form-group">
+                    <label>Full price (CAD)</label>
+                    <input type="number" id="fullprice-{{ ev.id }}" value="{{ ev.full_price }}"
+                           min="0" step="5">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="evstatus-{{ ev.id }}">
+                        <option value="active" {% if ev.status == 'active' %}selected{% endif %}>Active (bookable)</option>
+                        <option value="upcoming" {% if ev.status == 'upcoming' %}selected{% endif %}>Upcoming (visible)</option>
+                        <option value="completed" {% if ev.status == 'completed' %}selected{% endif %}>Completed</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Live slot preview -->
+            <div id="preview-{{ ev.id }}" class="slots-preview">
+                📅 <span id="preview-count-{{ ev.id }}">{{ ev.start_time }} → {{ ev.end_time }}</span>
+                <span style="font-weight:400; color:var(--text-2);">·</span>
+                <span id="preview-slots-{{ ev.id }}" style="color:var(--text-2); font-weight:400;"></span>
+            </div>
+            <div class="slots-list" id="slots-chips-{{ ev.id }}"></div>
+        </div>
+        {% endfor %}
+    </div>
+
     <!-- PHOTO MANAGEMENT -->
     <div style="margin-top:36px;">
         <div class="page-header" style="margin-bottom:16px;">
@@ -609,16 +919,13 @@
 <div id="toast"></div>
 
 <script>
-    const ADMIN_KEY = '{{ admin_key }}';
-
     /* ── toast ── */
     function toast(msg, type) {
         const el = document.getElementById('toast');
         el.textContent = msg;
         el.className = 'show ' + (type || '');
-        setTimeout(() => el.className = '', 3000);
+        setTimeout(() => el.className = '', 3500);
     }
-
 
     /* ── delete ── */
     async function deleteBooking(id, name) {
@@ -626,8 +933,8 @@
         try {
             const res = await fetch('/admin/delete', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
-                body: JSON.stringify({ booking_id: id, key: ADMIN_KEY })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ booking_id: id })
             });
             const data = await res.json();
             if (data.success) {
@@ -647,8 +954,8 @@
         try {
             const res = await fetch('/admin/confirm', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
-                body: JSON.stringify({ booking_id: id, paid_amount: 95, key: ADMIN_KEY })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ booking_id: id, paid_amount: 95 })
             });
             const data = await res.json();
             if (data.success) {
@@ -668,8 +975,8 @@
         try {
             const res = await fetch('/admin/cancel', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
-                body: JSON.stringify({ booking_id: id, key: ADMIN_KEY })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ booking_id: id })
             });
             const data = await res.json();
             if (data.success) {
@@ -683,26 +990,58 @@
         }
     }
 
-    /* ── filter ── */
-    function setFilter(f, btn) {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.brow').forEach(row => {
-            const s = row.dataset.status;
-            const show = f === 'all'
-                || (f === 'pending' && (s === 'pending_payment' || s === 'reserved'))
-                || s === f;
-            row.style.display = show ? '' : 'none';
-        });
+    /* ── server-side filtering ── */
+    function setStatusFilter(status) {
+        const form = document.getElementById('filter-form');
+        const statusInput = document.getElementById('status');
+        if (statusInput) {
+            statusInput.value = status;
+        }
+        form.submit();
     }
 
-    /* ── search ── */
-    function doSearch(q) {
-        const lq = q.toLowerCase();
-        document.querySelectorAll('.brow').forEach(row => {
-            row.style.display = row.dataset.search.includes(lq) ? '' : 'none';
-        });
+    function applyFilters() {
+        const form = document.getElementById('filter-form');
+        // Reset page to 1 when changing filters
+        const pageInput = document.getElementById('page');
+        if (pageInput) {
+            pageInput.value = 1;
+        }
+        form.submit();
     }
+
+    // Debounced search to avoid too many requests
+    let searchTimeout = null;
+    function doSearch(value) {
+        const form = document.getElementById('filter-form');
+        const searchInput = document.getElementById('search');
+        if (searchInput) {
+            searchInput.value = value;
+        }
+        // Reset page to 1 when searching
+        const pageInput = document.getElementById('page');
+        if (pageInput) {
+            pageInput.value = 1;
+        }
+        // Debounce submit
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            form.submit();
+        }, 500);
+    }
+
+    // Auto-submit filter form on change (except search which uses debounce)
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('filter-form');
+        if (form) {
+            form.querySelectorAll('select, input[type="date"]').forEach(el => {
+                el.addEventListener('change', () => {
+                    applyFilters();
+                });
+            });
+            // Search input already has oninput handler
+        }
+    });
 
     /* ── photos ── */
     async function uploadPhoto(eventId, slotIndex, input) {
@@ -720,7 +1059,6 @@
         try {
             const res = await fetch(`/admin/photos/${eventId}/upload`, {
                 method: 'POST',
-                headers: { 'X-Admin-Key': ADMIN_KEY },
                 body: fd
             });
             const data = await res.json();
@@ -743,8 +1081,8 @@
         try {
             const res = await fetch(`/admin/photos/${eventId}/delete`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
-                body: JSON.stringify({ slot_index: slotIndex, key: ADMIN_KEY })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slot_index: slotIndex })
             });
             const data = await res.json();
             if (data.success) {
@@ -757,6 +1095,92 @@
             toast('Error: ' + err.message, 'error');
         }
     }
+
+    /* ── event settings: live slot preview ── */
+    function computeSlots(startTime, endTime, sessionLen, breakLen) {
+        const slots = [];
+        const [sh, sm] = startTime.split(':').map(Number);
+        const [eh, em] = endTime.split(':').map(Number);
+        let cur = sh * 60 + sm;
+        const end = eh * 60 + em;
+        const interval = sessionLen + breakLen;
+        if (interval <= 0 || cur >= end) return slots;
+        while (cur < end) {
+            const h = String(Math.floor(cur / 60)).padStart(2, '0');
+            const m = String(cur % 60).padStart(2, '0');
+            const cur2 = cur + sessionLen;
+            const h2 = String(Math.floor(cur2 / 60)).padStart(2, '0');
+            const m2 = String(cur2 % 60).padStart(2, '0');
+            slots.push(`${h}:${m}–${h2}:${m2}`);
+            cur += interval;
+        }
+        return slots;
+    }
+
+    function updateSlotsPreview(eventId) {
+        const start  = document.getElementById(`start-${eventId}`)?.value || '';
+        const end    = document.getElementById(`end-${eventId}`)?.value || '';
+        const session = parseInt(document.getElementById(`session-${eventId}`)?.value) || 20;
+        const brk     = parseInt(document.getElementById(`break-${eventId}`)?.value) || 0;
+
+        const slots = (start && end) ? computeSlots(start, end, session, brk) : [];
+        const interval = session + brk;
+
+        const previewCount = document.getElementById(`preview-count-${eventId}`);
+        const previewSlots = document.getElementById(`preview-slots-${eventId}`);
+        const chipsEl      = document.getElementById(`slots-chips-${eventId}`);
+
+        if (previewCount) previewCount.textContent = `${start || '?'} → ${end || '?'}  ·  ${slots.length} slot${slots.length !== 1 ? 's' : ''}`;
+        if (previewSlots) previewSlots.textContent = `${session} min session + ${brk} min break = every ${interval} min`;
+        if (chipsEl) {
+            chipsEl.innerHTML = slots.map(s => `<span class="slot-chip">${s}</span>`).join('');
+        }
+    }
+
+    /* ── event settings: save ── */
+    async function saveEventSettings(eventId) {
+        const btn = document.getElementById(`save-btn-${eventId}`);
+        btn.disabled = true;
+        btn.textContent = '⏳ Saving…';
+
+        const payload = {
+            start_time:     document.getElementById(`start-${eventId}`)?.value,
+            end_time:       document.getElementById(`end-${eventId}`)?.value,
+            session_length: parseInt(document.getElementById(`session-${eventId}`)?.value),
+            break_length:   parseInt(document.getElementById(`break-${eventId}`)?.value),
+            deposit:        parseFloat(document.getElementById(`deposit-${eventId}`)?.value),
+            full_price:     parseFloat(document.getElementById(`fullprice-${eventId}`)?.value),
+            status:         document.getElementById(`evstatus-${eventId}`)?.value,
+        };
+
+        try {
+            const res = await fetch(`/admin/events/${eventId}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast(`✅ Saved — ${data.slots_count} slots generated`, 'success');
+                updateSlotsPreview(eventId);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+
+        btn.disabled = false;
+        btn.textContent = '💾 Save changes';
+    }
+
+    /* ── init previews on load ── */
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[id^="start-"]').forEach(el => {
+            const eventId = el.id.replace('start-', '');
+            updateSlotsPreview(eventId);
+        });
+    });
 </script>
 </body>
 </html>

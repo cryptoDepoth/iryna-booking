@@ -20,6 +20,7 @@ def client(monkeypatch):
     monkeypatch.setattr(booking_app, "DB_PATH", db_path)
     monkeypatch.setattr(booking_app, "NOTION_API_KEY", "")
     monkeypatch.setattr(booking_app, "ADMIN_KEY", "")
+    monkeypatch.setattr(booking_app, "ADMIN_PASSWORD", "")
     monkeypatch.setattr(booking_app, "_start_etransfer_checker", lambda booking_id: None, raising=False)
     booking_app.init_db()
 
