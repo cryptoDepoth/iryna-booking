@@ -454,6 +454,90 @@
         .btn-save:hover { background: #ea6c0a; }
         .btn-save:disabled { opacity: 0.6; cursor: default; }
 
+        /* ── EVENT TABS ── */
+        .ev-tab {
+            padding: 10px 18px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-2);
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: -1px;
+        }
+        .ev-tab:hover { color: var(--accent); }
+        .ev-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* ── CREATE EVENT MODAL ── */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(2px);
+            z-index: 9000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: all; }
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            transform: translateY(16px);
+            transition: transform 0.2s;
+        }
+        .modal-overlay.open .modal { transform: translateY(0); }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .modal-subtitle {
+            font-size: 13px;
+            color: var(--text-2);
+            margin-bottom: 24px;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+        .modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .modal-section-label {
+            grid-column: 1/-1;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-3);
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            margin-top: 4px;
+        }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 1100px) {
             .stats { grid-template-columns: repeat(3, 1fr); }
@@ -513,6 +597,7 @@
         <span style="color:#4b5563; font-weight:400;">/ Admin</span>
     </div>
     <div class="topbar-right">
+        <a href="/admin/clients" class="topbar-link" style="font-size:13px;">👥 Clients</a>
         <span class="topbar-badge">Admin</span>
         <a href="/" class="topbar-link" target="_blank">↗ Booking site</a>
     </div>
@@ -780,85 +865,172 @@
     </div>
     {% endif %}
 
-    <!-- EVENT SCHEDULE SETTINGS -->
-    <div style="margin-top:36px;">
+    <!-- EVENT MANAGEMENT -->
+    <div style="margin-top:36px;" id="events-section">
         <div class="page-header" style="margin-bottom:16px;">
             <div class="page-title">
-                <h1>Event Settings</h1>
-                <p>Set shooting hours, session length and break time — slots are computed automatically</p>
+                <h1>Events</h1>
+                <p>Create, edit and manage shooting events — slots are computed automatically</p>
+            </div>
+            <div class="page-actions">
+                <button class="btn-save" onclick="openCreateModal()" style="display:inline-flex;align-items:center;gap:6px;">
+                    ✦ New event
+                </button>
             </div>
         </div>
 
         {% for ev in events %}
-        <div class="event-settings-card">
+        <div class="event-settings-card" id="ev-card-{{ ev.id }}">
+
+            <!-- ── CARD HEADER ── -->
             <div class="event-settings-header">
-                <div>
-                    <div style="font-weight:700; font-size:15px;">{{ ev.title }}</div>
-                    <div style="color:var(--text-3); font-size:12px; margin-top:3px;">
-                        {{ ev.id }} · {{ ev.date }} ·
-                        <span id="status-badge-{{ ev.id }}" style="color:{% if ev.status == 'active' %}var(--green){% elif ev.status == 'upcoming' %}var(--blue){% else %}var(--text-3){% endif %}; font-weight:600;">{{ ev.status }}</span>
+                <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <span style="font-weight:700; font-size:15px;" id="ev-title-display-{{ ev.id }}">{{ ev.title }}</span>
+                        {% if ev.featured %}<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;border:1px solid #fde68a;">⭐ Featured</span>{% endif %}
+                        <span class="badge {% if ev.status == 'active' %}b-confirmed{% elif ev.status == 'upcoming' %}b-reserved{% else %}b-expired{% endif %}" style="font-size:11px;">
+                            <span class="badge-dot"></span>{{ ev.status }}
+                        </span>
+                    </div>
+                    <div style="color:var(--text-3); font-size:12px; margin-top:4px;">
+                        {{ ev.id }} · 📅 {{ ev.date }}
                     </div>
                 </div>
-                <button class="btn-save" onclick="saveEventSettings('{{ ev.id }}')" id="save-btn-{{ ev.id }}">
-                    💾 Save changes
+                <div style="display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;">
+                    <button class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick="duplicateEvent('{{ ev.id }}', '{{ ev.title | e }}')">
+                        ⊕ Duplicate
+                    </button>
+                    <button class="btn-delete" style="font-size:12px; padding:6px 12px;" onclick="deleteEvent('{{ ev.id }}', '{{ ev.title | e }}')">
+                        🗑 Delete
+                    </button>
+                    <button class="btn-save" onclick="saveAllEventSettings('{{ ev.id }}')" id="save-btn-{{ ev.id }}">
+                        💾 Save changes
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── TAB BAR ── -->
+            <div style="display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:20px;">
+                <button class="ev-tab active" data-ev="{{ ev.id }}" data-tab="schedule" onclick="switchTab('{{ ev.id }}','schedule')">📅 Schedule</button>
+                <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="info" onclick="switchTab('{{ ev.id }}','info')">✏️ Info</button>
+                <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="included" onclick="switchTab('{{ ev.id }}','included')">✅ What's included</button>
+            </div>
+
+            <!-- ── TAB: SCHEDULE ── -->
+            <div id="tab-schedule-{{ ev.id }}" class="ev-tab-panel">
+                <div class="event-settings-grid">
+                    <div class="form-group">
+                        <label>Start time</label>
+                        <input type="time" id="start-{{ ev.id }}" value="{{ ev.start_time }}"
+                               oninput="updateSlotsPreview('{{ ev.id }}')">
+                    </div>
+                    <div class="form-group">
+                        <label>End time</label>
+                        <input type="time" id="end-{{ ev.id }}" value="{{ ev.end_time }}"
+                               oninput="updateSlotsPreview('{{ ev.id }}')">
+                    </div>
+                    <div class="form-group">
+                        <label>Session length (min)</label>
+                        <input type="number" id="session-{{ ev.id }}" value="{{ ev.session_length }}"
+                               min="5" max="120" oninput="updateSlotsPreview('{{ ev.id }}')">
+                    </div>
+                    <div class="form-group">
+                        <label>Break between sessions (min)</label>
+                        <input type="number" id="break-{{ ev.id }}" value="{{ ev.break_length }}"
+                               min="0" max="60" oninput="updateSlotsPreview('{{ ev.id }}')">
+                    </div>
+                    <div class="form-group">
+                        <label>Deposit (CAD)</label>
+                        <input type="number" id="deposit-{{ ev.id }}" value="{{ ev.deposit }}"
+                               min="0" step="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Full price (CAD)</label>
+                        <input type="number" id="fullprice-{{ ev.id }}" value="{{ ev.full_price }}"
+                               min="0" step="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="evstatus-{{ ev.id }}">
+                            <option value="active" {% if ev.status == 'active' %}selected{% endif %}>Active (bookable)</option>
+                            <option value="upcoming" {% if ev.status == 'upcoming' %}selected{% endif %}>Upcoming (visible, no booking yet)</option>
+                            <option value="completed" {% if ev.status == 'completed' %}selected{% endif %}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label>Location</label>
+                        <input type="text" id="location-{{ ev.id }}" value="{{ ev.location|default('') }}"
+                               placeholder="e.g. Riley Park, Calgary — near Central Memorial Park">
+                    </div>
+                </div>
+                <!-- Live slot preview -->
+                <div id="preview-{{ ev.id }}" class="slots-preview" style="margin-top:16px;">
+                    📅 <span id="preview-count-{{ ev.id }}">{{ ev.start_time }} → {{ ev.end_time }}</span>
+                    <span style="font-weight:400; color:var(--text-2);">·</span>
+                    <span id="preview-slots-{{ ev.id }}" style="color:var(--text-2); font-weight:400;"></span>
+                </div>
+                <div class="slots-list" id="slots-chips-{{ ev.id }}"></div>
+            </div>
+
+            <!-- ── TAB: INFO ── -->
+            <div id="tab-info-{{ ev.id }}" class="ev-tab-panel" style="display:none;">
+                <div class="event-settings-grid" style="grid-template-columns:1fr 1fr;">
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label>Event title</label>
+                        <input type="text" id="ev-title-{{ ev.id }}" value="{{ ev.title | e }}"
+                               placeholder="e.g. 🌸 Spring Mini Sessions" maxlength="120">
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label>Subtitle / tagline</label>
+                        <input type="text" id="ev-subtitle-{{ ev.id }}" value="{{ ev.subtitle | default('') | e }}"
+                               placeholder="e.g. Soft spring moments you'll want to keep forever" maxlength="200">
+                    </div>
+                    <div class="form-group">
+                        <label>Event date</label>
+                        <input type="date" id="ev-date-{{ ev.id }}" value="{{ ev.date }}">
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:center; gap:12px; padding-top:22px;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500; margin-bottom:0;">
+                            <input type="checkbox" id="ev-featured-{{ ev.id }}" {% if ev.featured %}checked{% endif %}
+                                   style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);">
+                            ⭐ Mark as featured (shown prominently on booking page)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TAB: INCLUDED ── -->
+            <div id="tab-included-{{ ev.id }}" class="ev-tab-panel" style="display:none;">
+                <p style="font-size:13px; color:var(--text-2); margin-bottom:14px;">
+                    What clients get — shown as bullet points on the booking page.
+                </p>
+                <div id="included-list-{{ ev.id }}">
+                    {% for item in (ev.included or []) %}
+                    <div class="included-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                        <input type="text" class="included-input" value="{{ item | e }}"
+                               placeholder="e.g. 15 professionally edited photos"
+                               style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+                        <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;flex-shrink:0;">✕</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button onclick="addIncludedRow('{{ ev.id }}')"
+                        style="margin-top:8px; display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border:1px dashed var(--accent); border-radius:var(--radius); background:var(--accent-light); color:var(--accent); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">
+                    + Add item
                 </button>
             </div>
 
-            <div class="event-settings-grid">
-                <div class="form-group">
-                    <label>Start time</label>
-                    <input type="time" id="start-{{ ev.id }}" value="{{ ev.start_time }}"
-                           oninput="updateSlotsPreview('{{ ev.id }}')">
-                </div>
-                <div class="form-group">
-                    <label>End time</label>
-                    <input type="time" id="end-{{ ev.id }}" value="{{ ev.end_time }}"
-                           oninput="updateSlotsPreview('{{ ev.id }}')">
-                </div>
-                <div class="form-group">
-                    <label>Session length (min)</label>
-                    <input type="number" id="session-{{ ev.id }}" value="{{ ev.session_length }}"
-                           min="5" max="120" oninput="updateSlotsPreview('{{ ev.id }}')">
-                </div>
-                <div class="form-group">
-                    <label>Break between sessions (min)</label>
-                    <input type="number" id="break-{{ ev.id }}" value="{{ ev.break_length }}"
-                           min="0" max="60" oninput="updateSlotsPreview('{{ ev.id }}')">
-                </div>
-                <div class="form-group">
-                    <label>Deposit (CAD)</label>
-                    <input type="number" id="deposit-{{ ev.id }}" value="{{ ev.deposit }}"
-                           min="0" step="5">
-                </div>
-                <div class="form-group">
-                    <label>Full price (CAD)</label>
-                    <input type="number" id="fullprice-{{ ev.id }}" value="{{ ev.full_price }}"
-                           min="0" step="5">
-                </div>
-                <div class="form-group">
-                    <label>Status</label>
-                    <select id="evstatus-{{ ev.id }}">
-                        <option value="active" {% if ev.status == 'active' %}selected{% endif %}>Active (bookable)</option>
-                        <option value="upcoming" {% if ev.status == 'upcoming' %}selected{% endif %}>Upcoming (visible)</option>
-                        <option value="completed" {% if ev.status == 'completed' %}selected{% endif %}>Completed</option>
-                    </select>
-                </div>
-                <div class="form-group" style="grid-column:1/-1">
-                    <label>Location</label>
-                    <input type="text" id="location-{{ ev.id }}" value="{{ ev.location|default('') }}"
-                           placeholder="e.g. Riley Park, Calgary — near Central Memorial Park">
-                </div>
-            </div>
-
-            <!-- Live slot preview -->
-            <div id="preview-{{ ev.id }}" class="slots-preview">
-                📅 <span id="preview-count-{{ ev.id }}">{{ ev.start_time }} → {{ ev.end_time }}</span>
-                <span style="font-weight:400; color:var(--text-2);">·</span>
-                <span id="preview-slots-{{ ev.id }}" style="color:var(--text-2); font-weight:400;"></span>
-            </div>
-            <div class="slots-list" id="slots-chips-{{ ev.id }}"></div>
         </div>
         {% endfor %}
+
+        {% if not events %}
+        <div style="text-align:center; padding:60px 20px; color:var(--text-3); border:2px dashed var(--border); border-radius:var(--radius);">
+            <div style="font-size:40px; margin-bottom:12px;">📅</div>
+            <div style="font-size:16px; font-weight:600; margin-bottom:6px;">No events yet</div>
+            <div style="font-size:13px; margin-bottom:20px;">Create your first shooting event to start accepting bookings.</div>
+            <button class="btn-save" onclick="openCreateModal()">✦ Create first event</button>
+        </div>
+        {% endif %}
     </div>
 
     <!-- PHOTO MANAGEMENT -->
@@ -919,6 +1091,105 @@
         {% endfor %}
     </div>
 
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     CREATE EVENT MODAL
+═════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="create-modal" onclick="closeCreateModalOutside(event)">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-title" id="modal-title">✦ Create new event</div>
+        <div class="modal-subtitle">Fill in the details — you can edit everything later from the admin panel.</div>
+
+        <div class="modal-grid">
+            <!-- Basic info -->
+            <div class="modal-section-label" style="border-top:none; padding-top:0;">📋 Basic info</div>
+
+            <div class="form-group" style="grid-column:1/-1">
+                <label>Event title *</label>
+                <input type="text" id="new-title" placeholder="e.g. 🌸 Spring Mini Sessions" maxlength="120">
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+                <label>Subtitle / tagline</label>
+                <input type="text" id="new-subtitle" placeholder="e.g. Soft spring moments you'll want to keep forever" maxlength="200">
+            </div>
+            <div class="form-group">
+                <label>Event date *</label>
+                <input type="date" id="new-date">
+            </div>
+            <div class="form-group" style="display:flex; align-items:center; gap:8px; padding-top:22px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500; margin-bottom:0;">
+                    <input type="checkbox" id="new-featured" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);">
+                    ⭐ Featured event
+                </label>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+                <label>Location</label>
+                <input type="text" id="new-location" placeholder="e.g. Riley Park, Calgary — exact spot sent after booking">
+            </div>
+
+            <!-- Schedule -->
+            <div class="modal-section-label">⏱️ Schedule</div>
+
+            <div class="form-group">
+                <label>Start time</label>
+                <input type="time" id="new-start" value="10:00">
+            </div>
+            <div class="form-group">
+                <label>End time</label>
+                <input type="time" id="new-end" value="17:00">
+            </div>
+            <div class="form-group">
+                <label>Session length (min)</label>
+                <input type="number" id="new-session" value="20" min="5" max="120">
+            </div>
+            <div class="form-group">
+                <label>Break between sessions (min)</label>
+                <input type="number" id="new-break" value="10" min="0" max="60">
+            </div>
+
+            <!-- Pricing -->
+            <div class="modal-section-label">💰 Pricing</div>
+
+            <div class="form-group">
+                <label>Deposit (CAD)</label>
+                <input type="number" id="new-deposit" value="100" min="0" step="5">
+            </div>
+            <div class="form-group">
+                <label>Full price (CAD)</label>
+                <input type="number" id="new-fullprice" value="300" min="0" step="5">
+            </div>
+            <div class="form-group">
+                <label>Initial status</label>
+                <select id="new-status">
+                    <option value="upcoming">Upcoming (visible, no booking yet)</option>
+                    <option value="active">Active (bookable now)</option>
+                </select>
+            </div>
+
+            <!-- What's included -->
+            <div class="modal-section-label">✅ What's included <span style="font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></div>
+
+            <div style="grid-column:1/-1;" id="new-included-list">
+                <div class="included-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="text" class="included-input" placeholder="e.g. 15 professionally edited photos"
+                           style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+                    <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
+                </div>
+            </div>
+            <div style="grid-column:1/-1; margin-top:-4px;">
+                <button onclick="addNewIncludedRow()"
+                        style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border:1px dashed var(--accent); border-radius:var(--radius); background:var(--accent-light); color:var(--accent); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">
+                    + Add item
+                </button>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn-outline" onclick="closeCreateModal()">Cancel</button>
+            <button class="btn-save" id="create-submit-btn" onclick="submitCreateEvent()">✦ Create event</button>
+        </div>
+    </div>
 </div>
 
 <div id="toast"></div>
@@ -1142,13 +1413,24 @@
         }
     }
 
-    /* ── event settings: save ── */
-    async function saveEventSettings(eventId) {
+    /* ── init previews on load ── */
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[id^="start-"]').forEach(el => {
+            const eventId = el.id.replace('start-', '');
+            updateSlotsPreview(eventId);
+        });
+    });
+
+    /* ══════════════════════════════════════════════════════════
+       SAVE ALL — schedule + meta + included in one click
+    ══════════════════════════════════════════════════════════ */
+    async function saveAllEventSettings(eventId) {
         const btn = document.getElementById(`save-btn-${eventId}`);
         btn.disabled = true;
         btn.textContent = '⏳ Saving…';
 
-        const payload = {
+        // --- SCHEDULE payload (existing route) ---
+        const schedPayload = {
             start_time:     document.getElementById(`start-${eventId}`)?.value,
             end_time:       document.getElementById(`end-${eventId}`)?.value,
             session_length: parseInt(document.getElementById(`session-${eventId}`)?.value),
@@ -1159,18 +1441,45 @@
             location:       document.getElementById(`location-${eventId}`)?.value,
         };
 
+        // --- META payload (new route) ---
+        const metaPayload = {
+            title:    document.getElementById(`ev-title-${eventId}`)?.value,
+            subtitle: document.getElementById(`ev-subtitle-${eventId}`)?.value,
+            date:     document.getElementById(`ev-date-${eventId}`)?.value,
+            featured: document.getElementById(`ev-featured-${eventId}`)?.checked,
+        };
+
+        // --- INCLUDED payload ---
+        const includedInputs = document.querySelectorAll(`#tab-included-${eventId} .included-input`);
+        const includedItems = Array.from(includedInputs).map(i => i.value.trim()).filter(Boolean);
+
         try {
-            const res = await fetch(`/admin/events/${eventId}/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (data.success) {
-                toast(`✅ Saved — ${data.slots_count} slots generated`, 'success');
-                updateSlotsPreview(eventId);
+            // Fire all three in parallel
+            const [schedRes, metaRes] = await Promise.all([
+                fetch(`/admin/events/${eventId}/update`, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(schedPayload)
+                }),
+                fetch(`/admin/events/${eventId}/update-meta`, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ ...metaPayload, included: includedItems })
+                }),
+            ]);
+
+            const [schedData, metaData] = await Promise.all([schedRes.json(), metaRes.json()]);
+            const errors = [schedData, metaData].filter(d => d.error).map(d => d.error);
+
+            if (errors.length) {
+                toast('Error: ' + errors.join(' | '), 'error');
             } else {
-                toast('Error: ' + (data.error || 'Unknown'), 'error');
+                toast(`✅ Saved — ${schedData.slots_count} slots`, 'success');
+                updateSlotsPreview(eventId);
+
+                // Update displayed title in card header
+                if (metaPayload.title) {
+                    const disp = document.getElementById(`ev-title-display-${eventId}`);
+                    if (disp) disp.textContent = metaPayload.title;
+                }
             }
         } catch (err) {
             toast('Network error: ' + err.message, 'error');
@@ -1180,13 +1489,232 @@
         btn.textContent = '💾 Save changes';
     }
 
-    /* ── init previews on load ── */
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('[id^="start-"]').forEach(el => {
-            const eventId = el.id.replace('start-', '');
-            updateSlotsPreview(eventId);
+    /* ══════════════════════════════════════════════════════════
+       TAB SWITCHING
+    ══════════════════════════════════════════════════════════ */
+    function switchTab(eventId, tab) {
+        // Hide all panels for this event
+        ['schedule','info','included'].forEach(t => {
+            const panel = document.getElementById(`tab-${t}-${eventId}`);
+            if (panel) panel.style.display = t === tab ? '' : 'none';
         });
+        // Update tab button styles
+        document.querySelectorAll(`.ev-tab[data-ev="${eventId}"]`).forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       INCLUDED ITEMS — edit mode (existing events)
+    ══════════════════════════════════════════════════════════ */
+    function addIncludedRow(eventId) {
+        const list = document.getElementById(`included-list-${eventId}`);
+        const row = document.createElement('div');
+        row.className = 'included-row';
+        row.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
+        row.innerHTML = `
+            <input type="text" class="included-input" placeholder="e.g. All original photos included"
+                   style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+            <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;flex-shrink:0;">✕</button>
+        `;
+        list.appendChild(row);
+        row.querySelector('input').focus();
+    }
+
+    function removeIncludedRow(btn) {
+        btn.closest('.included-row').remove();
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       CREATE EVENT MODAL
+    ══════════════════════════════════════════════════════════ */
+    function openCreateModal() {
+        document.getElementById('create-modal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+        // Set default date to next week
+        const d = new Date(); d.setDate(d.getDate() + 7);
+        const iso = d.toISOString().split('T')[0];
+        document.getElementById('new-date').value = iso;
+        setTimeout(() => document.getElementById('new-title').focus(), 100);
+    }
+
+    function closeCreateModal() {
+        document.getElementById('create-modal').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    function closeCreateModalOutside(e) {
+        if (e.target === document.getElementById('create-modal')) closeCreateModal();
+    }
+
+    // Close with Escape
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeCreateModal();
     });
+
+    function addNewIncludedRow() {
+        const list = document.getElementById('new-included-list');
+        const row = document.createElement('div');
+        row.className = 'included-row';
+        row.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
+        row.innerHTML = `
+            <input type="text" class="included-input" placeholder="e.g. Quick turnaround (within 48 hours)"
+                   style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+            <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
+        `;
+        list.appendChild(row);
+        row.querySelector('input').focus();
+    }
+
+    async function submitCreateEvent() {
+        const title = document.getElementById('new-title').value.trim();
+        const date  = document.getElementById('new-date').value;
+
+        if (!title) { toast('Event title is required', 'error'); document.getElementById('new-title').focus(); return; }
+        if (!date)  { toast('Event date is required', 'error');  document.getElementById('new-date').focus(); return; }
+
+        const includedInputs = document.querySelectorAll('#new-included-list .included-input');
+        const included = Array.from(includedInputs).map(i => i.value.trim()).filter(Boolean);
+
+        const payload = {
+            title,
+            subtitle:       document.getElementById('new-subtitle').value.trim(),
+            date,
+            start_time:     document.getElementById('new-start').value,
+            end_time:       document.getElementById('new-end').value,
+            session_length: parseInt(document.getElementById('new-session').value),
+            break_length:   parseInt(document.getElementById('new-break').value),
+            deposit:        parseFloat(document.getElementById('new-deposit').value),
+            full_price:     parseFloat(document.getElementById('new-fullprice').value),
+            status:         document.getElementById('new-status').value,
+            location:       document.getElementById('new-location').value.trim(),
+            featured:       document.getElementById('new-featured').checked,
+            included,
+        };
+
+        const btn = document.getElementById('create-submit-btn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Creating…';
+
+        try {
+            const res  = await fetch('/admin/events/create', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('✅ Event created! Reloading…', 'success');
+                closeCreateModal();
+                setTimeout(() => {
+                    location.reload();
+                    // Scroll to events section after reload (hash trick)
+                    sessionStorage.setItem('scrollTo', 'events-section');
+                }, 800);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+                btn.disabled = false;
+                btn.textContent = '✦ Create event';
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = '✦ Create event';
+        }
+    }
+
+    // Restore scroll position after reload
+    window.addEventListener('DOMContentLoaded', () => {
+        const target = sessionStorage.getItem('scrollTo');
+        if (target) {
+            sessionStorage.removeItem('scrollTo');
+            const el = document.getElementById(target);
+            if (el) setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 200);
+        }
+    });
+
+    /* ══════════════════════════════════════════════════════════
+       DELETE EVENT
+    ══════════════════════════════════════════════════════════ */
+    async function deleteEvent(eventId, title) {
+        const confirmed = confirm(
+            `Delete event "${title}"?\n\n` +
+            `This will permanently remove the event from your system.\n` +
+            `⚠️ Active bookings for this event will NOT be deleted from the database,\n` +
+            `but the event will no longer be accessible.\n\nProceed?`
+        );
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`/admin/events/${eventId}/delete`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                toast('Event deleted', 'error');
+                const card = document.getElementById(`ev-card-${eventId}`);
+                if (card) {
+                    card.style.transition = 'opacity 0.4s, transform 0.4s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.97)';
+                    setTimeout(() => card.remove(), 400);
+                }
+            } else if (data.active_bookings) {
+                // Has active bookings — ask to force
+                const force = confirm(
+                    `⚠️ This event has ${data.active_bookings} active booking(s).\n\n` +
+                    `Are you sure you want to delete the event anyway?\n` +
+                    `(Existing bookings will remain in the database but the event will be gone.)`
+                );
+                if (!force) return;
+
+                const res2 = await fetch(`/admin/events/${eventId}/delete`, {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ force: true })
+                });
+                const data2 = await res2.json();
+                if (data2.success) {
+                    toast('Event force-deleted', 'error');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    toast('Error: ' + (data2.error || 'Unknown'), 'error');
+                }
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       DUPLICATE EVENT
+    ══════════════════════════════════════════════════════════ */
+    async function duplicateEvent(eventId, title) {
+        if (!confirm(`Duplicate "${title}"?\n\nA copy will be created with status "upcoming" and no photos.`)) return;
+
+        try {
+            const res = await fetch(`/admin/events/${eventId}/duplicate`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast(`✅ Duplicated as "${data.new_event_id}". Reloading…`, 'success');
+                sessionStorage.setItem('scrollTo', 'events-section');
+                setTimeout(() => location.reload(), 900);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+    }
 </script>
 </body>
 </html>

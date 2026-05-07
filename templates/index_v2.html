@@ -112,6 +112,7 @@ body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-h
 .drawer .form .full{grid-column:1/-1}
 .drawer input{width:100%;padding:12px 14px;background:#fff;border:1.5px solid var(--ink-5);border-radius:10px;font:.92rem var(--font-b);outline:none}
 .drawer input:focus{border-color:var(--rose);box-shadow:0 0 0 3px rgba(196,133,122,.12)}
+.field-error{display:block;color:#e53e3e;font-size:.72rem;margin-top:4px;}
 .drawer .btn{display:block;width:100%;padding:15px;background:var(--ink);color:#fff;border:0;border-radius:12px;font:600 .92rem var(--font-b);cursor:pointer;margin-top:18px;letter-spacing:.02em}
 .drawer .btn:hover{background:var(--ink-2)}
 .drawer .btn:disabled{opacity:0.5;cursor:not-allowed}
@@ -175,7 +176,13 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
 <nav class="nav">
   <div class="brand">Pashynska Photography<small>Calgary, Alberta</small></div>
-  <!-- Admin removed from public nav -->
+  <!-- Language switcher -->
+  <div id="lang-sw" style="display:flex;gap:3px;background:rgba(0,0,0,0.05);border-radius:20px;padding:3px;">
+    <button class="lbtn active" onclick="setLang('en')" data-lang="en" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:white;color:var(--rose);box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all .2s;font-family:inherit;">EN</button>
+    <button class="lbtn" onclick="setLang('ru')" data-lang="ru" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">РУ</button>
+    <button class="lbtn" onclick="setLang('hi')" data-lang="hi" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">हिं</button>
+    <button class="lbtn" onclick="setLang('uk')" data-lang="uk" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">УК</button>
+  </div>
 </nav>
 
 <!-- ────────── PUBLIC LANDING ────────── -->
@@ -505,12 +512,12 @@ async function openDrawer(id) {
         `).join('')}
       </div>
       <div class="form">
-        <input placeholder="Full name" class="full" id="fName">
-        <input placeholder="Phone" id="fPhone">
-        <input placeholder="Email" id="fEmail">
-        <input placeholder="@instagram" id="fIg">
+        <input data-ph="full_name" placeholder="Full name *" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
+        <input data-ph="phone_ph" placeholder="Phone (e.g. 403-555-1234) *" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
+        <input data-ph="email_ph" placeholder="Email *" id="fEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
+        <input data-ph="ig_ph" placeholder="@instagram (optional)" id="fIg" autocomplete="off" oninput="clearFieldError(this)">
       </div>
-      <button class="btn" onclick="reserveSlot('${e.id}', '${e.date}')">Continue to Payment →</button>
+      <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', '${e.date}')" data-i18n-val="continue_btn">Continue to Payment →</button>
       <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">Pay deposit via e-Transfer · remaining due on session day</p>`;
     document.getElementById('drawer').classList.add('open');
   } catch (err) {
@@ -524,20 +531,87 @@ function pickSlot(btn) {
   btn.classList.add('sel');
 }
 
+// ── FIELD VALIDATION HELPERS ──
+function clearFieldError(el) {
+  el.style.borderColor = '';
+  const err = el.parentNode.querySelector('.field-error[data-for="' + el.id + '"]');
+  if (err) err.remove();
+}
+
+function showFieldError(elId, msg) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.style.borderColor = '#e53e3e';
+  el.focus();
+  // Remove existing error
+  const old = el.parentNode.querySelector('.field-error[data-for="' + elId + '"]');
+  if (old) old.remove();
+  const span = document.createElement('span');
+  span.className = 'field-error';
+  span.dataset.for = elId;
+  span.style.cssText = 'display:block; color:#e53e3e; font-size:.73rem; margin-top:4px; grid-column:1/-1;';
+  span.textContent = msg;
+  el.insertAdjacentElement('afterend', span);
+}
+
+function validateBookingForm() {
+  const name  = document.getElementById('fName')?.value.trim() || '';
+  const phone = document.getElementById('fPhone')?.value.trim() || '';
+  const email = document.getElementById('fEmail')?.value.trim() || '';
+  const ig    = document.getElementById('fIg')?.value.trim() || '';
+  let valid = true;
+
+  // Name: letters, spaces, hyphens, apostrophes — 2-80 chars
+  if (name.length < 2) {
+    showFieldError('fName', 'Please enter your full name');
+    valid = false;
+  } else if (!/^[A-Za-zÀ-ÖØ-öø-ÿ'\- ]{2,80}$/.test(name)) {
+    showFieldError('fName', 'Name should contain only letters, spaces, or hyphens');
+    valid = false;
+  }
+
+  // Email
+  if (!email) {
+    showFieldError('fEmail', 'Email is required');
+    valid = false;
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    showFieldError('fEmail', 'Please enter a valid email (e.g. jane@example.com)');
+    valid = false;
+  }
+
+  // Phone: Canadian — 10 digits after stripping non-digits and optional leading 1
+  if (phone) {
+    let digits = phone.replace(/\D/g, '');
+    if (digits.startsWith('1') && digits.length === 11) digits = digits.slice(1);
+    if (digits.length !== 10 || ['0','1'].includes(digits[0]) || ['0','1'].includes(digits[3])) {
+      showFieldError('fPhone', 'Please enter a valid Canadian phone number (e.g. 403-555-1234)');
+      valid = false;
+    }
+  }
+
+  // Instagram: optional, but if provided must be valid handle
+  if (ig) {
+    const handle = ig.startsWith('@') ? ig.slice(1) : ig;
+    if (!/^[A-Za-z0-9_.]{1,30}$/.test(handle)) {
+      showFieldError('fIg', 'Instagram handle: 1–30 characters, letters, numbers, . or _');
+      valid = false;
+    }
+  }
+
+  return valid;
+}
+
 // ── RESERVE SLOT ──
 async function reserveSlot(eventId, eventDate) {
   const selBtn = document.querySelector('#slotsBox .slot.sel');
   if (!selBtn) { toast("Pick a time slot first"); return; }
   const time = selBtn.dataset.time;
-  const name = document.getElementById('fName').value.trim();
+  const name  = document.getElementById('fName').value.trim();
   const phone = document.getElementById('fPhone').value.trim();
   const email = document.getElementById('fEmail').value.trim();
-  const ig = document.getElementById('fIg').value.trim();
+  const ig    = document.getElementById('fIg').value.trim();
 
-  if (!name || !email) {
-    toast("Please fill in your name and email");
-    return;
-  }
+  if (!validateBookingForm()) return;
 
   try {
     const result = await API.reserve({
@@ -770,6 +844,90 @@ loadEvents().then(() => {
   {% if direct_event_id %}
   setTimeout(() => openDrawer('{{ direct_event_id }}'), 500);
   {% endif %}
+});
+</script>
+
+<!-- ══ i18n ══ -->
+<script>
+const SITE_I18N = {
+  en: {
+    full_name:    'Full name *',
+    phone_ph:     'Phone (e.g. 403-555-1234) *',
+    email_ph:     'Email *',
+    ig_ph:        '@instagram (optional)',
+    continue_btn: 'Continue to Payment →',
+    pick_slot:    'Pick a time slot first',
+    book_cta:     'Book →',
+    sold_out:     'Sold Out',
+    spots_left:   'spots left',
+    loading:      'Loading slots…',
+  },
+  ru: {
+    full_name:    'Полное имя *',
+    phone_ph:     'Телефон (напр. 403-555-1234) *',
+    email_ph:     'Эл. почта *',
+    ig_ph:        '@instagram (необязательно)',
+    continue_btn: 'Перейти к оплате →',
+    pick_slot:    'Сначала выберите время',
+    book_cta:     'Забронировать →',
+    sold_out:     'Мест нет',
+    spots_left:   'мест осталось',
+    loading:      'Загружаем слоты…',
+  },
+  hi: {
+    full_name:    'पूरा नाम *',
+    phone_ph:     'फ़ोन (जैसे 403-555-1234) *',
+    email_ph:     'ईमेल *',
+    ig_ph:        '@इंस्टाग्राम (वैकल्पिक)',
+    continue_btn: 'भुगतान की ओर जारी रखें →',
+    pick_slot:    'पहले समय चुनें',
+    book_cta:     'बुक करें →',
+    sold_out:     'सब भरे हैं',
+    spots_left:   'जगहें बाकी',
+    loading:      'लोड हो रहा है…',
+  },
+  uk: {
+    full_name:    'Повне ім\'я *',
+    phone_ph:     'Телефон (напр. 403-555-1234) *',
+    email_ph:     'Електронна пошта *',
+    ig_ph:        '@instagram (необов\'язково)',
+    continue_btn: 'Перейти до оплати →',
+    pick_slot:    'Спочатку оберіть час',
+    book_cta:     'Забронювати →',
+    sold_out:     'Немає місць',
+    spots_left:   'місць залишилось',
+    loading:      'Завантаження…',
+  }
+};
+
+function setLang(lang) {
+  if (!SITE_I18N[lang]) return;
+  localStorage.setItem('lang', lang);
+  const T = SITE_I18N[lang];
+
+  // Update input placeholders
+  document.querySelectorAll('[data-ph]').forEach(el => {
+    const k = el.dataset.ph;
+    if (T[k]) el.placeholder = T[k];
+  });
+
+  // Update button text where applicable
+  const rb = document.getElementById('reserve-btn');
+  if (rb) rb.textContent = T.continue_btn;
+
+  // Update lang switcher active state
+  document.querySelectorAll('.lbtn').forEach(b => {
+    const isActive = b.dataset.lang === lang;
+    b.style.background  = isActive ? 'white' : 'transparent';
+    b.style.color       = isActive ? 'var(--rose)' : '#a8a29e';
+    b.style.boxShadow   = isActive ? '0 1px 4px rgba(0,0,0,0.1)' : 'none';
+  });
+}
+
+// Init from stored preference
+document.addEventListener('DOMContentLoaded', () => {
+  const stored = localStorage.getItem('lang') || 'en';
+  setLang(stored);
 });
 </script>
 </body>

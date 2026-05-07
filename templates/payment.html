@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Complete Your Booking | Pashynska Photography</title>
+  <title data-i18n="page_title">Complete Your Booking | Pashynska Photography</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -252,6 +252,31 @@
       font-size: 0.85rem; color: var(--ink-4);
     }
     footer a { color: var(--rose); text-decoration: none; font-weight: 500; }
+
+    /* ── LANGUAGE SWITCHER ── */
+    .lang-switcher {
+      display: flex; gap: 3px;
+      background: rgba(0,0,0,0.05);
+      border-radius: 20px; padding: 3px;
+    }
+    .lang-btn {
+      padding: 4px 9px; border-radius: 16px; border: none;
+      font-family: var(--font-b); font-size: 11px; font-weight: 600;
+      cursor: pointer; background: transparent; color: var(--ink-3);
+      transition: all 0.2s; line-height: 1;
+    }
+    .lang-btn:hover { color: var(--rose); }
+    .lang-btn.active { background: white; color: var(--rose); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+    /* ── ENTRY ANIMATION ── */
+    @keyframes fade-slide { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+    .card, .transfer-box, .how-to, .info-note { animation: fade-slide 0.4s ease both; }
+    .card:nth-child(1)  { animation-delay: 0.05s; }
+    .card:nth-child(2)  { animation-delay: 0.1s; }
+    .card:nth-child(3)  { animation-delay: 0.15s; }
+    .transfer-box       { animation-delay: 0.2s; }
+    .how-to             { animation-delay: 0.25s; }
+    .info-note          { animation-delay: 0.3s; }
   </style>
 </head>
 <body>
@@ -260,10 +285,16 @@
   <div class="top-bar">
     <a class="back-btn" href="/">‹</a>
     <div class="top-bar-info">
-      <div class="top-bar-title">Complete Your Booking</div>
+      <div class="top-bar-title" data-i18n="complete_booking">Complete Your Booking</div>
       <div class="top-bar-sub">{{ date }} · {{ time }}</div>
     </div>
-    <div class="progress-dots">
+    <div class="lang-switcher" role="group" aria-label="Language">
+      <button class="lang-btn active" onclick="setLang('en')" data-lang="en">EN</button>
+      <button class="lang-btn" onclick="setLang('ru')" data-lang="ru">РУ</button>
+      <button class="lang-btn" onclick="setLang('hi')" data-lang="hi">हिं</button>
+      <button class="lang-btn" onclick="setLang('uk')" data-lang="uk">УК</button>
+    </div>
+    <div class="progress-dots" style="margin-left:8px">
       <div class="pdot" style="width:6px;opacity:0.4"></div>
       <div class="pdot" style="width:18px"></div>
       <div class="pdot" style="width:6px;opacity:0.4"></div>
@@ -274,13 +305,13 @@
 
     <!-- Timer -->
     <div class="timer-box" id="timer-box">
-      <span class="timer-label">Slot reserved for</span>
+      <span class="timer-label" data-i18n="slot_reserved_for">Slot reserved for</span>
       <span class="timer-count" id="timer-count">15:00</span>
     </div>
 
     <!-- Summary -->
     <div class="card">
-      <div class="card-title">Booking Summary</div>
+      <div class="card-title" data-i18n="booking_summary">Booking Summary</div>
       <div class="summary">
         <div class="summary-row">
           <span class="key">Session</span>
@@ -311,18 +342,18 @@
 
     <!-- Transfer instructions -->
     <div class="transfer-box">
-      <div class="transfer-eyebrow">Send via Interac e-Transfer</div>
+      <div class="transfer-eyebrow" data-i18n="send_via">Send via Interac e-Transfer</div>
       <div class="transfer-amount">${{ price }}</div>
       <div class="transfer-currency">CAD — Canadian dollars</div>
 
       <div class="email-copy" id="email-copy-box" onclick="copyEmail()">
         <div>
-          <div class="email-copy-label">Send to</div>
+          <div class="email-copy-label" data-i18n="send_to">Send to</div>
           <div class="email-copy-val" id="email-value">{{ email }}</div>
         </div>
         <button class="copy-pill" id="copy-pill" onclick="copyEmail(event)">Copy</button>
       </div>
-      <div class="transfer-note">Auto-deposit enabled · no password needed</div>
+      <div class="transfer-note" data-i18n="auto_deposit">Auto-deposit enabled · no password needed</div>
     </div>
 
     <!-- Bank message template -->
@@ -338,7 +369,7 @@
 
     <!-- How to send -->
     <div class="how-to">
-      <div class="how-to-title">How to send Interac e-Transfer</div>
+      <div class="how-to-title" data-i18n="how_to_title">How to send Interac e-Transfer</div>
       <ol>
         <li>Open your banking app (RBC, TD, Scotiabank, etc.)</li>
         <li>Choose "Send Interac e-Transfer"</li>
@@ -355,8 +386,8 @@
 
     <!-- Confirm form -->
     <div class="card">
-      <div class="card-title">I've Sent the Payment</div>
-      <p style="font-size:0.875rem;color:var(--ink-3);margin-bottom:20px">Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.</p>
+      <div class="card-title" data-i18n="ive_sent_title">I've Sent the Payment</div>
+      <p style="font-size:0.875rem;color:var(--ink-3);margin-bottom:20px" data-i18n="ive_sent_sub">Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.</p>
 
       <form id="confirm-form">
         <input type="hidden" id="time"         value="{{ time }}">
@@ -482,6 +513,91 @@
     });
 
     initTimer();
+  </script>
+
+  <!-- ══ i18n ══ -->
+  <script>
+  const PAY_I18N = {
+    en: {
+      page_title:       'Complete Your Booking | Pashynska Photography',
+      complete_booking: 'Complete Your Booking',
+      slot_reserved_for:'Slot reserved for',
+      booking_summary:  'Booking Summary',
+      send_via:         'Send via Interac e-Transfer',
+      send_to:          'Send to',
+      auto_deposit:     'Auto-deposit enabled · no password needed',
+      how_to_title:     'How to send Interac e-Transfer',
+      ive_sent_title:   "I've Sent the Payment",
+      ive_sent_sub:     "Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.",
+      confirm_btn:      "✓ Yes, I've Sent ${{ price }} — Confirm Booking",
+      back_btn:         '← Back to Change Time',
+      no_pwd:           '💡 No password needed! This is an auto-deposit enabled email. The money arrives instantly.',
+    },
+    ru: {
+      page_title:       'Оформление бронирования | Pashynska Photography',
+      complete_booking: 'Оформите бронирование',
+      slot_reserved_for:'Слот забронирован на',
+      booking_summary:  'Детали бронирования',
+      send_via:         'Отправить через Interac e-Transfer',
+      send_to:          'Отправить на',
+      auto_deposit:     'Автодепозит включён · пароль не нужен',
+      how_to_title:     'Как отправить Interac e-Transfer',
+      ive_sent_title:   'Я отправил(а) оплату',
+      ive_sent_sub:     'После отправки e-Transfer нажмите ниже. Я подтвержу ваше бронирование в течение нескольких минут.',
+      confirm_btn:      '✓ Да, я отправил(а) ${{ price }} — Подтвердить',
+      back_btn:         '← Назад, изменить время',
+      no_pwd:           '💡 Пароль не нужен! Это email с автодепозитом. Деньги поступают мгновенно.',
+    },
+    hi: {
+      page_title:       'बुकिंग पूरी करें | Pashynska Photography',
+      complete_booking: 'अपनी बुकिंग पूरी करें',
+      slot_reserved_for:'स्लॉट रिज़र्व है',
+      booking_summary:  'बुकिंग सारांश',
+      send_via:         'Interac e-Transfer से भेजें',
+      send_to:          'इस पते पर भेजें',
+      auto_deposit:     'ऑटो-डिपॉज़िट चालू है · पासवर्ड की ज़रूरत नहीं',
+      how_to_title:     'Interac e-Transfer कैसे भेजें',
+      ive_sent_title:   'मैंने भुगतान भेज दिया',
+      ive_sent_sub:     'e-Transfer भेजने के बाद नीचे दबाएं। मैं कुछ ही मिनटों में आपकी बुकिंग की पुष्टि कर दूंगी।',
+      confirm_btn:      '✓ हाँ, मैंने ${{ price }} भेजे — बुकिंग पक्की करें',
+      back_btn:         '← वापस जाएं और समय बदलें',
+      no_pwd:           '💡 पासवर्ड की ज़रूरत नहीं! यह ऑटो-डिपॉज़िट ईमेल है। पैसे तुरंत पहुंच जाते हैं।',
+    },
+    uk: {
+      page_title:       'Завершити бронювання | Pashynska Photography',
+      complete_booking: 'Завершити бронювання',
+      slot_reserved_for:'Слот заброньовано на',
+      booking_summary:  'Підсумок бронювання',
+      send_via:         'Надіслати через Interac e-Transfer',
+      send_to:          'Надіслати на',
+      auto_deposit:     'Автодепозит увімкнено · пароль не потрібен',
+      how_to_title:     'Як надіслати Interac e-Transfer',
+      ive_sent_title:   'Я надіслав(ла) оплату',
+      ive_sent_sub:     'Після відправки e-Transfer натисніть нижче. Я підтверджу ваше бронювання протягом кількох хвилин.',
+      confirm_btn:      '✓ Так, я надіслав(ла) ${{ price }} — Підтвердити',
+      back_btn:         '← Назад, змінити час',
+      no_pwd:           '💡 Пароль не потрібен! Це email із автодепозитом. Гроші надходять миттєво.',
+    }
+  };
+
+  let _lang = localStorage.getItem('lang') || 'en';
+
+  function setLang(lang) {
+    if (!PAY_I18N[lang]) return;
+    _lang = lang;
+    localStorage.setItem('lang', lang);
+    const T = PAY_I18N[lang];
+    document.title = T.page_title;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.dataset.i18n;
+      if (T[k]) el.textContent = T[k];
+    });
+    document.querySelectorAll('.lang-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.lang === lang);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => setLang(_lang));
   </script>
 </body>
 </html>

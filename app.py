@@ -619,12 +619,26 @@ START_TIME = _active.get("start_time", "10:00")
 END_TIME = _active.get("end_time", "16:00")
 
 # ===== DATABASE =====
-DB_PATH = os.path.join(os.path.dirname(__file__), "bookings.db")
+# DB_PATH: can be overridden via env var DB_PATH.
+# Default: ~/.pashynska-data/bookings.db — OUTSIDE the app folder so the
+# database survives code updates, git pulls, or server redeployments.
+_default_data_dir = os.path.join(os.path.expanduser("~"), ".pashynska-data")
+DB_PATH = os.environ.get("DB_PATH") or os.path.join(_default_data_dir, "bookings.db")
+BACKUP_DIR = os.environ.get("BACKUP_DIR") or os.path.join(_default_data_dir, "backups")
+
+# Ensure directories exist
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
+log.info(f"[db] Database: {DB_PATH}")
+log.info(f"[db] Backups:  {BACKUP_DIR}")
+
 
 def init_db():
-    """Create SQLite tables if they don't exist"""
+    """Create SQLite tables if they don't exist."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+
+    # ── bookings table ──
     c.execute('''
         CREATE TABLE IF NOT EXISTS bookings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -644,27 +658,156 @@ def init_db():
             UNIQUE(date, time)
         )
     ''')
-    # Lightweight migrations for columns added over time.
-    for col, ddl in [
-        ("paid_amount",         "ALTER TABLE bookings ADD COLUMN paid_amount REAL"),
-        ("notion_page_id",      "ALTER TABLE bookings ADD COLUMN notion_page_id TEXT"),
-        ("calendar_event_id",   "ALTER TABLE bookings ADD COLUMN calendar_event_id TEXT"),
-        ("calendar_event_url",  "ALTER TABLE bookings ADD COLUMN calendar_event_url TEXT"),
-        ("event_id",            "ALTER TABLE bookings ADD COLUMN event_id TEXT"),
-    ]:
+
+    # ── clients table — one row per unique email ──
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            phone TEXT DEFAULT '',
+            instagram TEXT DEFAULT '',
+            tags TEXT DEFAULT '[]',
+            notes TEXT DEFAULT '',
+            first_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            total_bookings INTEGER DEFAULT 0,
+            total_confirmed INTEGER DEFAULT 0,
+            total_paid REAL DEFAULT 0.0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # ── client_notes — timestamped notes per client ──
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS client_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            note TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # ── migrations: add columns that didn't exist in older installs ──
+    _migrations = [
+        ("bookings",  "paid_amount",       "ALTER TABLE bookings ADD COLUMN paid_amount REAL"),
+        ("bookings",  "notion_page_id",    "ALTER TABLE bookings ADD COLUMN notion_page_id TEXT"),
+        ("bookings",  "calendar_event_id", "ALTER TABLE bookings ADD COLUMN calendar_event_id TEXT"),
+        ("bookings",  "calendar_event_url","ALTER TABLE bookings ADD COLUMN calendar_event_url TEXT"),
+        ("bookings",  "event_id",          "ALTER TABLE bookings ADD COLUMN event_id TEXT"),
+        ("clients",   "tags",              "ALTER TABLE clients ADD COLUMN tags TEXT DEFAULT '[]'"),
+        ("clients",   "notes",             "ALTER TABLE clients ADD COLUMN notes TEXT DEFAULT ''"),
+    ]
+    for _tbl, _col, _ddl in _migrations:
         try:
-            c.execute(ddl)
+            c.execute(_ddl)
         except sqlite3.OperationalError:
             pass  # column already exists
+
     conn.commit()
     conn.close()
 
+
 init_db()
+
 
 def db_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# ── CLIENT SYNC ──────────────────────────────────────────────────────────────
+def sync_client(email: str, name: str, phone: str = "", instagram: str = ""):
+    """Upsert a client record and refresh aggregated stats from bookings table.
+    Called automatically whenever a booking is created or confirmed."""
+    if not email:
+        return
+    conn = db_conn()
+    c = conn.cursor()
+    now = datetime.now().isoformat()
+
+    # Insert or update basic info (keep latest name/phone/ig)
+    c.execute("""
+        INSERT INTO clients (email, name, phone, instagram, first_seen, last_seen)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET
+            name      = excluded.name,
+            phone     = CASE WHEN excluded.phone != '' THEN excluded.phone ELSE clients.phone END,
+            instagram = CASE WHEN excluded.instagram != '' THEN excluded.instagram ELSE clients.instagram END,
+            last_seen = excluded.last_seen
+    """, (email.lower().strip(), name, phone, instagram, now, now))
+
+    # Refresh aggregate stats
+    c.execute("""
+        UPDATE clients SET
+            total_bookings  = (SELECT COUNT(*) FROM bookings WHERE LOWER(email)=LOWER(?) AND status NOT IN ('expired')),
+            total_confirmed = (SELECT COUNT(*) FROM bookings WHERE LOWER(email)=LOWER(?) AND confirmed=1),
+            total_paid      = (SELECT COALESCE(SUM(paid_amount),0) FROM bookings WHERE LOWER(email)=LOWER(?) AND confirmed=1)
+        WHERE LOWER(email) = LOWER(?)
+    """, (email, email, email, email))
+
+    conn.commit()
+    conn.close()
+
+
+def rebuild_clients_from_bookings():
+    """One-time rebuild: populate clients table from existing bookings."""
+    conn = db_conn()
+    rows = conn.execute(
+        "SELECT DISTINCT email, name, phone, instagram FROM bookings WHERE email != '' ORDER BY created_at ASC"
+    ).fetchall()
+    conn.close()
+    for r in rows:
+        sync_client(r["email"], r["name"], r["phone"] or "", r["instagram"] or "")
+    log.info(f"[db] Rebuilt clients table: {len(rows)} unique emails processed")
+
+
+# Run once on startup to populate clients from existing bookings
+try:
+    _c = db_conn()
+    _cnt = _c.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
+    _c.close()
+    if _cnt == 0:
+        rebuild_clients_from_bookings()
+except Exception as _e:
+    log.warning(f"[db] Client rebuild skipped: {_e}")
+
+
+# ── BACKUP ───────────────────────────────────────────────────────────────────
+def create_backup(label: str = "auto") -> str:
+    """Copy the SQLite file to BACKUP_DIR with a timestamp.
+    Returns the backup file path."""
+    import shutil
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    dest = os.path.join(BACKUP_DIR, f"bookings_{ts}_{label}.db")
+    shutil.copy2(DB_PATH, dest)
+    # Keep only the 30 most recent backups (prevent disk bloat)
+    all_bk = sorted(
+        [f for f in os.listdir(BACKUP_DIR) if f.endswith(".db")],
+        reverse=True
+    )
+    for old in all_bk[30:]:
+        try:
+            os.remove(os.path.join(BACKUP_DIR, old))
+        except OSError:
+            pass
+    log.info(f"[backup] Created: {dest}")
+    return dest
+
+
+# Daily auto-backup on startup
+try:
+    _today_prefix = datetime.now().strftime("%Y-%m-%d")
+    _has_today = any(
+        f.startswith(f"bookings_{_today_prefix}") and "startup" in f
+        for f in os.listdir(BACKUP_DIR)
+    )
+    if not _has_today:
+        create_backup("startup")
+except Exception as _be:
+    log.warning(f"[backup] Startup backup failed: {_be}")
 
 def expire_reservations():
     """Mark expired reserved/pending_payment rows as 'expired' so slots open back up.
@@ -910,19 +1053,72 @@ def get_slots(date_str):
         "available": len(available_slots)
     })
 
+import re as _re
+
+def _validate_booking_fields(name, email, phone, instagram=""):
+    """Validate client booking fields. Returns (is_valid, error_message)."""
+    # Name: letters (incl. accented), spaces, hyphens, apostrophes — min 2 chars
+    if not name or len(name.strip()) < 2:
+        return False, "Please enter your full name (at least 2 characters)"
+    if not _re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ'\- ]{2,80}$", name.strip()):
+        return False, "Name should contain only letters, spaces, or hyphens"
+
+    # Email: standard format check
+    if not email or not _re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$", email.strip()):
+        return False, "Please enter a valid email address (e.g. jane@example.com)"
+    if len(email) > 254:
+        return False, "Email address is too long"
+
+    # Phone: Canadian number — accepts various formats, normalises to 10 digits
+    if phone:
+        digits = _re.sub(r"\D", "", phone)
+        if digits.startswith("1") and len(digits) == 11:
+            digits = digits[1:]  # strip leading country code 1
+        if len(digits) != 10:
+            return False, "Please enter a valid Canadian phone number (10 digits, e.g. 403-555-1234)"
+        # First digit of area code must be 2-9, first digit of subscriber must be 2-9
+        if digits[0] in "01" or digits[3] in "01":
+            return False, "Please enter a valid Canadian phone number"
+
+    # Instagram: optional — if provided must be @handle or handle (1-30 alphanumeric/._)
+    if instagram:
+        handle = instagram.lstrip("@")
+        if not _re.match(r"^[A-Za-z0-9_.]{1,30}$", handle):
+            return False, "Instagram handle should be 1–30 characters (letters, numbers, . or _)"
+
+    return True, ""
+
+
 @app.route("/reserve", methods=["POST"])
 def reserve_slot():
     data = request.json or {}
     slot_time = data.get("time")
     event_id = data.get("event_id") or data.get("date")  # accept either
-    client_name = data.get("name", "")
-    client_email = data.get("email", "")
-    client_phone = data.get("phone", "")
-    client_ig = data.get("instagram", "")
+    client_name = (data.get("name") or "").strip()
+    client_email = (data.get("email") or "").strip().lower()
+    client_phone = (data.get("phone") or "").strip()
+    client_ig = (data.get("instagram") or "").strip()
     session_type = data.get("session_type", "")
 
     if not slot_time:
         return jsonify({"success": False, "error": "No time slot specified"}), 400
+
+    # ── Field validation ──
+    valid, err = _validate_booking_fields(client_name, client_email, client_phone, client_ig)
+    if not valid:
+        return jsonify({"success": False, "error": err}), 400
+
+    # Normalise phone: strip non-digits, remove leading 1 if 11 digits
+    if client_phone:
+        _digits = _re.sub(r"\D", "", client_phone)
+        if _digits.startswith("1") and len(_digits) == 11:
+            _digits = _digits[1:]
+        # Format as (XXX) XXX-XXXX
+        client_phone = f"({_digits[:3]}) {_digits[3:6]}-{_digits[6:]}"
+
+    # Normalise Instagram — always store without @
+    if client_ig and client_ig.startswith("@"):
+        client_ig = client_ig[1:]
 
     # Resolve event
     ev = get_event_by_id(event_id) if event_id else get_active_event()
@@ -991,6 +1187,12 @@ def reserve_slot():
         raise
     finally:
         conn.close()
+
+    # Sync client record (upsert) — creates or updates client profile
+    try:
+        sync_client(client_email, client_name, client_phone, client_ig)
+    except Exception as _e:
+        log.warning(f"[reserve] sync_client failed: {_e}")
 
     # Notify photographer via Telegram
     _notify_new_reservation(
@@ -1399,6 +1601,14 @@ def admin_confirm():
     booking = dict(row) if row else {}
     conn.close()
 
+    # Sync client stats after confirmation
+    if booking:
+        try:
+            sync_client(booking.get("email", ""), booking.get("name", ""),
+                        booking.get("phone", ""), booking.get("instagram", ""))
+        except Exception as _e:
+            log.warning(f"[confirm] sync_client failed: {_e}")
+
     # Side-effects: GCal event first (so Notion can include the link), then Notion
     event_url = create_calendar_event_for_booking(booking_id)
     sync_to_notion(booking_id)
@@ -1657,6 +1867,432 @@ def admin_delete_photo(event_id):
 
     return jsonify({"success": True})
 
+
+# ===== EVENT CRUD =====
+
+def _reload_events_globals():
+    """Reload all in-memory event globals after YAML changes."""
+    global EVENTS, SETTINGS, _active, EVENT_TITLE, SESSION_LENGTH, BREAK_LENGTH, SLOT_INTERVAL, SESSION_PRICE, SESSION_TOTAL, DATE, START_TIME, END_TIME, SLOTS
+    EVENTS, SETTINGS = _load_events()
+    _active = get_active_event() or {}
+    EVENT_TITLE = _active.get("title", "Mini Sessions")
+    SESSION_LENGTH = _active.get("session_length", 20)
+    BREAK_LENGTH = _active.get("break_length", 10)
+    SLOT_INTERVAL = _active.get("slot_interval", 30)
+    SESSION_PRICE = _active.get("deposit", 95)
+    SESSION_TOTAL = _active.get("full_price", 190)
+    DATE = _active.get("date", "")
+    START_TIME = _active.get("start_time", "10:00")
+    END_TIME = _active.get("end_time", "16:00")
+    SLOTS = generate_slots()
+
+
+@app.route("/admin/events/create", methods=["POST"])
+@admin_required
+def admin_create_event():
+    """Create a new event and append to events.yaml."""
+    data = request.json or {}
+
+    # Required fields
+    title = str(data.get("title", "")).strip()
+    date_str = str(data.get("date", "")).strip()
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+    if not date_str:
+        return jsonify({"error": "date is required"}), 400
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+
+    # Build slug-style id from date + sanitised title
+    import re
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:30]
+    event_id = f"{slug}-{date_str}"
+
+    with open(EVENTS_YAML_PATH) as fh:
+        yaml_data = yaml.safe_load(fh) or {}
+
+    events_list = yaml_data.get("events", [])
+    # Ensure unique id
+    existing_ids = {e["id"] for e in events_list}
+    base_id = event_id
+    suffix = 2
+    while event_id in existing_ids:
+        event_id = f"{base_id}-{suffix}"
+        suffix += 1
+
+    session_len = int(data.get("session_length", 20))
+    break_len = int(data.get("break_length", 10))
+
+    new_event = {
+        "id": event_id,
+        "title": title,
+        "subtitle": str(data.get("subtitle", "")).strip(),
+        "date": date_str,
+        "start_time": data.get("start_time", "10:00"),
+        "end_time": data.get("end_time", "17:00"),
+        "session_length": session_len,
+        "break_length": break_len,
+        "slot_interval": session_len + break_len,
+        "deposit": float(data.get("deposit", 100)),
+        "full_price": float(data.get("full_price", 300)),
+        "location": str(data.get("location", "")).strip(),
+        "session_type": "mini",
+        "featured": bool(data.get("featured", False)),
+        "status": data.get("status", "upcoming"),
+        "included": [i.strip() for i in data.get("included", []) if str(i).strip()],
+        "photos": [],
+    }
+
+    events_list.append(new_event)
+    yaml_data["events"] = events_list
+
+    with open(EVENTS_YAML_PATH, "w") as fh:
+        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+
+    _reload_events_globals()
+    log.info(f"[admin] Event created: {event_id}")
+    return jsonify({"success": True, "event_id": event_id})
+
+
+@app.route("/admin/events/<event_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_event(event_id):
+    """Delete an event from events.yaml. Refuses if there are active bookings."""
+    with open(EVENTS_YAML_PATH) as fh:
+        yaml_data = yaml.safe_load(fh) or {}
+
+    events_list = yaml_data.get("events", [])
+    event = next((e for e in events_list if e["id"] == event_id), None)
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+
+    # Check for active/pending bookings
+    conn = db_conn()
+    active_count = conn.execute(
+        "SELECT COUNT(*) FROM bookings WHERE event_id=? AND status NOT IN ('cancelled','expired')",
+        (event_id,)
+    ).fetchone()[0]
+    conn.close()
+
+    if active_count > 0:
+        force = (request.json or {}).get("force", False)
+        if not force:
+            return jsonify({
+                "error": f"Event has {active_count} active booking(s). Pass force=true to delete anyway.",
+                "active_bookings": active_count
+            }), 409
+
+    yaml_data["events"] = [e for e in events_list if e["id"] != event_id]
+
+    with open(EVENTS_YAML_PATH, "w") as fh:
+        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+
+    _reload_events_globals()
+    log.info(f"[admin] Event deleted: {event_id}")
+    return jsonify({"success": True})
+
+
+@app.route("/admin/events/<event_id>/duplicate", methods=["POST"])
+@admin_required
+def admin_duplicate_event(event_id):
+    """Duplicate an event with a new id, cleared photos and upcoming status."""
+    with open(EVENTS_YAML_PATH) as fh:
+        yaml_data = yaml.safe_load(fh) or {}
+
+    events_list = yaml_data.get("events", [])
+    source = next((e for e in events_list if e["id"] == event_id), None)
+    if not source:
+        return jsonify({"error": "Event not found"}), 404
+
+    import copy, re
+    new_event = copy.deepcopy(source)
+    new_event["status"] = "upcoming"
+    new_event["photos"] = []
+    new_event["featured"] = False
+
+    # Generate new id
+    base_slug = re.sub(r"-\d{4}-\d{2}-\d{2}.*$", "", source["id"])
+    existing_ids = {e["id"] for e in events_list}
+    suffix = 2
+    new_id = f"{base_slug}-copy"
+    while new_id in existing_ids:
+        new_id = f"{base_slug}-copy-{suffix}"
+        suffix += 1
+    new_event["id"] = new_id
+    new_event["title"] = source["title"] + " (copy)"
+
+    events_list.append(new_event)
+    yaml_data["events"] = events_list
+
+    with open(EVENTS_YAML_PATH, "w") as fh:
+        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+
+    _reload_events_globals()
+    log.info(f"[admin] Event duplicated: {event_id} → {new_id}")
+    return jsonify({"success": True, "new_event_id": new_id})
+
+
+@app.route("/admin/events/<event_id>/update-meta", methods=["POST"])
+@admin_required
+def admin_update_event_meta(event_id):
+    """Update event metadata: title, subtitle, date, featured, included items."""
+    data = request.json or {}
+
+    with open(EVENTS_YAML_PATH) as fh:
+        yaml_data = yaml.safe_load(fh) or {}
+
+    events_list = yaml_data.get("events", [])
+    event = next((e for e in events_list if e["id"] == event_id), None)
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+
+    if "title" in data:
+        event["title"] = str(data["title"])[:120]
+    if "subtitle" in data:
+        event["subtitle"] = str(data["subtitle"])[:200]
+    if "date" in data:
+        try:
+            datetime.strptime(str(data["date"]), "%Y-%m-%d")
+            event["date"] = str(data["date"])
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+    if "featured" in data:
+        event["featured"] = bool(data["featured"])
+    if "included" in data:
+        event["included"] = [str(i).strip() for i in data["included"] if str(i).strip()]
+
+    with open(EVENTS_YAML_PATH, "w") as fh:
+        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+
+    _reload_events_globals()
+    log.info(f"[admin] Event meta updated: {event_id}")
+    return jsonify({"success": True})
+
+
+# ─────────────────────────────────────────────
+#  CLIENT DATABASE ROUTES
+# ─────────────────────────────────────────────
+
+@app.route("/admin/clients")
+@admin_required
+def admin_clients():
+    """Client database page."""
+    return render_template("admin_clients.html")
+
+
+@app.route("/admin/api/clients")
+@admin_required
+def api_clients_list():
+    """JSON list of all clients with optional search/filter."""
+    q = (request.args.get("q") or "").strip().lower()
+    tag = (request.args.get("tag") or "").strip()
+    sort = request.args.get("sort", "last_booking_at")
+    allowed_sorts = {"last_booking_at", "total_bookings", "total_paid", "name", "created_at"}
+    if sort not in allowed_sorts:
+        sort = "last_booking_at"
+
+    conn = db_conn()
+    sql = """
+        SELECT id, name, email, phone, instagram, tags,
+               total_bookings, total_confirmed, total_paid,
+               first_booking_at, last_booking_at, created_at, notes
+        FROM clients
+        WHERE 1=1
+    """
+    params = []
+    if q:
+        sql += " AND (LOWER(name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(phone) LIKE ? OR LOWER(instagram) LIKE ?)"
+        params += [f"%{q}%"] * 4
+    if tag:
+        sql += " AND (',' || tags || ',') LIKE ?"
+        params.append(f"%,{tag},%")
+    sql += f" ORDER BY {sort} DESC NULLS LAST"
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/admin/api/clients/<int:client_id>")
+@admin_required
+def api_client_detail(client_id):
+    """Single client profile + full booking history."""
+    conn = db_conn()
+    client = conn.execute("SELECT * FROM clients WHERE id=?", (client_id,)).fetchone()
+    if not client:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    client = dict(client)
+    bookings = conn.execute(
+        "SELECT * FROM bookings WHERE LOWER(email)=LOWER(?) ORDER BY date DESC, time DESC",
+        (client["email"],)
+    ).fetchall()
+    notes = conn.execute(
+        "SELECT * FROM client_notes WHERE client_id=? ORDER BY created_at DESC",
+        (client_id,)
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        "client": client,
+        "bookings": [dict(b) for b in bookings],
+        "notes": [dict(n) for n in notes],
+    })
+
+
+@app.route("/admin/api/clients/<int:client_id>/note", methods=["POST"])
+@admin_required
+def api_client_add_note(client_id):
+    """Add a note to a client."""
+    data = request.json or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "text required"}), 400
+    conn = db_conn()
+    # Verify client exists
+    if not conn.execute("SELECT id FROM clients WHERE id=?", (client_id,)).fetchone():
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    conn.execute(
+        "INSERT INTO client_notes (client_id, text) VALUES (?, ?)",
+        (client_id, text)
+    )
+    conn.commit()
+    note = conn.execute(
+        "SELECT * FROM client_notes WHERE client_id=? ORDER BY created_at DESC LIMIT 1",
+        (client_id,)
+    ).fetchone()
+    conn.close()
+    return jsonify({"success": True, "note": dict(note)})
+
+
+@app.route("/admin/api/clients/<int:client_id>/note/<int:note_id>", methods=["DELETE"])
+@admin_required
+def api_client_delete_note(client_id, note_id):
+    """Delete a note."""
+    conn = db_conn()
+    conn.execute("DELETE FROM client_notes WHERE id=? AND client_id=?", (note_id, client_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/admin/api/clients/<int:client_id>/tag", methods=["POST"])
+@admin_required
+def api_client_tag(client_id):
+    """Add or remove a tag on a client. Body: {tag, action:'add'|'remove'}"""
+    data = request.json or {}
+    tag = (data.get("tag") or "").strip().upper()
+    action = data.get("action", "add")
+    if not tag:
+        return jsonify({"error": "tag required"}), 400
+    conn = db_conn()
+    row = conn.execute("SELECT tags FROM clients WHERE id=?", (client_id,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    existing = [t.strip().upper() for t in (row["tags"] or "").split(",") if t.strip()]
+    if action == "add":
+        if tag not in existing:
+            existing.append(tag)
+    else:
+        existing = [t for t in existing if t != tag]
+    new_tags = ",".join(existing)
+    conn.execute("UPDATE clients SET tags=? WHERE id=?", (new_tags, client_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "tags": new_tags})
+
+
+@app.route("/admin/api/clients/<int:client_id>/edit", methods=["POST"])
+@admin_required
+def api_client_edit(client_id):
+    """Update client name / phone / instagram (manual override)."""
+    data = request.json or {}
+    conn = db_conn()
+    if not conn.execute("SELECT id FROM clients WHERE id=?", (client_id,)).fetchone():
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    fields = {}
+    if "name" in data:
+        fields["name"] = str(data["name"])[:120]
+    if "phone" in data:
+        fields["phone"] = str(data["phone"])[:30]
+    if "instagram" in data:
+        ig = str(data["instagram"]).lstrip("@")[:80]
+        fields["instagram"] = ig
+    if not fields:
+        conn.close()
+        return jsonify({"error": "nothing to update"}), 400
+    set_clause = ", ".join(f"{k}=?" for k in fields)
+    conn.execute(f"UPDATE clients SET {set_clause} WHERE id=?",
+                 list(fields.values()) + [client_id])
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/admin/backup", methods=["POST"])
+@admin_required
+def admin_manual_backup():
+    """Trigger a manual database backup."""
+    try:
+        path = create_backup()
+        return jsonify({"success": True, "path": str(path)})
+    except Exception as e:
+        log.error(f"[backup] Manual backup failed: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/admin/backups")
+@admin_required
+def admin_list_backups():
+    """List available database backups."""
+    import glob as _glob
+    pattern = os.path.join(BACKUP_DIR, "bookings_*.db")
+    files = sorted(_glob.glob(pattern), reverse=True)
+    result = []
+    for f in files[:50]:
+        try:
+            stat = os.stat(f)
+            result.append({
+                "filename": os.path.basename(f),
+                "size_kb": round(stat.st_size / 1024, 1),
+                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            })
+        except OSError:
+            pass
+    return jsonify(result)
+
+
+@app.route("/admin/api/clients/export")
+@admin_required
+def api_clients_export():
+    """Export all clients as CSV."""
+    import csv, io
+    conn = db_conn()
+    rows = conn.execute(
+        "SELECT name, email, phone, instagram, tags, total_bookings, total_confirmed, total_paid, "
+        "first_booking_at, last_booking_at, created_at FROM clients ORDER BY last_booking_at DESC NULLS LAST"
+    ).fetchall()
+    conn.close()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Name", "Email", "Phone", "Instagram", "Tags",
+                     "Total Bookings", "Confirmed", "Total Paid ($)",
+                     "First Booking", "Last Booking", "Client Since"])
+    for r in rows:
+        writer.writerow(list(r))
+    output.seek(0)
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=clients.csv"}
+    )
+
+
+# ─────────────────────────────────────────────
 
 @app.route("/booking-status")
 def booking_status():
