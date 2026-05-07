@@ -370,6 +370,283 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         log.error(f"[email] Send failed: {e}")
 
 
+def _send_email_raw(to_email, client_name, subject, plain, html):
+    """Low-level: send multipart/alternative email via Himalaya CLI."""
+    if not to_email:
+        return False
+    try:
+        import subprocess
+        boundary = f"====pashynska_{abs(hash(subject))}===="
+        template = (
+            f"From: Iryna Pashynska <iryna.pashynska@gmail.com>\r\n"
+            f"To: {client_name} <{to_email}>\r\n"
+            f"Subject: {subject}\r\n"
+            f"MIME-Version: 1.0\r\n"
+            f"Content-Type: multipart/alternative; boundary=\"{boundary}\"\r\n"
+            f"\r\n"
+            f"--{boundary}\r\n"
+            f"Content-Type: text/plain; charset=utf-8\r\n\r\n"
+            f"{plain}\r\n"
+            f"--{boundary}\r\n"
+            f"Content-Type: text/html; charset=utf-8\r\n\r\n"
+            f"{html}\r\n"
+            f"--{boundary}--\r\n"
+        )
+        result = subprocess.run(
+            ["himalaya", "message", "send", "-a", "iryna"],
+            input=template, capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            log.info(f"[email] Sent '{subject}' to {to_email}")
+            return True
+        else:
+            log.error(f"[email] Himalaya failed ({subject}): {result.stderr[:200]}")
+            return False
+    except Exception as e:
+        log.error(f"[email] Send failed ({subject}): {e}")
+        return False
+
+
+def _send_abandoned_email(booking):
+    """Send 'You were so close!' recovery email to a client who didn't complete payment."""
+    name = booking.get("name", "there")
+    email = booking.get("email", "")
+    event_id = booking.get("event_id")
+    slot_time = booking.get("time", "")
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    if not ev or not email:
+        return False
+
+    date_nice = ""
+    try:
+        date_nice = datetime.strptime(ev["date"], "%Y-%m-%d").strftime("%B %d, %Y")
+    except Exception:
+        date_nice = ev.get("date", "")
+
+    booking_url = f"https://{os.environ.get('SITE_HOST', 'www.pashynska.agency')}"
+    subject = f"Still thinking about your photo session? 📸"
+
+    plain = (
+        f"Hi {name},\n\n"
+        f"We noticed you started booking a mini session for {date_nice} at {slot_time} "
+        f"but didn't quite finish.\n\n"
+        f"Totally okay — life gets busy! But if you're still thinking about it, "
+        f"there might still be spots available.\n\n"
+        f"Book here: {booking_url}\n\n"
+        f"No pressure at all — just didn't want you to miss out! 🌸\n\n"
+        f"Warmly,\nIryna\n@pashynska.photo"
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
+  <tr><td style="background:linear-gradient(135deg,#b8a4c8 0%,#9b5e8a 100%);padding:36px 40px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:36px;">📸</p>
+    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">You were so close!</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+  </td></tr>
+  <tr><td style="padding:36px 40px 28px;">
+    <p style="margin:0 0 20px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong> 👋</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#7a5a6a;line-height:1.7;">
+      We noticed you started booking a mini session for
+      <strong>{ev.get('title', 'your session')}</strong> on <strong>{date_nice} at {slot_time}</strong>
+      but didn't quite finish.
+    </p>
+    <p style="margin:0 0 28px;font-size:15px;color:#7a5a6a;line-height:1.7;">
+      Totally okay — life gets busy! But if you're still thinking about it,
+      spots fill up fast and I'd love to have you. 🌸
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr><td align="center">
+        <a href="{booking_url}" style="display:inline-block;background:linear-gradient(135deg,#c084a8,#9b5e8a);color:#fff;text-decoration:none;padding:14px 36px;border-radius:50px;font-size:15px;letter-spacing:.5px;">
+          Check available spots →
+        </a>
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:13px;color:#b8a0b0;text-align:center;line-height:1.6;">
+      No pressure at all — just didn't want you to miss out!
+    </p>
+  </td></tr>
+  <tr><td style="background:#f9f1f5;padding:20px 40px;text-align:center;border-top:1px solid #f0e0e8;">
+    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada<br>
+    <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+
+    return _send_email_raw(email, name, subject, plain, html)
+
+
+def _send_reminder_email(booking):
+    """Send 48-hour pre-session reminder email."""
+    name = booking.get("name", "there")
+    email = booking.get("email", "")
+    event_id = booking.get("event_id")
+    slot_time = booking.get("time", "")
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    if not ev or not email:
+        return False
+
+    date_nice = ""
+    try:
+        date_nice = datetime.strptime(ev["date"], "%Y-%m-%d").strftime("%B %d, %Y")
+    except Exception:
+        date_nice = ev.get("date", "")
+
+    location = ev.get("location", "Location details coming soon")
+    subject = f"Your session is in 2 days! 🌸 — {date_nice} at {slot_time}"
+
+    plain = (
+        f"Hi {name},\n\n"
+        f"Just a friendly reminder — your mini photo session is coming up in 2 days!\n\n"
+        f"📅 {date_nice}\n"
+        f"⏰ {slot_time}\n"
+        f"📍 {location}\n\n"
+        f"A few tips to make the most of your session:\n"
+        f"• Wear colours that complement each other (avoid busy patterns)\n"
+        f"• Arrive 5 minutes early so we can start relaxed\n"
+        f"• Bring any props you love — a blanket, flowers, a favourite hat\n"
+        f"• Most importantly — just have fun! I'll guide you the whole time 😊\n\n"
+        f"Any questions? DM me on Instagram @pashynska.photo\n\n"
+        f"See you soon!\n"
+        f"Iryna 🌸"
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
+  <tr><td style="background:linear-gradient(135deg,#c084a8 0%,#9b5e8a 100%);padding:36px 40px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:36px;">🌸</p>
+    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">See you in 2 days!</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+  </td></tr>
+  <tr><td style="padding:36px 40px 28px;">
+    <p style="margin:0 0 20px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong>! 👋</p>
+    <p style="margin:0 0 24px;font-size:15px;color:#7a5a6a;line-height:1.7;">
+      Your mini photo session is just <strong>2 days away</strong>! Here are the details:
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;border-radius:12px;margin-bottom:28px;">
+      <tr><td style="padding:20px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">🗓 Date</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{date_nice}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">⏰ Time</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{slot_time}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#7a5a6a;font-size:14px;">📍 Location</td>
+            <td style="padding:8px 0;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{location}</strong></td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+    <h3 style="margin:0 0 12px;color:#5a3d4a;font-size:15px;">Tips for a beautiful session:</h3>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">👗 &nbsp;Wear colours that complement each other — avoid busy patterns</td></tr>
+      <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">⏱ &nbsp;Arrive 5 minutes early so we can start relaxed</td></tr>
+      <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">🎀 &nbsp;Bring props you love — a blanket, flowers, a favourite hat</td></tr>
+      <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">😊 &nbsp;Just have fun — I'll guide you the whole time!</td></tr>
+    </table>
+    <p style="margin:0 0 8px;font-size:14px;color:#7a5a6a;">Questions? DM me on Instagram
+      <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a>
+    </p>
+  </td></tr>
+  <tr><td style="padding:24px 40px;text-align:left;border-top:1px solid #f0e0e8;">
+    <p style="margin:0;font-size:15px;color:#5a3d4a;">See you soon! 🌸</p>
+    <p style="margin:8px 0 0;font-size:14px;color:#9b5e8a;"><strong>Iryna Pashynska</strong><br>
+    <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
+  </td></tr>
+  <tr><td style="background:#f9f1f5;padding:16px 40px;text-align:center;border-top:1px solid #f0e0e8;">
+    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada</p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+
+    return _send_email_raw(email, name, subject, plain, html)
+
+
+def _send_review_email(booking):
+    """Send post-session review request email (5 days after session)."""
+    name = booking.get("name", "there")
+    email = booking.get("email", "")
+    event_id = booking.get("event_id")
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    if not email:
+        return False
+
+    insta_url = "https://instagram.com/pashynska.photo"
+    google_review_url = os.environ.get("GOOGLE_REVIEW_URL", "https://g.page/r/pashynska-photography/review")
+
+    subject = "How were your photos? 🌸"
+
+    plain = (
+        f"Hi {name},\n\n"
+        f"I hope you've had a chance to look through your photos and love them as much as I do!\n\n"
+        f"If you enjoyed your session, a quick review means the absolute world to a small business like mine. "
+        f"It takes just 30 seconds:\n\n"
+        f"⭐ Google review: {google_review_url}\n"
+        f"📸 Tag me on Instagram: {insta_url}\n\n"
+        f"And of course — I'd LOVE to see you again for your next session! 🌸\n\n"
+        f"Thank you so much for trusting me to capture your memories.\n\n"
+        f"Warmly,\nIryna\n@pashynska.photo"
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
+  <tr><td style="background:linear-gradient(135deg,#e8c4d8 0%,#c084a8 100%);padding:36px 40px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:36px;">⭐</p>
+    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">How were your photos?</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+  </td></tr>
+  <tr><td style="padding:36px 40px 28px;">
+    <p style="margin:0 0 16px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong>! 🌸</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#7a5a6a;line-height:1.7;">
+      I hope you've had a chance to look through your photos and love them as much as I do!
+      It was such a pleasure photographing you.
+    </p>
+    <p style="margin:0 0 28px;font-size:15px;color:#7a5a6a;line-height:1.7;">
+      If you enjoyed your session, a quick review means the absolute world to a small business like mine — it helps other families and couples find me. It takes just 30 seconds! ✨
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+      <tr><td align="center" style="padding-bottom:12px;">
+        <a href="{google_review_url}" style="display:inline-block;background:linear-gradient(135deg,#f4c430,#f0a030);color:#fff;text-decoration:none;padding:14px 32px;border-radius:50px;font-size:15px;letter-spacing:.5px;">
+          ⭐ Leave a Google Review
+        </a>
+      </td></tr>
+      <tr><td align="center">
+        <a href="{insta_url}" style="display:inline-block;background:linear-gradient(135deg,#c084a8,#9b5e8a);color:#fff;text-decoration:none;padding:12px 28px;border-radius:50px;font-size:14px;letter-spacing:.5px;">
+          📸 Tag me on Instagram
+        </a>
+      </td></tr>
+    </table>
+    <p style="margin:20px 0 0;font-size:14px;color:#b8a0b0;text-align:center;line-height:1.6;">
+      And I'd love to see you again for your next session! 💜
+    </p>
+  </td></tr>
+  <tr><td style="padding:24px 40px;text-align:left;border-top:1px solid #f0e0e8;">
+    <p style="margin:0;font-size:15px;color:#5a3d4a;">Thank you so much! 🌸</p>
+    <p style="margin:8px 0 0;font-size:14px;color:#9b5e8a;"><strong>Iryna Pashynska</strong><br>
+    <a href="{insta_url}" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
+  </td></tr>
+  <tr><td style="background:#f9f1f5;padding:16px 40px;text-align:center;border-top:1px solid #f0e0e8;">
+    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada</p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+
+    return _send_email_raw(email, name, subject, plain, html)
+
+
 def notify_payment_confirmed(booking_id, paid_amount=None):
     """Send Telegram notification to admin: booking was auto-confirmed by e-Transfer checker."""
     try:
@@ -698,6 +975,13 @@ def init_db():
         ("bookings",  "event_id",          "ALTER TABLE bookings ADD COLUMN event_id TEXT"),
         ("clients",   "tags",              "ALTER TABLE clients ADD COLUMN tags TEXT DEFAULT '[]'"),
         ("clients",   "notes",             "ALTER TABLE clients ADD COLUMN notes TEXT DEFAULT ''"),
+        # Automated email tracking
+        ("bookings",  "abandoned_email_sent",  "ALTER TABLE bookings ADD COLUMN abandoned_email_sent TEXT"),
+        ("bookings",  "reminder_email_sent",   "ALTER TABLE bookings ADD COLUMN reminder_email_sent TEXT"),
+        ("bookings",  "review_email_sent",     "ALTER TABLE bookings ADD COLUMN review_email_sent TEXT"),
+        # first_booking_at / last_booking_at for clients table
+        ("clients",   "first_booking_at",  "ALTER TABLE clients ADD COLUMN first_booking_at TEXT"),
+        ("clients",   "last_booking_at",   "ALTER TABLE clients ADD COLUMN last_booking_at TEXT"),
     ]
     for _tbl, _col, _ddl in _migrations:
         try:
@@ -710,6 +994,129 @@ def init_db():
 
 
 init_db()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  BACKGROUND EMAIL SCHEDULER
+#  Runs every 5 minutes in a daemon thread. Handles:
+#    1. Abandoned booking recovery  (2h after expiry)
+#    2. Pre-session reminder         (48h before session)
+#    3. Post-session review request  (5 days after session)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _run_email_scheduler():
+    import threading as _threading
+    # Small initial delay so the server has time to fully start
+    _threading.Event().wait(60)
+    while True:
+        try:
+            _process_abandoned_emails()
+            _process_reminder_emails()
+            _process_review_emails()
+        except Exception as _e:
+            log.error(f"[scheduler] Unexpected error: {_e}")
+        _threading.Event().wait(300)  # run every 5 minutes
+
+
+def _process_abandoned_emails():
+    """Send recovery emails to clients who reserved but never paid (2h cooldown)."""
+    now = datetime.now()
+    cutoff = (now - timedelta(hours=2)).isoformat()
+    conn = db_conn()
+    rows = conn.execute("""
+        SELECT * FROM bookings
+        WHERE status = 'expired'
+          AND abandoned_email_sent IS NULL
+          AND created_at <= ?
+          AND email IS NOT NULL AND email != ''
+    """, (cutoff,)).fetchall()
+    conn.close()
+    for row in rows:
+        b = dict(row)
+        try:
+            ok = _send_abandoned_email(b)
+            conn2 = db_conn()
+            conn2.execute(
+                "UPDATE bookings SET abandoned_email_sent=? WHERE id=?",
+                (now.isoformat(), b["id"])
+            )
+            conn2.commit()
+            conn2.close()
+            if ok:
+                log.info(f"[scheduler] Abandoned email sent → booking #{b['id']} ({b.get('email')})")
+        except Exception as e:
+            log.error(f"[scheduler] Abandoned email failed for #{b['id']}: {e}")
+
+
+def _process_reminder_emails():
+    """Send 48h pre-session reminders to confirmed bookings."""
+    now = datetime.now()
+    # Window: sessions happening between 46h and 50h from now (4h window to avoid duplicates)
+    date_from = (now + timedelta(hours=46)).strftime("%Y-%m-%d")
+    date_to   = (now + timedelta(hours=50)).strftime("%Y-%m-%d")
+    conn = db_conn()
+    rows = conn.execute("""
+        SELECT * FROM bookings
+        WHERE status = 'confirmed' AND confirmed = 1
+          AND reminder_email_sent IS NULL
+          AND date BETWEEN ? AND ?
+          AND email IS NOT NULL AND email != ''
+    """, (date_from, date_to)).fetchall()
+    conn.close()
+    for row in rows:
+        b = dict(row)
+        try:
+            ok = _send_reminder_email(b)
+            conn2 = db_conn()
+            conn2.execute(
+                "UPDATE bookings SET reminder_email_sent=? WHERE id=?",
+                (now.isoformat(), b["id"])
+            )
+            conn2.commit()
+            conn2.close()
+            if ok:
+                log.info(f"[scheduler] Reminder email sent → booking #{b['id']} ({b.get('email')}) for {b.get('date')}")
+        except Exception as e:
+            log.error(f"[scheduler] Reminder email failed for #{b['id']}: {e}")
+
+
+def _process_review_emails():
+    """Send review request emails 5 days after a confirmed session."""
+    now = datetime.now()
+    # Sessions that happened between 4 and 6 days ago
+    date_from = (now - timedelta(days=6)).strftime("%Y-%m-%d")
+    date_to   = (now - timedelta(days=4)).strftime("%Y-%m-%d")
+    conn = db_conn()
+    rows = conn.execute("""
+        SELECT * FROM bookings
+        WHERE status = 'confirmed' AND confirmed = 1
+          AND review_email_sent IS NULL
+          AND date BETWEEN ? AND ?
+          AND email IS NOT NULL AND email != ''
+    """, (date_from, date_to)).fetchall()
+    conn.close()
+    for row in rows:
+        b = dict(row)
+        try:
+            ok = _send_review_email(b)
+            conn2 = db_conn()
+            conn2.execute(
+                "UPDATE bookings SET review_email_sent=? WHERE id=?",
+                (now.isoformat(), b["id"])
+            )
+            conn2.commit()
+            conn2.close()
+            if ok:
+                log.info(f"[scheduler] Review email sent → booking #{b['id']} ({b.get('email')})")
+        except Exception as e:
+            log.error(f"[scheduler] Review email failed for #{b['id']}: {e}")
+
+
+# Start the scheduler in a background daemon thread
+import threading as _bg_thread
+_sched = _bg_thread.Thread(target=_run_email_scheduler, daemon=True, name="email-scheduler")
+_sched.start()
+log.info("[scheduler] Email scheduler started (abandoned / reminder / review)")
 
 
 def db_conn():
@@ -1233,7 +1640,8 @@ def payment():
         price=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
         email=EMAIL,
         session_length=ev.get("session_length", SESSION_LENGTH) if ev else SESSION_LENGTH,
-        event_id=ev["id"] if ev else ""
+        event_id=ev["id"] if ev else "",
+        stripe_payment_link=ev.get("stripe_payment_link", "") if ev else ""
     )
 
 
