@@ -843,6 +843,11 @@
                         <option value="completed" {% if ev.status == 'completed' %}selected{% endif %}>Completed</option>
                     </select>
                 </div>
+                <div class="form-group" style="grid-column:1/-1">
+                    <label>Location</label>
+                    <input type="text" id="location-{{ ev.id }}" value="{{ ev.location|default('') }}"
+                           placeholder="e.g. Riley Park, Calgary — near Central Memorial Park">
+                </div>
             </div>
 
             <!-- Live slot preview -->
@@ -1151,6 +1156,7 @@
             deposit:        parseFloat(document.getElementById(`deposit-${eventId}`)?.value),
             full_price:     parseFloat(document.getElementById(`fullprice-${eventId}`)?.value),
             status:         document.getElementById(`evstatus-${eventId}`)?.value,
+            location:       document.getElementById(`location-${eventId}`)?.value,
         };
 
         try {

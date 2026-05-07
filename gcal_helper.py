@@ -9,7 +9,7 @@ One-time setup:
   4. export GCAL_HELPER="$(pwd)/gcal_helper.py"
 
 Then app.py calls:
-  gcal_helper.py create --calendar <id> --summary <s> --start <iso> --end <iso> --tz <tz> --description <d>
+  gcal_helper.py create --calendar <id> --summary <s> --start <iso> --end <iso> --tz <tz> --description <d> --location <loc>
 which prints a single JSON line: {"id": "...", "htmlLink": "..."}
 """
 import argparse
@@ -53,6 +53,7 @@ def cmd_create(args):
     body = {
         "summary": args.summary,
         "description": args.description or "",
+        "location": args.location or "",
         "start": {"dateTime": args.start, "timeZone": args.tz},
         "end": {"dateTime": args.end, "timeZone": args.tz},
         "reminders": {"useDefault": False, "overrides": [
@@ -75,6 +76,7 @@ def main():
     cr.add_argument("--end", required=True)
     cr.add_argument("--tz", default="America/Edmonton")
     cr.add_argument("--description", default="")
+    cr.add_argument("--location", default="")
     args = p.parse_args()
     if args.cmd == "auth":
         cmd_auth()

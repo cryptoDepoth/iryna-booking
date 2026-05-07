@@ -161,10 +161,45 @@ def _tg_send(chat_id, text, reply_markup=None):
     return None
 
 
-def _notify_admin(message):
+def _notify_admin(message, reply_markup=None):
     """Send notification to both Iryna and Andrzej via Telegram."""
-    _tg_send(TELEGRAM_CHAT_ID, message)
-    _tg_send(TELEGRAM_ADMIN_CHAT_ID, message)
+    _tg_send(TELEGRAM_CHAT_ID, message, reply_markup=reply_markup)
+    _tg_send(TELEGRAM_ADMIN_CHAT_ID, message, reply_markup=reply_markup)
+
+
+def _notify_new_reservation(booking_id, client_name, client_email, event_date,
+                            slot_time, event_title, session_type, client_ig,
+                            client_phone=None):
+    """Send NEW reservation notification with inline confirm/cancel buttons."""
+    ig_clean = (client_ig or "").lstrip("@")
+    phone_display = client_phone or "N/A"
+    admin_url = f"{BASE_URL}/admin" if BASE_URL else "/admin"
+    
+    text = (
+        f"🆕 <b>New reservation #{booking_id}</b>\n\n"
+        f"👤 {client_name or '(no name)'}\n"
+        f"📧 {client_email}\n"
+        f"📞 {phone_display}\n"
+        f"📱 Instagram: @{ig_clean or 'N/A'}\n\n"
+        f"📅 {event_date} @ {slot_time}\n"
+        f"🎉 {event_title}\n"
+        f"🏷 Session: {session_type or 'N/A'}\n"
+        f"⏱️ Expires in {RESERVATION_MINUTES} min\n\n"
+        f"<b>Press below when client pays:</b>"
+    )
+    
+    action_row = [
+        {"text": "✅ Payment Received", "callback_data": f"confirm:{booking_id}"},
+        {"text": "❌ Cancel", "callback_data": f"cancel:{booking_id}"},
+    ]
+    link_row = [
+        {"text": "🔗 Admin Panel", "url": admin_url},
+    ]
+    if ig_clean:
+        link_row.append({"text": "📸 Instagram", "url": f"https://instagram.com/{ig_clean}"})
+    
+    keyboard = {"inline_keyboard": [action_row, link_row]}
+    _notify_admin(text, reply_markup=keyboard)
 
 
 def _notify_payment_pending(booking_id, client_name, client_email, event_date,
@@ -217,7 +252,7 @@ def _notify_payment_pending(booking_id, client_name, client_email, event_date,
     _tg_send(TELEGRAM_ADMIN_CHAT_ID, text, reply_markup=keyboard)
 
 
-def _send_client_email(to_email, client_name, event_date, slot_time, event_title, booking_id):
+def _send_client_email(to_email, client_name, event_date, slot_time, event_title, booking_id, location=None):
     """Send HTML confirmation email to client via Himalaya CLI (multipart/alternative)."""
     if not to_email:
         return
@@ -227,19 +262,20 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         date_nice = datetime.strptime(event_date, "%Y-%m-%d").strftime("%B %d, %Y")
         subject = f"Booking Confirmed — {event_title} on {date_nice}"
 
+        location_line = f"Location: {location}\n" if location else "Location details will be sent closer to the session date.\n"
         plain = (
             f"Hi {client_name},\n\n"
             f"Your mini photo session is confirmed!\n\n"
             f"Event: {event_title}\n"
             f"Date: {date_nice}\n"
             f"Time: {slot_time}\n"
+            f"{location_line}"
             f"Booking ID: #{booking_id}\n\n"
             f"What's included:\n"
             f"• 20-minute photo session\n"
             f"• 15 professionally edited photos\n"
             f"• All original photos included\n"
             f"• Quick turnaround (within 48 hours)\n\n"
-            f"Location details will be sent closer to the session date.\n\n"
             f"Need to reschedule? DM me on Instagram @pashynska.photo.\n\n"
             f"Looking forward to our session!\n\n"
             f"Warmly,\nIryna Pashynska\n@pashynska.photo"
@@ -288,7 +324,7 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
       <tr><td style="padding:3px 0;color:#7a5a6a;font-size:14px;">🖼 &nbsp;All original photos included</td></tr>
       <tr><td style="padding:3px 0;color:#7a5a6a;font-size:14px;">⚡ &nbsp;Quick turnaround (within 48 hours)</td></tr>
     </table>
-    <p style="margin:0 0 12px;font-size:14px;color:#7a5a6a;line-height:1.7;">📍 Exact location will be sent closer to your session date.</p>
+    {f'<p style="margin:0 0 12px;font-size:14px;color:#7a5a6a;line-height:1.7;">📍 <strong>Location:</strong> {location}</p>' if location else '<p style="margin:0 0 12px;font-size:14px;color:#7a5a6a;line-height:1.7;">📍 Exact location will be sent closer to the session date.</p>'}
     <p style="margin:0 0 28px;font-size:14px;color:#7a5a6a;line-height:1.7;">Need to reschedule? DM me on Instagram <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
   </td></tr>
   <tr><td style="padding:0 40px 36px;">
@@ -323,7 +359,7 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         )
 
         result = subprocess.run(
-            ["himalaya", "template", "send", "-a", "iryna"],
+            ["himalaya", "message", "send", "-a", "iryna"],
             input=template, capture_output=True, text=True, timeout=30
         )
         if result.returncode == 0:
@@ -501,8 +537,13 @@ def create_calendar_event_for_booking(booking_id):
             f"Email: {b['email']}\n"
             f"Instagram: {b.get('instagram') or ''}\n"
             f"Session type: {b.get('session_type') or ''}\n"
-            f"Booking #{b['id']}"
+            f"Booking #{b['id']}\n"
+            f"Location: {ev.get('location') if ev else 'TBD'}"
         )
+        # Get event details for location
+        event = get_event_by_id(b.get('event_id')) if b.get('event_id') else None
+        location = event.get('location', '') if event else ''
+        
         import subprocess as _sp
         result = _sp.run(
             [helper, "create",
@@ -511,7 +552,8 @@ def create_calendar_event_for_booking(booking_id):
              "--start", start_dt.isoformat(),
              "--end", end_dt.isoformat(),
              "--tz", CALENDAR_TZ,
-             "--description", description],
+             "--description", description,
+             "--location", location],
             capture_output=True, text=True, timeout=30,
         )
         if result.returncode != 0:
@@ -951,14 +993,17 @@ def reserve_slot():
         conn.close()
 
     # Notify photographer via Telegram
-    _notify_admin(f"🆕 New reservation #{booking_id}\n"
-                  f"👤 {client_name or '(no name)'}\n"
-                  f"📅 {event_date} @ {slot_time}\n"
-                  f"🎉 {ev.get('title', '')}\n"
-                  f"📧 {client_email}\n"
-                  f"📸 @{client_ig or 'N/A'}\n"
-                  f"🏷️ {session_type or 'N/A'}\n"
-                  f"⏱️ Expires in {RESERVATION_MINUTES} min")
+    _notify_new_reservation(
+        booking_id=booking_id,
+        client_name=client_name,
+        client_email=client_email,
+        event_date=event_date,
+        slot_time=slot_time,
+        event_title=ev.get("title", ""),
+        session_type=session_type,
+        client_ig=client_ig,
+        client_phone=client_phone,
+    )
 
     return jsonify({
         "success": True,
@@ -1367,7 +1412,8 @@ def admin_confirm():
             event_date=ev["date"],
             slot_time=booking.get("time", ""),
             event_title=ev.get("title", "Mini Session"),
-            booking_id=booking_id
+            booking_id=booking_id,
+            location=ev.get("location")
         )
 
     log.info(f"[admin] Booking #{booking_id} confirmed, paid ${paid_amount}")
@@ -1698,7 +1744,8 @@ def telegram_webhook():
                 event_date=event_date,
                 slot_time=booking.get("time", ""),
                 event_title=event_title,
-                booking_id=booking_id
+                booking_id=booking_id,
+                location=ev.get("location")
             )
 
         log.info(f"[tg-webhook] Booking #{booking_id} confirmed by {from_user}")

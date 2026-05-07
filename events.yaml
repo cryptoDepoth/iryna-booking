@@ -4,12 +4,12 @@ events:
   subtitle: Soft spring moments you'll want to keep forever
   date: '2026-06-07'
   start_time: '10:00'
-  end_time: '13:00'
+  end_time: '19:00'
   session_length: 20
   break_length: 10
   slot_interval: 30
-  deposit: 95
-  full_price: 190
+  deposit: 100.0
+  full_price: 500.0
   location: Calgary — exact spot sent after booking
   session_type: mini
   featured: true
@@ -19,9 +19,8 @@ events:
   - All original photos included
   - Quick turnaround (within 48 hours)
   photos:
-  - /images/lilac_1.jpg
-  - /images/pregnancy_1.jpg
   - /images/lilac-jun7_fc0f222e.jpg
+  - /images/lilac-jun7_ee3244d9.jpeg
   status: active
 - id: blossom-may3
   title: 🪻 Blossom Mini Sessions
@@ -32,8 +31,8 @@ events:
   session_length: 20
   break_length: 10
   slot_interval: 30
-  deposit: 95
-  full_price: 190
+  deposit: 200.0
+  full_price: 400.0
   location: Calgary — exact spot sent after booking
   session_type: mini
   featured: false
@@ -43,9 +42,8 @@ events:
   - All original photos included
   - Quick turnaround (within 48 hours)
   photos:
-  - /images/lilac_1.jpg
-  - /images/pregnancy_1.jpg
-  status: completed
+  - /images/blossom-may3_e3ec0cdd.jpeg
+  status: active
 settings:
   photographer_email: iryna.pashynska@gmail.com
   photographer_name: Iryna
