@@ -34,3 +34,7 @@ primary_region = 'sjc'
 [env]
   DB_PATH = "/data/bookings.db"
   BACKUP_DIR = "/data/backups"
+
+[[mounts]]
+  source = "booking_data"
+  destination = "/data"
