@@ -33,18 +33,56 @@ import time
 import yaml
 
 # ===== LOGGING =====
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(os.path.dirname(__file__), 'booking.log')),
-        logging.StreamHandler()
-    ]
-)
+# Write log to persistent volume when available, else next to app
+_log_dir = os.environ.get("BACKUP_DIR", "").replace("/backups", "") or os.path.dirname(__file__)
+_log_path = os.path.join(_log_dir, 'booking.log')
+try:
+    os.makedirs(_log_dir, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[
+            logging.FileHandler(_log_path),
+            logging.StreamHandler()
+        ]
+    )
+except Exception:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.environ.get("SECRET_KEY") or os.urandom(24).hex()
+
+# ── Stable secret key ──────────────────────────────────────────────────────────
+# Priority: FLASK_SECRET_KEY env var → /data/.flask_secret (auto-generated once)
+# NEVER fall back to os.urandom() here — that would invalidate sessions on every restart.
+_secret_key = os.environ.get("FLASK_SECRET_KEY") or os.environ.get("SECRET_KEY")
+if not _secret_key:
+    _secret_file = os.path.join(
+        os.environ.get("BACKUP_DIR", "").replace("/backups", "") or os.path.dirname(__file__),
+        ".flask_secret"
+    )
+    try:
+        if os.path.exists(_secret_file):
+            with open(_secret_file) as _sf:
+                _secret_key = _sf.read().strip()
+        if not _secret_key:
+            import secrets as _secrets
+            _secret_key = _secrets.token_hex(32)
+            os.makedirs(os.path.dirname(_secret_file), exist_ok=True)
+            with open(_secret_file, "w") as _sf:
+                _sf.write(_secret_key)
+            log.info(f"[secret] Generated new stable secret key → {_secret_file}")
+        else:
+            log.info(f"[secret] Loaded stable secret key from {_secret_file}")
+    except Exception as _e:
+        log.warning(f"[secret] Could not persist secret key: {_e} — using ephemeral key")
+        import secrets as _secrets
+        _secret_key = _secrets.token_hex(32)
+app.secret_key = _secret_key
 
 PYTHON_BIN = os.environ.get("PYTHON_BIN", sys.executable)
 
@@ -850,7 +888,13 @@ def create_calendar_event_for_booking(booking_id):
         return None
 
 # ===== EVENTS CONFIG (YAML) =====
-_EVENTS_PATH = os.path.join(os.path.dirname(__file__), "events.yaml")
+# EVENTS_YAML_PATH env var lets Fly.io (or any deployment) store events on
+# the persistent volume (/data/events.yaml) so they survive restarts/redeploys.
+# start.sh copies the bundled events.yaml to /data on first run.
+_EVENTS_PATH = (
+    os.environ.get("EVENTS_YAML_PATH")
+    or os.path.join(os.path.dirname(__file__), "events.yaml")
+)
 
 def _load_events():
     """Load events from YAML, return list of event dicts."""
@@ -2074,7 +2118,7 @@ def admin_delete():
     return jsonify({"success": True})
 
 
-EVENTS_YAML_PATH = os.path.join(os.path.dirname(__file__), "events.yaml")
+EVENTS_YAML_PATH = _EVENTS_PATH  # same path used for reads
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 def _allowed_file(filename):
