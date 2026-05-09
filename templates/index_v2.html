@@ -188,24 +188,24 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 <!-- ────────── PUBLIC LANDING ────────── -->
 <section id="public">
   <div class="hero">
-    <div class="kicker">Mini Sessions · 2026</div>
-    <h1>Soft, sunlit moments<br>among <em>blooming flowers</em></h1>
-    <p>Pick a session below — booking takes about 2 minutes.</p>
+    <div class="kicker" data-i18n="hero_kicker">Mini Sessions · 2026</div>
+    <h1 data-i18n="hero_title_html">Soft, sunlit moments<br>among <em>blooming flowers</em></h1>
+    <p data-i18n="hero_subtitle">Pick a session below — booking takes about 2 minutes.</p>
   </div>
 
   <div class="proof">
-    <span><strong>★ 4.9</strong> · 80+ reviews</span>
+    <span data-i18n="proof_reviews"><strong>★ 4.9</strong> · 80+ reviews</span>
     <span class="sep">·</span>
-    <span><strong>120+</strong> sessions delivered</span>
+    <span data-i18n="proof_sessions"><strong>120+</strong> sessions delivered</span>
     <span class="sep">·</span>
-    <span><strong>Calgary</strong> local pick 2024 & 2025</span>
+    <span data-i18n="proof_award"><strong>Calgary</strong> local pick 2024 & 2025</span>
   </div>
 
   <!-- HOW IT WORKS -->
   <div class="how">
-    <div class="step"><div class="num">1</div><div><h4>Pick a session</h4><p>Browse upcoming dates and choose what fits — dress code & location come with confirmation.</p></div></div>
-    <div class="step"><div class="num">2</div><div><h4>Reserve in 2 min</h4><p>Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
-    <div class="step"><div class="num">3</div><div><h4>Pay deposit by e-Transfer</h4><p>Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
+    <div class="step"><div class="num">1</div><div><h4 data-i18n="how_step1_title">Pick a session</h4><p data-i18n="how_step1_desc">Browse upcoming dates and choose what fits — dress code & location come with confirmation.</p></div></div>
+    <div class="step"><div class="num">2</div><div><h4 data-i18n="how_step2_title">Reserve in 2 min</h4><p data-i18n="how_step2_desc">Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
+    <div class="step"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
   </div>
 
   <!-- FEATURED BANNER -->
@@ -213,12 +213,12 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
   <!-- FILTERS -->
   <div class="filters" id="filters">
-    <button class="chip on" data-filter="all">All</button>
-    <button class="chip" data-filter="month">This month</button>
-    <button class="chip" data-filter="mini">Mini</button>
-    <button class="chip" data-filter="individual">Individual</button>
-    <button class="chip" data-filter="wedding">Wedding</button>
-    <button class="chip" data-filter="family">Family</button>
+    <button class="chip on" data-filter="all" data-i18n="filter_all">All</button>
+    <button class="chip" data-filter="month" data-i18n="filter_month">This month</button>
+    <button class="chip" data-filter="mini" data-i18n="filter_mini">Mini</button>
+    <button class="chip" data-filter="individual" data-i18n="filter_individual">Individual</button>
+    <button class="chip" data-filter="wedding" data-i18n="filter_wedding">Wedding</button>
+    <button class="chip" data-filter="family" data-i18n="filter_family">Family</button>
     <span class="count" id="count"></span>
   </div>
 
@@ -227,26 +227,26 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
     <div id="gridLoading" style="text-align:center;padding:60px 20px;color:var(--ink-3)">
       <div style="width:40px;height:40px;border:3px solid var(--ink-5);border-top-color:var(--rose);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px"></div>
       <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-      Loading sessions...
+      <span data-i18n="loading_sessions">Loading sessions...</span>
     </div>
     <!-- Events grid -->
     <div class="events" id="grid" style="display:none"></div>
     <!-- Empty state -->
     <div id="gridEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--ink-3)">
       <div style="font-size:3rem;margin-bottom:12px">📸</div>
-      <p style="font-size:1.1rem;font-weight:500;color:var(--ink);margin-bottom:8px">No sessions available right now</p>
-      <p>Check back soon — new dates are added weekly.</p>
+      <p data-i18n="no_sessions_title" style="font-size:1.1rem;font-weight:500;color:var(--ink);margin-bottom:8px">No sessions available right now</p>
+      <p data-i18n="no_sessions_desc">Check back soon — new dates are added weekly.</p>
     </div>
   </div>
 
   <!-- FAQ -->
   <div class="faq">
-    <h2>Quick answers</h2>
-    <details><summary>What should we wear?</summary><div class="a">I send a styling guide after booking — soft tones, layered textures, nothing with big logos.</div></details>
-    <details><summary>What if it rains?</summary><div class="a">We reschedule for free, no questions asked. I check the forecast 24h before and reach out.</div></details>
-    <details><summary>Can I bring our dog?</summary><div class="a">Always yes — just let me know on the form so I plan the spot.</div></details>
-    <details><summary>How does the deposit work?</summary><div class="a">The deposit is non-refundable but transferable to another session if you give 7+ days notice. The remaining balance is due on session day.</div></details>
-    <details><summary>When do I get the photos?</summary><div class="a">Within 48 hours for mini sessions, 2 weeks for full sessions. You get a private gallery with download.</div></details>
+    <h2 data-i18n="faq_title">Quick answers</h2>
+    <details><summary data-i18n="faq_q1">What should we wear?</summary><div class="a" data-i18n="faq_a1">I send a styling guide after booking — soft tones, layered textures, nothing with big logos.</div></details>
+    <details><summary data-i18n="faq_q2">What if it rains?</summary><div class="a" data-i18n="faq_a2">We reschedule for free, no questions asked. I check the forecast 24h before and reach out.</div></details>
+    <details><summary data-i18n="faq_q3">Can I bring our dog?</summary><div class="a" data-i18n="faq_a3">Always yes — just let me know on the form so I plan the spot.</div></details>
+    <details><summary data-i18n="faq_q4">How does the deposit work?</summary><div class="a" data-i18n="faq_a4">The deposit is non-refundable but transferable to another session if you give 7+ days notice. The remaining balance is due on session day.</div></details>
+    <details><summary data-i18n="faq_q5">When do I get the photos?</summary><div class="a" data-i18n="faq_a5">Within 48 hours for mini sessions, 2 weeks for full sessions. You get a private gallery with download.</div></details>
   </div>
 </section>
 
@@ -262,8 +262,8 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 </div>
 
 <footer>
-  <p><strong>Pashynska Photography</strong> · Calgary, AB · <a href="https://instagram.com/pashynska.photo" target="_blank">@pashynska.photo</a></p>
-  <p style="margin-top:6px;color:var(--ink-4)">© 2026 Pashynska Photography — All rights reserved</p>
+  <p><span data-i18n="footer_studio"><strong>Pashynska Photography</strong> · Calgary, AB · </span><a href="https://instagram.com/pashynska.photo" target="_blank">@pashynska.photo</a></p>
+  <p data-i18n="footer_copyright" style="margin-top:6px;color:var(--ink-4)">© 2026 Pashynska Photography — All rights reserved</p>
   <!-- Hidden admin access: tiny dot in footer -->
   <a href="/backstage" class="admin-hint" title="Admin access">·</a>
 </footer>
@@ -317,12 +317,20 @@ const toast = (msg) => {
 };
 
 function fmtDate(iso) {
-  return new Date(iso + "T00:00:00").toLocaleDateString("en-CA", {
+  const loc = (typeof dateLocale === 'function') ? dateLocale() : 'en-CA';
+  return new Date(iso + "T00:00:00").toLocaleDateString(loc, {
     weekday: "short", month: "long", day: "numeric", year: "numeric"
   });
 }
 function daysUntil(iso) {
   return Math.ceil((new Date(iso + "T00:00:00") - new Date()) / 86400000);
+}
+// Countdown text used on cards and featured banner
+function countdownText(iso, short) {
+  const days = daysUntil(iso);
+  if (days <= 0) return T('today');
+  if (days === 1) return T('tomorrow');
+  return T(short ? 'in_days_short' : 'in_days', {n: days});
 }
 
 // ── LOAD EVENTS FROM API ──
@@ -334,7 +342,7 @@ async function loadEvents() {
     renderAll();
   } catch (err) {
     console.error('Failed to load events:', err);
-    toast('Error loading sessions. Please refresh.');
+    toast(T('toast_error_events'));
   }
 }
 
@@ -355,12 +363,12 @@ function applyFilter(list) {
 }
 
 function statusBadge(spots, total, status) {
-  if (status === "completed") return { cls: "sold", txt: "Past session" };
+  if (status === "completed") return { cls: "sold", txt: T('status_past') };
   // Calculate spots from API data
   const available = Number(spots) || 0;
-  if (available === 0) return { cls: "sold", txt: "Sold out" };
-  if (available <= 2) return { cls: "low", txt: `Only ${available} left` };
-  return { cls: "open", txt: `${available} of ${total} open` };
+  if (available === 0) return { cls: "sold", txt: T('status_sold') };
+  if (available <= 2) return { cls: "low", txt: T('status_low', {n: available}) };
+  return { cls: "open", txt: T('status_open', {n: available, total: total}) };
 }
 
 function renderFeatured() {
@@ -368,16 +376,15 @@ function renderFeatured() {
   const featured = visibleEvents().filter(e => e.featured).sort((a, b) => a.date.localeCompare(b.date))[0]
     || visibleEvents().sort((a, b) => a.date.localeCompare(b.date))[0];
   if (!featured) { wrap.innerHTML = ''; return; }
-  const days = daysUntil(featured.date);
-  const cdText = days <= 0 ? "Today" : days === 1 ? "Tomorrow" : `in ${days} days`;
+  const cdText = countdownText(featured.date, false);
   wrap.innerHTML = `
     <div class="featured" style="background-image:url('${featured.photo_url || featured.photo || '/static/images/placeholder.jpg'}')">
-      <div class="featured-tag">★ Featured</div>
+      <div class="featured-tag">${T('featured_tag')}</div>
       <div class="featured-countdown">${cdText}</div>
       <div class="featured-content">
         <h2>${featured.title}</h2>
-        <div class="meta">${fmtDate(featured.date)} · from $${featured.deposit || featured.price || 0} deposit · ${featured.location || 'Calgary'}</div>
-        <button class="cta" onclick="openDrawer('${featured.id}')">View time slots →</button>
+        <div class="meta">${fmtDate(featured.date)} · from $${featured.deposit || featured.price || 0} ${T('pay_row_deposit').toLowerCase()} · ${featured.location || 'Calgary'}</div>
+        <button class="cta" onclick="openDrawer('${featured.id}')">${T('view_slots_btn')}</button>
       </div>
     </div>`;
 }
@@ -390,7 +397,7 @@ function renderGrid() {
   loading.style.display = 'none';
 
   const list = applyFilter(visibleEvents()).sort((a, b) => a.date.localeCompare(b.date));
-  document.getElementById('count').textContent = `${list.length} ${list.length === 1 ? 'session' : 'sessions'}`;
+  document.getElementById('count').textContent = T(list.length === 1 ? 'sessions_count_one' : 'sessions_count_many', {n: list.length});
 
   if (!list.length) {
     grid.style.display = 'none';
@@ -402,16 +409,16 @@ function renderGrid() {
   empty.style.display = 'none';
   grid.innerHTML = list.map(e => {
     const b = statusBadge(e.spots_left, e.total_spots, e.status);
-    const days = daysUntil(e.date);
-    const cd = days <= 0 ? "Today" : days === 1 ? "Tomorrow" : `in ${days}d`;
+    const cd = countdownText(e.date, true);
     const isSold = e.spots_left === 0;
     const photo = e.photo_url || e.photo || '/static/images/placeholder.jpg';
+    const totalPrice = e.full_price || e.price || 0;
     return `
     <article class="event-card ${isSold ? 'sold' : ''}" onclick="openDrawer('${e.id}')">
       <div class="photo" style="background-image:url('${photo}')">
         <div class="status ${b.cls}"><span class="dot"></span>${b.txt}</div>
         <div class="countdown">${cd}</div>
-        ${e.featured ? '<div class="featured-mark">★ Featured</div>' : ''}
+        ${e.featured ? `<div class="featured-mark">${T('featured_tag')}</div>` : ''}
       </div>
       <div class="body">
         <div class="type-tag">${e.session_type || e.type || 'session'}</div>
@@ -422,8 +429,8 @@ function renderGrid() {
           <span>📍 ${(e.location || 'Calgary').split(',')[0]}</span>
         </div>
         <div class="price-bar">
-          <div class="price">$${e.deposit || e.price || 0}<small>deposit · $${e.full_price || e.price || 0} total</small></div>
-          <button class="cta">${isSold ? 'Join waitlist' : 'View dates →'}</button>
+          <div class="price">$${e.deposit || e.price || 0}<small>${T('deposit_caption', {total: totalPrice})}</small></div>
+          <button class="cta">${isSold ? T('join_waitlist_btn') : T('view_dates_btn')}</button>
         </div>
       </div>
     </article>`;
@@ -453,7 +460,7 @@ async function openDrawer(id) {
     }
   }
   if (!e) {
-    toast('Loading session info… please try again in a moment.');
+    toast(T('toast_loading_session'));
     return;
   }
   document.getElementById('dphoto').style.backgroundImage = `linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.4)),url('${e.photo_url || e.photo || '/static/images/placeholder.jpg'}')`;
@@ -466,29 +473,29 @@ async function openDrawer(id) {
     // WAITLIST mode
     dbody.innerHTML = `
       <div style="background:var(--red-bg);color:var(--red);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center">
-        This session is fully booked. Join the waitlist — I'll DM you the moment a spot opens.
+        ${T('waitlist_msg')}
       </div>
       <div class="form">
-        <input class="full" placeholder="Full name" id="wName">
-        <input placeholder="Email" id="wEmail">
-        <input placeholder="@instagram" id="wIg">
+        <input class="full" placeholder="${T('full_name').replace(/ \*$/, '')}" id="wName">
+        <input placeholder="${T('email_ph').replace(/ \*$/, '')}" id="wEmail">
+        <input placeholder="${T('ig_ph')}" id="wIg">
       </div>
-      <button class="btn" onclick="joinWaitlist('${e.id}')">Join waitlist</button>`;
+      <button class="btn" onclick="joinWaitlist('${e.id}')">${T('join_waitlist_btn')}</button>`;
     document.getElementById('drawer').classList.add('open');
     return;
   }
 
   // BOOKING mode — load real slots from API
   try {
-    toast('Loading available slots...');
+    toast(T('toast_loading_slots'));
     const slotsData = await API.slots(e.date);
     const availableSlots = slotsData.slots || [];
     if (availableSlots.length === 0) {
       dbody.innerHTML = `
         <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center">
-          No slots available for this session.
+          ${T('no_slots_msg')}
         </div>
-        <button class="btn" onclick="closeDrawer()">Close</button>`;
+        <button class="btn" onclick="closeDrawer()">${T('close_btn')}</button>`;
       document.getElementById('drawer').classList.add('open');
       return;
     }
@@ -498,31 +505,31 @@ async function openDrawer(id) {
       <div class="price-row">
         <div>
           <span class="p">$${e.deposit || 0}</span>
-          <small>deposit · $${e.full_price || 0} total CAD</small>
+          <small>${T('deposit_total_cad', {total: e.full_price || 0})}</small>
         </div>
         <div style="text-align:right">
           <div style="font-size:.78rem;color:var(--ink-3)">${fmtDate(e.date)}</div>
           <div style="font-size:.78rem;color:var(--ink-3);margin-top:2px">${e.location || 'Calgary'}</div>
         </div>
       </div>
-      <div class="lbl">Available time slots</div>
+      <div class="lbl">${T('available_slots_lbl')}</div>
       <div class="slots" id="slotsBox">
         ${availableSlots.map((s, i) => `
           <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
         `).join('')}
       </div>
       <div class="form">
-        <input data-ph="full_name" placeholder="Full name *" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
-        <input data-ph="phone_ph" placeholder="Phone (e.g. 403-555-1234) *" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
-        <input data-ph="email_ph" placeholder="Email *" id="fEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
-        <input data-ph="ig_ph" placeholder="@instagram (optional)" id="fIg" autocomplete="off" oninput="clearFieldError(this)">
+        <input data-ph="full_name" placeholder="${T('full_name')}" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
+        <input data-ph="phone_ph" placeholder="${T('phone_ph')}" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
+        <input data-ph="email_ph" placeholder="${T('email_ph')}" id="fEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
+        <input data-ph="ig_ph" placeholder="${T('ig_ph')}" id="fIg" autocomplete="off" oninput="clearFieldError(this)">
       </div>
-      <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', '${e.date}')" data-i18n-val="continue_btn">Continue to Payment →</button>
-      <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">Pay deposit via e-Transfer · remaining due on session day</p>`;
+      <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', '${e.date}')">${T('continue_btn')}</button>
+      <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">${T('pay_note')}</p>`;
     document.getElementById('drawer').classList.add('open');
   } catch (err) {
     console.error('Failed to load slots:', err);
-    toast('Error loading slots. Please try again.');
+    toast(T('toast_error_slots'));
   }
 }
 
@@ -562,20 +569,21 @@ function validateBookingForm() {
   let valid = true;
 
   // Name: letters, spaces, hyphens, apostrophes — 2-80 chars
+  // Accept Latin, Cyrillic, Devanagari (Hindi)
   if (name.length < 2) {
-    showFieldError('fName', 'Please enter your full name');
+    showFieldError('fName', T('err_name_required'));
     valid = false;
-  } else if (!/^[A-Za-zÀ-ÖØ-öø-ÿ'\- ]{2,80}$/.test(name)) {
-    showFieldError('fName', 'Name should contain only letters, spaces, or hyphens');
+  } else if (!/^[A-Za-zÀ-ÖØ-öø-ÿА-Яа-яЁёЇїІіЄєҐґऀ-ॿ'\- ]{2,80}$/.test(name)) {
+    showFieldError('fName', T('err_name_format'));
     valid = false;
   }
 
   // Email
   if (!email) {
-    showFieldError('fEmail', 'Email is required');
+    showFieldError('fEmail', T('err_email_required'));
     valid = false;
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-    showFieldError('fEmail', 'Please enter a valid email (e.g. jane@example.com)');
+    showFieldError('fEmail', T('err_email_format'));
     valid = false;
   }
 
@@ -584,7 +592,7 @@ function validateBookingForm() {
     let digits = phone.replace(/\D/g, '');
     if (digits.startsWith('1') && digits.length === 11) digits = digits.slice(1);
     if (digits.length !== 10 || ['0','1'].includes(digits[0]) || ['0','1'].includes(digits[3])) {
-      showFieldError('fPhone', 'Please enter a valid Canadian phone number (e.g. 403-555-1234)');
+      showFieldError('fPhone', T('err_phone'));
       valid = false;
     }
   }
@@ -593,7 +601,7 @@ function validateBookingForm() {
   if (ig) {
     const handle = ig.startsWith('@') ? ig.slice(1) : ig;
     if (!/^[A-Za-z0-9_.]{1,30}$/.test(handle)) {
-      showFieldError('fIg', 'Instagram handle: 1–30 characters, letters, numbers, . or _');
+      showFieldError('fIg', T('err_ig'));
       valid = false;
     }
   }
@@ -604,7 +612,7 @@ function validateBookingForm() {
 // ── RESERVE SLOT ──
 async function reserveSlot(eventId, eventDate) {
   const selBtn = document.querySelector('#slotsBox .slot.sel');
-  if (!selBtn) { toast("Pick a time slot first"); return; }
+  if (!selBtn) { toast(T('pick_slot')); return; }
   const time = selBtn.dataset.time;
   const name  = document.getElementById('fName').value.trim();
   const phone = document.getElementById('fPhone').value.trim();
@@ -637,11 +645,11 @@ async function reserveSlot(eventId, eventDate) {
       };
       goToPayment(eventId, eventDate);
     } else {
-      toast(result.error || 'Slot is no longer available');
+      toast(result.error || T('toast_slot_unavailable'));
     }
   } catch (err) {
     console.error('Reserve failed:', err);
-    toast('Network error. Please try again.');
+    toast(T('toast_network_error'));
   }
 }
 
@@ -656,66 +664,69 @@ function goToPayment(eventId, eventDate) {
   dphoto.style.height = "0";
   dphoto.querySelector('h2').style.display = 'none';
 
-  const bankMsg = `${e.title} — ${e.date} ${time}\nDeposit for ${name}`;
+  const depositForLine = T('pay_deposit_for', {name: name});
+  const bankMsg = `${e.title} — ${e.date} ${time}\n${depositForLine}`;
+  const amt = e.deposit || 0;
+  const sessionMin = e.session_length || 20;
   document.getElementById('dbody').innerHTML = `
     <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
       <button onclick="restoreDrawer('${eventId}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;cursor:pointer;font-size:14px">‹</button>
       <div>
-        <div style="font-weight:600;font-size:.92rem">Complete Your Booking</div>
+        <div style="font-weight:600;font-size:.92rem">${T('pay_complete_title')}</div>
         <div style="font-size:.74rem;color:var(--ink-3)">${fmtDate(e.date)} · ${time}</div>
       </div>
     </div>
 
     <div class="pay-timer" id="payTimerBox">
-      <span class="lbl-t">Slot reserved for</span>
+      <span class="lbl-t">${T('pay_slot_reserved_for')}</span>
       <span class="cnt" id="payCnt">15:00</span>
     </div>
 
     <div class="pay-summary">
-      <div class="row"><span class="key">Session</span><span>${e.title} (${e.session_length || 20} min)</span></div>
-      <div class="row"><span class="key">Date</span><span>${fmtDate(e.date)}</span></div>
-      <div class="row"><span class="key">Time</span><span>${time}</span></div>
-      <div class="row"><span class="key">Balance at session</span><span>$${(e.full_price || 0) - (e.deposit || 0)} + GST</span></div>
-      <div class="row"><span class="key">Deposit due now</span><span class="val-rose">$${e.deposit || 0} CAD</span></div>
+      <div class="row"><span class="key">${T('pay_row_session')}</span><span>${T('pay_session_min', {title: e.title, min: sessionMin})}</span></div>
+      <div class="row"><span class="key">${T('pay_row_date')}</span><span>${fmtDate(e.date)}</span></div>
+      <div class="row"><span class="key">${T('pay_row_time')}</span><span>${time}</span></div>
+      <div class="row"><span class="key">${T('pay_row_balance')}</span><span>$${(e.full_price || 0) - amt} + GST</span></div>
+      <div class="row"><span class="key">${T('pay_row_deposit')}</span><span class="val-rose">$${amt} CAD</span></div>
     </div>
 
     <div class="transfer-box">
-      <div class="eyebrow">Send via Interac e-Transfer</div>
-      <div class="amount">$${e.deposit || 0}</div>
-      <div class="ccy">CAD — Canadian dollars</div>
+      <div class="eyebrow">${T('pay_eyebrow')}</div>
+      <div class="amount">$${amt}</div>
+      <div class="ccy">${T('pay_cad_label')}</div>
       <div class="email-copy" onclick="copyText('${ETRANSFER_EMAIL}','copyPill')">
         <div>
-          <div class="lbl-e">Send to</div>
+          <div class="lbl-e">${T('pay_send_to')}</div>
           <div class="val-e">${ETRANSFER_EMAIL}</div>
         </div>
-        <button class="copy-pill" id="copyPill" onclick="event.stopPropagation();copyText('${ETRANSFER_EMAIL}','copyPill')">Copy</button>
+        <button class="copy-pill" id="copyPill" onclick="event.stopPropagation();copyText('${ETRANSFER_EMAIL}','copyPill')">${T('pay_copy')}</button>
       </div>
-      <div style="font-size:.74rem;color:var(--ink-4);margin-top:8px">Auto-deposit enabled · no password needed</div>
+      <div style="font-size:.74rem;color:var(--ink-4);margin-top:8px">${T('pay_autodeposit')}</div>
     </div>
 
-    <div style="font-size:.8rem;font-weight:600;margin-bottom:4px">Ready-to-use bank message</div>
-    <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:8px">Paste this in the "Message" field when sending</div>
+    <div style="font-size:.8rem;font-weight:600;margin-bottom:4px">${T('pay_ready_msg_title')}</div>
+    <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:8px">${T('pay_ready_msg_desc')}</div>
     <div class="bank-msg" onclick="copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">
-      <button class="copy-pill" id="bankPill" onclick="event.stopPropagation();copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">Copy</button>
-      ${e.title} — ${e.date} ${time}<br>Deposit for ${name}
+      <button class="copy-pill" id="bankPill" onclick="event.stopPropagation();copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">${T('pay_copy')}</button>
+      ${e.title} — ${e.date} ${time}<br>${depositForLine}
     </div>
 
     <div class="how-to">
-      <div class="t">How to send Interac e-Transfer</div>
+      <div class="t">${T('pay_howto_title')}</div>
       <ol>
-        <li>Open your banking app (RBC, TD, Scotiabank, etc.)</li>
-        <li>Choose "Send Interac e-Transfer"</li>
-        <li>Tap the email above to copy, paste as recipient</li>
-        <li>Enter amount: <strong>$${e.deposit || 0}.00</strong></li>
-        <li>Add message: "${e.title} — ${e.date} ${time}"</li>
-        <li>Send the transfer</li>
+        <li>${T('pay_howto_step1')}</li>
+        <li>${T('pay_howto_step2')}</li>
+        <li>${T('pay_howto_step3')}</li>
+        <li>${T('pay_howto_step4', {amt: amt})}</li>
+        <li>${T('pay_howto_step5', {title: e.title, date: e.date, time: time})}</li>
+        <li>${T('pay_howto_step6')}</li>
       </ol>
     </div>
 
-    <div class="info-note">💡 <strong>No password needed!</strong> This is auto-deposit. Money arrives instantly. I'll see it within minutes (Gmail-bot + Telegram alert) and confirm your booking.</div>
+    <div class="info-note">${T('pay_info_note')}</div>
 
-    <button class="btn" onclick="confirmClientPayment('${e.id}')"> ✓ Yes, I've Sent $${e.deposit || 0} — Confirm Booking</button>
-    <button class="btn-ghost" onclick="restoreDrawer('${e.id}')">← Back to change time</button>
+    <button class="btn" onclick="confirmClientPayment('${e.id}')">${T('pay_confirm_btn', {amt: amt})}</button>
+    <button class="btn-ghost" onclick="restoreDrawer('${e.id}')">${T('pay_back_btn')}</button>
   `;
   startPayTimer();
 }
@@ -736,7 +747,7 @@ function startPayTimer() {
     if (total <= 0) {
       clearInterval(payTimer);
       cnt.textContent = "0:00";
-      toast("Reservation expired. Please select a new slot.");
+      toast(T('toast_reservation_expired'));
       return;
     }
     const m = Math.floor(total / 60), s = total % 60;
@@ -755,13 +766,13 @@ function copyText(txt, pillId) {
   const p = document.getElementById(pillId);
   if (!p) return;
   const orig = p.textContent;
-  p.textContent = "✓ Copied"; p.classList.add('copied');
+  p.textContent = T('pay_copied'); p.classList.add('copied');
   setTimeout(() => { p.textContent = orig; p.classList.remove('copied') }, 2200);
 }
 
 // ── CONFIRM PAYMENT (CLIENT SIDE) ──
 async function confirmClientPayment(eventId) {
-  if (!currentBooking) { toast("No active reservation"); return; }
+  if (!currentBooking) { toast(T('toast_no_reservation')); return; }
   if (payTimer) clearInterval(payTimer);
 
   try {
@@ -779,7 +790,7 @@ async function confirmClientPayment(eventId) {
     if (result.success) {
       showSuccess(currentBooking.name);
     } else {
-      toast(result.error || 'Confirmation failed');
+      toast(result.error || T('toast_network_error'));
     }
   } catch (err) {
     console.error('Confirm failed:', err);
@@ -790,18 +801,19 @@ async function confirmClientPayment(eventId) {
 
 function showSuccess(name) {
   const e = eventsData.find(x => x.id === currentBooking?.event_id);
+  const firstName = name ? name.split(' ')[0] : '';
+  const namePart = firstName ? ', ' + firstName : '';
   document.getElementById('dbody').innerHTML = `
     <div class="success-state">
       <div style="font-size:40px;margin-bottom:8px">⏳</div>
-      <h3>Payment Pending</h3>
-      <p>Thanks${name ? ', ' + name.split(' ')[0] : ''}! <strong>Your payment is being reviewed.</strong></p>
-      <p>You'll get an email + Instagram DM the moment it's confirmed (usually within 5 minutes).</p>
+      <h3>${T('succ_pending_title')}</h3>
+      <p>${T('succ_pending_desc', {name: namePart})}</p>
       <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;margin:14px 0;font-size:.85rem">
-        <strong>Status:</strong> Pending ⏳<br>
-        <strong>Booking ID:</strong> #${currentBooking?.booking_id || ''}
+        <strong>${T('succ_status_lbl')}:</strong> ${T('succ_status_pending')}<br>
+        <strong>${T('succ_booking_id_lbl')}:</strong> #${currentBooking?.booking_id || ''}
       </div>
-      <p style="margin-top:18px;font-size:.85rem">${e?.title || 'Session'}<br><strong>${fmtDate(e?.date || '')} · ${currentBooking?.time || ''}</strong></p>
-      <button class="btn" style="margin-top:24px" onclick="closeDrawer(); currentBooking=null;">Done</button>
+      <p style="margin-top:18px;font-size:.85rem">${e?.title || ''}<br><strong>${fmtDate(e?.date || '')} · ${currentBooking?.time || ''}</strong></p>
+      <button class="btn" style="margin-top:24px" onclick="closeDrawer(); currentBooking=null;">${T('succ_done_btn')}</button>
     </div>`;
 }
 
@@ -809,8 +821,8 @@ function joinWaitlist(eventId) {
   const name = document.getElementById('wName')?.value?.trim();
   const email = document.getElementById('wEmail')?.value?.trim();
   const ig = document.getElementById('wIg')?.value?.trim();
-  if (!name || !email) { toast("Please fill in name and email"); return; }
-  toast("Waitlist joined! I'll DM you when a spot opens.");
+  if (!name || !email) { toast(T('fill_name_email')); return; }
+  toast(T('waitlist_join_msg'));
   closeDrawer();
 }
 
@@ -851,83 +863,531 @@ loadEvents().then(() => {
 <script>
 const SITE_I18N = {
   en: {
+    /* hero */
+    hero_kicker: 'Mini Sessions · 2026',
+    hero_title_html: 'Soft, sunlit moments<br>among <em>blooming flowers</em>',
+    hero_subtitle: 'Pick a session below — booking takes about 2 minutes.',
+    /* social proof */
+    proof_reviews: '<strong>★ 4.9</strong> · 80+ reviews',
+    proof_sessions: '<strong>120+</strong> sessions delivered',
+    proof_award: '<strong>Calgary</strong> local pick 2024 & 2025',
+    /* how it works */
+    how_step1_title: 'Pick a session',
+    how_step1_desc:  'Browse upcoming dates and choose what fits — dress code & location come with confirmation.',
+    how_step2_title: 'Reserve in 2 min',
+    how_step2_desc:  'Pick a time slot, fill in your details. Slot is held for you for 15 minutes.',
+    how_step3_title: 'Pay deposit by e-Transfer',
+    how_step3_desc:  'Send the deposit — auto-confirmed. Final balance only on session day.',
+    /* filters */
+    filter_all: 'All',
+    filter_month: 'This month',
+    filter_mini: 'Mini',
+    filter_individual: 'Individual',
+    filter_wedding: 'Wedding',
+    filter_family: 'Family',
+    sessions_count_one: '{n} session',
+    sessions_count_many: '{n} sessions',
+    /* loading & empty */
+    loading_sessions: 'Loading sessions…',
+    no_sessions_title: 'No sessions available right now',
+    no_sessions_desc: 'Check back soon — new dates are added weekly.',
+    /* faq */
+    faq_title: 'Quick answers',
+    faq_q1: 'What should we wear?',
+    faq_a1: 'I send a styling guide after booking — soft tones, layered textures, nothing with big logos.',
+    faq_q2: 'What if it rains?',
+    faq_a2: 'We reschedule for free, no questions asked. I check the forecast 24h before and reach out.',
+    faq_q3: 'Can I bring our dog?',
+    faq_a3: 'Always yes — just let me know on the form so I plan the spot.',
+    faq_q4: 'How does the deposit work?',
+    faq_a4: 'The deposit is non-refundable but transferable to another session if you give 7+ days notice. The remaining balance is due on session day.',
+    faq_q5: 'When do I get the photos?',
+    faq_a5: 'Within 48 hours for mini sessions, 2 weeks for full sessions. You get a private gallery with download.',
+    /* footer */
+    footer_studio: '<strong>Pashynska Photography</strong> · Calgary, AB · ',
+    footer_copyright: '© 2026 Pashynska Photography — All rights reserved',
+    /* card / featured */
+    featured_tag: '★ Featured',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    in_days: 'in {n} days',
+    in_days_short: 'in {n}d',
+    status_sold: 'Sold out',
+    status_low: 'Only {n} left',
+    status_open: '{n} of {total} open',
+    status_past: 'Past session',
+    deposit_caption: 'deposit · ${total} total',
+    deposit_total_cad: 'deposit · ${total} total CAD',
+    view_dates_btn: 'View dates →',
+    join_waitlist_btn: 'Join waitlist',
+    view_slots_btn: 'View time slots →',
+    /* drawer / booking form */
     full_name:    'Full name *',
     phone_ph:     'Phone (e.g. 403-555-1234) *',
     email_ph:     'Email *',
     ig_ph:        '@instagram (optional)',
     continue_btn: 'Continue to Payment →',
     pick_slot:    'Pick a time slot first',
-    book_cta:     'Book →',
-    sold_out:     'Sold Out',
-    spots_left:   'spots left',
-    loading:      'Loading slots…',
+    pay_note: 'Pay deposit via e-Transfer · remaining due on session day',
+    available_slots_lbl: 'Available time slots',
+    waitlist_msg: 'This session is fully booked. Join the waitlist — I\'ll DM you the moment a spot opens.',
+    no_slots_msg: 'No slots available for this session.',
+    close_btn: 'Close',
+    waitlist_join_msg: 'Waitlist joined! I\'ll DM you when a spot opens.',
+    fill_name_email: 'Please fill in name and email',
+    /* toasts */
+    toast_loading_slots: 'Loading available slots…',
+    toast_error_events: 'Error loading sessions. Please refresh.',
+    toast_error_slots: 'Error loading slots. Please try again.',
+    toast_loading_session: 'Loading session info… please try again in a moment.',
+    toast_no_reservation: 'No active reservation',
+    toast_network_error: 'Network error. Please try again.',
+    toast_slot_unavailable: 'Slot is no longer available',
+    toast_reservation_expired: 'Reservation expired. Please select a new slot.',
+    /* validation errors */
+    err_name_required: 'Please enter your full name',
+    err_name_format: 'Name should contain only letters, spaces, or hyphens',
+    err_email_required: 'Email is required',
+    err_email_format: 'Please enter a valid email (e.g. jane@example.com)',
+    err_phone: 'Please enter a valid Canadian phone number (e.g. 403-555-1234)',
+    err_ig: 'Instagram handle: 1–30 characters, letters, numbers, . or _',
+    /* payment view */
+    pay_complete_title: 'Complete Your Booking',
+    pay_slot_reserved_for: 'Slot reserved for',
+    pay_row_session: 'Session',
+    pay_row_date: 'Date',
+    pay_row_time: 'Time',
+    pay_row_balance: 'Balance at session',
+    pay_row_deposit: 'Deposit due now',
+    pay_session_min: '{title} ({min} min)',
+    pay_eyebrow: 'Send via Interac e-Transfer',
+    pay_cad_label: 'CAD — Canadian dollars',
+    pay_send_to: 'Send to',
+    pay_copy: 'Copy',
+    pay_copied: '✓ Copied',
+    pay_autodeposit: 'Auto-deposit enabled · no password needed',
+    pay_ready_msg_title: 'Ready-to-use bank message',
+    pay_ready_msg_desc: 'Paste this in the "Message" field when sending',
+    pay_howto_title: 'How to send Interac e-Transfer',
+    pay_howto_step1: 'Open your banking app (RBC, TD, Scotiabank, etc.)',
+    pay_howto_step2: 'Choose "Send Interac e-Transfer"',
+    pay_howto_step3: 'Tap the email above to copy, paste as recipient',
+    pay_howto_step4: 'Enter amount: <strong>${amt}.00</strong>',
+    pay_howto_step5: 'Add message: "{title} — {date} {time}"',
+    pay_howto_step6: 'Send the transfer',
+    pay_info_note: '💡 <strong>No password needed!</strong> This is auto-deposit. Money arrives instantly. I\'ll see it within minutes (Gmail-bot + Telegram alert) and confirm your booking.',
+    pay_confirm_btn: ' ✓ Yes, I\'ve Sent ${amt} — Confirm Booking',
+    pay_back_btn: '← Back to change time',
+    pay_deposit_for: 'Deposit for {name}',
+    /* success */
+    succ_pending_title: 'Payment Pending',
+    succ_pending_desc: 'Thanks{name}! <strong>Your payment is being reviewed.</strong>',
+    succ_status_pending: 'Pending ⏳',
+    succ_booking_id_lbl: 'Booking ID',
+    succ_status_lbl: 'Status',
+    succ_done_btn: 'Done',
   },
   ru: {
+    hero_kicker: 'Мини-сессии · 2026',
+    hero_title_html: 'Мягкий свет<br>среди <em>цветущих полей</em>',
+    hero_subtitle: 'Выберите сессию ниже — бронирование занимает около 2 минут.',
+    proof_reviews: '<strong>★ 4.9</strong> · 80+ отзывов',
+    proof_sessions: '<strong>120+</strong> съёмок проведено',
+    proof_award: '<strong>Калгари</strong> · локальный выбор 2024 и 2025',
+    how_step1_title: 'Выберите сессию',
+    how_step1_desc:  'Просмотрите даты и выберите подходящую — рекомендации по одежде и локация придут с подтверждением.',
+    how_step2_title: 'Забронируйте за 2 минуты',
+    how_step2_desc:  'Выберите время и заполните данные. Слот удерживается за вами 15 минут.',
+    how_step3_title: 'Оплатите депозит через e-Transfer',
+    how_step3_desc:  'Отправьте депозит — подтверждение автоматическое. Остаток оплачивается в день съёмки.',
+    filter_all: 'Все',
+    filter_month: 'В этом месяце',
+    filter_mini: 'Мини',
+    filter_individual: 'Индивидуальная',
+    filter_wedding: 'Свадьба',
+    filter_family: 'Семья',
+    sessions_count_one: '{n} сессия',
+    sessions_count_many: '{n} сессий',
+    loading_sessions: 'Загружаем сессии…',
+    no_sessions_title: 'Сейчас нет доступных сессий',
+    no_sessions_desc: 'Загляните позже — новые даты добавляются каждую неделю.',
+    faq_title: 'Часто задаваемые вопросы',
+    faq_q1: 'Что нам надеть?',
+    faq_a1: 'После бронирования я отправлю гид по стилю — мягкие тона, слоистые текстуры, без больших логотипов.',
+    faq_q2: 'А если будет дождь?',
+    faq_a2: 'Перенесём бесплатно, без лишних вопросов. Я смотрю прогноз за 24 часа и сама свяжусь с вами.',
+    faq_q3: 'Можно прийти с собакой?',
+    faq_a3: 'Конечно — просто отметьте это в форме, чтобы я подобрала локацию.',
+    faq_q4: 'Как работает депозит?',
+    faq_a4: 'Депозит не возвращается, но его можно перенести на другую сессию, если предупредить за 7 дней. Остаток оплачивается в день съёмки.',
+    faq_q5: 'Когда я получу фотографии?',
+    faq_a5: 'В течение 48 часов для мини-сессий, 2 недель для полных сессий. Вы получаете личную галерею с возможностью скачать снимки.',
+    footer_studio: '<strong>Pashynska Photography</strong> · Калгари, AB · ',
+    footer_copyright: '© 2026 Pashynska Photography — Все права защищены',
+    featured_tag: '★ Избранное',
+    today: 'Сегодня',
+    tomorrow: 'Завтра',
+    in_days: 'через {n} дн.',
+    in_days_short: 'через {n}д',
+    status_sold: 'Мест нет',
+    status_low: 'Осталось всего {n}',
+    status_open: '{n} из {total} свободны',
+    status_past: 'Прошедшая сессия',
+    deposit_caption: 'депозит · ${total} всего',
+    deposit_total_cad: 'депозит · ${total} всего CAD',
+    view_dates_btn: 'Смотреть даты →',
+    join_waitlist_btn: 'В лист ожидания',
+    view_slots_btn: 'Смотреть время →',
     full_name:    'Полное имя *',
     phone_ph:     'Телефон (напр. 403-555-1234) *',
     email_ph:     'Эл. почта *',
     ig_ph:        '@instagram (необязательно)',
     continue_btn: 'Перейти к оплате →',
     pick_slot:    'Сначала выберите время',
-    book_cta:     'Забронировать →',
-    sold_out:     'Мест нет',
-    spots_left:   'мест осталось',
-    loading:      'Загружаем слоты…',
+    pay_note: 'Депозит через e-Transfer · остаток в день съёмки',
+    available_slots_lbl: 'Доступное время',
+    waitlist_msg: 'Эта сессия полностью забронирована. Запишитесь в лист ожидания — я напишу вам в Direct, как только освободится место.',
+    no_slots_msg: 'Нет доступных слотов для этой сессии.',
+    close_btn: 'Закрыть',
+    waitlist_join_msg: 'Вы в листе ожидания! Я напишу в Direct, когда освободится место.',
+    fill_name_email: 'Заполните имя и email',
+    toast_loading_slots: 'Загружаем доступное время…',
+    toast_error_events: 'Ошибка загрузки сессий. Обновите страницу.',
+    toast_error_slots: 'Ошибка загрузки времени. Попробуйте ещё раз.',
+    toast_loading_session: 'Загружаем информацию о сессии… попробуйте через секунду.',
+    toast_no_reservation: 'Нет активной брони',
+    toast_network_error: 'Ошибка сети. Попробуйте ещё раз.',
+    toast_slot_unavailable: 'Слот больше недоступен',
+    toast_reservation_expired: 'Бронь истекла. Выберите новое время.',
+    err_name_required: 'Пожалуйста, введите своё полное имя',
+    err_name_format: 'Имя должно содержать только буквы, пробелы и дефисы',
+    err_email_required: 'Email обязателен',
+    err_email_format: 'Введите корректный email (например, jane@example.com)',
+    err_phone: 'Введите корректный канадский номер (напр. 403-555-1234)',
+    err_ig: 'Instagram: 1–30 символов, буквы, цифры, . или _',
+    pay_complete_title: 'Завершите бронирование',
+    pay_slot_reserved_for: 'Слот удерживается',
+    pay_row_session: 'Сессия',
+    pay_row_date: 'Дата',
+    pay_row_time: 'Время',
+    pay_row_balance: 'Остаток в день съёмки',
+    pay_row_deposit: 'Депозит сейчас',
+    pay_session_min: '{title} ({min} мин)',
+    pay_eyebrow: 'Отправьте через Interac e-Transfer',
+    pay_cad_label: 'CAD — канадские доллары',
+    pay_send_to: 'Получатель',
+    pay_copy: 'Копировать',
+    pay_copied: '✓ Скопировано',
+    pay_autodeposit: 'Автозачисление активно · пароль не нужен',
+    pay_ready_msg_title: 'Готовое сообщение для банка',
+    pay_ready_msg_desc: 'Вставьте это в поле "Сообщение" при отправке',
+    pay_howto_title: 'Как отправить Interac e-Transfer',
+    pay_howto_step1: 'Откройте приложение банка (RBC, TD, Scotiabank и т.д.)',
+    pay_howto_step2: 'Выберите "Send Interac e-Transfer"',
+    pay_howto_step3: 'Нажмите на email выше, чтобы скопировать — вставьте как получателя',
+    pay_howto_step4: 'Введите сумму: <strong>${amt}.00</strong>',
+    pay_howto_step5: 'Добавьте сообщение: "{title} — {date} {time}"',
+    pay_howto_step6: 'Отправьте перевод',
+    pay_info_note: '💡 <strong>Пароль не нужен!</strong> Это автозачисление. Деньги приходят мгновенно. Я увижу перевод в течение пары минут (Gmail-бот + Telegram) и подтвержу бронь.',
+    pay_confirm_btn: ' ✓ Да, я отправил(а) ${amt} — Подтвердить бронь',
+    pay_back_btn: '← Назад изменить время',
+    pay_deposit_for: 'Депозит за {name}',
+    succ_pending_title: 'Платёж в обработке',
+    succ_pending_desc: 'Спасибо{name}! <strong>Ваш платёж проверяется.</strong>',
+    succ_status_pending: 'В обработке ⏳',
+    succ_booking_id_lbl: 'Номер брони',
+    succ_status_lbl: 'Статус',
+    succ_done_btn: 'Готово',
   },
   hi: {
+    hero_kicker: 'मिनी सेशन · 2026',
+    hero_title_html: 'धूप में नर्म पल<br><em>खिले फूलों</em> के बीच',
+    hero_subtitle: 'नीचे एक सेशन चुनें — बुकिंग में लगभग 2 मिनट लगते हैं।',
+    proof_reviews: '<strong>★ 4.9</strong> · 80+ समीक्षाएँ',
+    proof_sessions: '<strong>120+</strong> सेशन पूरे',
+    proof_award: '<strong>कैलगरी</strong> · लोकल चॉइस 2024 और 2025',
+    how_step1_title: 'सेशन चुनें',
+    how_step1_desc:  'आगामी तारीखें देखें और जो उपयुक्त हो वो चुनें — ड्रेस कोड और लोकेशन पुष्टि के साथ आते हैं।',
+    how_step2_title: '2 मिनट में बुक करें',
+    how_step2_desc:  'समय चुनें और अपनी जानकारी भरें। स्लॉट आपके लिए 15 मिनट तक रखा जाता है।',
+    how_step3_title: 'e-Transfer से डिपॉज़िट भेजें',
+    how_step3_desc:  'डिपॉज़िट भेजें — स्वतः पुष्टि। बाकी राशि सेशन के दिन।',
+    filter_all: 'सभी',
+    filter_month: 'इस महीने',
+    filter_mini: 'मिनी',
+    filter_individual: 'व्यक्तिगत',
+    filter_wedding: 'शादी',
+    filter_family: 'परिवार',
+    sessions_count_one: '{n} सेशन',
+    sessions_count_many: '{n} सेशन',
+    loading_sessions: 'सेशन लोड हो रहे हैं…',
+    no_sessions_title: 'अभी कोई सेशन उपलब्ध नहीं',
+    no_sessions_desc: 'जल्द ही देखें — नई तारीखें हर हफ़्ते जोड़ी जाती हैं।',
+    faq_title: 'अक्सर पूछे जाने वाले सवाल',
+    faq_q1: 'हमें क्या पहनना चाहिए?',
+    faq_a1: 'बुकिंग के बाद मैं स्टाइलिंग गाइड भेजूँगी — हल्के रंग, परतदार बनावट, बड़े लोगो वाले नहीं।',
+    faq_q2: 'अगर बारिश हो जाए?',
+    faq_a2: 'हम मुफ़्त में पुनर्निर्धारित करेंगे, कोई सवाल नहीं। मैं 24 घंटे पहले मौसम जाँचती हूँ और संपर्क करती हूँ।',
+    faq_q3: 'क्या मैं अपने कुत्ते को ला सकता/सकती हूँ?',
+    faq_a3: 'हमेशा हाँ — बस फ़ॉर्म में बता दें ताकि मैं जगह की योजना बना सकूँ।',
+    faq_q4: 'डिपॉज़िट कैसे काम करता है?',
+    faq_a4: 'डिपॉज़िट वापसी योग्य नहीं है, लेकिन 7+ दिनों की सूचना देने पर दूसरे सेशन में स्थानांतरित किया जा सकता है। बाकी राशि सेशन के दिन देय है।',
+    faq_q5: 'मुझे फ़ोटो कब मिलेंगी?',
+    faq_a5: 'मिनी सेशन के लिए 48 घंटे में, फ़ुल सेशन के लिए 2 हफ़्ते में। आपको डाउनलोड के साथ निजी गैलरी मिलती है।',
+    footer_studio: '<strong>Pashynska Photography</strong> · कैलगरी, AB · ',
+    footer_copyright: '© 2026 Pashynska Photography — सर्वाधिकार सुरक्षित',
+    featured_tag: '★ विशेष',
+    today: 'आज',
+    tomorrow: 'कल',
+    in_days: '{n} दिन में',
+    in_days_short: '{n}दि में',
+    status_sold: 'सब भर गया',
+    status_low: 'सिर्फ़ {n} बचे',
+    status_open: '{n}/{total} उपलब्ध',
+    status_past: 'पिछला सेशन',
+    deposit_caption: 'डिपॉज़िट · कुल ${total}',
+    deposit_total_cad: 'डिपॉज़िट · कुल ${total} CAD',
+    view_dates_btn: 'तारीखें देखें →',
+    join_waitlist_btn: 'वेटलिस्ट में जुड़ें',
+    view_slots_btn: 'समय देखें →',
     full_name:    'पूरा नाम *',
     phone_ph:     'फ़ोन (जैसे 403-555-1234) *',
     email_ph:     'ईमेल *',
     ig_ph:        '@इंस्टाग्राम (वैकल्पिक)',
     continue_btn: 'भुगतान की ओर जारी रखें →',
     pick_slot:    'पहले समय चुनें',
-    book_cta:     'बुक करें →',
-    sold_out:     'सब भरे हैं',
-    spots_left:   'जगहें बाकी',
-    loading:      'लोड हो रहा है…',
+    pay_note: 'e-Transfer से डिपॉज़िट · बाकी सेशन के दिन',
+    available_slots_lbl: 'उपलब्ध समय',
+    waitlist_msg: 'यह सेशन पूरी तरह बुक है। वेटलिस्ट में शामिल हों — जगह खुलते ही मैं DM करूँगी।',
+    no_slots_msg: 'इस सेशन के लिए कोई स्लॉट उपलब्ध नहीं।',
+    close_btn: 'बंद करें',
+    waitlist_join_msg: 'आप वेटलिस्ट में हैं! जगह खुलते ही DM करूँगी।',
+    fill_name_email: 'कृपया नाम और ईमेल भरें',
+    toast_loading_slots: 'उपलब्ध समय लोड हो रहा है…',
+    toast_error_events: 'सेशन लोड नहीं हुए। पेज ताज़ा करें।',
+    toast_error_slots: 'समय लोड नहीं हुआ। फिर कोशिश करें।',
+    toast_loading_session: 'सेशन की जानकारी लोड हो रही है… एक पल में फिर कोशिश करें।',
+    toast_no_reservation: 'कोई सक्रिय बुकिंग नहीं',
+    toast_network_error: 'नेटवर्क त्रुटि। फिर कोशिश करें।',
+    toast_slot_unavailable: 'यह स्लॉट अब उपलब्ध नहीं है',
+    toast_reservation_expired: 'बुकिंग समाप्त हो गई। नया समय चुनें।',
+    err_name_required: 'कृपया अपना पूरा नाम दर्ज करें',
+    err_name_format: 'नाम में केवल अक्षर, खाली जगह या हाइफ़न होना चाहिए',
+    err_email_required: 'ईमेल आवश्यक है',
+    err_email_format: 'सही ईमेल दर्ज करें (जैसे jane@example.com)',
+    err_phone: 'सही कैनेडियन फ़ोन नंबर दर्ज करें (जैसे 403-555-1234)',
+    err_ig: 'Instagram: 1–30 अक्षर, संख्या, . या _',
+    pay_complete_title: 'अपनी बुकिंग पूरी करें',
+    pay_slot_reserved_for: 'स्लॉट आरक्षित',
+    pay_row_session: 'सेशन',
+    pay_row_date: 'तारीख',
+    pay_row_time: 'समय',
+    pay_row_balance: 'सेशन पर बाकी',
+    pay_row_deposit: 'अभी देय डिपॉज़िट',
+    pay_session_min: '{title} ({min} मिन)',
+    pay_eyebrow: 'Interac e-Transfer से भेजें',
+    pay_cad_label: 'CAD — कैनेडियन डॉलर',
+    pay_send_to: 'प्राप्तकर्ता',
+    pay_copy: 'कॉपी',
+    pay_copied: '✓ कॉपी हुआ',
+    pay_autodeposit: 'ऑटो-डिपॉज़िट चालू · पासवर्ड की ज़रूरत नहीं',
+    pay_ready_msg_title: 'बैंक के लिए तैयार संदेश',
+    pay_ready_msg_desc: 'भेजते समय "Message" फ़ील्ड में यह पेस्ट करें',
+    pay_howto_title: 'Interac e-Transfer कैसे भेजें',
+    pay_howto_step1: 'अपना बैंकिंग ऐप खोलें (RBC, TD, Scotiabank, आदि)',
+    pay_howto_step2: '"Send Interac e-Transfer" चुनें',
+    pay_howto_step3: 'ऊपर ईमेल पर टैप करके कॉपी करें, प्राप्तकर्ता के रूप में पेस्ट करें',
+    pay_howto_step4: 'राशि दर्ज करें: <strong>${amt}.00</strong>',
+    pay_howto_step5: 'संदेश जोड़ें: "{title} — {date} {time}"',
+    pay_howto_step6: 'ट्रांसफ़र भेजें',
+    pay_info_note: '💡 <strong>पासवर्ड नहीं चाहिए!</strong> यह ऑटो-डिपॉज़िट है। पैसे तुरंत आते हैं। मैं कुछ मिनटों में देख लूँगी (Gmail-बॉट + Telegram अलर्ट) और बुकिंग की पुष्टि करूँगी।',
+    pay_confirm_btn: ' ✓ हाँ, मैंने ${amt} भेज दिए — बुकिंग की पुष्टि करें',
+    pay_back_btn: '← समय बदलने के लिए वापस',
+    pay_deposit_for: '{name} के लिए डिपॉज़िट',
+    succ_pending_title: 'भुगतान विचाराधीन',
+    succ_pending_desc: 'धन्यवाद{name}! <strong>आपके भुगतान की समीक्षा हो रही है।</strong>',
+    succ_status_pending: 'विचाराधीन ⏳',
+    succ_booking_id_lbl: 'बुकिंग ID',
+    succ_status_lbl: 'स्थिति',
+    succ_done_btn: 'पूर्ण',
   },
   uk: {
+    hero_kicker: 'Міні-сесії · 2026',
+    hero_title_html: 'М\'які сонячні моменти<br>серед <em>квітучих полів</em>',
+    hero_subtitle: 'Оберіть сесію нижче — бронювання займає близько 2 хвилин.',
+    proof_reviews: '<strong>★ 4.9</strong> · 80+ відгуків',
+    proof_sessions: '<strong>120+</strong> сесій проведено',
+    proof_award: '<strong>Калгарі</strong> · локальний вибір 2024 і 2025',
+    how_step1_title: 'Оберіть сесію',
+    how_step1_desc:  'Перегляньте дати й оберіть, що підходить — рекомендації з одягу та локація приходять із підтвердженням.',
+    how_step2_title: 'Забронюйте за 2 хвилини',
+    how_step2_desc:  'Оберіть час і заповніть свої дані. Слот тримається за вами 15 хвилин.',
+    how_step3_title: 'Сплатіть депозит через e-Transfer',
+    how_step3_desc:  'Надішліть депозит — підтвердження автоматичне. Залишок у день зйомки.',
+    filter_all: 'Усі',
+    filter_month: 'Цього місяця',
+    filter_mini: 'Міні',
+    filter_individual: 'Індивідуальна',
+    filter_wedding: 'Весілля',
+    filter_family: 'Сім\'я',
+    sessions_count_one: '{n} сесія',
+    sessions_count_many: '{n} сесій',
+    loading_sessions: 'Завантажуємо сесії…',
+    no_sessions_title: 'Зараз немає доступних сесій',
+    no_sessions_desc: 'Загляньте пізніше — нові дати додаються щотижня.',
+    faq_title: 'Поширені питання',
+    faq_q1: 'Що нам одягнути?',
+    faq_a1: 'Після бронювання я надішлю стайл-гайд — м\'які тони, шарувата текстура, без великих логотипів.',
+    faq_q2: 'А якщо буде дощ?',
+    faq_a2: 'Перенесемо безкоштовно, без зайвих питань. Я перевіряю прогноз за 24 години і сама зв\'яжусь.',
+    faq_q3: 'Чи можна привести собаку?',
+    faq_a3: 'Завжди так — лише позначте у формі, щоб я підібрала локацію.',
+    faq_q4: 'Як працює депозит?',
+    faq_a4: 'Депозит не повертається, але можна перенести на іншу сесію, якщо повідомити за 7+ днів. Залишок у день зйомки.',
+    faq_q5: 'Коли я отримаю фотографії?',
+    faq_a5: 'Протягом 48 годин для міні-сесій, 2 тижнів для повних сесій. Отримуєте приватну галерею з можливістю завантажити.',
+    footer_studio: '<strong>Pashynska Photography</strong> · Калгарі, AB · ',
+    footer_copyright: '© 2026 Pashynska Photography — Усі права захищені',
+    featured_tag: '★ Обране',
+    today: 'Сьогодні',
+    tomorrow: 'Завтра',
+    in_days: 'через {n} дн.',
+    in_days_short: 'через {n}д',
+    status_sold: 'Місць немає',
+    status_low: 'Залишилось {n}',
+    status_open: '{n} з {total} вільні',
+    status_past: 'Минула сесія',
+    deposit_caption: 'депозит · ${total} всього',
+    deposit_total_cad: 'депозит · ${total} всього CAD',
+    view_dates_btn: 'Дивитися дати →',
+    join_waitlist_btn: 'У лист очікування',
+    view_slots_btn: 'Дивитися час →',
     full_name:    'Повне ім\'я *',
     phone_ph:     'Телефон (напр. 403-555-1234) *',
     email_ph:     'Електронна пошта *',
     ig_ph:        '@instagram (необов\'язково)',
     continue_btn: 'Перейти до оплати →',
     pick_slot:    'Спочатку оберіть час',
-    book_cta:     'Забронювати →',
-    sold_out:     'Немає місць',
-    spots_left:   'місць залишилось',
-    loading:      'Завантаження…',
+    pay_note: 'Депозит через e-Transfer · залишок у день зйомки',
+    available_slots_lbl: 'Доступний час',
+    waitlist_msg: 'Ця сесія повністю заброньована. Запишіться у лист очікування — напишу в Direct, як з\'явиться місце.',
+    no_slots_msg: 'Немає доступних слотів для цієї сесії.',
+    close_btn: 'Закрити',
+    waitlist_join_msg: 'Ви у листі очікування! Напишу в Direct, як звільниться місце.',
+    fill_name_email: 'Заповніть ім\'я та email',
+    toast_loading_slots: 'Завантажуємо доступний час…',
+    toast_error_events: 'Помилка завантаження сесій. Оновіть сторінку.',
+    toast_error_slots: 'Помилка завантаження часу. Спробуйте ще раз.',
+    toast_loading_session: 'Завантажуємо інформацію про сесію… спробуйте через секунду.',
+    toast_no_reservation: 'Немає активної броні',
+    toast_network_error: 'Помилка мережі. Спробуйте ще раз.',
+    toast_slot_unavailable: 'Слот більше недоступний',
+    toast_reservation_expired: 'Бронь закінчилась. Оберіть новий час.',
+    err_name_required: 'Введіть своє повне ім\'я',
+    err_name_format: 'Ім\'я має містити лише літери, пробіли та дефіси',
+    err_email_required: 'Email обов\'язковий',
+    err_email_format: 'Введіть коректний email (напр. jane@example.com)',
+    err_phone: 'Введіть коректний канадський номер (напр. 403-555-1234)',
+    err_ig: 'Instagram: 1–30 символів, літери, цифри, . або _',
+    pay_complete_title: 'Завершіть бронювання',
+    pay_slot_reserved_for: 'Слот тримається',
+    pay_row_session: 'Сесія',
+    pay_row_date: 'Дата',
+    pay_row_time: 'Час',
+    pay_row_balance: 'Залишок у день зйомки',
+    pay_row_deposit: 'Депозит зараз',
+    pay_session_min: '{title} ({min} хв)',
+    pay_eyebrow: 'Надішліть через Interac e-Transfer',
+    pay_cad_label: 'CAD — канадські долари',
+    pay_send_to: 'Отримувач',
+    pay_copy: 'Копіювати',
+    pay_copied: '✓ Скопійовано',
+    pay_autodeposit: 'Автозарахування активне · пароль не потрібен',
+    pay_ready_msg_title: 'Готове повідомлення для банку',
+    pay_ready_msg_desc: 'Вставте це у поле "Message" при відправці',
+    pay_howto_title: 'Як надіслати Interac e-Transfer',
+    pay_howto_step1: 'Відкрийте додаток банку (RBC, TD, Scotiabank тощо)',
+    pay_howto_step2: 'Оберіть "Send Interac e-Transfer"',
+    pay_howto_step3: 'Натисніть на email вище, щоб скопіювати — вставте як отримувача',
+    pay_howto_step4: 'Введіть суму: <strong>${amt}.00</strong>',
+    pay_howto_step5: 'Додайте повідомлення: "{title} — {date} {time}"',
+    pay_howto_step6: 'Надішліть переказ',
+    pay_info_note: '💡 <strong>Пароль не потрібен!</strong> Це автозарахування. Гроші приходять миттєво. Я побачу переказ за хвилини (Gmail-бот + Telegram) і підтверджу бронь.',
+    pay_confirm_btn: ' ✓ Так, я надіслав(ла) ${amt} — Підтвердити бронь',
+    pay_back_btn: '← Назад змінити час',
+    pay_deposit_for: 'Депозит за {name}',
+    succ_pending_title: 'Платіж в обробці',
+    succ_pending_desc: 'Дякую{name}! <strong>Ваш платіж перевіряється.</strong>',
+    succ_status_pending: 'В обробці ⏳',
+    succ_booking_id_lbl: 'Номер броні',
+    succ_status_lbl: 'Статус',
+    succ_done_btn: 'Готово',
   }
 };
 
-function setLang(lang) {
-  if (!SITE_I18N[lang]) return;
-  localStorage.setItem('lang', lang);
-  const T = SITE_I18N[lang];
+let CURRENT_LANG = (localStorage.getItem('lang') || 'en');
+if (!SITE_I18N[CURRENT_LANG]) CURRENT_LANG = 'en';
 
-  // Update input placeholders
+// Translation helper. Supports {placeholder} interpolation.
+function T(key, vars) {
+  const dict = SITE_I18N[CURRENT_LANG] || SITE_I18N.en;
+  let s = (dict[key] !== undefined ? dict[key] : (SITE_I18N.en[key] || ''));
+  if (vars) {
+    for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+  }
+  return s;
+}
+
+// Locale code for Date.toLocaleDateString
+function dateLocale(){
+  return {en:'en-CA', ru:'ru-RU', hi:'hi-IN', uk:'uk-UA'}[CURRENT_LANG] || 'en-CA';
+}
+
+function applyStaticI18n(){
+  const dict = SITE_I18N[CURRENT_LANG] || SITE_I18N.en;
+  // Elements with data-i18n -> set innerHTML (translations may include <strong>, <em>, <br>)
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.dataset.i18n;
+    if (dict[k] !== undefined) el.innerHTML = dict[k];
+  });
+  // Placeholders
   document.querySelectorAll('[data-ph]').forEach(el => {
     const k = el.dataset.ph;
-    if (T[k]) el.placeholder = T[k];
+    if (dict[k] !== undefined) el.placeholder = dict[k];
   });
+  // <html lang>
+  document.documentElement.setAttribute('lang', CURRENT_LANG);
+}
 
-  // Update button text where applicable
-  const rb = document.getElementById('reserve-btn');
-  if (rb) rb.textContent = T.continue_btn;
+function setLang(lang) {
+  if (!SITE_I18N[lang]) return;
+  CURRENT_LANG = lang;
+  localStorage.setItem('lang', lang);
 
-  // Update lang switcher active state
+  applyStaticI18n();
+
+  // Lang switcher active state
   document.querySelectorAll('.lbtn').forEach(b => {
     const isActive = b.dataset.lang === lang;
     b.style.background  = isActive ? 'white' : 'transparent';
     b.style.color       = isActive ? 'var(--rose)' : '#a8a29e';
     b.style.boxShadow   = isActive ? '0 1px 4px rgba(0,0,0,0.1)' : 'none';
   });
+
+  // Re-render dynamic content (event grid, featured banner) in the new language
+  if (typeof renderAll === 'function' && Array.isArray(eventsData) && eventsData.length) {
+    renderAll();
+  }
+  // Update reserve button if drawer is open
+  const rb = document.getElementById('reserve-btn');
+  if (rb) rb.textContent = T('continue_btn');
 }
 
 // Init from stored preference
 document.addEventListener('DOMContentLoaded', () => {
-  const stored = localStorage.getItem('lang') || 'en';
-  setLang(stored);
+  applyStaticI18n();
+  // Active button highlight
+  setLang(CURRENT_LANG);
 });
 </script>
 </body>

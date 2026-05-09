@@ -136,7 +136,11 @@ def record_request(ip):
 # ===== ADMIN AUTH =====
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+# Fall back to ADMIN_KEY for browser login if ADMIN_PASSWORD is unset, so a
+# single secret is enough to operate both the form-login and the X-Admin-Key
+# API access. Operators can still set ADMIN_PASSWORD separately if they want
+# different values.
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "") or ADMIN_KEY
 
 def _admin_key_from_request():
     return (
