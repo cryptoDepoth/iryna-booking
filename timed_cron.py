@@ -340,14 +340,53 @@ def sync_to_notion(booking_id):
         print(f"   ⚠️ Notion sync failed: {e}")
 
 
-def expected_deposit_amount():
+def get_expected_amount_for_booking(booking_id):
+    """Get expected deposit amount for a specific booking from events.yaml"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT event_id FROM bookings WHERE id=?", (booking_id,))
+    row = c.fetchone()
+    conn.close()
+
+    event_id = row["event_id"] if row else None
+
+    # Try events.yaml first
+    try:
+        import yaml
+        events_yaml_path = os.environ.get("EVENTS_YAML_PATH",
+            os.path.join(os.path.dirname(__file__), "events.yaml"))
+        if os.path.exists(events_yaml_path):
+            with open(events_yaml_path) as f:
+                data = yaml.safe_load(f)
+            events = data.get("events", [])
+            for ev in events:
+                if ev.get("id") == event_id or (not event_id and ev.get("active", False)):
+                    deposit = ev.get("deposit") or ev.get("deposit_due") or ev.get("price")
+                    if deposit:
+                        return float(deposit)
+    except Exception:
+        pass
+
+    # Fallback to event.json (legacy single-event file)
     try:
         event_path = os.path.join(os.path.dirname(__file__), "event.json")
-        with open(event_path) as f:
-            cfg = json.load(f)
-        return float(cfg.get("deposit") or 95.0)
+        if os.path.exists(event_path):
+            with open(event_path) as f:
+                cfg = json.load(f)
+            deposit = cfg.get("deposit") or cfg.get("deposit_due") or cfg.get("price")
+            if deposit:
+                return float(deposit)
     except Exception:
-        return 95.0
+        pass
+
+    # Ultimate fallback
+    return 95.0
+
+
+# Deprecated: kept for compatibility but should not be used
+def expected_deposit_amount():
+    return 95.0
 
 
 def main(max_minutes=20, interval_seconds=60, booking_id=None):
@@ -377,7 +416,7 @@ def main(max_minutes=20, interval_seconds=60, booking_id=None):
         "booking_id": booking_id
     })
     
-    expected_amount = expected_deposit_amount()
+    # Old: expected_amount = expected_deposit_amount()  # REMOVED — now per-booking
     
     checked_count = 0
     payments_confirmed = 0
@@ -460,7 +499,9 @@ def main(max_minutes=20, interval_seconds=60, booking_id=None):
                 continue
             
             # Check amount with ±$3 tolerance
-            expected = expected_amount
+            # Check amount against per-booking expected deposit (±$3 tolerance)
+            expected = get_expected_amount_for_booking(booking["id"])
+            print(f"      Expected: ${expected:.2f} (from event/photoshoot)")
             tolerance = 3.0
             if amount < expected - tolerance:
                 diff = expected - amount

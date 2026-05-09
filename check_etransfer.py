@@ -162,6 +162,51 @@ def extract_payment_info(body_text):
         "sender_email": sender_email
     }
 
+def get_expected_amount_for_booking(booking_id):
+    """Get expected deposit amount for a specific booking from events.yaml"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT event_id FROM bookings WHERE id=?", (booking_id,))
+    row = c.fetchone()
+    conn.close()
+
+    event_id = row["event_id"] if row else None
+
+    # Try events.yaml first
+    try:
+        import yaml
+        events_yaml_path = os.environ.get("EVENTS_YAML_PATH",
+            os.path.join(os.path.dirname(__file__), "events.yaml"))
+        if os.path.exists(events_yaml_path):
+            with open(events_yaml_path) as f:
+                data = yaml.safe_load(f)
+            events = data.get("events", [])
+            for ev in events:
+                if ev.get("id") == event_id or (not event_id and ev.get("active", False)):
+                    deposit = ev.get("deposit") or ev.get("deposit_due") or ev.get("price")
+                    if deposit:
+                        return float(deposit)
+    except Exception:
+        pass
+
+    # Fallback to event.json (legacy single-event file)
+    try:
+        event_path = os.path.join(os.path.dirname(__file__), "event.json")
+        if os.path.exists(event_path):
+            with open(event_path) as f:
+                cfg = json.load(f)
+            deposit = cfg.get("deposit") or cfg.get("deposit_due") or cfg.get("price")
+            if deposit:
+                return float(deposit)
+    except Exception:
+        pass
+
+    # Ultimate fallback
+    return 95.0
+
+
+# DEPRECATED: global constant — use get_expected_amount_for_booking(booking_id) instead
 EXPECTED_AMOUNT = 95.0  # CAD deposit amount
 PAYMENT_WINDOW_MINUTES = 15  # Time to pay before slot is released
 
@@ -354,7 +399,7 @@ def main():
             continue
         
         # Check for underpayment
-        expected = EXPECTED_AMOUNT
+        expected = get_expected_amount_for_booking(booking["id"])
         paid = payment_info["amount"]
         if paid < expected:
             diff = expected - paid
