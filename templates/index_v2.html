@@ -328,7 +328,7 @@ const API = {
     return r.json();
   },
   slots: async (eventId) => {
-    const r = await fetch(`/slots/${eventId}`);
+    const r = await fetch(`/slots/${eventId}?event_id=${eventId}`);
     if (!r.ok) throw new Error('Failed to load slots');
     return r.json();
   },
