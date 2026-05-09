@@ -763,6 +763,8 @@
     const bookingId = '{{ booking.id if booking else "" }}';
     if (!bookingId) return;
 
+    const confirmationToken = '{{ confirmation_token }}';
+
     let isConfirmed = false;
     let pollTimer;
 
@@ -847,7 +849,7 @@
     }
 
     function poll() {
-      fetch('/booking-status?booking_id=' + bookingId)
+      fetch('/booking-status?booking_id=' + bookingId + '&token=' + confirmationToken)
         .then(r => r.json())
         .then(data => {
           if (data.confirmed || data.status === 'confirmed' || data.status === 'cancelled') {

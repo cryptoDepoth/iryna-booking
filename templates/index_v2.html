@@ -684,6 +684,7 @@ async function reserveSlot(eventId, eventDate) {
         event_id: eventId,
         time: time,
         booking_id: result.booking_id,
+        confirmation_token: result.confirmation_token,  // identity-safe API token
         expires_at: result.expires_at,
         name: name,
         email: email,
@@ -825,13 +826,6 @@ async function confirmClientPayment(eventId) {
 
   try {
     const result = await API.confirm({
-      event_id: currentBooking.event_id,
-      time: currentBooking.time,
-      name: currentBooking.name,
-      email: currentBooking.email,
-      phone: currentBooking.phone,
-      instagram: currentBooking.instagram,
-      session_type: eventsData.find(e => e.id === eventId)?.session_type || 'mini',
       booking_id: currentBooking.booking_id
     });
 
@@ -880,11 +874,12 @@ function startStatusPolling(bookingId) {
   let attempts = 0;
   const tick = async () => {
     attempts++;
+    const token = currentBooking?.confirmation_token || '';
     // Stop after 30 minutes (450 attempts at 4s) — page may stay open in
     // a tab that the client forgot about. Email always lands eventually.
     if (attempts > 450) { stopStatusPolling(); return; }
     try {
-      const r = await fetch('/booking-status?booking_id=' + encodeURIComponent(bookingId));
+      const r = await fetch('/booking-status?booking_id=' + encodeURIComponent(bookingId) + '&token=' + encodeURIComponent(token));
       if (!r.ok) return;
       const data = await r.json();
       if (data.confirmed) {

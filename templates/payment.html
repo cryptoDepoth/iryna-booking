@@ -286,7 +286,7 @@
     <a class="back-btn" href="/">‹</a>
     <div class="top-bar-info">
       <div class="top-bar-title" data-i18n="complete_booking">Complete Your Booking</div>
-      <div class="top-bar-sub">{{ date }} · {{ time }}</div>
+      <div class="top-bar-sub">{{ date }} · {{ booking.time }}</div>
     </div>
     <div class="lang-switcher" role="group" aria-label="Language">
       <button class="lang-btn active" onclick="setLang('en')" data-lang="en">EN</button>
@@ -323,7 +323,7 @@
         </div>
         <div class="summary-row">
           <span class="key">Time</span>
-          <span>{{ time }}</span>
+          <span>{{ booking.time }}</span>
         </div>
         <div class="summary-row">
           <span class="key">Includes</span>
@@ -348,7 +348,7 @@
         <span style="font-size:0.78rem;color:var(--ink-3);white-space:nowrap;">Choose how to pay</span>
         <div style="flex:1;height:1px;background:var(--stroke)"></div>
       </div>
-      <a href="{{ stripe_payment_link }}?prefilled_email={{ client_email }}" target="_blank"
+      <a href="{{ stripe_payment_link }}?prefilled_email={{ booking.email }}" target="_blank"
          style="display:flex;align-items:center;justify-content:center;gap:12px;
                 background:#635bff;color:#fff;border-radius:14px;padding:16px 20px;
                 font-size:0.95rem;font-weight:600;text-decoration:none;letter-spacing:.02em;
@@ -390,8 +390,8 @@
       <div style="font-size:0.78rem;color:var(--ink-3);margin-bottom:10px">Paste this in the "Message" field when sending</div>
       <div class="bank-msg-wrap" id="bank-msg" onclick="copyBankMsg()">
         <button class="bank-copy-btn" onclick="copyBankMsg(event)" id="bank-copy-btn">Copy</button>
-        Blossom Mini Session — {{ date }} {{ time }}<br>
-        Deposit for {{ name }}
+        Blossom Mini Session — {{ date }} {{ booking.time }}<br>
+        Deposit for {{ booking.name }}
       </div>
     </div>
 
@@ -403,7 +403,7 @@
         <li>Choose "Send Interac e-Transfer"</li>
         <li>Tap the email above to copy, paste as recipient</li>
         <li>Enter amount: <strong>${{ price }}.00</strong></li>
-        <li>Add message: "Blossom Mini Session — {{ date }} {{ time }}"</li>
+        <li>Add message: "Blossom Mini Session — {{ date }} {{ booking.time }}"</li>
         <li>Send the transfer</li>
       </ol>
     </div>
@@ -418,13 +418,13 @@
       <p style="font-size:0.875rem;color:var(--ink-3);margin-bottom:20px" data-i18n="ive_sent_sub">Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.</p>
 
       <form id="confirm-form">
-        <input type="hidden" id="time"         value="{{ time }}">
-        <input type="hidden" id="name"         value="{{ name }}">
-        <input type="hidden" id="email"        value="{{ client_email }}">
-        <input type="hidden" id="phone"        value="{{ phone }}">
-        <input type="hidden" id="instagram"    value="{{ instagram }}">
-        <input type="hidden" id="session_type" value="{{ session_type }}">
-        <input type="hidden" id="event_id"     value="{{ event_id }}">
+        <input type="hidden" id="time"         value="{{ booking.time }}">
+        <input type="hidden" id="name"         value="{{ booking.name }}">
+        <input type="hidden" id="email"        value="{{ booking.email }}">
+        <input type="hidden" id="phone"        value="{{ booking.phone }}">
+        <input type="hidden" id="instagram"    value="{{ booking.instagram }}">
+        <input type="hidden" id="session_type" value="{{ booking.session_type }}">
+        <input type="hidden" id="event_id"     value="{{ booking.event_id }}">
 
         <button type="submit" class="btn-primary" id="confirm-btn">
           ✓ Yes, I've Sent ${{ price }} — Confirm Booking
@@ -446,10 +446,9 @@
   <script>
     // ── Populate hidden fields from URL params (fallback) ──
     const urlParams = new URLSearchParams(window.location.search);
-    ['time','name','email','phone','instagram','session_type','event_id'].forEach(k => {
-      const v = urlParams.get(k);
-      if (v && document.getElementById(k)) document.getElementById(k).value = v;
-    });
+    // Identity-safe: booking data comes from server, not URL params
+    const urlBookingId = urlParams.get('booking_id');
+    const urlToken     = urlParams.get('token');
 
     // ── Timer ──
     let timerInterval = null;
@@ -494,7 +493,7 @@
     // ── Copy bank message ──
     function copyBankMsg(e) {
       if (e) e.stopPropagation();
-      const msg = `Blossom Mini Session — {{ date }} {{ time }}\nDeposit for {{ name }}`;
+      const msg = `Blossom Mini Session — {{ date }} {{ booking.time }}\nDeposit for {{ booking.name }}`;
       navigator.clipboard.writeText(msg).catch(() => {});
       const btn = document.getElementById('bank-copy-btn');
       btn.textContent = '✓ Copied';
@@ -509,13 +508,7 @@
       btn.textContent = 'Processing…';
 
       const data = {
-        time:         document.getElementById('time').value,
-        event_id:     document.getElementById('event_id').value,
-        name:         document.getElementById('name').value,
-        email:        document.getElementById('email').value,
-        phone:        document.getElementById('phone').value,
-        instagram:    document.getElementById('instagram').value,
-        session_type: document.getElementById('session_type').value
+        booking_id: '{{ booking.id }}'
       };
 
       try {
@@ -527,7 +520,7 @@
         const result = await res.json();
         if (result.success) {
           sessionStorage.removeItem('reservationExpiry');
-          window.location.href = '/success?booking_id=' + result.booking_id;
+          window.location.href = '/success?booking_id=' + result.booking_id + '&token={{ booking.confirmation_token }}';
         } else {
           alert(result.error || 'Something went wrong. Please try again.');
           btn.disabled = false;

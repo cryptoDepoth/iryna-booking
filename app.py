@@ -1695,24 +1695,37 @@ def reserve_slot():
 
 @app.route("/payment")
 def payment():
-    time = request.args.get("time")
-    event_id = request.args.get("event_id")
-    if not time:
+    """Standalone payment page — identity-safe via booking_id+token."""
+    booking_id = request.args.get("booking_id")
+    token      = request.args.get("token")
+    if not booking_id or not token:
         return redirect(url_for("index"))
-    ev = get_event_by_id(event_id) if event_id else get_active_event()
+
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    c  = conn.cursor()
+    c.execute("SELECT * FROM bookings WHERE id=? AND confirmation_token=?",
+              (booking_id, token))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        return redirect(url_for("index"))
+
+    booking = dict(row)
+    ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
+    if not ev:
+        ev = {}
+
     return render_template("payment.html",
-        time=time,
-        name=request.args.get("name", ""),
-        client_email=request.args.get("email", ""),
-        phone=request.args.get("phone", ""),
-        instagram=request.args.get("instagram", ""),
-        session_type=request.args.get("session_type", ""),
-        date=ev["date"] if ev else DATE,
-        price=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
+        booking=booking,
+        date=ev.get("date", DATE),
+        time=booking.get("time", ""),
+        name=booking.get("name", ""),
+        price=ev.get("deposit", SESSION_PRICE) if ev.get("deposit") is not None else SESSION_PRICE,
+        session_length=ev.get("session_length", SESSION_LENGTH),
         email=EMAIL,
-        session_length=ev.get("session_length", SESSION_LENGTH) if ev else SESSION_LENGTH,
-        event_id=ev["id"] if ev else "",
-        stripe_payment_link=ev.get("stripe_payment_link", "") if ev else ""
+        stripe_payment_link=ev.get("stripe_payment_link", "")
     )
 
 
@@ -1814,7 +1827,8 @@ def success():
         email=EMAIL,
         date=ev["date"] if ev else DATE,
         price=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
-        booking=booking
+        booking=booking,
+        confirmation_token=booking.get("confirmation_token") if booking else ""
     )
 
 @app.route("/backstage")
