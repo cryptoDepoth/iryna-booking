@@ -1,6 +1,6 @@
-"""Booking flow regression tests — v1.1 (auto e-Transfer checker).
+"""Booking flow regression tests — current v2 drawer flow.
 
-Tests the full client flow: reserve → confirm → booking-status polling.
+Tests the client flow: reserve → confirm payment submitted → status polling → admin confirm.
 Uses a temp SQLite database and mocks external services.
 """
 import os
@@ -16,12 +16,17 @@ def client(monkeypatch):
     os.close(fd)
     os.unlink(db_path)
 
-    old_db = booking_app.DB_PATH
     monkeypatch.setattr(booking_app, "DB_PATH", db_path)
     monkeypatch.setattr(booking_app, "NOTION_API_KEY", "")
-    monkeypatch.setattr(booking_app, "ADMIN_KEY", "")
-    monkeypatch.setattr(booking_app, "ADMIN_PASSWORD", "")
+    monkeypatch.setattr(booking_app, "ADMIN_KEY", "test-admin-key")
+    monkeypatch.setattr(booking_app, "ADMIN_PASSWORD", "test-admin-key")
     monkeypatch.setattr(booking_app, "_start_etransfer_checker", lambda booking_id: None, raising=False)
+    monkeypatch.setattr(booking_app, "sync_to_notion", lambda booking_id: None, raising=False)
+    monkeypatch.setattr(booking_app, "_notify_new_reservation", lambda **kwargs: None, raising=False)
+    monkeypatch.setattr(booking_app, "_notify_payment_pending", lambda **kwargs: None, raising=False)
+    monkeypatch.setattr(booking_app, "send_confirmation_email", lambda booking_id: True, raising=False)
+    booking_app._rate_limits.clear()
+    booking_app._login_attempts.clear()
     booking_app.init_db()
 
     with booking_app.app.test_client() as c:
@@ -33,59 +38,72 @@ def client(monkeypatch):
         pass
 
 
+def _first_event():
+    active_events = [e for e in booking_app.EVENTS if e.get("status") in ("active", "upcoming") and not e.get("hidden")]
+    assert active_events, "No active events configured"
+    return active_events[0]
+
+
 def _first_slot(client_tuple):
-    """Get the first available slot time from /slots/<date>."""
+    """Get the first available slot time from /slots/<date>?event_id=<id>."""
     c, _ = client_tuple
-    # Get date from the first active event
-    active_events = [e for e in booking_app.EVENTS if e.get("status") in ("active", "upcoming")]
-    if active_events:
-        date = active_events[0]["date"]
-    else:
-        date = "2026-05-03"
-    resp = c.get(f"/slots/{date}").get_json()
-    # Available slots are in "slots" list (booked ones are excluded)
-    slots = resp.get("slots", [])
-    return slots[0]["time"] if slots else "10:00", date
+    ev = _first_event()
+    resp = c.get(f"/slots/{ev['date']}?event_id={ev['id']}")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    slots = data.get("slots", [])
+    assert slots, f"No slots returned for event {ev['id']}"
+    return slots[0]["time"], ev["date"], ev["id"]
+
+
+def _reserve(c, slot_time, event_id, *, name="Test Client", email="test@example.com"):
+    return c.post("/reserve", json={
+        "event_id": event_id,
+        "time": slot_time,
+        "name": name,
+        "email": email,
+        "phone": "4035550000",
+        "instagram": "@test",
+    })
 
 
 def test_reserve_and_confirm_flow(client):
     c, db_path = client_tuple = client
-    slot_time, date = _first_slot(client_tuple)
+    slot_time, date, event_id = _first_slot(client_tuple)
 
-    # Step 1: Reserve slot
-    reserve = c.post("/reserve", json={"time": slot_time})
+    # Step 1: Reserve slot with the current drawer API contract
+    reserve = _reserve(c, slot_time, event_id)
     assert reserve.status_code == 200
     data = reserve.get_json()
     assert data["success"] is True
     booking_id = data["booking_id"]
+    token = data["confirmation_token"]
     assert booking_id is not None
+    assert token
 
-    # Step 2: Confirm with client details (like "I've Sent Payment")
+    # Step 2: Client clicks "I've Sent Payment"
     confirm = c.post("/confirm", json={
-        "time": slot_time,
-        "name": "Test Client",
-        "email": "test@example.com",
-        "phone": "4035550000",
-        "instagram": "@test",
+        "booking_id": booking_id,
+        "confirmation_token": token,
     })
     assert confirm.status_code == 200
     confirm_data = confirm.get_json()
     assert confirm_data["success"] is True
 
-    # Step 3: Check booking-status API
-    status = c.get(f"/booking-status?booking_id={booking_id}").get_json()
+    # Step 3: Check identity-safe booking-status API
+    status = c.get(f"/booking-status?booking_id={booking_id}&token={token}").get_json()
     assert status["status"] == "pending_payment"
     assert status["confirmed"] is False
 
     # Step 4: Admin confirms
-    admin = c.post("/admin/confirm", json={
+    admin = c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"}, json={
         "booking_id": booking_id,
         "paid_amount": 95.00,
     })
     assert admin.status_code == 200
 
     # Step 5: Booking should now be confirmed
-    status2 = c.get(f"/booking-status?booking_id={booking_id}").get_json()
+    status2 = c.get(f"/booking-status?booking_id={booking_id}&token={token}").get_json()
     assert status2["status"] == "confirmed"
     assert status2["confirmed"] is True
     assert status2["paid"] is True
@@ -94,36 +112,38 @@ def test_reserve_and_confirm_flow(client):
 
 def test_reserve_hides_slot(client):
     c, db_path = client_tuple = client
-    slot_time, date = _first_slot(client_tuple)
+    slot_time, date, event_id = _first_slot(client_tuple)
 
     # Reserve
-    c.post("/reserve", json={"time": slot_time})
+    resp = _reserve(c, slot_time, event_id, email="hide@test.com")
+    assert resp.status_code == 200
 
-    # Slot should not be available
-    slots = c.get(f"/slots/{date}").get_json()
+    # Slot should not be available for the same event
+    slots = c.get(f"/slots/{date}?event_id={event_id}").get_json()
     slot_times = [s["time"] for s in slots.get("slots", [])]
     assert slot_time not in slot_times
 
 
 def test_cancel_frees_slot(client):
     c, db_path = client_tuple = client
-    slot_time, date = _first_slot(client_tuple)
+    slot_time, date, event_id = _first_slot(client_tuple)
 
     # Reserve
-    resp = c.post("/reserve", json={"time": slot_time})
+    resp = _reserve(c, slot_time, event_id, email="cancel@test.com")
+    assert resp.status_code == 200
     booking_id = resp.get_json()["booking_id"]
 
     # Cancel
-    cancel = c.post("/admin/cancel", json={"booking_id": booking_id})
+    cancel = c.post("/admin/cancel", headers={"X-Admin-Key": "test-admin-key"}, json={"booking_id": booking_id})
     assert cancel.status_code == 200
 
     # Slot should be available again
-    slots = c.get(f"/slots/{date}").get_json()
+    slots = c.get(f"/slots/{date}?event_id={event_id}").get_json()
     slot_times = [s["time"] for s in slots.get("slots", [])]
     assert slot_time in slot_times
 
     # Can reserve again — gets a new booking ID
-    resp2 = c.post("/reserve", json={"time": slot_time})
+    resp2 = _reserve(c, slot_time, event_id, email="cancel2@test.com")
     assert resp2.status_code == 200
     new_data = resp2.get_json()
     assert new_data["success"] is True
@@ -132,30 +152,40 @@ def test_cancel_frees_slot(client):
 
 def test_booking_status_not_found(client):
     c, _ = client
-    resp = c.get("/booking-status?booking_id=99999")
+    resp = c.get("/booking-status?booking_id=99999&token=missing")
     assert resp.status_code == 404
+
+
+def test_booking_status_rejects_missing_or_wrong_token(client):
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+    resp = _reserve(c, slot_time, event_id, email="secure@test.com")
+    booking_id = resp.get_json()["booking_id"]
+
+    assert c.get(f"/booking-status?booking_id={booking_id}").status_code == 403
+    assert c.get(f"/booking-status?booking_id={booking_id}&token=wrong").status_code == 403
 
 
 def test_booking_status_shows_paid_amount(client):
     c, db_path = client_tuple = client
-    slot_time, date = _first_slot(client_tuple)
+    slot_time, date, event_id = _first_slot(client_tuple)
 
     # Full flow
-    resp = c.post("/reserve", json={"time": slot_time})
+    resp = _reserve(c, slot_time, event_id, email="amount@test.com")
     booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
 
     c.post("/confirm", json={
-        "time": slot_time,
-        "name": "Amount Test",
-        "email": "amount@test.com",
+        "booking_id": booking_id,
+        "confirmation_token": token,
     })
 
     # Auto-confirm with specific amount (simulating e-Transfer)
-    c.post("/admin/confirm", json={
+    c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"}, json={
         "booking_id": booking_id,
         "paid_amount": 97.50,
     })
 
-    status = c.get(f"/booking-status?booking_id={booking_id}").get_json()
+    status = c.get(f"/booking-status?booking_id={booking_id}&token={token}").get_json()
     assert status["paid_amount"] == 97.50
     assert status["status"] == "confirmed"

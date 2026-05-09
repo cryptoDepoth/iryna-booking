@@ -327,8 +327,9 @@ const API = {
     if (!r.ok) throw new Error('Failed to load events');
     return r.json();
   },
-  slots: async (eventId) => {
-    const r = await fetch(`/slots/${eventId}?event_id=${eventId}`);
+  slots: async (date, eventId) => {
+    const qs = eventId ? `?event_id=${encodeURIComponent(eventId)}` : '';
+    const r = await fetch(`/slots/${encodeURIComponent(date)}${qs}`);
     if (!r.ok) throw new Error('Failed to load slots');
     return r.json();
   },
@@ -535,7 +536,7 @@ async function openDrawer(id) {
   // BOOKING mode — load real slots from API
   try {
     toast(T('toast_loading_slots'));
-    const slotsData = await API.slots(e.date);
+    const slotsData = await API.slots(e.date, e.id);
     const availableSlots = slotsData.slots || [];
     if (availableSlots.length === 0) {
       dbody.innerHTML = `
