@@ -145,10 +145,57 @@ body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-h
 .info-note{background:#eef4fb;border-left:3px solid #5b9bd5;border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:14px;font-size:.85rem;color:#1e3a5f}
 .btn-ghost{display:block;width:100%;padding:13px;background:transparent;color:var(--ink-3);border:1.5px solid var(--ink-5);border-radius:12px;font:.88rem var(--font-b);cursor:pointer;margin-top:8px}
 .btn-ghost:hover{border-color:var(--ink-3);color:var(--ink)}
-.success-state{text-align:center;padding:30px 20px}
+.success-state{text-align:center;padding:30px 20px;position:relative;overflow:hidden}
 .success-state .check{width:64px;height:64px;border-radius:50%;background:var(--green-bg);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px}
 .success-state h3{font-family:var(--font-d);font-size:1.6rem;font-weight:500;margin-bottom:8px}
 .success-state p{font-size:.9rem;color:var(--ink-3);margin-bottom:6px}
+
+/* ── Pending hourglass spin ── */
+.pending-icon{font-size:44px;display:inline-block;animation:hourglass-spin 2.4s ease-in-out infinite;margin-bottom:8px}
+@keyframes hourglass-spin{
+  0%,40%{transform:rotate(0deg)}
+  50%,90%{transform:rotate(180deg)}
+  100%{transform:rotate(360deg)}
+}
+/* Pulsing pending dot */
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-right:6px;animation:pulse-amber 1.4s infinite ease-in-out;vertical-align:middle}
+@keyframes pulse-amber{0%,100%{opacity:.4;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+
+/* ── Confirmed — animated checkmark in big ring ── */
+.confirm-ring{width:96px;height:96px;border-radius:50%;background:var(--green-bg);margin:0 auto 18px;display:flex;align-items:center;justify-content:center;position:relative;animation:ring-pop .7s cubic-bezier(.34,1.56,.64,1)}
+.confirm-ring::before{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--green);opacity:0;animation:ring-wave 1.6s .35s ease-out 2}
+@keyframes ring-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
+@keyframes ring-wave{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.6);opacity:0}}
+.confirm-ring svg{width:48px;height:48px}
+.confirm-ring svg path{
+  fill:none;stroke:var(--green);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:55;stroke-dashoffset:55;
+  animation:check-draw .55s .35s cubic-bezier(.65,0,.45,1) forwards;
+}
+@keyframes check-draw{to{stroke-dashoffset:0}}
+
+/* ── Confetti ── */
+.confetti-host{position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden}
+.confetti-piece{position:absolute;width:9px;height:14px;top:-20px;border-radius:2px;will-change:transform,opacity;animation:confetti-fall var(--d,3.2s) var(--delay,0s) cubic-bezier(.2,.6,.4,1) forwards;opacity:0}
+@keyframes confetti-fall{
+  0%{opacity:0;transform:translate3d(0,-10vh,0) rotate(0deg)}
+  10%{opacity:1}
+  90%{opacity:1}
+  100%{opacity:0;transform:translate3d(var(--x,0px),110vh,0) rotate(var(--r,720deg))}
+}
+
+/* Glow pulse behind ring on confirm */
+.confirm-glow{position:absolute;left:50%;top:42px;transform:translate(-50%,-50%);width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(61,107,79,.18),transparent 70%);animation:glow-fade 1.6s ease-out forwards;pointer-events:none}
+@keyframes glow-fade{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}40%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.4)}}
+
+/* What's next list */
+.next-list{text-align:left;margin:18px auto 0;max-width:380px;display:flex;flex-direction:column;gap:9px}
+.next-list .nl-item{display:flex;gap:11px;align-items:flex-start;font-size:.86rem;color:var(--ink-2);line-height:1.45}
+.next-list .nl-item .nl-dot{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--green-bg);color:var(--green);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.78rem}
+.next-list .nl-title{font-weight:600;font-size:.9rem;margin:18px 0 8px;color:var(--ink);text-align:center;font-family:var(--font-d)}
+
+.fade-swap{animation:fade-swap-in .55s ease both}
+@keyframes fade-swap-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── FAQ ── */
 .faq{max-width:760px;margin:0 auto 60px;padding:0 28px}
@@ -732,8 +779,9 @@ function goToPayment(eventId, eventDate) {
 }
 
 function restoreDrawer(eventId) {
-  // Stop timer and restore drawer view
+  // Stop timer + status polling and restore drawer view
   if (payTimer) clearInterval(payTimer);
+  if (typeof stopStatusPolling === 'function') stopStatusPolling();
   openDrawer(eventId);
 }
 
@@ -799,22 +847,159 @@ async function confirmClientPayment(eventId) {
   }
 }
 
+// Track polling state so it can be stopped on close/back/confirm
+let statusPollHandle = null;
+
 function showSuccess(name) {
   const e = eventsData.find(x => x.id === currentBooking?.event_id);
   const firstName = name ? name.split(' ')[0] : '';
   const namePart = firstName ? ', ' + firstName : '';
+  const bookingId = currentBooking?.booking_id || '';
   document.getElementById('dbody').innerHTML = `
-    <div class="success-state">
-      <div style="font-size:40px;margin-bottom:8px">⏳</div>
+    <div class="success-state" id="successState">
+      <div class="pending-icon">⏳</div>
       <h3>${T('succ_pending_title')}</h3>
       <p>${T('succ_pending_desc', {name: namePart})}</p>
-      <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;margin:14px 0;font-size:.85rem">
-        <strong>${T('succ_status_lbl')}:</strong> ${T('succ_status_pending')}<br>
-        <strong>${T('succ_booking_id_lbl')}:</strong> #${currentBooking?.booking_id || ''}
+      <p style="font-size:.78rem;color:var(--ink-4);margin-top:4px">${T('succ_pending_hint')}</p>
+      <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;margin:18px 0;font-size:.85rem">
+        <span class="live-dot"></span><strong>${T('succ_status_lbl')}:</strong> ${T('succ_status_pending')}<br>
+        <strong>${T('succ_booking_id_lbl')}:</strong> #${bookingId}
       </div>
       <p style="margin-top:18px;font-size:.85rem">${e?.title || ''}<br><strong>${fmtDate(e?.date || '')} · ${currentBooking?.time || ''}</strong></p>
       <button class="btn" style="margin-top:24px" onclick="closeDrawer(); currentBooking=null;">${T('succ_done_btn')}</button>
     </div>`;
+
+  // Start polling for confirmation; if it never confirms, that's fine — user
+  // closes the drawer eventually and gets email when payment is verified.
+  startStatusPolling(bookingId);
+}
+
+function startStatusPolling(bookingId) {
+  if (!bookingId) return;
+  stopStatusPolling();
+  let attempts = 0;
+  const tick = async () => {
+    attempts++;
+    // Stop after 30 minutes (450 attempts at 4s) — page may stay open in
+    // a tab that the client forgot about. Email always lands eventually.
+    if (attempts > 450) { stopStatusPolling(); return; }
+    try {
+      const r = await fetch('/booking-status?booking_id=' + encodeURIComponent(bookingId));
+      if (!r.ok) return;
+      const data = await r.json();
+      if (data.confirmed) {
+        stopStatusPolling();
+        showConfirmed(data.name || currentBooking?.name || '');
+      } else if (data.status === 'cancelled' || data.status === 'expired') {
+        stopStatusPolling();
+      }
+    } catch (_) { /* network blip — keep polling */ }
+  };
+  // First check almost immediately, then every 4s
+  tick();
+  statusPollHandle = setInterval(tick, 4000);
+}
+
+function stopStatusPolling() {
+  if (statusPollHandle) { clearInterval(statusPollHandle); statusPollHandle = null; }
+}
+
+function showConfirmed(name) {
+  const e = eventsData.find(x => x.id === currentBooking?.event_id);
+  const firstName = (name || currentBooking?.name || '').split(' ')[0] || '';
+  const namePart = firstName ? ', ' + firstName : '';
+  const bookingId = currentBooking?.booking_id || '';
+  const dbody = document.getElementById('dbody');
+  if (!dbody) return;
+
+  dbody.innerHTML = `
+    <div class="success-state fade-swap">
+      <div class="confirm-glow"></div>
+      <div class="confirm-ring">
+        <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M14 31 L26 43 L46 19" />
+        </svg>
+      </div>
+      <h3>${T('succ_confirmed_title')}</h3>
+      <p>${T('succ_confirmed_desc', {name: namePart})}</p>
+      <p style="font-size:.85rem;color:var(--green);margin-top:6px">📧 ${T('succ_email_sent')}</p>
+      <div style="background:var(--green-bg);color:var(--green);border-radius:10px;padding:12px;margin:18px 0;font-size:.85rem">
+        <strong>${T('succ_status_lbl')}:</strong> ${T('succ_status_confirmed')}<br>
+        <strong>${T('succ_booking_id_lbl')}:</strong> #${bookingId}
+      </div>
+      <p style="margin-top:14px;font-size:.92rem"><span style="color:var(--ink-3)">${T('succ_see_you')}:</span><br><strong>${fmtDate(e?.date || '')} · ${currentBooking?.time || ''}</strong></p>
+      <div class="next-list">
+        <div class="nl-title">${T('succ_what_next_title')}</div>
+        <div class="nl-item"><span class="nl-dot">1</span><span>${T('succ_what_next_1')}</span></div>
+        <div class="nl-item"><span class="nl-dot">2</span><span>${T('succ_what_next_2')}</span></div>
+        <div class="nl-item"><span class="nl-dot">3</span><span>${T('succ_what_next_3')}</span></div>
+      </div>
+      <p style="margin-top:18px;font-size:.85rem"><a href="https://instagram.com/pashynska.photo" target="_blank" style="color:var(--rose);text-decoration:none;font-weight:500">📸 ${T('succ_dm_question')} →</a></p>
+      <button class="btn" style="margin-top:18px" onclick="closeDrawer(); currentBooking=null;">${T('succ_done_btn')}</button>
+    </div>`;
+
+  // Fire confetti + a soft chime (best-effort, will silently fail if blocked)
+  launchConfetti();
+  try { playChime(); } catch (_) {}
+}
+
+// ── Confetti — pure CSS, no library ──
+function launchConfetti() {
+  // Avoid stacking multiple bursts
+  document.querySelectorAll('.confetti-host').forEach(n => n.remove());
+  const host = document.createElement('div');
+  host.className = 'confetti-host';
+  document.body.appendChild(host);
+
+  const palette = ['#c4857a', '#e8c8c0', '#3d6b4f', '#92722a', '#f5ede8', '#a3685e', '#fdf5e4', '#1c1917'];
+  const N = 110;
+  for (let i = 0; i < N; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    const startX = Math.random() * 100;          // start position 0-100vw
+    const driftX = (Math.random() * 60 - 30);    // -30..+30 vw drift
+    const dur     = 2.6 + Math.random() * 2.2;   // 2.6-4.8s
+    const delay   = Math.random() * 0.6;
+    const rot     = (Math.random() * 1080 - 540).toFixed(0) + 'deg';
+    const w       = 6 + Math.random() * 8;
+    const h       = 10 + Math.random() * 12;
+    const color   = palette[Math.floor(Math.random() * palette.length)];
+    const isCircle = Math.random() < 0.25;
+    piece.style.left      = startX + 'vw';
+    piece.style.background = color;
+    piece.style.width      = w + 'px';
+    piece.style.height     = h + 'px';
+    piece.style.borderRadius = isCircle ? '50%' : '2px';
+    piece.style.setProperty('--x', driftX + 'vw');
+    piece.style.setProperty('--r', rot);
+    piece.style.setProperty('--d', dur + 's');
+    piece.style.setProperty('--delay', delay + 's');
+    host.appendChild(piece);
+  }
+  // Clean up after animations finish
+  setTimeout(() => host.remove(), 6000);
+}
+
+// ── Soft chime on confirm (Web Audio, no asset) ──
+function playChime() {
+  if (!('AudioContext' in window || 'webkitAudioContext' in window)) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  const notes = [659.25, 783.99, 987.77]; // E5 G5 B5 — pleasant major arpeggio
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    osc.connect(gain).connect(ctx.destination);
+    const start = ctx.currentTime + i * 0.11;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(0.18, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.7);
+    osc.start(start);
+    osc.stop(start + 0.75);
+  });
+  setTimeout(() => ctx.close(), 1500);
 }
 
 function joinWaitlist(eventId) {
@@ -829,6 +1014,7 @@ function joinWaitlist(eventId) {
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('open');
   if (payTimer) clearInterval(payTimer);
+  if (typeof stopStatusPolling === 'function') stopStatusPolling();
   // Restore drawer photo aspect ratio
   setTimeout(() => {
     const dphoto = document.getElementById('dphoto');
@@ -982,10 +1168,22 @@ const SITE_I18N = {
     /* success */
     succ_pending_title: 'Payment Pending',
     succ_pending_desc: 'Thanks{name}! <strong>Your payment is being reviewed.</strong>',
+    succ_pending_hint: 'I\'ll see your e-Transfer within minutes — this page will update automatically.',
     succ_status_pending: 'Pending ⏳',
     succ_booking_id_lbl: 'Booking ID',
     succ_status_lbl: 'Status',
     succ_done_btn: 'Done',
+    /* confirmed state */
+    succ_confirmed_title: '🎉 Booking Confirmed!',
+    succ_confirmed_desc: 'Thank you{name}! Your spot is locked in.',
+    succ_status_confirmed: 'Confirmed ✓',
+    succ_email_sent: 'Confirmation details sent to your email.',
+    succ_see_you: 'See you on',
+    succ_what_next_title: 'What\'s next?',
+    succ_what_next_1: 'I\'ll send a styling guide 1–2 days before the session',
+    succ_what_next_2: 'Weather check 24h before — we\'ll reschedule for free if needed',
+    succ_what_next_3: 'Final balance is due on session day',
+    succ_dm_question: 'Questions? DM me on Instagram',
   },
   ru: {
     hero_kicker: 'Мини-сессии · 2026',
@@ -1094,10 +1292,21 @@ const SITE_I18N = {
     pay_deposit_for: 'Депозит за {name}',
     succ_pending_title: 'Платёж в обработке',
     succ_pending_desc: 'Спасибо{name}! <strong>Ваш платёж проверяется.</strong>',
+    succ_pending_hint: 'Я увижу e-Transfer в течение нескольких минут — страница обновится автоматически.',
     succ_status_pending: 'В обработке ⏳',
     succ_booking_id_lbl: 'Номер брони',
     succ_status_lbl: 'Статус',
     succ_done_btn: 'Готово',
+    succ_confirmed_title: '🎉 Бронь подтверждена!',
+    succ_confirmed_desc: 'Спасибо{name}! Ваше место зафиксировано.',
+    succ_status_confirmed: 'Подтверждено ✓',
+    succ_email_sent: 'Детали подтверждения отправлены на ваш email.',
+    succ_see_you: 'Увидимся',
+    succ_what_next_title: 'Что дальше?',
+    succ_what_next_1: 'За 1–2 дня до сессии пришлю стайл-гайд',
+    succ_what_next_2: 'За 24 часа проверим погоду — при необходимости перенесём бесплатно',
+    succ_what_next_3: 'Остаток оплачивается в день съёмки',
+    succ_dm_question: 'Вопросы? Напишите мне в Instagram',
   },
   hi: {
     hero_kicker: 'मिनी सेशन · 2026',
@@ -1206,10 +1415,21 @@ const SITE_I18N = {
     pay_deposit_for: '{name} के लिए डिपॉज़िट',
     succ_pending_title: 'भुगतान विचाराधीन',
     succ_pending_desc: 'धन्यवाद{name}! <strong>आपके भुगतान की समीक्षा हो रही है।</strong>',
+    succ_pending_hint: 'मैं कुछ मिनटों में आपका e-Transfer देख लूँगी — यह पेज अपने आप अपडेट हो जाएगा।',
     succ_status_pending: 'विचाराधीन ⏳',
     succ_booking_id_lbl: 'बुकिंग ID',
     succ_status_lbl: 'स्थिति',
     succ_done_btn: 'पूर्ण',
+    succ_confirmed_title: '🎉 बुकिंग की पुष्टि हो गई!',
+    succ_confirmed_desc: 'धन्यवाद{name}! आपकी जगह पक्की हो गई।',
+    succ_status_confirmed: 'पुष्टि हो गई ✓',
+    succ_email_sent: 'पुष्टि की जानकारी आपके ईमेल पर भेज दी गई।',
+    succ_see_you: 'मिलते हैं',
+    succ_what_next_title: 'आगे क्या?',
+    succ_what_next_1: 'सेशन से 1–2 दिन पहले स्टाइलिंग गाइड भेजूँगी',
+    succ_what_next_2: '24 घंटे पहले मौसम जाँचूँगी — ज़रूरत पड़ी तो मुफ़्त में पुनर्निर्धारण',
+    succ_what_next_3: 'बाकी राशि सेशन के दिन देय है',
+    succ_dm_question: 'सवाल हैं? Instagram पर DM करें',
   },
   uk: {
     hero_kicker: 'Міні-сесії · 2026',
@@ -1318,10 +1538,21 @@ const SITE_I18N = {
     pay_deposit_for: 'Депозит за {name}',
     succ_pending_title: 'Платіж в обробці',
     succ_pending_desc: 'Дякую{name}! <strong>Ваш платіж перевіряється.</strong>',
+    succ_pending_hint: 'Я побачу e-Transfer за кілька хвилин — сторінка оновиться автоматично.',
     succ_status_pending: 'В обробці ⏳',
     succ_booking_id_lbl: 'Номер броні',
     succ_status_lbl: 'Статус',
     succ_done_btn: 'Готово',
+    succ_confirmed_title: '🎉 Бронь підтверджено!',
+    succ_confirmed_desc: 'Дякую{name}! Ваше місце зафіксовано.',
+    succ_status_confirmed: 'Підтверджено ✓',
+    succ_email_sent: 'Деталі підтвердження надіслано на ваш email.',
+    succ_see_you: 'Зустрінемось',
+    succ_what_next_title: 'Що далі?',
+    succ_what_next_1: 'За 1–2 дні до сесії надішлю стайл-гайд',
+    succ_what_next_2: 'За 24 години перевіримо погоду — при потребі перенесемо безкоштовно',
+    succ_what_next_3: 'Залишок сплачується у день зйомки',
+    succ_dm_question: 'Питання? Напишіть мені в Instagram',
   }
 };
 
