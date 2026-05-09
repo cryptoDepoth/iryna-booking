@@ -1849,10 +1849,69 @@ def success():
     return render_template("success.html",
         email=EMAIL,
         date=ev["date"] if ev else DATE,
+        time=booking.get("time", "15:00") if booking else "15:00",
         price=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
+        event_title=ev.get("title", "Photo Session") if ev else "Photo Session",
+        session_length=ev.get("session_length", 20) if ev else 20,
+        location=ev.get("location", "Calgary, AB") if ev else "Calgary, AB",
         booking=booking,
         confirmation_token=booking.get("confirmation_token") if booking else ""
     )
+
+@app.route("/calendar-ics/<booking_id>")
+def calendar_ics(booking_id):
+    """Generate .ics calendar file for a confirmed booking."""
+    token = request.args.get("token", "")
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM bookings WHERE id=? AND confirmation_token=?", (booking_id, token))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"error": "not found"}), 404
+
+    booking = dict(row)
+    if not booking.get("confirmed"):
+        return jsonify({"error": "booking not confirmed"}), 403
+
+    ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
+    event_date = ev["date"] if ev else booking.get("date", "")
+    event_time = booking.get("time", "15:00")
+    session_length = ev.get("session_length", 20) if ev else 20
+
+    # Parse datetime
+    from datetime import datetime, timedelta
+    dt_start = datetime.strptime(f"{event_date} {event_time}", "%Y-%m-%d %H:%M")
+    dt_end = dt_start + timedelta(minutes=session_length)
+
+    dt_start_utc = dt_start.strftime("%Y%m%dT%H%M%SZ")
+    dt_end_utc = dt_end.strftime("%Y%m%dT%H%M%SZ")
+    dt_stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+    summary = ev.get("title", "Photo Session") if ev else "Photo Session"
+    location = ev.get("location", "Calgary, AB")
+
+    ics_body = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Pashynska Photography//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:{booking_id}@pashynska.agency
+DTSTAMP:{dt_stamp}
+DTSTART:{dt_start_utc}
+DTEND:{dt_end_utc}
+SUMMARY:{summary}
+LOCATION:{location}
+DESCRIPTION:Booking #{booking_id} with Pashynska Photography\\nClient: {booking.get('name', '')}
+END:VEVENT
+END:VCALENDAR"""
+
+    from flask import Response
+    return Response(ics_body, mimetype="text/calendar",
+                    headers={"Content-Disposition": f"attachment; filename=booking-{booking_id}.ics"})
 
 @app.route("/backstage")
 def backstage():
