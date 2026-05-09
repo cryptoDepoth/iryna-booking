@@ -826,7 +826,8 @@ async function confirmClientPayment(eventId) {
 
   try {
     const result = await API.confirm({
-      booking_id: currentBooking.booking_id
+      booking_id: currentBooking.booking_id,
+      confirmation_token: currentBooking.confirmation_token
     });
 
     if (result.success) {

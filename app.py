@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import hmac
+import secrets  # used by /reserve to generate confirmation_token
 import sqlite3
 import requests
 import sys
@@ -55,6 +56,9 @@ except Exception:
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
+# Cap upload body to 10 MB to defuse DoS via giant photo uploads (admin route
+# only accepts photos but Flask defaults to unlimited).
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 # ── Stable secret key ──────────────────────────────────────────────────────────
 # Priority: FLASK_SECRET_KEY env var → /data/.flask_secret (auto-generated once)
@@ -92,17 +96,33 @@ import threading as _threading
 _watcher_started = False
 
 def _watcher_thread():
-    """Daemon thread — continuously checks all pending bookings against new emails."""
+    """Daemon thread — does two periodic jobs:
+       1. Check Gmail for incoming Interac e-Transfers and auto-confirm bookings
+       2. Expire stale reservations whose 15-min window has passed, freeing slots
+
+    Without (2), a client who reserves a slot and walks away locks that time
+    forever (until someone hits /expired manually). That silently kills
+    conversion: the next visitor sees 'Sold out' on a slot nobody is paying for.
+    """
     import time as _time
-    CHECK_INTERVAL = 30  # seconds
+    CHECK_INTERVAL = 30  # seconds — fast enough to free slots for the next visitor
     log_w = logging.getLogger("watcher")
-    log_w.info("[watcher] Global e-Transfer watcher started")
+    log_w.info("[watcher] Global e-Transfer + slot-expiry watcher started")
 
     from check_etransfer_v2 import (
         get_pending_bookings, get_emails, is_etransfer_email, check_single_email
     )
 
     while True:
+        # 1. Sweep expired reservations every tick — cheap query, no external IO.
+        try:
+            released = expire_reservations()
+            if released:
+                log_w.info(f"[watcher] Released {released} expired reservation(s)")
+        except Exception as e:
+            log_w.error(f"[watcher] expire_reservations error: {e}")
+
+        # 2. Poll Gmail for e-Transfer notifications and match to pending bookings.
         try:
             pending = get_pending_bookings(within_minutes=30)
             if pending:
@@ -114,7 +134,7 @@ def _watcher_thread():
             else:
                 log_w.debug("[watcher] No pending bookings")
         except Exception as e:
-            log_w.error(f"[watcher] Error: {e}")
+            log_w.error(f"[watcher] e-Transfer check error: {e}")
 
         _time.sleep(CHECK_INTERVAL)
 
@@ -174,10 +194,13 @@ ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "") or ADMIN_KEY
 
 def _admin_key_from_request():
+    # Use silent=True so empty / malformed JSON bodies don't raise — defensive
+    # against weird probes hitting admin endpoints.
+    body = request.get_json(silent=True) if request.is_json else None
     return (
         request.headers.get("X-Admin-Key")
         or request.args.get("key")
-        or (request.json.get("key") if request.is_json else None)
+        or ((body or {}).get("key") if isinstance(body, dict) else None)
         or ""
     )
 
@@ -206,6 +229,12 @@ def admin_required(f):
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "792920251")  # Andrzej — always gets copies
+# Secret token for the Telegram webhook (set when calling setWebhook). When set,
+# every incoming POST /telegram/webhook must carry the matching value in the
+# X-Telegram-Bot-Api-Secret-Token header — otherwise the request is rejected.
+# This is the only thing that prevents anyone with the URL from sending fake
+# confirm/cancel callback_query payloads.
+TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 BASE_URL = os.environ.get("BOOKING_BASE_URL", "")
 
 
@@ -834,10 +863,31 @@ def notify_payment_confirmed(booking_id, paid_amount=None):
     except Exception as e:
         log.error(f"[notify_confirmed] Failed: {e}")
 
-# Serve static images
+# ── PHOTO STORAGE ────────────────────────────────────────────────────────────
+# Photos uploaded via the admin panel are stored on the persistent volume
+# (PHOTOS_DIR, defaults to /data/images on Fly). Bundled images that ship with
+# the repo live in /app/static/images and are used as fallback so existing URLs
+# in events.yaml keep working.
+PHOTOS_DIR = os.environ.get(
+    "PHOTOS_DIR",
+    os.path.join(
+        (os.environ.get("BACKUP_DIR", "").replace("/backups", "") or os.path.dirname(__file__)),
+        "images"
+    )
+)
+try:
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+except Exception as _e:
+    log.warning(f"[photos] Could not ensure PHOTOS_DIR={PHOTOS_DIR}: {_e}")
+_BUNDLED_IMAGES_DIR = os.path.join(app.root_path, 'static', 'images')
+
+# Serve uploaded photos: try persistent volume first, then bundled static.
 @app.route('/images/<path:filename>')
 def serve_image(filename):
-    return send_from_directory(os.path.join(app.root_path, 'static', 'images'), filename)
+    persistent_path = os.path.join(PHOTOS_DIR, filename)
+    if os.path.isfile(persistent_path):
+        return send_from_directory(PHOTOS_DIR, filename)
+    return send_from_directory(_BUNDLED_IMAGES_DIR, filename)
 
 # ===== NOTION CONFIG =====
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY", "")
@@ -1885,23 +1935,31 @@ def expired_endpoint():
 
 @app.route("/confirm", methods=["POST"])
 def confirm_payment():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     booking_id = data.get("booking_id")
+    token      = (data.get("confirmation_token") or data.get("token") or "").strip()
     if not booking_id:
         return jsonify({"success": False, "error": "booking_id required"}), 400
-    
+    if not token:
+        return jsonify({"success": False, "error": "confirmation_token required"}), 400
+
     conn = db_conn()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    
-    # Lookup by booking_id — identity-safe, no ON CONFLICT by date/time
-    c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+
+    # Identity-safe lookup: must match BOTH booking_id AND its confirmation_token.
+    # Prevents an attacker from flipping arbitrary bookings to pending_payment by
+    # guessing booking_ids.
+    c.execute(
+        "SELECT * FROM bookings WHERE id=? AND confirmation_token=?",
+        (booking_id, token)
+    )
     booking = c.fetchone()
-    
+
     if not booking:
         conn.close()
-        return jsonify({"success": False, "error": "Booking not found"}), 404
-    
+        return jsonify({"success": False, "error": "Booking not found or token mismatch"}), 404
+
     row = dict(booking)
     
     # Can only move reserved bookings to pending_payment
@@ -2487,9 +2545,11 @@ def admin_upload_photo(event_id):
     import uuid
     ext = f.filename.rsplit(".", 1)[1].lower()
     filename = f"{event_id}_{uuid.uuid4().hex[:8]}.{ext}"
-    images_dir = os.path.join(app.root_path, "static", "images")
-    os.makedirs(images_dir, exist_ok=True)
-    save_path = os.path.join(images_dir, filename)
+    # Save to PHOTOS_DIR (persistent volume on Fly.io). Files in the bundled
+    # /app/static/images directory are LOST on every redeploy — this directory
+    # survives them.
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    save_path = os.path.join(PHOTOS_DIR, filename)
     f.save(save_path)
     url = f"/images/{filename}"
 
@@ -2503,12 +2563,18 @@ def admin_upload_photo(event_id):
             if slot_index is not None:
                 idx = int(slot_index)
                 if 0 <= idx < len(photos):
-                    # delete old file if it lives in our images dir
-                    old = photos[idx].lstrip("/")
-                    old_path = os.path.join(app.root_path, "static", old)
-                    if os.path.exists(old_path) and old_path != save_path:
-                        try: os.remove(old_path)
-                        except Exception: pass
+                    # Delete the previous file. It may live in PHOTOS_DIR (newer
+                    # uploads) OR in the bundled /app/static/images (legacy).
+                    # Try both, ignore failures.
+                    old_url = photos[idx].lstrip("/")  # e.g. "images/foo.jpg"
+                    old_basename = os.path.basename(old_url)
+                    for candidate in (
+                        os.path.join(PHOTOS_DIR, old_basename),
+                        os.path.join(_BUNDLED_IMAGES_DIR, old_basename),
+                    ):
+                        if os.path.exists(candidate) and candidate != save_path:
+                            try: os.remove(candidate)
+                            except Exception: pass
                     photos[idx] = url
                 else:
                     photos.append(url)
@@ -2553,12 +2619,16 @@ def admin_delete_photo(event_id):
     with open(EVENTS_YAML_PATH, "w") as fh:
         yaml.dump(data, fh, allow_unicode=True, sort_keys=False)
 
-    # delete file from disk if it's ours
+    # Delete file from disk — try both PHOTOS_DIR (new) and bundled (legacy).
     if deleted_url:
-        old_path = os.path.join(app.root_path, "static", deleted_url.lstrip("/"))
-        if os.path.exists(old_path):
-            try: os.remove(old_path)
-            except Exception: pass
+        basename = os.path.basename(deleted_url.lstrip("/"))
+        for candidate in (
+            os.path.join(PHOTOS_DIR, basename),
+            os.path.join(_BUNDLED_IMAGES_DIR, basename),
+        ):
+            if os.path.exists(candidate):
+                try: os.remove(candidate)
+                except Exception: pass
 
     global EVENTS, SETTINGS
     _cfg = yaml.safe_load(open(EVENTS_YAML_PATH))
@@ -3023,9 +3093,28 @@ def booking_status():
 # ===== TELEGRAM WEBHOOK =====
 @app.route("/telegram/webhook", methods=["POST"])
 def telegram_webhook():
-    """Handle inline button presses from Telegram bot (confirm/cancel bookings)."""
-    data = request.json
-    if not data or "callback_query" not in data:
+    """Handle inline button presses from Telegram bot (confirm/cancel bookings).
+
+    SECURITY: requires X-Telegram-Bot-Api-Secret-Token header to match
+    TELEGRAM_WEBHOOK_SECRET. When you call Telegram's setWebhook API, pass
+    secret_token=<same value> — Telegram then sends that header with every
+    callback. Without this check, anyone who guesses the URL can confirm or
+    cancel arbitrary bookings.
+    """
+    if TELEGRAM_WEBHOOK_SECRET:
+        provided = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if not hmac.compare_digest(provided, TELEGRAM_WEBHOOK_SECRET):
+            log.warning("[tg-webhook] Rejected: bad/missing secret token")
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+    else:
+        # Fail closed: if no secret is configured, reject everything to avoid
+        # accidental open-webhook deployments. Operators MUST set
+        # TELEGRAM_WEBHOOK_SECRET to use this endpoint.
+        log.warning("[tg-webhook] Rejected: TELEGRAM_WEBHOOK_SECRET not configured")
+        return jsonify({"ok": False, "error": "webhook not configured"}), 503
+
+    data = request.get_json(silent=True) or {}
+    if "callback_query" not in data:
         return jsonify({"ok": True})
 
     cb = data["callback_query"]
@@ -3066,9 +3155,17 @@ def telegram_webhook():
             _tg_send(chat_id, f"ℹ️ Booking #{booking_id} already confirmed.")
             return jsonify({"ok": True})
 
+        # Resolve real per-event deposit (was hardcoded SESSION_PRICE which is the
+        # *first* active event's deposit — wrong when multiple events exist).
+        ev_for_price = get_event_by_id(booking.get("event_id"))
+        deposit_amount = (
+            ev_for_price.get("deposit") if ev_for_price and ev_for_price.get("deposit") is not None
+            else SESSION_PRICE
+        )
+
         c.execute(
             "UPDATE bookings SET confirmed=1, paid=1, status='confirmed', paid_amount=? WHERE id=?",
-            (SESSION_PRICE, booking_id)
+            (deposit_amount, booking_id)
         )
         conn.commit()
         conn.close()

@@ -508,7 +508,8 @@
       btn.textContent = 'Processing…';
 
       const data = {
-        booking_id: '{{ booking.id }}'
+        booking_id: '{{ booking.id }}',
+        confirmation_token: '{{ booking.confirmation_token }}'
       };
 
       try {

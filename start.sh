@@ -68,9 +68,20 @@ fi
 export DB_PATH=/data/bookings.db
 export BACKUP_DIR=/data/backups
 export EVENTS_YAML_PATH=/data/events.yaml
+# PHOTOS_DIR keeps admin-uploaded photos on the persistent volume so they
+# survive container restarts and redeploys (the bundled /app/static/images
+# directory is wiped on every deploy).
+export PHOTOS_DIR=/data/images
+mkdir -p "$PHOTOS_DIR"
 
 echo "[start] DB_PATH=$DB_PATH"
 echo "[start] EVENTS_YAML_PATH=$EVENTS_YAML_PATH"
+echo "[start] PHOTOS_DIR=$PHOTOS_DIR"
 
 # ── Launch Gunicorn ────────────────────────────────────────────────────────────
-exec gunicorn --bind :8080 --workers 1 --timeout 120 app:app
+# 1 worker × 4 threads keeps memory under 256MB while letting slow Notion /
+# Calendar / SMTP calls run in parallel — without this the entire site freezes
+# for ~20 seconds every time admin clicks "Confirm". The global watcher and
+# email scheduler threads live in this same process, so a single worker is
+# safer than multiple (no double-firing of cron jobs).
+exec gunicorn --bind :8080 --worker-class gthread --workers 1 --threads 4 --timeout 120 app:app
