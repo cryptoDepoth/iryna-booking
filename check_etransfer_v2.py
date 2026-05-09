@@ -245,6 +245,30 @@ def _notify_admin_ambiguity(amount, candidates):
         print(f"[admin] Failed to send ambiguity alert: {e}")
 
 
+def _notify_admin_orphan(amount, body, msg_id):
+    """Send admin notification when e-Transfer has no matching pending booking."""
+    try:
+        from app import _tg_message
+        # Extract sender info from body for context
+        snippet = body[:500].replace('\n', ' ').strip()
+        lines = [
+            f"💸 **Orphan payment: ${amount:.2f}**",
+            f"No pending booking matches this amount.",
+            f"",
+            f"*Email snippet:*",
+            f"```",
+            f"{snippet[:300]}",
+            f"```",
+            f"",
+            f"Message ID: `{msg_id}`",
+            f"Action needed: check if client paid without booking, or booking expired."
+        ]
+        _tg_message("\n".join(lines))
+        print(f"[admin] Orphan alert sent for ${amount:.2f}")
+    except Exception as e:
+        print(f"[admin] Failed to send orphan alert: {e}")
+
+
 def check_single_email(email, bookings):
     """Process one email against current pending bookings.
     Returns (confirmed_booking_id, ambiguity_list) or (None, None)."""
@@ -277,6 +301,9 @@ def check_single_email(email, bookings):
 
     if matched is None:
         print(f"   ❌ No booking matches ${amount:.2f}")
+        # Orphan payment: e-Transfer received but no matching pending booking
+        _notify_admin_orphan(amount, body, msg_id)
+        mark_message_processed(msg_id, None, amount)
         return None, None
 
     # Confirm

@@ -645,6 +645,94 @@ def _send_reminder_email(booking):
     return _send_email_raw(email, name, subject, plain, html)
 
 
+def _send_24h_reminder_email(booking):
+    """Send 24-hour pre-session reminder email — short and punchy."""
+    name = booking.get("name", "there")
+    email = booking.get("email", "")
+    event_id = booking.get("event_id")
+    slot_time = booking.get("time", "")
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    if not ev or not email:
+        return False
+
+    date_nice = ""
+    try:
+        date_nice = datetime.strptime(ev["date"], "%Y-%m-%d").strftime("%B %d, %Y")
+    except Exception:
+        date_nice = ev.get("date", "")
+
+    location = ev.get("location", "Location details coming soon")
+    subject = f"Tomorrow: your session at {slot_time}! 🌸 — {date_nice}"
+
+    plain = (
+        f"Hi {name},\n\n"
+        f"Your mini photo session is **tomorrow**!\n\n"
+        f"📅 {date_nice}\n"
+        f"⏰ {slot_time}\n"
+        f"📍 {location}\n\n"
+        f"Quick prep checklist:\n"
+        f"• Soft, coordinating colours (lilac, cream, white, pastels)\n"
+        f"• Avoid neon and busy patterns\n"
+        f"• Arrive 5 min early\n"
+        f"• Bring any favourite prop (blanket, flowers, hat)\n\n"
+        f"Any last-minute questions? DM @pashynska.photo\n\n"
+        f"See you tomorrow!\n"
+        f"Iryna 🌸"
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
+  <tr><td style="background:linear-gradient(135deg,#c084a8 0%,#9b5e8a 100%);padding:36px 40px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:36px;">🌸</p>
+    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">See you tomorrow!</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+  </td></tr>
+  <tr><td style="padding:36px 40px 28px;">
+    <p style="margin:0 0 20px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong>! 👋</p>
+    <p style="margin:0 0 24px;font-size:15px;color:#7a5a6a;line-height:1.7;">
+      Your mini photo session is <strong>tomorrow</strong>! Here's everything you need:
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;border-radius:12px;margin-bottom:28px;">
+      <tr><td style="padding:20px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">🗓 Date</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{date_nice}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">⏰ Time</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{slot_time}</strong></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#7a5a6a;font-size:14px;">📍 Location</td>
+            <td style="padding:8px 0;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{location}</strong></td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+    <h3 style="margin:0 0 12px;color:#5a3d4a;font-size:15px;">Quick prep checklist:</h3>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">👗 &nbsp;Soft, coordinating colours — lilac, cream, white, pastels</td></tr>
+      <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">⏱ &nbsp;Arrive 5 minutes early</td></tr>
+      <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">🎀 &nbsp;Bring a favourite prop — blanket, flowers, hat</td></tr>
+      <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">😊 &nbsp;Most importantly — just have fun!</td></tr>
+    </table>
+    <p style="margin:0 0 8px;font-size:14px;color:#7a5a6a;">Questions? DM me on Instagram
+      <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a>
+    </p>
+  </td></tr>
+  <tr><td style="background:#f9f1f5;padding:16px 40px;text-align:center;border-top:1px solid #f0e0e8;">
+    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada</p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+
+    return _send_email_raw(email, name, subject, plain, html)
+
+
 def _send_review_email(booking):
     """Send post-session review request email (5 days after session)."""
     name = booking.get("name", "there")
@@ -1068,6 +1156,7 @@ def init_db():
         # Automated email tracking
         ("bookings",  "abandoned_email_sent",  "ALTER TABLE bookings ADD COLUMN abandoned_email_sent TEXT"),
         ("bookings",  "reminder_email_sent",   "ALTER TABLE bookings ADD COLUMN reminder_email_sent TEXT"),
+        ("bookings",  "reminder_24h_email_sent","ALTER TABLE bookings ADD COLUMN reminder_24h_email_sent TEXT"),
         ("bookings",  "review_email_sent",     "ALTER TABLE bookings ADD COLUMN review_email_sent TEXT"),
         # first_booking_at / last_booking_at for clients table
         ("clients",   "first_booking_at",  "ALTER TABLE clients ADD COLUMN first_booking_at TEXT"),
@@ -1104,7 +1193,8 @@ def _run_email_scheduler():
     while True:
         try:
             _process_abandoned_emails()
-            _process_reminder_emails()
+            _process_reminder_emails()      # 48h
+            _process_24h_reminder_emails()  # 24h
             _process_review_emails()
         except Exception as _e:
             log.error(f"[scheduler] Unexpected error: {_e}")
@@ -1173,6 +1263,38 @@ def _process_reminder_emails():
             log.error(f"[scheduler] Reminder email failed for #{b['id']}: {e}")
 
 
+def _process_24h_reminder_emails():
+    """Send 24-hour pre-session reminders to confirmed bookings."""
+    now = datetime.now()
+    # Window: sessions happening between 22h and 26h from now (4h window to avoid duplicates)
+    date_from = (now + timedelta(hours=22)).strftime("%Y-%m-%d")
+    date_to   = (now + timedelta(hours=26)).strftime("%Y-%m-%d")
+    conn = db_conn()
+    rows = conn.execute("""
+        SELECT * FROM bookings
+        WHERE status = 'confirmed' AND confirmed = 1
+          AND reminder_24h_email_sent IS NULL
+          AND date BETWEEN ? AND ?
+          AND email IS NOT NULL AND email != ''
+    """, (date_from, date_to)).fetchall()
+    conn.close()
+    for row in rows:
+        b = dict(row)
+        try:
+            ok = _send_24h_reminder_email(b)
+            conn2 = db_conn()
+            conn2.execute(
+                "UPDATE bookings SET reminder_24h_email_sent=? WHERE id=?",
+                (now.isoformat(), b["id"])
+            )
+            conn2.commit()
+            conn2.close()
+            if ok:
+                log.info(f"[scheduler] 24h reminder sent → booking #{b['id']} ({b.get('email')}) for {b.get('date')}")
+        except Exception as e:
+            log.error(f"[scheduler] 24h reminder failed for #{b['id']}: {e}")
+
+
 def _process_review_emails():
     """Send review request emails 5 days after a confirmed session."""
     now = datetime.now()
@@ -1209,7 +1331,7 @@ def _process_review_emails():
 import threading as _bg_thread
 _sched = _bg_thread.Thread(target=_run_email_scheduler, daemon=True, name="email-scheduler")
 _sched.start()
-log.info("[scheduler] Email scheduler started (abandoned / reminder / review)")
+log.info("[scheduler] Email scheduler started (abandoned / 48h reminder / 24h reminder / review)")
 
 
 def db_conn():
