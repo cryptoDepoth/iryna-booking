@@ -92,10 +92,16 @@ def _start_etransfer_checker(booking_id):
     try:
         import subprocess as _sp
         cron_script = os.path.join(os.path.dirname(__file__) or ".", "timed_cron.py")
+        import os as _os
+        _cron_log = _os.path.join(_os.environ.get("DB_PATH", "/data").replace("/bookings.db", ""), "timed_cron.log")
+        _env = _os.environ.copy()
+        _env["HIMALAYA_CONFIG"] = _env.get("HIMALAYA_CONFIG", "/data/.config/himalaya/config.toml")
         _sp.Popen(
             [PYTHON_BIN, cron_script, "--booking-id", str(booking_id), "--interval", "30", "--minutes", "20"],
-            stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
-            cwd=os.path.dirname(__file__) or "."
+            stdout=open(_cron_log, "a"),
+            stderr=_sp.STDOUT,
+            cwd=_os.path.dirname(__file__) or ".",
+            env=_env
         )
         log.info(f"[etransfer-checker] Started for booking #{booking_id} (30s interval, 20min max)")
     except Exception as e:

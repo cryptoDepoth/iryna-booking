@@ -24,3 +24,5 @@ disabled_launchagents/
 # Tunnel logs
 tunnel.log
 flask.log
+*.tokens
+FLY_API_TOKEN.txt

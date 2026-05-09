@@ -51,6 +51,7 @@ EOF
 
 # Set XDG_CONFIG_HOME so Himalaya finds the config
 export XDG_CONFIG_HOME="/data/.config"
+export HIMALAYA_CONFIG="/data/.config/himalaya/config.toml"
 echo "[start] Himalaya config: $HIMALAYA_DIR/config.toml"
 
 # ── Generate a stable Flask secret key if not provided ────────────────────────
