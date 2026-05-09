@@ -86,26 +86,51 @@ app.secret_key = _secret_key
 
 PYTHON_BIN = os.environ.get("PYTHON_BIN", sys.executable)
 
+# ===== GLOBAL E-TRANSFER WATCHER (replaces per-booking Popen) =====
+import threading as _threading
 
-def _start_etransfer_checker(booking_id):
-    """Launch timed_cron.py in background to auto-detect e-Transfer for this booking."""
-    try:
-        import subprocess as _sp
-        cron_script = os.path.join(os.path.dirname(__file__) or ".", "timed_cron.py")
-        import os as _os
-        _cron_log = _os.path.join(_os.environ.get("DB_PATH", "/data").replace("/bookings.db", ""), "timed_cron.log")
-        _env = _os.environ.copy()
-        _env["HIMALAYA_CONFIG"] = _env.get("HIMALAYA_CONFIG", "/data/.config/himalaya/config.toml")
-        _sp.Popen(
-            [PYTHON_BIN, cron_script, "--booking-id", str(booking_id), "--interval", "30", "--minutes", "20"],
-            stdout=open(_cron_log, "a"),
-            stderr=_sp.STDOUT,
-            cwd=_os.path.dirname(__file__) or ".",
-            env=_env
-        )
-        log.info(f"[etransfer-checker] Started for booking #{booking_id} (30s interval, 20min max)")
-    except Exception as e:
-        log.error(f"[etransfer-checker] Failed to start: {e}")
+_watcher_started = False
+
+def _watcher_thread():
+    """Daemon thread — continuously checks all pending bookings against new emails."""
+    import time as _time
+    CHECK_INTERVAL = 30  # seconds
+    log_w = logging.getLogger("watcher")
+    log_w.info("[watcher] Global e-Transfer watcher started")
+
+    from check_etransfer_v2 import (
+        get_pending_bookings, get_emails, is_etransfer_email, check_single_email
+    )
+
+    while True:
+        try:
+            pending = get_pending_bookings(within_minutes=30)
+            if pending:
+                emails = get_emails()
+                if emails:
+                    for email in emails:
+                        if is_etransfer_email(email):
+                            check_single_email(email, pending)
+            else:
+                log_w.debug("[watcher] No pending bookings")
+        except Exception as e:
+            log_w.error(f"[watcher] Error: {e}")
+
+        _time.sleep(CHECK_INTERVAL)
+
+
+def _start_global_watcher():
+    global _watcher_started
+    if _watcher_started:
+        return
+    t = _threading.Thread(target=_watcher_thread, daemon=True, name="etransfer-watcher")
+    t.start()
+    _watcher_started = True
+    log.info("[main] Started global e-Transfer watcher thread")
+
+
+# Start watcher once at module import (Gunicorn worker startup)
+_start_global_watcher()
 
 # ===== RATE LIMITING =====
 # Simple IP-based rate limit: 5 booking requests per 10 minutes per IP
@@ -1799,10 +1824,8 @@ def confirm_payment():
         client_phone=client_phone,
     )
     
-    # Start automatic e-Transfer checker
-    _start_etransfer_checker(booking_id)
-    
-    log.info(f"[confirm] Booking #{booking_id} — {client_name} @ {time} — payment submitted, checker started")
+    # Payment submitted — global watcher auto-detects e-Transfer
+    log.info(f"[confirm] Booking #{booking_id} — {client_name} @ {time} — payment submitted, global watcher active")
     
     return jsonify({
         "success": True,
