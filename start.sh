@@ -5,8 +5,6 @@ set -e
 mkdir -p /data /data/backups
 
 # ── Copy bundled events.yaml to /data on FIRST RUN only ───────────────────────
-# This preserves any events the photographer creates via the admin panel across
-# restarts and redeploys.  Only copies if the persistent copy doesn't exist yet.
 if [ ! -f /data/events.yaml ]; then
     echo "[start] First run — copying bundled events.yaml to /data/events.yaml"
     cp /app/events.yaml /data/events.yaml
@@ -14,8 +12,48 @@ else
     echo "[start] Using existing /data/events.yaml"
 fi
 
+# ── Generate Himalaya config (Linux server paths, env-based password) ──────────
+HIMALAYA_DIR="/data/.config/himalaya"
+mkdir -p "$HIMALAYA_DIR"
+
+# Write password to file (Himalaya auth.cmd reads from file)
+if [ -n "$GMAIL_APP_PASSWORD" ]; then
+    echo "$GMAIL_APP_PASSWORD" > "$HIMALAYA_DIR/iryna_gmail_app_password"
+    chmod 600 "$HIMALAYA_DIR/iryna_gmail_app_password"
+    echo "[start] Gmail app password configured"
+else
+    echo "[WARN] GMAIL_APP_PASSWORD not set — e-Transfer auto-check will fail"
+fi
+
+# Write Himalaya config.toml
+cat > "$HIMALAYA_DIR/config.toml" <<'EOF'
+[accounts.iryna]
+default = true
+email = "iryna.pashynska@gmail.com"
+display-name = "Pashynska Photography"
+
+backend.type = "imap"
+backend.host = "imap.gmail.com"
+backend.port = 993
+backend.encryption.type = "tls"
+backend.login = "iryna.pashynska@gmail.com"
+backend.auth.type = "password"
+backend.auth.cmd = "cat /data/.config/himalaya/iryna_gmail_app_password"
+
+message.send.backend.type = "smtp"
+message.send.backend.host = "smtp.gmail.com"
+message.send.backend.port = 587
+message.send.backend.encryption.type = "start-tls"
+message.send.backend.login = "iryna.pashynska@gmail.com"
+message.send.backend.auth.type = "password"
+message.send.backend.auth.cmd = "cat /data/.config/himalaya/iryna_gmail_app_password"
+EOF
+
+# Set XDG_CONFIG_HOME so Himalaya finds the config
+export XDG_CONFIG_HOME="/data/.config"
+echo "[start] Himalaya config: $HIMALAYA_DIR/config.toml"
+
 # ── Generate a stable Flask secret key if not provided ────────────────────────
-# Storing it in /data means it survives restarts (same as the DB volume).
 if [ -z "$FLASK_SECRET_KEY" ]; then
     if [ ! -f /data/.flask_secret ]; then
         python3 -c "import secrets; print(secrets.token_hex(32))" > /data/.flask_secret

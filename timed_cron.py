@@ -24,7 +24,7 @@ from datetime import datetime, timedelta
 # Add parent directory for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "bookings.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "bookings.db"))
 LOCK_PATH = os.path.join(os.path.dirname(__file__), ".timed_cron.lock")
 
 

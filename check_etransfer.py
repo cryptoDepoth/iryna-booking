@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(__file__))
 from app import sync_to_notion
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "bookings.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "bookings.db"))
 
 def get_emails():
     """Fetch recent emails via Himalaya CLI"""
