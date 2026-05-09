@@ -1020,6 +1020,17 @@ def init_db():
         )
     ''')
 
+    # ── processed_emails — prevent double-processing of same Interac email ──
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS processed_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id TEXT UNIQUE NOT NULL,
+            booking_id INTEGER,
+            amount REAL,
+            processed_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # ── migrations: add columns that didn't exist in older installs ──
     _migrations = [
         ("bookings",  "paid_amount",       "ALTER TABLE bookings ADD COLUMN paid_amount REAL"),
@@ -1036,6 +1047,9 @@ def init_db():
         # first_booking_at / last_booking_at for clients table
         ("clients",   "first_booking_at",  "ALTER TABLE clients ADD COLUMN first_booking_at TEXT"),
         ("clients",   "last_booking_at",   "ALTER TABLE clients ADD COLUMN last_booking_at TEXT"),
+        ("bookings",  "confirmation_token", "ALTER TABLE bookings ADD COLUMN confirmation_token TEXT"),
+        # processed_emails ledger for e-Transfer safety
+        ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
     ]
     for _tbl, _col, _ddl in _migrations:
         try:
@@ -1630,11 +1644,13 @@ def reserve_slot():
               )
         """, (event_date, slot_time, now.isoformat()))
 
+        token = secrets.token_urlsafe(16)
+
         c.execute("""
             INSERT INTO bookings
-                (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?)
-        """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"]))
+                (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id, confirmation_token)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?)
+        """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"], token))
 
         if c.rowcount == 0:
             conn.rollback()
@@ -1672,6 +1688,7 @@ def reserve_slot():
         "success": True,
         "booking_id": booking_id,
         "event_id": ev["id"],
+        "confirmation_token": token,
         "expires_at": expires.isoformat(),
         "message": f"Reserved for {RESERVATION_MINUTES} minutes. Complete payment before {expires.strftime('%H:%M')}."
     })
@@ -1709,66 +1726,69 @@ def expired_endpoint():
 @app.route("/confirm", methods=["POST"])
 def confirm_payment():
     data = request.json
-    time = data.get("time")
-    event_id = data.get("event_id")
-    client_name = data.get("name", "")
-    client_email = data.get("email", "")
-    client_phone = data.get("phone", "")
-    client_ig = data.get("instagram", "")
-    session_type = data.get("session_type", "")
-
-    ev = get_event_by_id(event_id) if event_id else get_active_event()
-    event_date = ev["date"] if ev else DATE
+    booking_id = data.get("booking_id")
+    if not booking_id:
+        return jsonify({"success": False, "error": "booking_id required"}), 400
     
     conn = db_conn()
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     
-    # Update or insert booking as pending
-    c.execute('''
-        INSERT INTO bookings (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?)
-        ON CONFLICT(date, time) DO UPDATE SET
-            name=excluded.name,
-            email=excluded.email,
-            phone=excluded.phone,
-            instagram=excluded.instagram,
-            session_type=excluded.session_type,
-            status='pending_payment',
-            reserved_until=excluded.reserved_until,
-            event_id=excluded.event_id
-    ''', (event_date, time, client_name, client_email, client_phone, client_ig, session_type,
-          (datetime.now() + timedelta(minutes=RESERVATION_MINUTES)).isoformat(), ev["id"] if ev else None))
-    conn.commit()
+    # Lookup by booking_id — identity-safe, no ON CONFLICT by date/time
+    c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+    booking = c.fetchone()
     
-    # Get booking ID
-    c.execute("SELECT id FROM bookings WHERE date=? AND time=?", (event_date, time))
-    row = c.fetchone()
-    booking_id = row["id"] if row else None
+    if not booking:
+        conn.close()
+        return jsonify({"success": False, "error": "Booking not found"}), 404
+    
+    row = dict(booking)
+    
+    # Can only move reserved bookings to pending_payment
+    if row["status"] not in ("reserved", "pending_payment"):
+        conn.close()
+        return jsonify({"success": False, "error": "Booking already confirmed/cancelled/expired"}), 400
+    
+    event_id = row.get("event_id")
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    event_date = row["date"]
+    time = row["time"]
+    client_name = row["name"]
+    client_email = row["email"]
+    client_phone = row["phone"]
+    client_ig = row["instagram"]
+    session_type = row["session_type"]
+    
+    # Extend reservation window
+    new_expires = (datetime.now() + timedelta(minutes=RESERVATION_MINUTES)).isoformat()
+    c.execute("""
+        UPDATE bookings
+        SET status='pending_payment', reserved_until=?, confirmed=0, paid=0
+        WHERE id=?
+    """, (new_expires, booking_id))
+    conn.commit()
     conn.close()
     
     # Sync to Notion
-    if booking_id:
-        sync_to_notion(booking_id)
-
+    sync_to_notion(booking_id)
+    
     # Notify with inline confirm/cancel buttons
-    if booking_id:
-        _notify_payment_pending(
-            booking_id=booking_id,
-            client_name=client_name,
-            client_email=client_email,
-            event_date=event_date,
-            slot_time=time,
-            event_title=ev.get("title", "Mini Session") if ev else "Mini Session",
-            session_type=session_type,
-            client_ig=client_ig,
-            expected_deposit=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
-            client_phone=client_phone,
-        )
-
+    _notify_payment_pending(
+        booking_id=booking_id,
+        client_name=client_name,
+        client_email=client_email,
+        event_date=event_date,
+        slot_time=time,
+        event_title=ev.get("title", "Mini Session") if ev else "Mini Session",
+        session_type=session_type,
+        client_ig=client_ig,
+        expected_deposit=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
+        client_phone=client_phone,
+    )
+    
     # Start automatic e-Transfer checker
-    if booking_id:
-        _start_etransfer_checker(booking_id)
-
+    _start_etransfer_checker(booking_id)
+    
     log.info(f"[confirm] Booking #{booking_id} — {client_name} @ {time} — payment submitted, checker started")
     
     return jsonify({
@@ -2758,16 +2778,22 @@ def api_clients_export():
 
 @app.route("/booking-status")
 def booking_status():
-    """API for live client page polling — returns booking status + paid_amount."""
+    """API for live client page polling — requires confirmation_token for identity safety."""
     booking_id = request.args.get("booking_id")
+    token = request.args.get("token")
     if not booking_id:
         return jsonify({"error": "booking_id required"}), 400
     conn = db_conn()
-    row = conn.execute("SELECT status, confirmed, paid, paid_amount, name FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    row = conn.execute("SELECT status, confirmed, paid, paid_amount, name, confirmation_token FROM bookings WHERE id=?", (booking_id,)).fetchone()
     conn.close()
     if not row:
         return jsonify({"error": "not found"}), 404
     b = dict(row)
+    # Token check: must match confirmation_token
+    stored_token = b.get("confirmation_token", "")
+    if not token or not stored_token or token != stored_token:
+        log.warning(f"[booking-status] Invalid token for booking #{booking_id}")
+        return jsonify({"error": "unauthorized"}), 403
     return jsonify({
         "status": b["status"],
         "confirmed": bool(b["confirmed"]),

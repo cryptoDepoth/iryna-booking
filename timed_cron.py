@@ -24,6 +24,14 @@ from datetime import datetime, timedelta
 # Add parent directory for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
+# v2 safe payment checker (amount-only, processed_emails ledger)
+from check_etransfer_v2 import (
+    check_single_email,
+    get_pending_bookings as get_v2_pending_bookings,
+    get_emails as get_v2_emails,
+    is_etransfer_email as is_v2_etransfer_email,
+)
+
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "bookings.db"))
 LOCK_PATH = os.path.join(os.path.dirname(__file__), ".timed_cron.lock")
 
@@ -280,23 +288,10 @@ def extract_payment_info(body_text):
     }
 
 
+# DEPRECATED: name/email matching removed — use check_single_email from check_etransfer_v2
 def match_payment_to_booking(payment_info, bookings):
-    """Match payment to a booking by email or name"""
-    for booking in bookings:
-        # Exact email match
-        if payment_info.get("sender_email") and booking.get("email"):
-            if payment_info["sender_email"].lower() == booking["email"].lower():
-                return booking
-        
-        # Name fuzzy match
-        if payment_info.get("sender_name") and booking.get("name"):
-            p_name = payment_info["sender_name"].lower()
-            b_name = booking["name"].lower()
-            p_words = [w for w in p_name.split() if len(w) > 2]
-            b_words = [w for w in b_name.split() if len(w) > 2]
-            if any(pw in b_words for pw in p_words):
-                return booking
-    
+    """DEPRECATED: Name/email matching leads to false positives.
+    Use check_single_email() from check_etransfer_v2 for amount-only matching."""
     return None
 
 
@@ -465,62 +460,19 @@ def main(max_minutes=20, interval_seconds=60, booking_id=None):
         
         print(f"   💰 {len(etransfers)} e-Transfer email(s) found.")
         
-        # Process each email
+        # Process each email using v2 safe checker (amount-only, processed_emails ledger)
         for email in etransfers:
             print(f"\n   📧 Checking: {email.get('subject', 'No subject')}")
-            
-            # Read body
-            try:
-                body_text = read_message_body(email["id"])
-                if not body_text:
-                    print("      Could not read email body.")
-                    continue
-            except Exception as e:
-                print(f"      Error reading email: {e}")
+
+            result = check_single_email(email, bookings)
+            if result is None:
                 continue
-            
-            # Extract payment info
-            payment_info = extract_payment_info(body_text)
-            if not payment_info or not payment_info.get("amount"):
-                print("      Could not extract payment amount.")
-                continue
-            
-            amount = payment_info["amount"]
-            sender_name = payment_info.get("sender_name", "Unknown")
-            sender_email = payment_info.get("sender_email", "N/A")
-            
-            print(f"      Amount: ${amount:.2f}")
-            print(f"      From: {sender_name} ({sender_email})")
-            
-            # Match to booking
-            booking = match_payment_to_booking(payment_info, bookings)
-            if not booking:
-                print("      ⚠️ No matching booking found.")
-                continue
-            
-            # Check amount with ±$3 tolerance
-            # Check amount against per-booking expected deposit (±$3 tolerance)
-            expected = get_expected_amount_for_booking(booking["id"])
-            print(f"      Expected: ${expected:.2f} (from event/photoshoot)")
-            tolerance = 3.0
-            if amount < expected - tolerance:
-                diff = expected - amount
-                print(f"      ⚠️ UNDERPAID: ${amount:.2f} (expected ${expected:.2f}, short ${diff:.2f})")
-                print("      ⏳ Will wait for additional payment.")
-                continue
-            if amount > expected + tolerance:
-                print(f"      ⚠️ OVERPAID: ${amount:.2f} (expected ${expected:.2f}, over ${amount - expected:.2f})")
-                print("      ⏳ Will still confirm — overpayment is OK.")
-            
-            # Confirm booking
-            print(f"      ✅ Payment confirmed: ${amount:.2f}")
-            if confirm_booking(booking["id"], amount):
-                print(f"      ✅ CONFIRMED: Booking #{booking['id']} — {booking['name']}")
+            confirmed_id, ambiguous = result
+
+            # Refresh booking list if one was confirmed
+            if confirmed_id:
                 payments_confirmed += 1
-                # Remove this booking from list
-                bookings = [b for b in bookings if b["id"] != booking["id"]]
-            else:
-                print(f"      ❌ Failed to confirm booking #{booking['id']}")
+                bookings = [b for b in bookings if b["id"] != confirmed_id]
         
         # Update state
         save_cron_state({
