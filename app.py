@@ -1635,11 +1635,11 @@ def index():
         ev = get_event_by_id(event_id)
         if not ev:
             return "Event not found", 404
-        # Always use v2 landing; JavaScript will handle direct event linking if needed
-        return render_template("index_v2.html", direct_event_id=event_id)
+        return render_template("index_v2.html", direct_event_id=event_id,
+                               stripe_enabled=bool(STRIPE_SECRET_KEY))
 
     # ── Render the new landing grid (v2 design) for all cases ──
-    return render_template("index_v2.html")
+    return render_template("index_v2.html", stripe_enabled=bool(STRIPE_SECRET_KEY))
 
 
 def _render_single_event(ev):

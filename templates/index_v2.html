@@ -355,6 +355,7 @@ let eventsData = [];
 let activeFilter = "all";
 let currentBooking = null; // {event_id, time, booking_id, expires_at}
 const ETRANSFER_EMAIL = "iryna.pashynska@gmail.com";
+const STRIPE_ENABLED = {{ stripe_enabled | tojson }};
 let payTimer = null;
 
 const toast = (msg) => {
@@ -739,6 +740,30 @@ function goToPayment(eventId, eventDate) {
       <div class="row"><span class="key">${T('pay_row_deposit')}</span><span class="val-rose">$${amt} CAD</span></div>
     </div>
 
+    ${STRIPE_ENABLED ? `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
+        <span style="font-size:.72rem;color:var(--ink-3);white-space:nowrap;letter-spacing:.04em;text-transform:uppercase;">Choose how to pay</span>
+        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
+      </div>
+      <button id="stripe-btn" onclick="startStripeCheckout()"
+         style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+                background:#635bff;color:#fff;border:none;border-radius:14px;padding:15px 20px;
+                font-size:.92rem;font-weight:600;letter-spacing:.02em;cursor:pointer;
+                box-shadow:0 4px 16px rgba(99,91,255,.28);transition:opacity .15s;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="5" width="20" height="14" rx="3" stroke="white" stroke-width="1.8"/>
+          <path d="M2 10H22" stroke="white" stroke-width="1.8"/>
+        </svg>
+        <span id="stripe-btn-text">Pay $${amt} CAD — Card · Apple Pay · Google Pay</span>
+      </button>
+      <p style="text-align:center;font-size:.76rem;color:var(--ink-3);margin-top:8px">
+        Prefer <strong style="color:var(--ink-2)">Interac e-Transfer?</strong> (free, no card fees) ↓
+      </p>
+    </div>
+    ` : ''}
+
     <div class="transfer-box">
       <div class="eyebrow">${T('pay_eyebrow')}</div>
       <div class="amount">$${amt}</div>
@@ -818,6 +843,36 @@ function copyText(txt, pillId) {
   const orig = p.textContent;
   p.textContent = T('pay_copied'); p.classList.add('copied');
   setTimeout(() => { p.textContent = orig; p.classList.remove('copied') }, 2200);
+}
+
+// ── STRIPE CHECKOUT ──
+async function startStripeCheckout() {
+  if (!currentBooking) { toast(T('toast_no_reservation')); return; }
+  const btn  = document.getElementById('stripe-btn');
+  const txt  = document.getElementById('stripe-btn-text');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+  if (txt) txt.textContent = 'Redirecting to Stripe…';
+  try {
+    const res = await fetch('/stripe/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        booking_id: currentBooking.booking_id,
+        token: currentBooking.confirmation_token
+      })
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      toast(data.error || 'Could not start card payment. Please try Interac e-Transfer.');
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      if (txt) txt.textContent = `Pay $${currentBooking.amt || ''} CAD — Card · Apple Pay · Google Pay`;
+    }
+  } catch (err) {
+    toast('Network error. Please try Interac e-Transfer or refresh.');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  }
 }
 
 // ── CONFIRM PAYMENT (CLIENT SIDE) ──
