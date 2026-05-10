@@ -91,7 +91,7 @@ def test_check_single_email_confirms_reserved_booking_by_amount(tmp_path, monkey
     monkeypatch.setattr(checker, "read_message_body", lambda message_id: "You've received $3.00 from andhon")
 
     pending = checker.get_pending_bookings(within_minutes=30)
-    confirmed_id, ambiguous = checker.check_single_email({"id": "msg-1"}, pending)
+    confirmed_id, ambiguous = checker.check_single_email({"id": "msg-1", "date": now.strftime('%Y-%m-%d %H:%M+00:00')}, pending)
 
     assert confirmed_id == booking_id
     assert ambiguous is None
@@ -103,3 +103,39 @@ def test_check_single_email_confirms_reserved_booking_by_amount(tmp_path, monkey
 
     assert row == {"status": "confirmed", "paid": 1, "confirmed": 1, "paid_amount": 3.0}
     assert processed is not None
+
+
+def test_check_single_email_rejects_stale_email_for_future_booking(tmp_path, monkeypatch):
+    db_path = tmp_path / "bookings.db"
+    conn = _init_db(str(db_path))
+    created = datetime(2026, 5, 10, 16, 0, 0)
+    cur = conn.execute("""
+        INSERT INTO bookings(date,time,name,email,status,paid,confirmed,created_at,reserved_until,event_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+    """, (
+        "2026-05-17", "10:30", "Future Client", "future@example.com",
+        "reserved", 0, 0,
+        created.strftime('%Y-%m-%d %H:%M:%S'),
+        (created + timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S'),
+        "test-event",
+    ))
+    booking_id = cur.lastrowid
+    conn.commit(); conn.close()
+
+    monkeypatch.setattr(checker, "DB_PATH", str(db_path))
+    monkeypatch.setattr(checker, "get_expected_amount_for_booking", lambda booking_id: 3.00)
+    monkeypatch.setattr(checker, "read_message_body", lambda message_id: "You've received $3.00 from old payment")
+
+    pending = checker.get_pending_bookings(within_minutes=30)
+    confirmed_id, ambiguous = checker.check_single_email({"id": "old-msg", "date": "2026-05-10 15:19+00:00"}, pending)
+
+    assert confirmed_id is None
+    assert ambiguous is None
+
+    conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+    row = dict(conn.execute("SELECT status, paid, confirmed, paid_amount FROM bookings WHERE id=?", (booking_id,)).fetchone())
+    processed = conn.execute("SELECT message_id FROM processed_emails WHERE message_id='old-msg'").fetchone()
+    conn.close()
+
+    assert row == {"status": "reserved", "paid": 0, "confirmed": 0, "paid_amount": None}
+    assert processed is None

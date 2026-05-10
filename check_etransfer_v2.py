@@ -16,7 +16,7 @@ import re
 import json
 import sqlite3
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "bookings.db"))
 EVENTS_YAML_PATH = os.environ.get("EVENTS_YAML_PATH",
@@ -276,6 +276,64 @@ def _notify_admin_orphan(amount, body, msg_id):
         print(f"[admin] Failed to send orphan alert: {e}")
 
 
+def _parse_email_datetime(value):
+    """Parse Himalaya envelope date to naive UTC datetime.
+
+    Example from Gmail/Himalaya: "2026-05-10 15:19+00:00".
+    Return None if parsing fails; callers should fail closed for safety.
+    """
+    if not value:
+        return None
+    text = str(value).strip()
+    candidates = [text]
+    # Python accepts ISO offsets better with a T separator.
+    if " " in text:
+        candidates.append(text.replace(" ", "T", 1))
+    for candidate in candidates:
+        try:
+            dt = datetime.fromisoformat(candidate)
+            if dt.tzinfo is not None:
+                dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            return dt
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_db_datetime(value):
+    """Parse SQLite datetime strings stored either with space or T separator."""
+    if not value:
+        return None
+    text = str(value).strip()
+    for candidate in (text, text.replace("T", " ")):
+        try:
+            return datetime.fromisoformat(candidate)
+        except ValueError:
+            try:
+                return datetime.strptime(candidate.split(".")[0], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
+    return None
+
+
+def _filter_bookings_created_before_email(email, bookings):
+    """Prevent stale e-Transfer emails from confirming future bookings."""
+    email_dt = _parse_email_datetime(email.get("date"))
+    if email_dt is None:
+        # Fail closed: if we cannot trust the email timestamp, do not match it.
+        print(f"   [skip] Could not parse email date for message {email.get('id')}")
+        return []
+    safe = []
+    for booking in bookings:
+        created_dt = _parse_db_datetime(booking.get("created_at"))
+        if created_dt is None:
+            continue
+        # Allow a small clock-skew grace window, but reject old emails for new bookings.
+        if created_dt <= email_dt + timedelta(minutes=2):
+            safe.append(booking)
+    return safe
+
+
 def check_single_email(email, bookings):
     """Process one email against current pending bookings.
     Returns (confirmed_booking_id, ambiguity_list) or (None, None)."""
@@ -297,6 +355,11 @@ def check_single_email(email, bookings):
         return None, None
 
     print(f"   💰 Extracted amount: ${amount:.2f}")
+
+    bookings = _filter_bookings_created_before_email(email, bookings)
+    if not bookings:
+        print(f"   [skip] No time-valid bookings for message {msg_id}")
+        return None, None
 
     matched, ambiguous = match_by_amount_only(amount, bookings)
 
