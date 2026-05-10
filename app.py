@@ -2347,8 +2347,15 @@ def stripe_webhook():
             return jsonify({"error": "Parse error"}), 400
 
     # ── Handle checkout.session.completed ──
-    if event["type"] == "checkout.session.completed":
-        session_obj = event["data"]["object"]
+    event_type = getattr(event, "type", None) or event.get("type")
+    if event_type == "checkout.session.completed":
+        try:
+            session_obj = event.data.object
+        except AttributeError:
+            session_obj = event.get("data", {}).get("object", {})
+        if not session_obj:
+            log.warning("[stripe-webhook] checkout.session.completed with empty data.object (thin payload?)")
+            return jsonify({"ok": True})
         metadata    = session_obj.get("metadata", {})
         booking_id  = metadata.get("booking_id")
         token       = metadata.get("confirmation_token", "")
