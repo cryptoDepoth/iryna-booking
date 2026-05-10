@@ -502,7 +502,18 @@
         const badgeEl   = document.getElementById('availability-badge');
 
         if (data.slots.length === 0) {
-          container.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--red);font-weight:500;padding:16px 0">All slots are fully booked. DM me on Instagram for the waitlist.</p>';
+          const igUrl = data.instagram_url || 'https://instagram.com/pashynska.photo';
+          const igHandle = data.instagram_handle || '@pashynska.photo';
+          const msg = data.sold_out_message
+            ? data.sold_out_message
+            : `All spots are taken! DM ${igHandle} on Instagram — cancellations happen and I'd love to fit you in.`;
+          container.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px 0">
+            <p style="color:var(--red);font-weight:500;margin-bottom:10px">${msg}</p>
+            <a href="${igUrl}" target="_blank" rel="noopener"
+               style="display:inline-block;background:var(--rose);color:#fff;padding:10px 22px;border-radius:50px;font-size:0.875rem;text-decoration:none;font-weight:500">
+              📸 DM on Instagram
+            </a>
+          </div>`;
           badge.textContent = 'Sold out';
           heroBadge.textContent = 'Sold out';
           badgeEl.className = 'avail-badge sold';
@@ -529,7 +540,11 @@
       } catch (err) {
         console.error('Failed to load slots:', err);
         document.getElementById('slots-container').innerHTML =
-          '<p style="grid-column:1/-1;text-align:center;color:var(--red);padding:16px 0">Error loading slots. Please refresh.</p>';
+          `<div style="grid-column:1/-1;text-align:center;padding:16px 0">
+            <p style="color:var(--red);margin-bottom:10px">Could not load slots. Please refresh the page.</p>
+            <p style="font-size:0.85rem;color:var(--ink-3)">If the problem continues,
+              <a href="https://instagram.com/pashynska.photo" target="_blank" style="color:var(--rose)">DM @pashynska.photo</a> to book directly.</p>
+          </div>`;
       }
     }
 

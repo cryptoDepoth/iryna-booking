@@ -189,3 +189,116 @@ def test_booking_status_shows_paid_amount(client):
     status = c.get(f"/booking-status?booking_id={booking_id}&token={token}").get_json()
     assert status["paid_amount"] == 97.50
     assert status["status"] == "confirmed"
+
+
+# ── Phone validation tests (Fix: international numbers) ──────────────────────
+
+def test_international_phone_accepted(client):
+    """Ukrainian/Russian/other international numbers should be accepted."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+
+    for phone in ["+380501234567", "+78252888500", "+447911123456", "+12125551234"]:
+        resp = c.post("/reserve", json={
+            "event_id": event_id,
+            "time": slot_time,
+            "name": "Test User",
+            "email": f"intl_{phone[-4:]}@test.com",
+            "phone": phone,
+            "instagram": "@test",
+        })
+        data = resp.get_json()
+        assert resp.status_code == 200, f"Phone {phone} rejected: {data}"
+        assert data.get("success") is True, f"Phone {phone} failed: {data.get('error')}"
+        # Free slot for next iteration
+        if data.get("booking_id"):
+            c.post("/admin/cancel", headers={"X-Admin-Key": "test-admin-key"},
+                   json={"booking_id": data["booking_id"]})
+
+
+def test_canadian_phone_formats_accepted(client):
+    """Standard Canadian phone formats should still work."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+
+    for phone in ["4035550001", "403-555-0002", "(403) 555-0003", "14035550004"]:
+        resp = c.post("/reserve", json={
+            "event_id": event_id,
+            "time": slot_time,
+            "name": "Test User",
+            "email": f"ca_{phone[-4:]}@test.com",
+            "phone": phone,
+            "instagram": "@test",
+        })
+        data = resp.get_json()
+        assert resp.status_code == 200, f"CA phone {phone} rejected: {data}"
+        assert data.get("success") is True, f"CA phone {phone} failed: {data.get('error')}"
+        if data.get("booking_id"):
+            c.post("/admin/cancel", headers={"X-Admin-Key": "test-admin-key"},
+                   json={"booking_id": data["booking_id"]})
+
+
+def test_invalid_phone_rejected(client):
+    """Garbage phone numbers should still fail."""
+    c, _ = client
+    for bad in ["123", "notaphone", "000-000-0000"]:
+        resp = c.post("/reserve", json={
+            "event_id": _first_event()["id"],
+            "time": "99:99",  # bad time too, but validation fires first
+            "name": "Test User",
+            "email": "bad@test.com",
+            "phone": bad,
+            "instagram": "@test",
+        })
+        data = resp.get_json()
+        assert data.get("success") is not True, f"Bad phone {bad!r} was incorrectly accepted"
+
+
+# ── Slots API tests ───────────────────────────────────────────────────────────
+
+def test_slots_response_includes_instagram_fallback(client):
+    """Slots API response should always include instagram_url and instagram_handle."""
+    c, _ = client
+    ev = _first_event()
+    resp = c.get(f"/slots/{ev['date']}?event_id={ev['id']}")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "instagram_url" in data, "slots response missing instagram_url"
+    assert "instagram_handle" in data, "slots response missing instagram_handle"
+
+
+def test_health_endpoint_returns_json(client):
+    """Admin health check should return valid JSON with 'healthy' key."""
+    c, _ = client
+    resp = c.get("/admin/health", headers={"X-Admin-Key": "test-admin-key"})
+    assert resp.status_code in (200, 503)
+    data = resp.get_json()
+    assert "healthy" in data
+    assert "checks" in data
+    assert "database" in data["checks"]
+    assert data["checks"]["database"]["ok"] is True
+
+
+def test_ics_uses_local_timezone(client):
+    """Calendar .ics file should use TZID (local time) not Z (UTC) to prevent drift."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+
+    resp = _reserve(c, slot_time, event_id, email="ics@test.com")
+    booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
+
+    # Confirm the booking so ICS is accessible
+    c.post("/confirm", json={"booking_id": booking_id, "confirmation_token": token})
+    c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"},
+           json={"booking_id": booking_id, "paid_amount": 100.0})
+
+    ics_resp = c.get(f"/calendar-ics/{booking_id}?token={token}")
+    assert ics_resp.status_code == 200
+    ics_text = ics_resp.data.decode()
+
+    # Must have VTIMEZONE block
+    assert "BEGIN:VTIMEZONE" in ics_text, "ICS missing VTIMEZONE block"
+    # DTSTART must use TZID, not end with Z (UTC)
+    assert "DTSTART;TZID=" in ics_text, "DTSTART should use TZID= not bare UTC Z"
+    assert "DTSTART:2" not in ics_text, "DTSTART must not be bare UTC format"

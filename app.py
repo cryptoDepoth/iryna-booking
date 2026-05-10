@@ -149,8 +149,8 @@ def _start_global_watcher():
     log.info("[main] Started global e-Transfer watcher thread")
 
 
-# Start watcher once at module import (Gunicorn worker startup)
-_start_global_watcher()
+# NOTE: _start_global_watcher() is called at the BOTTOM of this file,
+# after all function definitions, to prevent NameError on first watcher tick.
 
 # ===== RATE LIMITING =====
 # Simple IP-based rate limit: 5 booking requests per 10 minutes per IP
@@ -1221,6 +1221,24 @@ def init_db():
         except sqlite3.OperationalError:
             pass  # column already exists
 
+    # ── Indexes for hot query paths ────────────────────────────────────────────
+    # /slots queries: WHERE date=? AND status NOT IN (...) AND reserved_until>?
+    # expire_reservations: WHERE confirmed=0 AND paid=0 AND reserved_until<=? AND status IN (...)
+    # email scheduler: WHERE status='expired' AND abandoned_email_sent IS NULL ...
+    _indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_bookings_date        ON bookings(date)",
+        "CREATE INDEX IF NOT EXISTS idx_bookings_status      ON bookings(status)",
+        "CREATE INDEX IF NOT EXISTS idx_bookings_confirmed   ON bookings(confirmed)",
+        "CREATE INDEX IF NOT EXISTS idx_bookings_reserved    ON bookings(reserved_until)",
+        "CREATE INDEX IF NOT EXISTS idx_bookings_event_id    ON bookings(event_id)",
+        "CREATE INDEX IF NOT EXISTS idx_clients_email        ON clients(email)",
+    ]
+    for _idx_ddl in _indexes:
+        try:
+            c.execute(_idx_ddl)
+        except sqlite3.OperationalError:
+            pass
+
     conn.commit()
     conn.close()
 
@@ -1716,13 +1734,24 @@ def get_slots(date_str):
         if s["time"] not in booked_times
     ]
 
+    instagram_url = SETTINGS.get("photographer_instagram_url", "https://instagram.com/pashynska.photo")
+    instagram_handle = SETTINGS.get("photographer_instagram", "@pashynska.photo")
+
     return jsonify({
         "date": date_str,
         "event_id": ev["id"],
         "event_title": ev.get("title", ""),
         "slots": available_slots,
         "total": len(slots),
-        "available": len(available_slots)
+        "available": len(available_slots),
+        # Fallback shown in frontend when all slots are booked
+        "sold_out_message": (
+            f"All spots are taken! DM {instagram_handle} on Instagram — "
+            "cancellations happen and I'd love to fit you in."
+            if len(available_slots) == 0 and len(slots) > 0 else None
+        ),
+        "instagram_url": instagram_url,
+        "instagram_handle": instagram_handle,
     })
 
 import re as _re
@@ -1741,16 +1770,25 @@ def _validate_booking_fields(name, email, phone, instagram=""):
     if len(email) > 254:
         return False, "Email address is too long"
 
-    # Phone: Canadian number — accepts various formats, normalises to 10 digits
+    # Phone: accept Canadian (10 digits) or international (+country code, 7–15 digits).
+    # We no longer reject non-Canadian formats — many clients are newcomers or
+    # have family booking from abroad.
     if phone:
-        digits = _re.sub(r"\D", "", phone)
-        if digits.startswith("1") and len(digits) == 11:
-            digits = digits[1:]  # strip leading country code 1
-        if len(digits) != 10:
-            return False, "Please enter a valid Canadian phone number (10 digits, e.g. 403-555-1234)"
-        # First digit of area code must be 2-9, first digit of subscriber must be 2-9
-        if digits[0] in "01" or digits[3] in "01":
-            return False, "Please enter a valid Canadian phone number"
+        raw = phone.strip()
+        digits = _re.sub(r"\D", "", raw)
+        is_international = raw.startswith("+")
+        if is_international:
+            # E.164-ish: + followed by 7–15 digits
+            if not (7 <= len(digits) <= 15):
+                return False, "Please enter a valid phone number including country code (e.g. +1 403-555-1234)"
+        else:
+            # No + prefix — treat as North American: strip leading 1 if present
+            if digits.startswith("1") and len(digits) == 11:
+                digits = digits[1:]
+            if len(digits) != 10:
+                return False, "Please enter a valid phone number (e.g. 403-555-1234 or +380 50 123 4567)"
+            if digits[0] in "01" or digits[3] in "01":
+                return False, "Please enter a valid Canadian phone number"
 
     # Instagram: optional — if provided must be @handle or handle (1-30 alphanumeric/._)
     if instagram:
@@ -1780,13 +1818,18 @@ def reserve_slot():
     if not valid:
         return jsonify({"success": False, "error": err}), 400
 
-    # Normalise phone: strip non-digits, remove leading 1 if 11 digits
+    # Normalise phone: keep international as-is (+...), format NA as (XXX) XXX-XXXX
     if client_phone:
-        _digits = _re.sub(r"\D", "", client_phone)
-        if _digits.startswith("1") and len(_digits) == 11:
-            _digits = _digits[1:]
-        # Format as (XXX) XXX-XXXX
-        client_phone = f"({_digits[:3]}) {_digits[3:6]}-{_digits[6:]}"
+        if client_phone.startswith("+"):
+            # International — store cleaned but preserve + prefix
+            _digits = _re.sub(r"\D", "", client_phone)
+            client_phone = "+" + _digits
+        else:
+            _digits = _re.sub(r"\D", "", client_phone)
+            if _digits.startswith("1") and len(_digits) == 11:
+                _digits = _digits[1:]
+            if len(_digits) == 10:
+                client_phone = f"({_digits[:3]}) {_digits[3:6]}-{_digits[6:]}"
 
     # Normalise Instagram — always store without @
     if client_ig and client_ig.startswith("@"):
@@ -2061,28 +2104,49 @@ def calendar_ics(booking_id):
     event_time = booking.get("time", "15:00")
     session_length = ev.get("session_length", 20) if ev else 20
 
-    # Parse datetime
+    # Parse datetime — use local timezone (America/Edmonton = MST/MDT)
+    # IMPORTANT: do NOT append Z (UTC marker) to local times.
+    # Using TZID format keeps Apple/Google Calendar correct regardless of DST.
     from datetime import datetime, timedelta
     dt_start = datetime.strptime(f"{event_date} {event_time}", "%Y-%m-%d %H:%M")
     dt_end = dt_start + timedelta(minutes=session_length)
 
-    dt_start_utc = dt_start.strftime("%Y%m%dT%H%M%SZ")
-    dt_end_utc = dt_end.strftime("%Y%m%dT%H%M%SZ")
+    tz_name = (ev.get("timezone") if ev else None) or "America/Edmonton"
+    dt_start_local = dt_start.strftime("%Y%m%dT%H%M%S")
+    dt_end_local   = dt_end.strftime("%Y%m%dT%H%M%S")
     dt_stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
 
-    summary = ev.get("title", "Photo Session") if ev else "Photo Session"
-    location = ev.get("location", "Calgary, AB")
+    summary  = ev.get("title", "Photo Session") if ev else "Photo Session"
+    location = ev.get("location", "Calgary, AB") if ev else "Calgary, AB"
 
     ics_body = f"""BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Pashynska Photography//EN
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
+BEGIN:VTIMEZONE
+TZID:{tz_name}
+X-LIC-LOCATION:{tz_name}
+BEGIN:DAYLIGHT
+TZOFFSETFROM:-0700
+TZOFFSETTO:-0600
+TZNAME:MDT
+DTSTART:19700308T020000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:-0600
+TZOFFSETTO:-0700
+TZNAME:MST
+DTSTART:19701101T020000
+RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU
+END:STANDARD
+END:VTIMEZONE
 BEGIN:VEVENT
 UID:{booking_id}@pashynska.agency
 DTSTAMP:{dt_stamp}
-DTSTART:{dt_start_utc}
-DTEND:{dt_end_utc}
+DTSTART;TZID={tz_name}:{dt_start_local}
+DTEND;TZID={tz_name}:{dt_end_local}
 SUMMARY:{summary}
 LOCATION:{location}
 DESCRIPTION:Booking #{booking_id} with Pashynska Photography\\nClient: {booking.get('name', '')}
@@ -2150,6 +2214,75 @@ def admin_login():
 def admin_logout():
     session.pop("admin_authenticated", None)
     return redirect(url_for("admin_login"))
+
+@app.route("/admin/health")
+@admin_required
+def admin_health():
+    """System health check — returns JSON status for all critical integrations."""
+    import shutil
+
+    status = {}
+
+    # Database
+    try:
+        conn = db_conn()
+        conn.execute("SELECT COUNT(*) FROM bookings").fetchone()
+        conn.close()
+        db_size = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
+        status["database"] = {"ok": True, "path": DB_PATH, "size_kb": round(db_size / 1024, 1)}
+    except Exception as e:
+        status["database"] = {"ok": False, "error": str(e)}
+
+    # Himalaya email CLI
+    himalaya_ok = shutil.which("himalaya") is not None
+    status["email_himalaya"] = {
+        "ok": himalaya_ok,
+        "error": None if himalaya_ok else "himalaya CLI not found in PATH — emails will silently fail",
+    }
+
+    # Telegram bot
+    tg_ok = bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
+    tg_secret_ok = bool(TELEGRAM_WEBHOOK_SECRET)
+    status["telegram"] = {
+        "ok": tg_ok,
+        "webhook_secret_set": tg_secret_ok,
+        "warning": None if tg_secret_ok else "TELEGRAM_WEBHOOK_SECRET not set — webhook accepts unauthenticated callbacks",
+    }
+
+    # Watcher thread alive
+    import threading
+    watcher_alive = any(t.name == "etransfer-watcher" and t.is_alive() for t in threading.enumerate())
+    status["watcher_thread"] = {"ok": watcher_alive}
+
+    # Email scheduler thread alive
+    sched_alive = any(t.name == "email-scheduler" and t.is_alive() for t in threading.enumerate())
+    status["email_scheduler"] = {"ok": sched_alive}
+
+    # Notion (optional)
+    notion_configured = bool(NOTION_API_KEY)
+    status["notion"] = {"ok": notion_configured, "warning": None if notion_configured else "NOTION_API_KEY not set — Notion sync disabled"}
+
+    # Events loaded
+    events_ok = bool(EVENTS)
+    active_events = [e for e in EVENTS if e.get("status") in ("active", "upcoming")]
+    status["events"] = {
+        "ok": events_ok,
+        "total": len(EVENTS),
+        "active_or_upcoming": len(active_events),
+    }
+
+    overall_ok = all(
+        v.get("ok", True)
+        for k, v in status.items()
+        if k not in ("notion",)  # Notion is optional
+    )
+
+    return jsonify({
+        "healthy": overall_ok,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "checks": status,
+    }), 200 if overall_ok else 503
+
 
 @app.route("/admin")
 @admin_required
@@ -3228,6 +3361,11 @@ def telegram_webhook():
 
     return jsonify({"ok": True})
 
+
+# ===== STARTUP: start background watcher AFTER all functions are defined =====
+# This prevents NameError on the first watcher tick when expire_reservations()
+# is called before Python finishes loading the module.
+_start_global_watcher()
 
 # ===== RUN =====
 if __name__ == "__main__":
