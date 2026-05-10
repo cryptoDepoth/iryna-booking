@@ -340,30 +340,45 @@
       </div>
     </div>
 
-    <!-- Stripe pay-by-card option (shown only when stripe_payment_link is set) -->
-    {% if stripe_payment_link %}
-    <div style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="flex:1;height:1px;background:var(--stroke)"></div>
-        <span style="font-size:0.78rem;color:var(--ink-3);white-space:nowrap;">Choose how to pay</span>
-        <div style="flex:1;height:1px;background:var(--stroke)"></div>
+    <!-- Stripe pay-by-card option (shown when STRIPE_PUBLISHABLE_KEY is configured) -->
+    {% if stripe_enabled %}
+    <div id="stripe-section" style="margin-bottom:16px;">
+      <!-- Divider: "Choose how to pay" -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
+        <span style="font-size:0.75rem;color:var(--ink-3);white-space:nowrap;letter-spacing:.04em;text-transform:uppercase;">Choose how to pay</span>
+        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
       </div>
-      <a href="{{ stripe_payment_link }}?prefilled_email={{ booking.email }}" target="_blank"
-         style="display:flex;align-items:center;justify-content:center;gap:12px;
-                background:#635bff;color:#fff;border-radius:14px;padding:16px 20px;
-                font-size:0.95rem;font-weight:600;text-decoration:none;letter-spacing:.02em;
-                box-shadow:0 4px 16px rgba(99,91,255,.35);transition:opacity .15s;"
+
+      <!-- Card / Apple Pay / Google Pay button -->
+      <button id="stripe-btn" onclick="startStripeCheckout()"
+         style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;
+                background:#635bff;color:#fff;border:none;border-radius:14px;padding:16px 20px;
+                font-size:0.95rem;font-weight:600;letter-spacing:.02em;cursor:pointer;
+                box-shadow:0 4px 16px rgba(99,91,255,.3);transition:opacity .15s, transform .1s;"
          onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="20" height="14" rx="3" stroke="white" stroke-width="1.8"/><path d="M2 10H22" stroke="white" stroke-width="1.8"/></svg>
-        Pay ${{ price }} CAD by Card / Apple Pay / Google Pay
-      </a>
-      <div style="text-align:center;margin-top:8px;font-size:0.75rem;color:var(--ink-3);">
-        Secure payment via Stripe · instant confirmation
+        <!-- Card icon -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="5" width="20" height="14" rx="3" stroke="white" stroke-width="1.8"/>
+          <path d="M2 10H22" stroke="white" stroke-width="1.8"/>
+        </svg>
+        <span id="stripe-btn-text">Pay ${{ price }} CAD — Card · Apple Pay · Google Pay</span>
+      </button>
+
+      <!-- Trust labels -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px;">
+        <span style="font-size:0.72rem;color:var(--ink-3);">🔒 Secure · Powered by Stripe</span>
+        <span style="font-size:0.72rem;color:var(--ink-4);">·</span>
+        <span style="font-size:0.72rem;color:var(--ink-3);">Instant confirmation</span>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;margin:16px 0 12px;">
-        <div style="flex:1;height:1px;background:var(--stroke)"></div>
-        <span style="font-size:0.78rem;color:var(--ink-3);white-space:nowrap;">or pay via e-Transfer (free)</span>
-        <div style="flex:1;height:1px;background:var(--stroke)"></div>
+
+      <!-- "Prefer Interac" nudge — secondary option -->
+      <div style="display:flex;align-items:center;gap:10px;margin:18px 0 14px;">
+        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
+        <span style="font-size:0.75rem;color:var(--ink-3);white-space:nowrap;">
+          Prefer <strong style="color:var(--ink-2)">Interac e-Transfer?</strong> (free, no card fees)
+        </span>
+        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
       </div>
     </div>
     {% endif %}
@@ -501,6 +516,40 @@
     }
 
     // ── Confirm payment ──
+    // ── Stripe Checkout ──────────────────────────────────────────────────────
+    async function startStripeCheckout() {
+      const btn     = document.getElementById('stripe-btn');
+      const btnText = document.getElementById('stripe-btn-text');
+      btn.disabled  = true;
+      btnText.textContent = 'Redirecting to secure checkout…';
+      btn.style.opacity   = '0.7';
+
+      try {
+        const res = await fetch('/stripe/create-checkout', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            booking_id:         '{{ booking.id }}',
+            confirmation_token: '{{ booking.confirmation_token }}'
+          })
+        });
+        const data = await res.json();
+        if (data.checkout_url) {
+          window.location.href = data.checkout_url;
+        } else {
+          alert(data.error || 'Could not start card payment. Please try Interac e-Transfer or refresh the page.');
+          btn.disabled  = false;
+          btnText.textContent = 'Pay ${{ price }} CAD — Card · Apple Pay · Google Pay';
+          btn.style.opacity   = '1';
+        }
+      } catch (err) {
+        alert('Network error. Please try Interac e-Transfer or refresh the page.');
+        btn.disabled  = false;
+        btnText.textContent = 'Pay ${{ price }} CAD — Card · Apple Pay · Google Pay';
+        btn.style.opacity   = '1';
+      }
+    }
+
     document.getElementById('confirm-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('confirm-btn');

@@ -899,6 +899,21 @@ NOTION_HEADERS = {
     "Content-Type": "application/json"
 }
 
+# ===== STRIPE CONFIG =====
+STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+if STRIPE_SECRET_KEY:
+    try:
+        import stripe as _stripe
+        _stripe.api_key = STRIPE_SECRET_KEY
+        log.info("[stripe] Stripe configured ✓")
+    except ImportError:
+        log.warning("[stripe] stripe package not installed — card payments disabled")
+else:
+    log.info("[stripe] STRIPE_SECRET_KEY not set — card payments disabled")
+
 # Map internal SQLite status → Notion select option
 NOTION_STATUS_MAP = {
     "reserved": "Reserved",
@@ -1965,7 +1980,10 @@ def payment():
         price=ev.get("deposit", SESSION_PRICE) if ev.get("deposit") is not None else SESSION_PRICE,
         session_length=ev.get("session_length", SESSION_LENGTH),
         email=EMAIL,
-        stripe_payment_link=ev.get("stripe_payment_link", "")
+        # Legacy static Payment Link (kept for backward compat — ignored if stripe_enabled)
+        stripe_payment_link=ev.get("stripe_payment_link", ""),
+        # New: dynamic Stripe Checkout — enabled when secret key is configured
+        stripe_enabled=bool(STRIPE_SECRET_KEY),
     )
 
 
@@ -2163,6 +2181,256 @@ def backstage():
     if _admin_authorized():
         return redirect(url_for("admin"))
     return redirect(url_for("admin_login", next=url_for("admin")))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  STRIPE ENDPOINTS
+#  Two routes:
+#    POST /stripe/create-checkout  — create a Stripe Checkout Session for a booking
+#    POST /stripe/webhook          — handle Stripe events (auto-confirm on payment)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/stripe/create-checkout", methods=["POST"])
+def stripe_create_checkout():
+    """Create a Stripe Checkout Session for the deposit payment.
+
+    Expects JSON: {booking_id, confirmation_token}
+    Returns JSON: {checkout_url} or {error}
+    """
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Card payments are not configured yet"}), 503
+
+    try:
+        import stripe as _stripe
+    except ImportError:
+        return jsonify({"error": "Stripe library not installed"}), 503
+
+    data = request.get_json(silent=True) or {}
+    booking_id = data.get("booking_id")
+    token      = (data.get("confirmation_token") or data.get("token") or "").strip()
+
+    if not booking_id or not token:
+        return jsonify({"error": "booking_id and confirmation_token required"}), 400
+
+    # Verify booking exists and token matches (identity-safe)
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT * FROM bookings WHERE id=? AND confirmation_token=?", (booking_id, token)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"error": "Booking not found or token mismatch"}), 404
+
+    booking = dict(row)
+    if booking["status"] not in ("reserved", "pending_payment"):
+        return jsonify({"error": "Booking already confirmed, cancelled or expired"}), 400
+
+    ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
+    if not ev:
+        return jsonify({"error": "Event not found"}), 404
+
+    deposit_cents = int(round(ev.get("deposit", SESSION_PRICE) * 100))
+    event_title   = ev.get("title", "Mini Photo Session")
+    event_date    = ev.get("date", booking.get("date", ""))
+    try:
+        date_nice = datetime.strptime(event_date, "%Y-%m-%d").strftime("%B %d, %Y")
+    except Exception:
+        date_nice = event_date
+
+    base_url = BASE_URL or "https://pashynska.agency"
+    success_url = (
+        f"{base_url}/success?booking_id={booking_id}"
+        f"&token={token}&stripe_paid=1"
+    )
+    cancel_url = f"{base_url}/payment?booking_id={booking_id}&token={token}"
+
+    # Build product description from event includes
+    includes = ev.get("included", [
+        "20-minute photo session",
+        "15 professionally edited photos",
+        "Quick turnaround (within 48 hours)",
+    ])
+    description = " · ".join(includes[:3]) if includes else f"Mini session on {date_nice}"
+
+    # Cover photo for the Stripe checkout page
+    images = []
+    ev_photos = ev.get("photos", [])
+    if ev_photos:
+        first_photo = ev_photos[0]
+        if first_photo.startswith("/"):
+            first_photo = f"{base_url}{first_photo}"
+        images = [first_photo]
+
+    try:
+        session = _stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "cad",
+                    "product_data": {
+                        "name": f"Deposit — {event_title}",
+                        "description": f"{date_nice} · {booking.get('time', '')} · {description}",
+                        "images": images,
+                    },
+                    "unit_amount": deposit_cents,
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            customer_email=booking.get("email") or None,
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "booking_id":         str(booking_id),
+                "confirmation_token": token,
+                "client_name":        booking.get("name", ""),
+                "event_id":           ev.get("id", ""),
+            },
+            # Collect billing address (helps dispute resolution)
+            billing_address_collection="auto",
+            # Allow Apple Pay / Google Pay automatically
+            payment_method_options={},
+        )
+        log.info(f"[stripe] Checkout session created for booking #{booking_id}: {session.id}")
+        return jsonify({"checkout_url": session.url, "session_id": session.id})
+
+    except _stripe.error.StripeError as e:
+        log.error(f"[stripe] Checkout session error for #{booking_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        log.error(f"[stripe] Unexpected error for #{booking_id}: {e}")
+        return jsonify({"error": "Failed to create checkout session"}), 500
+
+
+@app.route("/stripe/webhook", methods=["POST"])
+def stripe_webhook():
+    """Handle Stripe webhook events.
+
+    On checkout.session.completed → auto-confirm the booking (paid by card).
+
+    IMPORTANT: Cloudflare must NOT buffer/transform this route — it uses the
+    raw request body for signature verification. Add a Cloudflare Page Rule or
+    WAF bypass for /stripe/webhook if needed.
+    """
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Stripe not configured"}), 503
+
+    try:
+        import stripe as _stripe
+    except ImportError:
+        return jsonify({"error": "Stripe library not installed"}), 503
+
+    payload    = request.get_data()
+    sig_header = request.headers.get("Stripe-Signature", "")
+
+    # Verify webhook signature when secret is configured
+    if STRIPE_WEBHOOK_SECRET:
+        try:
+            event = _stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        except _stripe.error.SignatureVerificationError:
+            log.warning("[stripe-webhook] Invalid signature — rejected")
+            return jsonify({"error": "Invalid signature"}), 400
+        except Exception as e:
+            log.error(f"[stripe-webhook] Signature check error: {e}")
+            return jsonify({"error": "Webhook error"}), 400
+    else:
+        # No secret set — parse but log a warning (set STRIPE_WEBHOOK_SECRET in prod)
+        log.warning("[stripe-webhook] STRIPE_WEBHOOK_SECRET not set — accepting unverified event")
+        try:
+            event = _stripe.Event.construct_from(
+                json.loads(payload), _stripe.api_key
+            )
+        except Exception as e:
+            log.error(f"[stripe-webhook] Parse error: {e}")
+            return jsonify({"error": "Parse error"}), 400
+
+    # ── Handle checkout.session.completed ──
+    if event["type"] == "checkout.session.completed":
+        session_obj = event["data"]["object"]
+        metadata    = session_obj.get("metadata", {})
+        booking_id  = metadata.get("booking_id")
+        token       = metadata.get("confirmation_token", "")
+
+        if not booking_id:
+            log.warning("[stripe-webhook] checkout.session.completed with no booking_id in metadata")
+            return jsonify({"ok": True})
+
+        try:
+            booking_id = int(booking_id)
+        except (ValueError, TypeError):
+            log.warning(f"[stripe-webhook] Invalid booking_id in metadata: {booking_id!r}")
+            return jsonify({"ok": True})
+
+        # Prevent duplicate processing
+        conn = db_conn()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        if not row:
+            conn.close()
+            log.warning(f"[stripe-webhook] Booking #{booking_id} not found")
+            return jsonify({"ok": True})
+
+        booking = dict(row)
+        if booking.get("confirmed") or booking.get("status") == "confirmed":
+            conn.close()
+            log.info(f"[stripe-webhook] Booking #{booking_id} already confirmed — skipping")
+            return jsonify({"ok": True})
+
+        # Amount paid (Stripe sends in cents)
+        amount_received_cents = session_obj.get("amount_total", 0)
+        amount_paid = amount_received_cents / 100.0
+
+        conn.execute(
+            "UPDATE bookings SET confirmed=1, paid=1, status='confirmed', paid_amount=? WHERE id=?",
+            (amount_paid, booking_id)
+        )
+        conn.commit()
+        conn.close()
+
+        log.info(f"[stripe-webhook] Booking #{booking_id} auto-confirmed via Stripe (${amount_paid:.2f} CAD)")
+
+        # Side effects: calendar, Notion, email, Telegram
+        try:
+            create_calendar_event_for_booking(booking_id)
+        except Exception as e:
+            log.error(f"[stripe-webhook] Calendar error for #{booking_id}: {e}")
+        try:
+            sync_to_notion(booking_id)
+        except Exception as e:
+            log.error(f"[stripe-webhook] Notion error for #{booking_id}: {e}")
+
+        ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
+        try:
+            _send_client_email(
+                to_email=booking.get("email", ""),
+                client_name=booking.get("name", "Client"),
+                event_date=ev["date"] if ev else booking.get("date", ""),
+                slot_time=booking.get("time", ""),
+                event_title=ev.get("title", "Mini Session") if ev else "Mini Session",
+                booking_id=booking_id,
+                location=ev.get("location") if ev else None,
+            )
+        except Exception as e:
+            log.error(f"[stripe-webhook] Email error for #{booking_id}: {e}")
+
+        # Notify admin on Telegram
+        try:
+            msg = (
+                f"💳 <b>Stripe Payment Confirmed!</b>\n\n"
+                f"👤 {booking.get('name', '?')}\n"
+                f"📧 {booking.get('email', '?')}\n"
+                f"📅 {booking.get('date', '?')} @ {booking.get('time', '?')}\n"
+                f"💰 <b>${amount_paid:.2f} CAD via card</b>\n"
+                f"🆔 Booking #{booking_id}\n\n"
+                f"✅ Auto-confirmed · email sent to client"
+            )
+            _notify_admin(msg)
+        except Exception as e:
+            log.error(f"[stripe-webhook] Telegram notify error for #{booking_id}: {e}")
+
+    return jsonify({"ok": True})
 
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
