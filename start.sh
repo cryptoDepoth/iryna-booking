@@ -40,6 +40,12 @@ backend.login = "iryna.pashynska@gmail.com"
 backend.auth.type = "password"
 backend.auth.cmd = "cat /data/.config/himalaya/iryna_gmail_app_password"
 
+# Gmail exposes the Sent folder with a localized IMAP name in this mailbox.
+# Avoid failing confirmations with: "cannot add IMAP message / Folder doesn't exist".
+folder.aliases.inbox = "INBOX"
+folder.aliases.sent = "[Gmail]/Отправленные"
+message.send.save-copy = false
+
 message.send.backend.type = "smtp"
 message.send.backend.host = "smtp.gmail.com"
 message.send.backend.port = 587

@@ -130,7 +130,9 @@ def _watcher_thread():
                 if emails:
                     for email in emails:
                         if is_etransfer_email(email):
-                            check_single_email(email, pending)
+                            confirmed_id, _ambiguous = check_single_email(email, pending)
+                            if confirmed_id:
+                                _after_auto_payment_confirmed(confirmed_id)
             else:
                 log_w.debug("[watcher] No pending bookings")
         except Exception as e:
@@ -880,6 +882,40 @@ def notify_payment_confirmed(booking_id, paid_amount=None):
         _notify_admin(msg)
     except Exception as e:
         log.error(f"[notify_confirmed] Failed: {e}")
+
+
+def _after_auto_payment_confirmed(booking_id):
+    """Run the same side-effects after automatic e-Transfer confirmation
+    that manual admin confirmation runs: calendar, Notion, client email,
+    and admin Telegram notification.
+    """
+    try:
+        conn = db_conn()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        conn.close()
+        if not row:
+            log.warning(f"[auto-confirm] Booking #{booking_id} not found after payment match")
+            return
+        booking = dict(row)
+        event_url = create_calendar_event_for_booking(booking_id)
+        sync_to_notion(booking_id)
+        ev = get_event_by_id(booking.get("event_id"))
+        if ev and booking.get("email"):
+            _send_client_email(
+                to_email=booking.get("email", ""),
+                client_name=booking.get("name", "Client"),
+                event_date=ev.get("date", booking.get("date", "")),
+                slot_time=booking.get("time", ""),
+                event_title=ev.get("title", "Mini Session"),
+                booking_id=booking_id,
+                location=ev.get("location")
+            )
+        notify_payment_confirmed(booking_id, booking.get("paid_amount"))
+        log.info(f"[auto-confirm] Booking #{booking_id} side-effects complete; calendar={event_url or 'none'}")
+    except Exception as e:
+        log.error(f"[auto-confirm] side-effects failed for booking #{booking_id}: {e}")
+
 
 # ── PHOTO STORAGE ────────────────────────────────────────────────────────────
 # Photos uploaded via the admin panel are stored on the persistent volume

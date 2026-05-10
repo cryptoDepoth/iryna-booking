@@ -131,10 +131,15 @@ def extract_payment_info(body_text):
         return None
 
     patterns = [
-        r"\\$([0-9,]+\.\\d{2})",
-        r"amount:\s*\\$?([0-9,]+\.?\\d*)",
-        r"for the amount of\s*\\$?([0-9,]+\.?\\d*)",
-        r"sent you\s*\\$?([0-9,]+\.?\\d*)",
+        # Interac subjects/bodies often contain: "You've received $3.00" or
+        # "Funds Deposited! $95.00". These are regexes, so use single
+        # backslashes in raw strings. Double-escaping `\\$?` makes `$` an
+        # end-of-string anchor and crashes with "nothing to repeat".
+        r"\$([0-9,]+\.\d{2})",
+        r"amount:\s*\$?([0-9,]+\.?\d*)",
+        r"for the amount of\s*\$?([0-9,]+\.?\d*)",
+        r"sent you\s*\$?([0-9,]+\.?\d*)",
+        r"received\s*\$?([0-9,]+\.?\d*)",
     ]
     for pattern in patterns:
         match = re.search(pattern, body_text, re.I)
@@ -177,13 +182,15 @@ def get_pending_bookings(within_minutes=30):
     """Get bookings awaiting payment, created within recent window."""
     conn = get_db()
     c = conn.cursor()
-    now = datetime.now().isoformat()
-    # Only look at bookings created recently enough that a new email could match
-    # Also exclude bookings already confirmed/paid
-    cutoff = (datetime.now() - timedelta(minutes=within_minutes)).isoformat()
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # Only look at bookings created recently enough that a new email could match.
+    # Include BOTH statuses: some clients send the e-Transfer after reserving
+    # the slot but forget to click "I've sent the payment". In that case the
+    # system must still detect the payment before the hold expires.
+    cutoff = (datetime.now() - timedelta(minutes=within_minutes)).strftime('%Y-%m-%d %H:%M:%S')
     c.execute("""
         SELECT * FROM bookings
-        WHERE status = 'pending_payment'
+        WHERE status IN ('reserved', 'pending_payment')
         AND reserved_until > ?
         AND confirmed = 0
         AND paid = 0
