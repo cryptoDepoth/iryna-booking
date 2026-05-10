@@ -132,11 +132,23 @@ def _select_knowledge(message: str, limit: int = 8) -> list[dict[str, Any]]:
     return [item for _, item in scored[:limit]]
 
 
-def _event_lines(events: list[dict[str, Any]]) -> list[str]:
+def _event_lines(events: list[dict[str, Any]], today: str | None = None) -> list[str]:
+    """Return assistant-safe public event facts.
+
+    Do not feed past events to the model. The website may keep old sessions in
+    events.yaml for records/admin flows, but the public assistant must only
+    answer from currently bookable public sessions. Otherwise it can recommend
+    an expired session simply because it sorts earlier than the real upcoming
+    event.
+    """
     lines: list[str] = []
+    today = today or datetime.now().strftime("%Y-%m-%d")
     visible = [
         e for e in events
-        if e.get("status") in ("active", "upcoming") and not e.get("hidden")
+        if e.get("status") in ("active", "upcoming")
+        and not e.get("hidden")
+        and e.get("photos")
+        and str(e.get("date", "")) >= today
     ]
     visible.sort(key=lambda e: str(e.get("date", "")))
     for event in visible[:8]:

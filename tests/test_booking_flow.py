@@ -8,6 +8,7 @@ import tempfile
 import pytest
 
 import app as booking_app  # noqa: E402
+import assistant_engine  # noqa: E402
 
 
 @pytest.fixture()
@@ -317,6 +318,72 @@ def test_health_endpoint_returns_json(client):
     assert data["checks"]["database"]["ok"] is True
 
 
+def test_public_events_exclude_past_and_hidden_sessions(client, monkeypatch):
+    """The public /events API must not show expired sessions or draft/test events."""
+    c, _ = client
+    monkeypatch.setattr(booking_app, "EVENTS", [
+        {
+            "id": "past-event",
+            "title": "Past Event",
+            "date": "2026-05-03",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "session_length": 20,
+            "break_length": 10,
+            "slot_interval": 30,
+            "deposit": 200,
+            "full_price": 400,
+            "status": "active",
+        },
+        {
+            "id": "hidden-test-event",
+            "title": "Hidden Test Event",
+            "date": "2099-06-07",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "session_length": 20,
+            "break_length": 10,
+            "slot_interval": 30,
+            "deposit": 1,
+            "full_price": 1,
+            "status": "active",
+            "hidden": True,
+        },
+        {
+            "id": "future-public-event",
+            "title": "Future Public Event",
+            "date": "2099-06-07",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "session_length": 20,
+            "break_length": 10,
+            "slot_interval": 30,
+            "deposit": 100,
+            "status": "active",
+            "photos": ["/images/future-public.jpg"],
+        },
+        {
+            "id": "future-no-photo-test-event",
+            "title": "Future No Photo Test Event",
+            "date": "2099-06-07",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "session_length": 20,
+            "break_length": 10,
+            "slot_interval": 30,
+            "deposit": 1,
+            "full_price": 1,
+            "status": "active",
+        },
+    ], raising=False)
+
+    resp = c.get("/events")
+
+    assert resp.status_code == 200
+    ids = [event["id"] for event in resp.get_json()["events"]]
+    assert ids == ["future-public-event"]
+
+
 def test_assistant_chat_fallback_works_without_openai_key(client, monkeypatch):
     """Assistant endpoint should still return a useful local answer without LLM keys."""
     c, _ = client
@@ -334,6 +401,41 @@ def test_assistant_chat_fallback_works_without_openai_key(client, monkeypatch):
     assert data["success"] is True
     assert data["answer"]
     assert data["source"] in {"fallback", "openai", "zai"}
+
+
+def test_assistant_event_context_excludes_past_active_sessions():
+    """Past active events must not be fed to the public assistant as bookable facts."""
+    events = [
+        {
+            "title": "Past Blossom Mini Sessions",
+            "date": "2026-05-03",
+            "start_time": "10:00",
+            "end_time": "16:00",
+            "deposit": 200,
+            "full_price": 400,
+            "location": "Calgary",
+            "included": ["old package"],
+            "status": "active",
+        },
+        {
+            "title": "Future Lilac Mini Sessions",
+            "date": "2026-06-07",
+            "start_time": "15:00",
+            "end_time": "19:00",
+            "deposit": 100,
+            "full_price": 500,
+            "location": "Calgary",
+            "included": ["new package"],
+            "status": "active",
+            "photos": ["/images/future-lilac.jpg"],
+        },
+    ]
+
+    lines = assistant_engine._event_lines(events, today="2026-05-10")
+
+    assert len(lines) == 1
+    assert "Future Lilac Mini Sessions" in lines[0]
+    assert "Past Blossom" not in "\n".join(lines)
 
 
 def test_ics_uses_local_timezone(client):

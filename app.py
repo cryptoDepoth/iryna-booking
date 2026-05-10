@@ -1723,8 +1723,17 @@ def list_events():
     conn = db_conn()
     c = conn.cursor()
 
+    today = now.strftime("%Y-%m-%d")
+
     for ev in EVENTS:
-        if ev.get("status") in ("active", "upcoming", "completed"):
+        # Public listing should only expose currently bookable sessions.
+        # Admin screens still use EVENTS directly and can show historical/draft data.
+        if (
+            ev.get("status") in ("active", "upcoming")
+            and not ev.get("hidden")
+            and ev.get("photos")
+            and str(ev.get("date", "")) >= today
+        ):
             # Calculate total and available spots
             slots = generate_slots(ev)
             total_spots = len(slots)
