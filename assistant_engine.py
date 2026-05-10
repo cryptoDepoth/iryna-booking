@@ -8,12 +8,15 @@ cases. Raw Instagram exports should never be committed to the repo.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import requests
 
@@ -305,9 +308,6 @@ def _call_zai(message: str, history: list[dict[str, str]], context: dict[str, An
         "stream": False,
         "max_tokens": int(os.environ.get("ASSISTANT_MAX_OUTPUT_TOKENS", "450")),
         "temperature": float(os.environ.get("ASSISTANT_TEMPERATURE", "0.35")),
-        # Business chat should answer quickly; deep thinking can be enabled in env
-        # later if custom planning/long reasoning is needed.
-        "thinking": {"type": os.environ.get("ZAI_THINKING", "disabled")},
     }
     response = requests.post(
         os.environ.get("ZAI_CHAT_COMPLETIONS_URL", ZAI_CHAT_COMPLETIONS_URL),
@@ -319,7 +319,7 @@ def _call_zai(message: str, history: list[dict[str, str]], context: dict[str, An
         timeout=float(os.environ.get("ASSISTANT_ZAI_TIMEOUT", "18")),
     )
     if response.status_code >= 400:
-        raise RuntimeError(f"Z.ai API error {response.status_code}: {response.text[:300]}")
+        raise RuntimeError(f"Z.ai API error {response.status_code}: {response.text[:400]}")
 
     data = response.json()
     choices = data.get("choices") or []
@@ -430,7 +430,8 @@ def answer_assistant_message(
                 source = "openai"
         if not answer:
             answer = _fallback_answer(clean_message, context, lang)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.error("[assistant] AI call failed (%s), using keyword fallback: %s", type(exc).__name__, exc)
         answer = _fallback_answer(clean_message, context, lang)
 
     return {
