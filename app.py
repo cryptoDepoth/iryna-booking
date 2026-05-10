@@ -3568,6 +3568,7 @@ def assistant_chat():
             events=EVENTS,
             settings=SETTINGS,
             lang=lang,
+            db_path=DB_PATH,
         )
         return jsonify({"success": True, **result})
     except Exception as e:

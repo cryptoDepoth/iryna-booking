@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,75 @@ ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 DEFAULT_ZAI_MODEL = "glm-4.5-air"
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash-lite"
+
+
+# ── slot helper ──────────────────────────────────────────────────────────────
+def _generate_event_slots(event: dict[str, Any], booked_times: set[str]) -> list[str]:
+    """Return available slot labels like ['10:00–10:20', '10:30–10:50']."""
+    start = datetime.strptime(event.get("start_time", "10:00"), "%H:%M")
+    end = datetime.strptime(event.get("end_time", "16:00"), "%H:%M")
+    interval = event.get("slot_interval", 30)
+    sl = event.get("session_length", 20)
+    slots: list[str] = []
+    current = start
+    while current < end:
+        slot_str = current.strftime("%H:%M")
+        if slot_str not in booked_times:
+            session_end = current + timedelta(minutes=sl)
+            slots.append(f"{slot_str}–{session_end.strftime('%H:%M')}")
+        current += timedelta(minutes=interval)
+    return slots
+
+
+def _build_slot_info(
+    events: list[dict[str, Any]], db_path: str, settings: dict[str, Any]
+) -> dict[str, str] | None:
+    """Fetch live available slots from DB for the first upcoming public event."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    visible = [
+        e for e in events
+        if e.get("status") in ("active", "upcoming")
+        and not e.get("hidden")
+        and e.get("photos")
+        and str(e.get("date", "")) >= today
+    ]
+    visible.sort(key=lambda e: str(e.get("date", "")))
+    if not visible:
+        return None
+
+    event = visible[0]
+    date = event["date"]
+    booked: set[str] = set()
+    if db_path and os.path.exists(db_path):
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("""
+            SELECT time FROM bookings
+            WHERE date=? AND status NOT IN ('cancelled','expired')
+              AND (confirmed=1 OR reserved_until > ?)
+        """, (date, datetime.now().isoformat()))
+        booked = {row["time"] for row in c.fetchall()}
+        conn.close()
+
+    slots = _generate_event_slots(event, booked)
+    if not slots:
+        return None
+
+    site_url = os.environ.get("ASSISTANT_SITE_URL", "https://iryna-booking.fly.dev")
+    event_id = event["id"]
+    deposit = event.get("deposit", "")
+    etransfer_email = settings.get("photographer_email", "iryna.pashynska@gmail.com")
+
+    return {
+        "slots_str": ", ".join(slots[:8]),
+        "booking_url": f"{site_url}/?event={event_id}",
+        "deposit_instructions": (
+            f"e-Transfer {etransfer_email}  ${deposit} CAD. "
+            f"Slot held for 15 min after booking starts."
+        ),
+    }
 
 _KNOWLEDGE_CACHE: dict[str, Any] = {"path": None, "mtime": None, "items": []}
 
@@ -171,7 +240,12 @@ def _event_lines(events: list[dict[str, Any]], today: str | None = None) -> list
     return lines
 
 
-def build_context(message: str, events: list[dict[str, Any]], settings: dict[str, Any]) -> dict[str, Any]:
+def build_context(
+    message: str,
+    events: list[dict[str, Any]],
+    settings: dict[str, Any],
+    db_path: str = "",
+) -> dict[str, Any]:
     selected = _select_knowledge(message)
     event_context = "\n".join(_event_lines(events)) or "- No public sessions are currently listed."
     knowledge_context = "\n".join(
@@ -191,6 +265,27 @@ def build_context(message: str, events: list[dict[str, Any]], settings: dict[str
         "tax_label": settings.get("tax_label", "+GST"),
         "timezone": settings.get("timezone", "America/Edmonton"),
     }
+
+    # Build slot info for the first upcoming event
+    slot_info = _build_slot_info(events, db_path, settings)
+    if slot_info:
+        facts["available_slots"] = slot_info["slots_str"]
+        facts["booking_url"] = slot_info["booking_url"]
+        facts["deposit_instructions"] = slot_info["deposit_instructions"]
+        # Also expose raw numbers for fallback use
+        visible = [
+            e for e in events
+            if e.get("status") in ("active", "upcoming")
+            and not e.get("hidden")
+            and e.get("photos")
+            and str(e.get("date", "")) >= datetime.now().strftime("%Y-%m-%d")
+        ]
+        visible.sort(key=lambda e: str(e.get("date", "")))
+        if visible:
+            ev0 = visible[0]
+            facts["deposit"] = ev0.get("deposit", "")
+            facts["full_price"] = ev0.get("full_price", "")
+
     return {
         "events": event_context,
         "knowledge": knowledge_context,
@@ -211,6 +306,9 @@ Rules:
 - Do not claim to be Iryna personally. You may write in a warm Iryna-like style as her assistant.
 - Do not invent unavailable dates, exact private locations, discounts, or policies. If unsure, ask the visitor to DM Iryna on Instagram.
 - Do not take payment details or promise a booking in chat. Guide the visitor to choose a session/time on the site.
+- **Always give the direct booking link** from the facts when the visitor shows booking intent ("book", "забронировать", etc.).
+- **Mention the available time slots** from the facts when asked about times or booking.
+- **Give e-Transfer payment details** (email + amount) when the visitor asks about payment/deposit. Do NOT send them to another page for payment info.
 - Keep answers practical: usually 2-5 short sentences. Include one clear next step.
 
 Iryna's tone from past business chats:
@@ -237,9 +335,16 @@ Business facts:
 - Booking reservation window: {reservation_minutes} minutes
 - Currency/tax: {currency} {tax_label}
 - Timezone: {timezone}
+- Deposit method: e-Transfer to {email}
 
 Current public sessions:
 {events}
+
+Available time slots for the next session:
+{slots}
+
+To book: {booking_url}
+Payment details: {deposit_instructions}
 
 Relevant sanitized past examples:
 {knowledge}
@@ -258,7 +363,11 @@ Visitor message:
         currency=facts["currency"],
         tax_label=facts["tax_label"],
         timezone=facts["timezone"],
+        email=facts["email"],
         events=context["events"],
+        slots=facts.get("available_slots", "- Slot info not available — ask the visitor to check the site."),
+        booking_url=facts.get("booking_url", os.environ.get("ASSISTANT_SITE_URL", "https://iryna-booking.fly.dev")),
+        deposit_instructions=facts.get("deposit_instructions", "- Payment details available on the booking page."),
         knowledge=context["knowledge"] or "- No matching past examples found.",
         history="\n".join(history_lines) or "- none",
         message=message,
@@ -408,16 +517,36 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
     is_ru = lang in {"ru", "uk"} or re.search(r"[А-Яа-яІіЇїЄєҐґ]", message)
 
     if any(k in lower for k in ["price", "cost", "deposit", "payment", "сколько", "цена", "депозит", "оплат"]):
+        booking_url = facts.get("booking_url", "")
+        slots = facts.get("available_slots", "")
+        deposit_instr = facts.get("deposit_instructions", "")
         if is_ru:
             return (
-                "Конечно. Сейчас на сайте актуальные цены указаны в карточках сессий: "
-                f"{first_event or 'выберите ближайшую доступную сессию на сайте'}. "
-                f"Слот держится {facts['reservation_minutes']} минут, депозит оплачивается при бронировании, остаток в день съемки."
+                f"{first_event or 'Актуальная сессия — выберите на сайте'}. "
+                f"{slots and f'Свободные слоты: {slots}. ' or ''}"
+                f"{deposit_instr and f'Оплата: {deposit_instr} ' or ''}"
+                f"{booking_url and f'Бронировать: {booking_url}' or 'Для бронирования напишите Ирине в Instagram.'}"
             )
         return (
-            "Of course. The current price is shown on each session card: "
-            f"{first_event or 'please choose an available session on the site'}. "
-            f"Your slot is held for {facts['reservation_minutes']} minutes, with the deposit paid at booking and the balance due on session day."
+            f"{first_event or 'Current session — choose on the site'}. "
+            f"{slots and f'Available slots: {slots}. ' or ''}"
+            f"{deposit_instr and f'Payment: {deposit_instr} ' or ''}"
+            f"{booking_url and f'Book here: {booking_url}' or 'To book, DM Iryna on Instagram.'}"
+        )
+
+    if any(k in lower for k in ["book", "reserve", "забронировать", "бронь", "записаться", "slot", "time", "время", "сегодня", "завтра", "когда"]):
+        booking_url = facts.get("booking_url", "")
+        slots = facts.get("available_slots", "")
+        if is_ru:
+            return (
+                f"{slots and f'Свободные слоты: {slots}. ' or ''}"
+                f"{booking_url and f'Забронировать можно здесь: {booking_url}. ' or 'Напишите Ирине в Instagram для бронирования.'}"
+                f"Депозит ${facts.get('deposit', '')} CAD через e-Transfer на {facts['email']}. Остаток — в день съемки."
+            )
+        return (
+            f"{slots and f'Available slots: {slots}. ' or ''}"
+            f"{booking_url and f'You can book here: {booking_url}. ' or 'DM Iryna on Instagram to book.'}"
+            f"Deposit ${facts.get('deposit', '')} CAD via e-Transfer to {facts['email']}. Balance due on session day."
         )
 
     if any(k in lower for k in ["wear", "outfit", "clothes", "одеть", "одяг", "вдяг"]):
@@ -471,10 +600,11 @@ def answer_assistant_message(
     events: list[dict[str, Any]],
     settings: dict[str, Any],
     lang: str = "en",
+    db_path: str = "",
 ) -> dict[str, Any]:
     clean_message = _safe_text(message, 1200)
     clean_history = history if isinstance(history, list) else []
-    context = build_context(clean_message, events, settings)
+    context = build_context(clean_message, events, settings, db_path=db_path)
     started = time.time()
 
     source = "fallback"
