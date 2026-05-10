@@ -469,6 +469,33 @@
     let timerInterval = null;
     let expiresAt = null;
 
+    function redirectIfConfirmed(data) {
+      if (data && (data.confirmed || data.status === 'confirmed')) {
+        sessionStorage.removeItem('reservationExpiry');
+        window.location.href = '/success?booking_id=' + encodeURIComponent(urlBookingId) + '&token=' + encodeURIComponent(urlToken);
+        return true;
+      }
+      if (data && data.status === 'cancelled') {
+        alert('This booking was cancelled. Please select a new time slot.');
+        window.location.href = '/';
+        return true;
+      }
+      return false;
+    }
+
+    function pollBookingStatus() {
+      if (!urlBookingId || !urlToken) return;
+      fetch('/booking-status?booking_id=' + encodeURIComponent(urlBookingId) + '&token=' + encodeURIComponent(urlToken))
+        .then(r => r.ok ? r.json() : null)
+        .then(redirectIfConfirmed)
+        .catch(() => {});
+    }
+
+    // If the e-Transfer is auto-detected while the client is still on this page,
+    // move them to the confirmed status page without requiring a button click.
+    setInterval(pollBookingStatus, 3000);
+    pollBookingStatus();
+
     function initTimer() {
       const saved = sessionStorage.getItem('reservationExpiry');
       expiresAt = saved ? new Date(saved) : new Date(Date.now() + 15 * 60 * 1000);

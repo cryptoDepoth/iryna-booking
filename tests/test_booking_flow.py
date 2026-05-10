@@ -192,6 +192,43 @@ def test_booking_status_shows_paid_amount(client):
     assert status["status"] == "confirmed"
 
 
+def test_success_page_initially_renders_confirmed_state_for_confirmed_booking(client):
+    """A confirmed e-Transfer booking should not show stale pending copy on page load."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+    resp = _reserve(c, slot_time, event_id, email="success-confirmed@test.com")
+    booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
+
+    c.post("/confirm", json={"booking_id": booking_id, "confirmation_token": token})
+    c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"},
+           json={"booking_id": booking_id, "paid_amount": 100.0})
+
+    page = c.get(f"/success?booking_id={booking_id}")
+    assert page.status_code == 200
+    html = page.data.decode()
+    assert 'id="main-title" data-i18n="confirmed_title"' in html
+    assert 'id="detail-status" data-i18n="confirmed_status"' in html
+    assert 'id="msg-pending" style="display:none"' in html
+    assert 'id="msg-confirmed" style="display:block"' in html
+
+
+def test_payment_page_polls_and_redirects_when_booking_auto_confirmed(client):
+    """If client stays on payment page, auto-confirm should move them to success page."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+    resp = _reserve(c, slot_time, event_id, email="payment-poll@test.com")
+    booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
+
+    page = c.get(f"/payment?booking_id={booking_id}&token={token}")
+    assert page.status_code == 200
+    html = page.data.decode()
+    assert "/booking-status?booking_id=" in html
+    assert "redirectIfConfirmed" in html
+    assert "/success?booking_id=" in html
+
+
 # ── Phone validation tests (Fix: international numbers) ──────────────────────
 
 def test_international_phone_accepted(client):

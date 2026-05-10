@@ -308,7 +308,7 @@
     footer a { color: var(--rose); text-decoration: none; font-weight: 500; }
   </style>
 </head>
-<body>
+<body{% if booking and booking.confirmed %} class="confirmed-bg"{% endif %}>
 
   <!-- Petal / confetti layer -->
   <div id="petal-canvas"></div>
@@ -335,25 +335,25 @@
     <!-- Status hero -->
     <div class="status-hero">
       <div class="icon-wrap" id="icon-wrap">
-        <div class="icon-ring pending" id="icon-ring"></div>
-        <div class="icon-inner pending" id="icon-inner">
-          <span id="icon-emoji">⏳</span>
-          <svg class="check-svg" id="check-svg" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div class="icon-ring {% if booking and booking.confirmed %}confirmed{% else %}pending{% endif %}" id="icon-ring"></div>
+        <div class="icon-inner {% if booking and booking.confirmed %}confirmed{% else %}pending{% endif %}" id="icon-inner">
+          <span id="icon-emoji"{% if booking and booking.confirmed %} style="display:none"{% endif %}>⏳</span>
+          <svg class="check-svg{% if booking and booking.confirmed %} show{% endif %}" id="check-svg" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path class="check-path" d="M8 20 L17 29 L33 13"/>
           </svg>
         </div>
       </div>
 
-      <div class="status-title" id="main-title" data-i18n="verifying">Verifying Payment…</div>
-      <p class="status-sub" id="subtitle" data-i18n="verifying_sub">Your e-Transfer is being verified. This usually takes under a minute.</p>
-      <span class="status-badge pending" id="status-badge">
+      <div class="status-title" id="main-title" data-i18n="{% if booking and booking.confirmed %}confirmed_title{% else %}verifying{% endif %}">{% if booking and booking.confirmed %}You're Confirmed! 🌸{% else %}Verifying Payment…{% endif %}</div>
+      <p class="status-sub" id="subtitle" data-i18n="{% if booking and booking.confirmed %}confirmed_sub{% else %}verifying_sub{% endif %}">{% if booking and booking.confirmed %}Payment received. See you at the session!{% else %}Your e-Transfer is being verified. This usually takes under a minute.{% endif %}</p>
+      <span class="status-badge {% if booking and booking.confirmed %}confirmed{% else %}pending{% endif %}" id="status-badge">
         <span class="badge-dot"></span>
-        <span id="status-text" data-i18n="checking">Checking payment…</span>
+        <span id="status-text" data-i18n="{% if booking and booking.confirmed %}confirmed_status{% else %}checking{% endif %}">{% if booking and booking.confirmed %}Confirmed ✓{% else %}Checking payment…{% endif %}</span>
       </span>
     </div>
 
     <!-- Confirmed banner (shown on confirmation) -->
-    <div class="confirmed-banner" id="confirmed-banner">
+    <div class="confirmed-banner{% if booking and booking.confirmed %} show{% endif %}" id="confirmed-banner">
       <div class="banner-emoji">🌸</div>
       <div class="banner-title" data-i18n="confirmed_title">You're Confirmed!</div>
       <div class="banner-sub" data-i18n="confirmed_sub">Payment received. See you at the session!</div>
@@ -395,25 +395,25 @@
       </div>
       <div class="detail-row">
         <span class="key" data-i18n="status_label">Status</span>
-        <span class="val" id="detail-status" data-i18n="pending_verify">Pending verification</span>
+        <span class="val" id="detail-status" data-i18n="{% if booking and booking.confirmed %}confirmed_status{% else %}pending_verify{% endif %}">{% if booking and booking.confirmed %}Confirmed ✓{% else %}Pending verification{% endif %}</span>
       </div>
     </div>
 
     <!-- Pending message -->
-    <div class="msg info" id="msg-pending">
+    <div class="msg info" id="msg-pending"{% if booking and booking.confirmed %} style="display:none"{% endif %}>
       📧 <strong data-i18n="what_next_title">What happens next?</strong><br><br>
       <span data-i18n="what_next_body">Our system checks for your e-Transfer automatically. Once confirmed, this page updates instantly.</span><br><br>
       <strong data-i18n="no_resend">Please do not resend the payment.</strong>
     </div>
 
     <!-- Confirmed message (hidden) -->
-    <div class="msg success" id="msg-confirmed" style="display:none">
+    <div class="msg success" id="msg-confirmed" style="display:{% if booking and booking.confirmed %}block{% else %}none{% endif %}">
       🎉 <strong data-i18n="booking_confirmed_msg">Your booking is confirmed!</strong><br><br>
       <span data-i18n="booking_confirmed_body">Payment received. A confirmation has been noted. See you at the session!</span>
     </div>
 
     <!-- Confirmed calendar buttons (hidden until confirmed) -->
-    <div id="calendar-buttons" style="display:none; margin-bottom: 16px;">
+    <div id="calendar-buttons" style="display:{% if booking and booking.confirmed %}block{% else %}none{% endif %}; margin-bottom: 16px;">
       <div style="display:flex; gap: 10px; flex-wrap: wrap;">
         <a id="google-cal-link" href="#" target="_blank" class="btn-cal" style="flex:1; min-width: 140px; background: #fff; border: 1px solid var(--ink-5); border-radius: 12px; padding: 12px 16px; text-decoration: none; color: var(--ink); font-size: 0.85rem; font-weight: 500; display:flex; align-items:center; justify-content:center; gap: 8px;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -427,7 +427,7 @@
     </div>
 
     <!-- Warning -->
-    <div class="msg warning" id="msg-warning">
+    <div class="msg warning" id="msg-warning"{% if booking and booking.confirmed %} style="display:none"{% endif %}>
       ⚠️ <strong data-i18n="slot_reserved_msg">Your slot is reserved</strong>
       <span data-i18n="slot_reserved_body"> while payment verifies. Questions?</span>
       <a href="https://instagram.com/pashynska.photo" style="color:var(--rose);text-decoration:none;font-weight:600" target="_blank"> DM @pashynska.photo</a>
@@ -676,6 +676,7 @@
   };
 
   let currentLang = localStorage.getItem('lang') || 'en';
+  let isConfirmed = {{ 'true' if booking and booking.confirmed else 'false' }};
 
   function setLang(lang) {
     if (!TRANSLATIONS[lang]) return;
@@ -779,10 +780,9 @@
 
     const confirmationToken = '{{ confirmation_token }}';
 
-    let isConfirmed = false;
     let pollTimer;
 
-    window.isConfirmed = false;
+    window.isConfirmed = isConfirmed;
 
     function applyConfirmedTranslations() {
       document.getElementById('main-title').textContent  = t('confirmed_title');
@@ -901,8 +901,31 @@
 
     function stopPolling() { if (pollTimer) clearInterval(pollTimer); }
 
-    pollTimer = setInterval(poll, 3000);
-    poll();
+    if (isConfirmed) {
+      document.title = '✅ ' + t('confirmed_title') + ' | Pashynska Photography';
+      const calDate = '{{ date }}';
+      const calTime = '{{ time }}';
+      const calTitle = '{{ event_title }}';
+      const calLoc = '{{ location }}';
+      const bookingIdForCal = '{{ booking.id if booking else "" }}';
+      const tokenForCal = '{{ confirmation_token }}';
+      const [h, m] = calTime.split(':').map(Number);
+      const startIso = calDate + 'T' + calTime.replace(':', '') + '00';
+      const endH = h + Math.floor((m + 30) / 60);
+      const endM = (m + 30) % 60;
+      const endIso = calDate + 'T' + String(endH).padStart(2,'0') + String(endM).padStart(2,'0') + '00';
+      document.getElementById('google-cal-link').href =
+        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+        '&text=' + encodeURIComponent(calTitle) +
+        '&dates=' + startIso + '/' + endIso +
+        '&location=' + encodeURIComponent(calLoc) +
+        '&details=' + encodeURIComponent('Booking #' + bookingIdForCal + ' with Pashynska Photography');
+      document.getElementById('apple-cal-link').href = '/calendar-ics/' + bookingIdForCal + '?token=' + tokenForCal;
+      stopPolling();
+    } else {
+      pollTimer = setInterval(poll, 3000);
+      poll();
+    }
   })();
 
   /* ════════════════════════════════════════════════════
