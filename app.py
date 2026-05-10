@@ -1836,10 +1836,11 @@ import re as _re
 
 def _validate_booking_fields(name, email, phone, instagram=""):
     """Validate client booking fields. Returns (is_valid, error_message)."""
-    # Name: letters (incl. accented), spaces, hyphens, apostrophes — min 2 chars
+    # Name: letters (Latin, accented, Cyrillic, Ukrainian, Devanagari), spaces,
+    # hyphens, apostrophes — min 2 chars. Many clients are Russian/Ukrainian.
     if not name or len(name.strip()) < 2:
         return False, "Please enter your full name (at least 2 characters)"
-    if not _re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿ'\- ]{2,80}$", name.strip()):
+    if not _re.match(r"^[A-Za-zÀ-ÖØ-öø-ÿА-Яа-яЁёЇїІіЄєҐґऀ-ॿ'\- ]{2,80}$", name.strip()):
         return False, "Name should contain only letters, spaces, or hyphens"
 
     # Email: standard format check
@@ -2056,6 +2057,49 @@ def expired_endpoint():
     deleted = expire_reservations()
     return jsonify({"success": True, "released": deleted,
                     "message": f"{deleted} expired slot(s) released"})
+
+
+@app.route("/cancel-reservation", methods=["POST"])
+def cancel_reservation():
+    """Let a client cancel their own unconfirmed reservation using booking_id + token.
+    Only works on 'reserved' or 'pending_payment' (not yet confirmed/paid) bookings.
+    This frees the slot immediately so the client can rebook a different time.
+    """
+    data = request.get_json(silent=True) or {}
+    booking_id = data.get("booking_id")
+    token = (data.get("token") or "").strip()
+    if not booking_id or not token:
+        return jsonify({"success": False, "error": "booking_id and token required"}), 400
+
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        "SELECT * FROM bookings WHERE id=? AND confirmation_token=?",
+        (booking_id, token)
+    )
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"success": False, "error": "Booking not found"}), 404
+
+    booking = dict(row)
+    # Only cancel unconfirmed, unpaid reservations
+    if booking.get("confirmed") or booking.get("paid"):
+        conn.close()
+        return jsonify({"success": False, "error": "Cannot cancel a confirmed or paid booking"}), 400
+    if booking.get("status") not in ("reserved", "pending_payment"):
+        conn.close()
+        return jsonify({"success": True, "message": "Already released"})
+
+    c.execute(
+        "UPDATE bookings SET status='cancelled', reserved_until=NULL WHERE id=?",
+        (booking_id,)
+    )
+    conn.commit()
+    conn.close()
+    log.info(f"[cancel-reservation] Booking #{booking_id} cancelled by client (token match)")
+    return jsonify({"success": True, "message": "Reservation cancelled. The slot is now free."})
 
 @app.route("/confirm", methods=["POST"])
 def confirm_payment():

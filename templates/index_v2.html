@@ -852,9 +852,22 @@ function goToPayment(eventId, eventDate) {
 }
 
 function restoreDrawer(eventId) {
-  // Stop timer + status polling and restore drawer view
+  // Stop timer + status polling
   if (payTimer) clearInterval(payTimer);
   if (typeof stopStatusPolling === 'function') stopStatusPolling();
+  // Cancel the unconfirmed reservation so the slot opens back up immediately.
+  // Fire-and-forget — don't block the UI on this.
+  if (currentBooking?.booking_id && currentBooking?.confirmation_token) {
+    fetch('/cancel-reservation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        booking_id: currentBooking.booking_id,
+        token: currentBooking.confirmation_token
+      })
+    }).catch(() => {});  // silent — slot will expire anyway after 15 min
+  }
+  currentBooking = null;
   openDrawer(eventId);
 }
 
