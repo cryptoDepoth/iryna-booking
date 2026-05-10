@@ -389,6 +389,7 @@ def test_assistant_chat_fallback_works_without_openai_key(client, monkeypatch):
     c, _ = client
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("ZAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     resp = c.post("/assistant/chat", json={
         "message": "How much is the deposit and what is included?",
@@ -400,7 +401,37 @@ def test_assistant_chat_fallback_works_without_openai_key(client, monkeypatch):
     data = resp.get_json()
     assert data["success"] is True
     assert data["answer"]
-    assert data["source"] in {"fallback", "openai", "zai"}
+    assert data["source"] in {"fallback", "openai", "zai", "openrouter"}
+
+
+def test_assistant_chat_uses_openrouter_provider(client, monkeypatch):
+    """Assistant can use OpenRouter as the cheap production LLM provider."""
+    c, _ = client
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        class FakeResponse:
+            status_code = 200
+            text = "{}"
+
+            def json(self):
+                return {"choices": [{"message": {"content": "OpenRouter answer"}}]}
+
+        assert "openrouter.ai" in url
+        assert json["model"] == "google/gemini-2.5-flash-lite"
+        return FakeResponse()
+
+    monkeypatch.setenv("AI_PROVIDER", "openrouter")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_MODEL", "google/gemini-2.5-flash-lite")
+    monkeypatch.setattr(assistant_engine.requests, "post", fake_post)
+
+    resp = c.post("/assistant/chat", json={"message": "How much is the deposit?", "lang": "en", "history": []})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["source"] == "openrouter"
+    assert data["answer"] == "OpenRouter answer"
 
 
 def test_assistant_event_context_excludes_past_active_sessions():

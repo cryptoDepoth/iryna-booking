@@ -25,6 +25,8 @@ OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
 ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 DEFAULT_ZAI_MODEL = "glm-4.5-air"
+OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
+DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash-lite"
 
 _KNOWLEDGE_CACHE: dict[str, Any] = {"path": None, "mtime": None, "items": []}
 
@@ -350,6 +352,53 @@ def _call_zai(message: str, history: list[dict[str, str]], context: dict[str, An
     return str(content).strip() if content else None
 
 
+def _call_openrouter(message: str, history: list[dict[str, str]], context: dict[str, Any], lang: str) -> str | None:
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    messages = [
+        {"role": "system", "content": _instructions(lang)},
+        {"role": "user", "content": _input_text(message, history, context)},
+    ]
+    payload = {
+        "model": os.environ.get("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL),
+        "messages": messages,
+        "stream": False,
+        "max_tokens": int(os.environ.get("ASSISTANT_MAX_OUTPUT_TOKENS", "450")),
+        "temperature": float(os.environ.get("ASSISTANT_TEMPERATURE", "0.35")),
+    }
+    response = requests.post(
+        os.environ.get("OPENROUTER_CHAT_COMPLETIONS_URL", OPENROUTER_CHAT_COMPLETIONS_URL),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": os.environ.get("ASSISTANT_SITE_URL", "https://iryna-booking.fly.dev"),
+            "X-Title": "Pashynska Photography Assistant",
+        },
+        json=payload,
+        timeout=float(os.environ.get("ASSISTANT_OPENROUTER_TIMEOUT", "18")),
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"OpenRouter API error {response.status_code}: {response.text[:400]}")
+
+    data = response.json()
+    choices = data.get("choices") or []
+    if not choices:
+        return None
+    message_obj = choices[0].get("message") or {}
+    content = message_obj.get("content")
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("text"):
+                parts.append(str(item["text"]))
+            elif isinstance(item, str):
+                parts.append(item)
+        return "\n".join(parts).strip() or None
+    return str(content).strip() if content else None
+
+
 def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
     lower = message.lower()
     facts = context["facts"]
@@ -432,7 +481,11 @@ def answer_assistant_message(
     try:
         provider = os.environ.get("AI_PROVIDER", "auto").strip().lower()
         answer = None
-        if provider in {"auto", "zai", "z.ai"}:
+        if provider in {"auto", "openrouter"}:
+            answer = _call_openrouter(clean_message, clean_history, context, lang)
+            if answer:
+                source = "openrouter"
+        if not answer and provider in {"auto", "zai", "z.ai"}:
             answer = _call_zai(clean_message, clean_history, context, lang)
             if answer:
                 source = "zai"
