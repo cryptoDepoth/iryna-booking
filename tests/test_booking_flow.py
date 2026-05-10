@@ -27,6 +27,7 @@ def client(monkeypatch):
     monkeypatch.setattr(booking_app, "send_confirmation_email", lambda booking_id: True, raising=False)
     booking_app._rate_limits.clear()
     booking_app._login_attempts.clear()
+    booking_app._assistant_attempts.clear()
     booking_app.init_db()
 
     with booking_app.app.test_client() as c:
@@ -277,6 +278,25 @@ def test_health_endpoint_returns_json(client):
     assert "checks" in data
     assert "database" in data["checks"]
     assert data["checks"]["database"]["ok"] is True
+
+
+def test_assistant_chat_fallback_works_without_openai_key(client, monkeypatch):
+    """Assistant endpoint should still return a useful local answer without LLM keys."""
+    c, _ = client
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ZAI_API_KEY", raising=False)
+
+    resp = c.post("/assistant/chat", json={
+        "message": "How much is the deposit and what is included?",
+        "lang": "en",
+        "history": [],
+    })
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["answer"]
+    assert data["source"] in {"fallback", "openai", "zai"}
 
 
 def test_ics_uses_local_timezone(client):

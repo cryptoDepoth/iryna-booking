@@ -76,6 +76,31 @@ launchctl list | grep com.pashynska.booking
 - **Notion sync:** On confirmation, writes `Name`, `Date`, `Time`, `Session Type`, `Instagram`, `Deposit`, `Status`
 - **Gmail check:** `check_etransfer.py` runs every 5 min via LaunchAgent, marks deposits as `paid` + confirms client
 
+## 🤖 Website Assistant
+
+The public site includes a small chat helper on `index_v2.html`.
+
+- Endpoint: `POST /assistant/chat`
+- Optional LLM: set `ZAI_API_KEY`/`ZAI_MODEL` or `OPENAI_API_KEY`/`OPENAI_MODEL`
+- Fallback: works without OpenAI using current event data and simple local answers
+- Local knowledge file: `~/.pashynska-data/assistant_knowledge.jsonl`
+- Production knowledge file on Fly volume: `/data/assistant_knowledge.jsonl`
+
+Build the sanitized knowledge file from an Instagram export:
+
+```bash
+python3 scripts/build_assistant_knowledge.py /path/to/instagram-export.zip
+```
+
+Do not commit raw exports or generated knowledge files. The builder redacts links, emails, phone numbers, Instagram handles, and obvious client names.
+
+Production setup:
+
+```bash
+fly secrets set AI_PROVIDER="zai" ZAI_API_KEY="..." ZAI_MODEL="glm-4.5-air"
+fly ssh sftp put /Users/andrzej/.pashynska-data/assistant_knowledge.jsonl /data/assistant_knowledge.jsonl
+```
+
 ## 🎯 TODO / Improvements for AI Agents
 
 ### Critical

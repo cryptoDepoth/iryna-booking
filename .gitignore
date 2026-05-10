@@ -21,6 +21,9 @@ event.json
 backups/
 disabled_launchagents/
 
+# AI assistant generated knowledge (contains sanitized but private business chat patterns)
+assistant_knowledge*.jsonl
+
 # Tunnel logs
 tunnel.log
 flask.log

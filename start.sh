@@ -68,6 +68,7 @@ fi
 export DB_PATH=/data/bookings.db
 export BACKUP_DIR=/data/backups
 export EVENTS_YAML_PATH=/data/events.yaml
+export ASSISTANT_KNOWLEDGE_PATH="${ASSISTANT_KNOWLEDGE_PATH:-/data/assistant_knowledge.jsonl}"
 # PHOTOS_DIR keeps admin-uploaded photos on the persistent volume so they
 # survive container restarts and redeploys (the bundled /app/static/images
 # directory is wiped on every deploy).
@@ -77,6 +78,7 @@ mkdir -p "$PHOTOS_DIR"
 echo "[start] DB_PATH=$DB_PATH"
 echo "[start] EVENTS_YAML_PATH=$EVENTS_YAML_PATH"
 echo "[start] PHOTOS_DIR=$PHOTOS_DIR"
+echo "[start] ASSISTANT_KNOWLEDGE_PATH=$ASSISTANT_KNOWLEDGE_PATH"
 
 # ── Launch Gunicorn ────────────────────────────────────────────────────────────
 # 1 worker × 4 threads keeps memory under 256MB while letting slow Notion /

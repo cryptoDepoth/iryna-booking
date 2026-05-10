@@ -26,6 +26,7 @@ primary_region = 'sjc'
   DB_PATH            = "/data/bookings.db"
   BACKUP_DIR         = "/data/backups"
   EVENTS_YAML_PATH   = "/data/events.yaml"
+  ASSISTANT_KNOWLEDGE_PATH = "/data/assistant_knowledge.jsonl"
 
 [[mounts]]
   source = "booking_data"

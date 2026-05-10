@@ -157,6 +157,9 @@ def _start_global_watcher():
 _rate_limits = {}
 # Separate counter for admin login attempts (brute-force protection)
 _login_attempts = {}
+# Public assistant chat has its own, gentler limit. It should tolerate a real
+# conversation without letting one browser hammer the OpenAI API.
+_assistant_attempts = {}
 
 def check_login_rate_limit(ip):
     now = time.time()
@@ -183,6 +186,21 @@ def record_request(ip):
         stale = [k for k, v in _rate_limits.items() if not v or v[-1] < cutoff]
         for k in stale:
             del _rate_limits[k]
+
+def check_assistant_rate_limit(ip):
+    now = time.time()
+    window = [t for t in _assistant_attempts.get(ip, []) if now - t < 600]
+    _assistant_attempts[ip] = window
+    return len(window) < 30  # 30 chat messages per 10 minutes per IP
+
+def record_assistant_request(ip):
+    now = time.time()
+    _assistant_attempts.setdefault(ip, []).append(now)
+    if len(_assistant_attempts) > 10_000:
+        cutoff = now - 600
+        stale = [k for k, v in _assistant_attempts.items() if not v or v[-1] < cutoff]
+        for k in stale:
+            del _assistant_attempts[k]
 
 # ===== ADMIN AUTH =====
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
@@ -3471,6 +3489,50 @@ def api_clients_export():
 
 
 # ─────────────────────────────────────────────
+
+@app.route("/assistant/chat", methods=["POST"])
+def assistant_chat():
+    """Public site assistant.
+
+    Uses current event data plus an optional sanitized Instagram-derived
+    knowledge file. The raw client archive is never read by this route.
+    """
+    data = request.get_json(silent=True) or {}
+    message = (data.get("message") or "").strip()
+    if len(message) < 2:
+        return jsonify({"error": "message required"}), 400
+    if len(message) > 1200:
+        return jsonify({"error": "message is too long"}), 400
+
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    if isinstance(ip, str) and "," in ip:
+        ip = ip.split(",", 1)[0].strip()
+    if not check_assistant_rate_limit(ip):
+        return jsonify({"error": "Too many chat messages. Please wait a few minutes."}), 429
+    record_assistant_request(ip)
+
+    history = data.get("history") if isinstance(data.get("history"), list) else []
+    lang = (data.get("lang") or "en").strip()[:8]
+
+    try:
+        from assistant_engine import answer_assistant_message
+
+        result = answer_assistant_message(
+            message=message,
+            history=history,
+            events=EVENTS,
+            settings=SETTINGS,
+            lang=lang,
+        )
+        return jsonify({"success": True, **result})
+    except Exception as e:
+        log.error(f"[assistant] Unexpected failure: {e}")
+        fallback = (
+            "I can help with sessions, pricing, outfits, location details, and booking questions. "
+            "Please choose an available session on the site, or DM Iryna on Instagram for a custom request."
+        )
+        return jsonify({"success": True, "answer": fallback, "source": "fallback", "knowledge_used": 0})
+
 
 @app.route("/booking-status")
 def booking_status():

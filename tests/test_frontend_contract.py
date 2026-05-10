@@ -32,3 +32,12 @@ def test_drawer_uses_available_slots_returned_by_api_without_fake_status_filter(
     assert "const availableSlots = slotsData.slots || [];" in html
     assert "status === 'available'" not in html
     assert 'status === "available"' not in html
+
+
+def test_public_assistant_widget_posts_to_assistant_chat_endpoint():
+    """The public assistant should remain wired to the Flask assistant endpoint."""
+    html = TEMPLATE.read_text()
+
+    assert 'id="assistantWidget"' in html
+    assert "fetch('/assistant/chat'" in html
+    assert "updateAssistantLang" in html
