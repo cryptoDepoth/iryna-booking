@@ -935,6 +935,15 @@ except Exception as _e:
     log.warning(f"[photos] Could not ensure PHOTOS_DIR={PHOTOS_DIR}: {_e}")
 _BUNDLED_IMAGES_DIR = os.path.join(app.root_path, 'static', 'images')
 
+# ── Basic security headers ────────────────────────────────────────────────────
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
+
+
 # Serve uploaded photos: try persistent volume first, then bundled static.
 @app.route('/images/<path:filename>')
 def serve_image(filename):
@@ -2043,6 +2052,7 @@ def payment():
         name=booking.get("name", ""),
         price=ev.get("deposit", SESSION_PRICE) if ev.get("deposit") is not None else SESSION_PRICE,
         session_length=ev.get("session_length", SESSION_LENGTH),
+        event_title=ev.get("title", "Mini Session"),
         email=EMAIL,
         # Legacy static Payment Link (kept for backward compat — ignored if stripe_enabled)
         stripe_payment_link=ev.get("stripe_payment_link", ""),

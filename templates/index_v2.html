@@ -682,13 +682,23 @@ function validateBookingForm() {
     valid = false;
   }
 
-  // Phone: Canadian — 10 digits after stripping non-digits and optional leading 1
+  // Phone: accept Canadian (10 digits) or international (+country code, 7-15 digits)
   if (phone) {
-    let digits = phone.replace(/\D/g, '');
-    if (digits.startsWith('1') && digits.length === 11) digits = digits.slice(1);
-    if (digits.length !== 10 || ['0','1'].includes(digits[0]) || ['0','1'].includes(digits[3])) {
-      showFieldError('fPhone', T('err_phone'));
-      valid = false;
+    const raw = phone.trim();
+    let digits = raw.replace(/\D/g, '');
+    if (raw.startsWith('+')) {
+      // International format — just check digit count
+      if (digits.length < 7 || digits.length > 15) {
+        showFieldError('fPhone', T('err_phone'));
+        valid = false;
+      }
+    } else {
+      // North American — strip leading 1 if 11 digits
+      if (digits.startsWith('1') && digits.length === 11) digits = digits.slice(1);
+      if (digits.length !== 10 || ['0','1'].includes(digits[0]) || ['0','1'].includes(digits[3])) {
+        showFieldError('fPhone', T('err_phone'));
+        valid = false;
+      }
     }
   }
 
@@ -716,6 +726,10 @@ async function reserveSlot(eventId, eventDate) {
 
   if (!validateBookingForm()) return;
 
+  // Prevent double-submit while the request is in flight
+  const reserveBtn = document.getElementById('reserve-btn');
+  if (reserveBtn) { reserveBtn.disabled = true; reserveBtn.style.opacity = '.6'; }
+
   try {
     const result = await API.reserve({
       event_id: eventId,
@@ -742,10 +756,12 @@ async function reserveSlot(eventId, eventDate) {
       goToPayment(eventId, eventDate);
     } else {
       toast(result.error || T('toast_slot_unavailable'));
+      if (reserveBtn) { reserveBtn.disabled = false; reserveBtn.style.opacity = '1'; }
     }
   } catch (err) {
     console.error('Reserve failed:', err);
     toast(T('toast_network_error'));
+    if (reserveBtn) { reserveBtn.disabled = false; reserveBtn.style.opacity = '1'; }
   }
 }
 

@@ -405,7 +405,7 @@
       <div style="font-size:0.78rem;color:var(--ink-3);margin-bottom:10px">Paste this in the "Message" field when sending</div>
       <div class="bank-msg-wrap" id="bank-msg" onclick="copyBankMsg()">
         <button class="bank-copy-btn" onclick="copyBankMsg(event)" id="bank-copy-btn">Copy</button>
-        Blossom Mini Session — {{ date }} {{ booking.time }}<br>
+        {{ event_title }} — {{ date }} {{ booking.time }}<br>
         Deposit for {{ booking.name }}
       </div>
     </div>
@@ -418,7 +418,7 @@
         <li>Choose "Send Interac e-Transfer"</li>
         <li>Tap the email above to copy, paste as recipient</li>
         <li>Enter amount: <strong>${{ price }}.00</strong></li>
-        <li>Add message: "Blossom Mini Session — {{ date }} {{ booking.time }}"</li>
+        <li>Add message: "{{ event_title }} — {{ date }} {{ booking.time }}"</li>
         <li>Send the transfer</li>
       </ol>
     </div>
@@ -535,7 +535,7 @@
     // ── Copy bank message ──
     function copyBankMsg(e) {
       if (e) e.stopPropagation();
-      const msg = `Blossom Mini Session — {{ date }} {{ booking.time }}\nDeposit for {{ booking.name }}`;
+      const msg = `{{ event_title }} — {{ date }} {{ booking.time }}\nDeposit for {{ booking.name }}`;
       navigator.clipboard.writeText(msg).catch(() => {});
       const btn = document.getElementById('bank-copy-btn');
       btn.textContent = '✓ Copied';

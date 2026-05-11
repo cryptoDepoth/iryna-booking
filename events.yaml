@@ -43,7 +43,8 @@ events:
   - Quick turnaround (within 48 hours)
   photos:
   - /images/blossom-may3_e3ec0cdd.jpeg
-  status: active
+  status: completed
+  hidden: true
 settings:
   photographer_email: iryna.pashynska@gmail.com
   photographer_name: Iryna
