@@ -363,9 +363,11 @@ Primary goal: help visitors choose and book photo sessions with clear, warm, con
 
 4. NEVER make up slot times, dates, prices, or locations not in the provided facts.
 
-5. For booking intent — always give the direct booking link from the facts and nothing else. Do not collect name, email, or payment info in chat.
+5. For booking intent — never send website links. Instead tell visitors to DM Iryna on Instagram (@pashynska.photo) for the fastest booking. Do not collect name, email, or payment info in chat.
 
-6. If the question is completely unrelated to photography, booking, pricing, outfits, weather, location, or photo delivery — politely say this assistant only helps with session questions, and suggest DM-ing Iryna on Instagram for anything else.
+6. If someone asks to see photos or portfolio — direct them to Instagram @pashynska.photo where all current work is posted.
+
+7. If the question is completely unrelated to photography, booking, pricing, outfits, weather, location, or photo delivery — politely say this assistant only helps with session questions, and suggest DM-ing Iryna on Instagram for anything else.
 
 == Correct response examples ==
 
@@ -375,7 +377,7 @@ Correct: "Thank you! Payment confirmation is sent automatically by email — ple
 
 Visitor: "Book me for June 7th"
 Wrong: "Sure, you're booked for June 7th!"
-Correct: "To book your spot, use this link: [booking_url] — it takes about 2 minutes. Your slot will be held for {{reservation_minutes}} minutes after you start."
+Correct: "To book your spot, DM Iryna on Instagram @pashynska.photo — she'll send you the link and available slots. Your slot will be held for {{reservation_minutes}} minutes after you start."
 
 == Style ==
 - Reply in the same language as the visitor. UI language hint: {lang}.
@@ -409,7 +411,7 @@ Current public sessions:
 Available time slots for {slot_event_title}:
 {slots}
 
-To book: {booking_url}
+To book: DM Iryna on Instagram {instagram}
 Payment details: {deposit_instructions}
 
 Relevant sanitized past examples:
@@ -433,7 +435,6 @@ Visitor message:
         events=context["events"],
         slot_event_title=facts.get("slot_event_title", "the selected or next session"),
         slots=facts.get("available_slots", "- Slot info not available — ask the visitor to check the site."),
-        booking_url=facts.get("booking_url", os.environ.get("ASSISTANT_SITE_URL", "https://iryna-booking.fly.dev")),
         deposit_instructions=facts.get("deposit_instructions", "- Payment details available on the booking page."),
         knowledge=context["knowledge"] or "- No matching past examples found.",
         history="\n".join(history_lines) or "- none",
@@ -584,35 +585,33 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
     is_ru = lang in {"ru", "uk"} or re.search(r"[А-Яа-яІіЇїЄєҐґ]", message)
 
     if any(k in lower for k in ["price", "cost", "deposit", "payment", "сколько", "цена", "депозит", "оплат"]):
-        booking_url = facts.get("booking_url", "")
         slots = facts.get("available_slots", "")
         deposit_instr = facts.get("deposit_instructions", "")
         if is_ru:
             return (
-                f"{first_event or 'Актуальная сессия — выберите на сайте'}. "
+                f"{first_event or 'Актуальная сессия — уточните детали у Ирины'}. "
                 f"{slots and f'Свободные слоты: {slots}. ' or ''}"
                 f"{deposit_instr and f'Оплата: {deposit_instr} ' or ''}"
-                f"{booking_url and f'Бронировать: {booking_url}' or 'Для бронирования напишите Ирине в Instagram.'}"
+                f"Для бронирования напишите Ирине в Instagram {facts['instagram']} — она ответит быстрее всего."
             )
         return (
-            f"{first_event or 'Current session — choose on the site'}. "
+            f"{first_event or 'Current session — ask Iryna for details'}. "
             f"{slots and f'Available slots: {slots}. ' or ''}"
             f"{deposit_instr and f'Payment: {deposit_instr} ' or ''}"
-            f"{booking_url and f'Book here: {booking_url}' or 'To book, DM Iryna on Instagram.'}"
+            f"To book, DM Iryna on Instagram {facts['instagram']} — fastest way to get a spot."
         )
 
     if any(k in lower for k in ["book", "reserve", "забронировать", "бронь", "записаться", "slot", "time", "время", "сегодня", "завтра", "когда"]):
-        booking_url = facts.get("booking_url", "")
         slots = facts.get("available_slots", "")
         if is_ru:
             return (
                 f"{slots and f'Свободные слоты: {slots}. ' or ''}"
-                f"{booking_url and f'Забронировать можно здесь: {booking_url}. ' or 'Напишите Ирине в Instagram для бронирования.'}"
+                f"Напишите Ирине в Instagram {facts['instagram']} для бронирования — она пришлёт ссылку и подтвердит слот. "
                 f"Депозит ${facts.get('deposit', '')} CAD через e-Transfer на {facts['email']}. Остаток — в день съемки."
             )
         return (
             f"{slots and f'Available slots: {slots}. ' or ''}"
-            f"{booking_url and f'You can book here: {booking_url}. ' or 'DM Iryna on Instagram to book.'}"
+            f"DM Iryna on Instagram {facts['instagram']} to book — she'll send the link and confirm your spot. "
             f"Deposit ${facts.get('deposit', '')} CAD via e-Transfer to {facts['email']}. Balance due on session day."
         )
 
@@ -650,6 +649,16 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
             if is_ru else
             "Mini sessions usually include retouched photos plus all original images, with delivery timing shown on the selected session card. "
             "After the shoot, Iryna sends a private gallery and instructions for choosing photos."
+        )
+
+    # NEW: portfolio / photo viewing requests
+    if any(k in lower for k in ["portfolio", "see photos", "посмотреть", "примеры", "работы", "фото", "фотографии", "снимки", "портфолио", "work", "gallery"]):
+        return (
+            f"Все актуальные фото и работы Ирины выложены в Instagram {facts['instagram']}. "
+            "Там можно увидеть полное портфолио мини-сессий и стиль съёмки."
+            if is_ru else
+            f"All current work and portfolio photos are on Instagram {facts['instagram']}. "
+            "That's the best place to see Iryna's style and session examples."
         )
 
     return (
