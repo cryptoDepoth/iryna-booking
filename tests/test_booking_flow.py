@@ -469,6 +469,49 @@ def test_assistant_event_context_excludes_past_active_sessions():
     assert "Past Blossom" not in "\n".join(lines)
 
 
+def test_assistant_slot_info_uses_requested_event(monkeypatch):
+    """If a visitor asks about Lilac, the assistant must not link to a different earlier event."""
+    monkeypatch.setenv("ASSISTANT_SITE_URL", "https://example.test")
+    events = [
+        {
+            "id": "summer-minis-2099-06-01",
+            "title": "Summer minis",
+            "date": "2099-06-01",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "session_length": 20,
+            "slot_interval": 30,
+            "deposit": 1,
+            "full_price": 300,
+            "status": "upcoming",
+            "photos": ["/images/summer.jpg"],
+        },
+        {
+            "id": "lilac-jun7",
+            "title": "Lilac Mini Sessions",
+            "date": "2099-06-07",
+            "start_time": "15:00",
+            "end_time": "16:00",
+            "session_length": 20,
+            "slot_interval": 30,
+            "deposit": 100,
+            "full_price": 500,
+            "status": "active",
+            "photos": ["/images/lilac.jpg"],
+        },
+    ]
+
+    context = assistant_engine.build_context(
+        "Какие свободные слоты есть на Lilac Mini Sessions?",
+        events,
+        {"photographer_email": "iryna@example.test"},
+    )
+
+    assert context["facts"]["booking_url"] == "https://example.test/?event=lilac-jun7"
+    assert context["facts"]["deposit"] == 100
+    assert "15:00" in context["facts"]["available_slots"]
+
+
 def test_ics_uses_local_timezone(client):
     """Calendar .ics file should use TZID (local time) not Z (UTC) to prevent drift."""
     c, db_path = client_tuple = client

@@ -29,7 +29,82 @@ OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions
 DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash-lite"
 
 
-# ── slot helper ──────────────────────────────────────────────────────────────
+# ── event + slot helpers ─────────────────────────────────────────────────────
+def _public_future_events(events: list[dict[str, Any]], today: str | None = None) -> list[dict[str, Any]]:
+    """Return events that are safe to show to public visitors."""
+    today = today or datetime.now().strftime("%Y-%m-%d")
+    visible = [
+        e for e in events
+        if e.get("status") in ("active", "upcoming")
+        and not e.get("hidden")
+        and e.get("photos")
+        and str(e.get("date", "")) >= today
+    ]
+    visible.sort(key=lambda e: str(e.get("date", "")))
+    return visible
+
+
+def _event_match_score(event: dict[str, Any], message: str) -> int:
+    """Score how likely the visitor is asking about this specific event."""
+    message_l = _safe_text(message, 1200).lower()
+    if not message_l:
+        return 0
+
+    score = 0
+    event_id = str(event.get("id", "")).lower()
+    if event_id and event_id in message_l:
+        score += 30
+
+    event_text = " ".join(
+        str(event.get(k, "")) for k in ("id", "title", "subtitle", "session_type", "type")
+    )
+    query_tokens = _tokenize(message_l)
+    event_tokens = _tokenize(event_text.lower())
+    score += len(query_tokens & event_tokens) * 4
+
+    date_raw = str(event.get("date", ""))
+    if date_raw and date_raw in message_l:
+        score += 20
+    try:
+        event_date = datetime.strptime(date_raw, "%Y-%m-%d")
+        day = str(event_date.day)
+        month_num = str(event_date.month)
+        month_names = {
+            1: ("jan", "january", "январ", "січ"),
+            2: ("feb", "february", "феврал", "лют"),
+            3: ("mar", "march", "март", "берез"),
+            4: ("apr", "april", "апрел", "квіт"),
+            5: ("may", "май", "трав"),
+            6: ("jun", "june", "июн", "черв"),
+            7: ("jul", "july", "июл", "лип"),
+            8: ("aug", "august", "август", "серп"),
+            9: ("sep", "september", "сент", "верес"),
+            10: ("oct", "october", "октябр", "жовт"),
+            11: ("nov", "november", "ноябр", "листоп"),
+            12: ("dec", "december", "декабр", "груд"),
+        }
+        has_day = re.search(rf"\b0?{re.escape(day)}\b", message_l) is not None
+        has_month = month_num in query_tokens or any(part in message_l for part in month_names[event_date.month])
+        if has_day and has_month:
+            score += 18
+        elif has_day:
+            score += 3
+    except ValueError:
+        pass
+
+    return score
+
+
+def _select_relevant_event(events: list[dict[str, Any]], message: str) -> dict[str, Any] | None:
+    if not events:
+        return None
+    scored = [(_event_match_score(event, message), event) for event in events]
+    scored.sort(key=lambda row: (-row[0], str(row[1].get("date", ""))))
+    if scored[0][0] > 0:
+        return scored[0][1]
+    return events[0]
+
+
 def _generate_event_slots(event: dict[str, Any], booked_times: set[str]) -> list[str]:
     """Return available slot labels like ['10:00–10:20', '10:30–10:50']."""
     start = datetime.strptime(event.get("start_time", "10:00"), "%H:%M")
@@ -48,22 +123,14 @@ def _generate_event_slots(event: dict[str, Any], booked_times: set[str]) -> list
 
 
 def _build_slot_info(
-    events: list[dict[str, Any]], db_path: str, settings: dict[str, Any]
+    events: list[dict[str, Any]], db_path: str, settings: dict[str, Any], message: str = ""
 ) -> dict[str, str] | None:
-    """Fetch live available slots from DB for the first upcoming public event."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    visible = [
-        e for e in events
-        if e.get("status") in ("active", "upcoming")
-        and not e.get("hidden")
-        and e.get("photos")
-        and str(e.get("date", "")) >= today
-    ]
-    visible.sort(key=lambda e: str(e.get("date", "")))
+    """Fetch live available slots for the event the visitor means, if clear."""
+    visible = _public_future_events(events)
     if not visible:
         return None
 
-    event = visible[0]
+    event = _select_relevant_event(visible, message) or visible[0]
     date = event["date"]
     booked: set[str] = set()
     if db_path and os.path.exists(db_path):
@@ -89,6 +156,8 @@ def _build_slot_info(
     etransfer_email = settings.get("photographer_email", "iryna.pashynska@gmail.com")
 
     return {
+        "event_id": str(event_id),
+        "event_title": str(event.get("title", "")),
         "slots_str": ", ".join(slots[:8]),
         "booking_url": f"{site_url}/?event={event_id}",
         "deposit_instructions": (
@@ -213,15 +282,7 @@ def _event_lines(events: list[dict[str, Any]], today: str | None = None) -> list
     event.
     """
     lines: list[str] = []
-    today = today or datetime.now().strftime("%Y-%m-%d")
-    visible = [
-        e for e in events
-        if e.get("status") in ("active", "upcoming")
-        and not e.get("hidden")
-        and e.get("photos")
-        and str(e.get("date", "")) >= today
-    ]
-    visible.sort(key=lambda e: str(e.get("date", "")))
+    visible = _public_future_events(events, today=today)
     for event in visible[:8]:
         included = "; ".join(str(x) for x in (event.get("included") or [])[:4])
         lines.append(
@@ -267,24 +328,17 @@ def build_context(
     }
 
     # Build slot info for the first upcoming event
-    slot_info = _build_slot_info(events, db_path, settings)
+    slot_info = _build_slot_info(events, db_path, settings, message=message)
     if slot_info:
         facts["available_slots"] = slot_info["slots_str"]
         facts["booking_url"] = slot_info["booking_url"]
         facts["deposit_instructions"] = slot_info["deposit_instructions"]
+        facts["slot_event_title"] = slot_info["event_title"]
         # Also expose raw numbers for fallback use
-        visible = [
-            e for e in events
-            if e.get("status") in ("active", "upcoming")
-            and not e.get("hidden")
-            and e.get("photos")
-            and str(e.get("date", "")) >= datetime.now().strftime("%Y-%m-%d")
-        ]
-        visible.sort(key=lambda e: str(e.get("date", "")))
-        if visible:
-            ev0 = visible[0]
-            facts["deposit"] = ev0.get("deposit", "")
-            facts["full_price"] = ev0.get("full_price", "")
+        selected_event = next((e for e in events if str(e.get("id", "")) == slot_info["event_id"]), None)
+        if selected_event:
+            facts["deposit"] = selected_event.get("deposit", "")
+            facts["full_price"] = selected_event.get("full_price", "")
 
     return {
         "events": event_context,
@@ -352,7 +406,7 @@ Business facts:
 Current public sessions:
 {events}
 
-Available time slots for the next session:
+Available time slots for {slot_event_title}:
 {slots}
 
 To book: {booking_url}
@@ -377,6 +431,7 @@ Visitor message:
         timezone=facts["timezone"],
         email=facts["email"],
         events=context["events"],
+        slot_event_title=facts.get("slot_event_title", "the selected or next session"),
         slots=facts.get("available_slots", "- Slot info not available — ask the visitor to check the site."),
         booking_url=facts.get("booking_url", os.environ.get("ASSISTANT_SITE_URL", "https://iryna-booking.fly.dev")),
         deposit_instructions=facts.get("deposit_instructions", "- Payment details available on the booking page."),
