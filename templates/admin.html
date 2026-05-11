@@ -914,6 +914,7 @@
                 <button class="ev-tab active" data-ev="{{ ev.id }}" data-tab="schedule" onclick="switchTab('{{ ev.id }}','schedule')">📅 Schedule</button>
                 <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="info" onclick="switchTab('{{ ev.id }}','info')">✏️ Info</button>
                 <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="included" onclick="switchTab('{{ ev.id }}','included')">✅ What's included</button>
+                <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="photos" onclick="switchTab('{{ ev.id }}','photos')">📸 Photos <span id="photos-count-{{ ev.id }}" style="background:var(--accent-light);color:var(--accent);border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px;">{{ (ev.photos or [])|length }}</span></button>
             </div>
 
             <!-- ── TAB: SCHEDULE ── -->
@@ -1020,6 +1021,53 @@
                 </button>
             </div>
 
+            <!-- ── TAB: PHOTOS ── -->
+            <div id="tab-photos-{{ ev.id }}" class="ev-tab-panel" style="display:none;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <p style="font-size:13px; color:var(--text-2);">
+                        Preview photos shown on the booking page. First photo is the main card image.
+                    </p>
+                    <label class="btn-outline" style="cursor:pointer; color:var(--accent); border-color:var(--accent); display:inline-flex; align-items:center; gap:6px;">
+                        + Add photo
+                        <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
+                            onchange="uploadPhoto('{{ ev.id }}', null, this)">
+                    </label>
+                </div>
+
+                <div id="photo-grid-{{ ev.id }}" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px;">
+                    {% set photos = ev.photos or [] %}
+                    {% if photos %}
+                        {% for photo in photos %}
+                        <div class="photo-slot" data-index="{{ loop.index0 }}" style="position:relative; border-radius:10px; overflow:hidden; background:var(--surface-2); border:1px solid var(--border); aspect-ratio:4/3;">
+                            {% if loop.index0 == 0 %}
+                            <div style="position:absolute;top:6px;left:6px;z-index:3;background:var(--accent);color:white;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;">Main</div>
+                            {% endif %}
+                            <img src="{{ photo }}" style="width:100%; height:100%; object-fit:cover; display:block;">
+                            <div style="position:absolute; inset:0; background:rgba(0,0,0,0); transition:background 0.2s;"
+                                 onmouseover="this.style.background='rgba(0,0,0,0.35)'; this.nextElementSibling.style.opacity='1'"
+                                 onmouseout="this.style.background='rgba(0,0,0,0)'; this.nextElementSibling.style.opacity='0'">
+                            </div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; opacity:0; transition:opacity 0.2s; pointer-events:none;" class="photo-actions">
+                                <label style="background:white; color:#111; border:none; border-radius:7px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; pointer-events:all;">
+                                    ↑ Replace
+                                    <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
+                                        onchange="uploadPhoto('{{ ev.id }}', {{ loop.index0 }}, this)">
+                                </label>
+                                <button onclick="deletePhoto('{{ ev.id }}', {{ loop.index0 }})"
+                                    style="background:var(--red); color:white; border:none; border-radius:7px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; pointer-events:all;">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div id="photo-empty-{{ ev.id }}" style="grid-column:1/-1; padding:40px; text-align:center; color:var(--text-3); border:2px dashed var(--border); border-radius:10px;">
+                            No photos yet — click <strong>+ Add photo</strong> to upload
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
         </div>
         {% endfor %}
 
@@ -1033,63 +1081,6 @@
         {% endif %}
     </div>
 
-    <!-- PHOTO MANAGEMENT -->
-    <div style="margin-top:36px;">
-        <div class="page-header" style="margin-bottom:16px;">
-            <div class="page-title">
-                <h1>Photos</h1>
-                <p>Manage preview photos shown on the booking page — per event</p>
-            </div>
-        </div>
-
-        {% for ev in events %}
-        {% if ev.status in ('active', 'upcoming') or loop.index == 1 %}
-        <div class="card" style="margin-bottom:20px; padding:24px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-                <div>
-                    <div style="font-weight:700; font-size:15px;">{{ ev.title }}</div>
-                    <div style="color:var(--text-3); font-size:12px; margin-top:2px;">{{ ev.id }} · {{ ev.date }} · status: <strong>{{ ev.status }}</strong></div>
-                </div>
-                <label class="btn-outline" style="cursor:pointer; color:var(--accent); border-color:var(--accent);">
-                    + Add photo
-                    <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
-                        onchange="uploadPhoto('{{ ev.id }}', null, this)">
-                </label>
-            </div>
-
-            <div class="photo-slots" id="slots-{{ ev.id }}" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px;">
-                {% set photos = ev.photos or [] %}
-                {% if photos %}
-                    {% for photo in photos %}
-                    <div class="photo-slot" data-index="{{ loop.index0 }}" style="position:relative; border-radius:10px; overflow:hidden; background:var(--surface-2); border:1px solid var(--border); aspect-ratio:4/3;">
-                        <img src="{{ photo }}" style="width:100%; height:100%; object-fit:cover; display:block;">
-                        <div style="position:absolute; inset:0; background:rgba(0,0,0,0); transition:background 0.2s;"
-                             onmouseover="this.style.background='rgba(0,0,0,0.35)'; this.nextElementSibling.style.opacity='1'"
-                             onmouseout="this.style.background='rgba(0,0,0,0)'; this.nextElementSibling.style.opacity='0'">
-                        </div>
-                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; opacity:0; transition:opacity 0.2s; pointer-events:none;" class="photo-actions">
-                            <label style="background:white; color:#111; border:none; border-radius:7px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; pointer-events:all;">
-                                ↑ Replace
-                                <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
-                                    onchange="uploadPhoto('{{ ev.id }}', {{ loop.index0 }}, this)">
-                            </label>
-                            <button onclick="deletePhoto('{{ ev.id }}', {{ loop.index0 }})"
-                                style="background:var(--red); color:white; border:none; border-radius:7px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; pointer-events:all;">
-                                ✕
-                            </button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div id="empty-{{ ev.id }}" style="grid-column:1/-1; padding:40px; text-align:center; color:var(--text-3); border:2px dashed var(--border); border-radius:10px;">
-                        No photos yet — click <strong>+ Add photo</strong> to upload
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-        {% endfor %}
-    </div>
 
 </div>
 
@@ -1494,7 +1485,7 @@
     ══════════════════════════════════════════════════════════ */
     function switchTab(eventId, tab) {
         // Hide all panels for this event
-        ['schedule','info','included'].forEach(t => {
+        ['schedule','info','included','photos'].forEach(t => {
             const panel = document.getElementById(`tab-${t}-${eventId}`);
             if (panel) panel.style.display = t === tab ? '' : 'none';
         });
@@ -1604,13 +1595,11 @@
             });
             const data = await res.json();
             if (data.success) {
-                toast('✅ Event created! Reloading…', 'success');
+                toast('✅ Event created! Opening Photos tab…', 'success');
                 closeCreateModal();
-                setTimeout(() => {
-                    location.reload();
-                    // Scroll to events section after reload (hash trick)
-                    sessionStorage.setItem('scrollTo', 'events-section');
-                }, 800);
+                sessionStorage.setItem('scrollTo', 'events-section');
+                sessionStorage.setItem('openPhotosTab', data.event_id || '');
+                setTimeout(() => location.reload(), 800);
             } else {
                 toast('Error: ' + (data.error || 'Unknown'), 'error');
                 btn.disabled = false;
@@ -1623,13 +1612,27 @@
         }
     }
 
-    // Restore scroll position after reload
+    // Restore scroll position + auto-open Photos tab after event creation
     window.addEventListener('DOMContentLoaded', () => {
         const target = sessionStorage.getItem('scrollTo');
         if (target) {
             sessionStorage.removeItem('scrollTo');
             const el = document.getElementById(target);
             if (el) setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 200);
+        }
+        const openPhotosFor = sessionStorage.getItem('openPhotosTab');
+        if (openPhotosFor) {
+            sessionStorage.removeItem('openPhotosTab');
+            setTimeout(() => {
+                const card = document.getElementById(`ev-card-${openPhotosFor}`);
+                if (card) {
+                    switchTab(openPhotosFor, 'photos');
+                    card.scrollIntoView({behavior:'smooth', block:'start'});
+                    // Highlight the Photos tab briefly
+                    const tab = card.querySelector(`.ev-tab[data-tab="photos"]`);
+                    if (tab) { tab.style.background='var(--accent-light)'; setTimeout(()=>tab.style.background='',1400); }
+                }
+            }, 350);
         }
     });
 

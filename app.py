@@ -1784,6 +1784,7 @@ def list_events():
                 "spots_left": available_spots,
                 "photo_url": photo_url,
                 "photo": photo_url,
+                "photos": photos,
                 "included": ev.get("included", []),
             })
     conn.close()

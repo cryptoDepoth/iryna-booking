@@ -242,6 +242,27 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 /* Hidden admin hint */
 .admin-hint{opacity:0;transition:opacity .3s;font-size:10px;color:var(--ink-5);text-decoration:none;cursor:default}
 .admin-hint:hover{opacity:1;color:var(--ink-4)}
+
+/* ── KEN BURNS SLIDESHOW ── */
+.kb-host{position:absolute;inset:0;overflow:hidden;border-radius:inherit;z-index:0}
+.kb-slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;will-change:transform,opacity;transition:opacity 1.1s ease}
+.kb-slide.kb-active{opacity:1;animation:kb-zoom 7s ease-in-out forwards}
+.kb-slide.kb-out{opacity:0}
+@keyframes kb-zoom{0%{transform:scale(1) translate(0,0)}100%{transform:scale(1.09) translate(-1%,.5%)}}
+
+/* ── CARD PHOTO HOVER ZOOM ── */
+.event-card .photo{overflow:hidden}
+.event-card .photo .photo-bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .55s ease;will-change:transform}
+.event-card:hover .photo .photo-bg{transform:scale(1.07)}
+
+/* ── MOBILE BOTTOM SHEET DRAWER ── */
+@media(max-width:640px){
+  .drawer-bg{align-items:flex-end;padding:0;padding-bottom:env(safe-area-inset-bottom,0)}
+  .drawer{border-radius:24px 24px 0 0;max-width:100%;width:100%;max-height:92vh;animation:slide-up .32s cubic-bezier(.32,1,.28,1)}
+  .drawer .dphoto{border-radius:24px 24px 0 0}
+  .drawer .dphoto h2{font-size:1.4rem}
+}
+@keyframes slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -466,22 +487,65 @@ function statusBadge(spots, total, status) {
   return { cls: "open", txt: T('status_open', {n: available, total: total}) };
 }
 
+let _kbTimers = [];
 function renderFeatured() {
   const wrap = document.getElementById('featuredWrap');
   const featured = visibleEvents().filter(e => e.featured).sort((a, b) => a.date.localeCompare(b.date))[0]
     || visibleEvents().sort((a, b) => a.date.localeCompare(b.date))[0];
   if (!featured) { wrap.innerHTML = ''; return; }
   const cdText = countdownText(featured.date, false);
+
+  // Build photos list — use photos array if available, fallback to single photo
+  const photos = (featured.photos && featured.photos.length)
+    ? featured.photos
+    : [featured.photo_url || featured.photo || '/static/images/placeholder.jpg'];
+
+  // Build KB slides HTML
+  const slidesHtml = photos.map((src, i) =>
+    `<div class="kb-slide${i === 0 ? ' kb-active' : ''}" style="background-image:url('${src}')"></div>`
+  ).join('');
+
   wrap.innerHTML = `
-    <div class="featured" style="background-image:url('${featured.photo_url || featured.photo || '/static/images/placeholder.jpg'}')">
-      <div class="featured-tag">${T('featured_tag')}</div>
-      <div class="featured-countdown">${cdText}</div>
-      <div class="featured-content">
+    <div class="featured" style="position:relative;">
+      <div class="kb-host">${slidesHtml}</div>
+      <div class="featured-tag" style="position:relative;z-index:2;">${T('featured_tag')}</div>
+      <div class="featured-countdown" style="position:relative;z-index:2;">${cdText}</div>
+      <div class="featured-content" style="position:relative;z-index:2;">
         <h2>${featured.title}</h2>
         <div class="meta">${fmtDate(featured.date)} · from $${featured.deposit || featured.price || 0} ${T('pay_row_deposit').toLowerCase()} · ${featured.location || 'Calgary'}</div>
         <button class="cta" onclick="openDrawer('${featured.id}')">${T('view_slots_btn')}</button>
       </div>
     </div>`;
+
+  // Start Ken Burns cycle if multiple photos
+  if (photos.length > 1) startKenBurns(wrap.querySelector('.kb-host'), photos.length);
+}
+
+function startKenBurns(host, count) {
+  // Clear any previous timers
+  _kbTimers.forEach(clearTimeout);
+  _kbTimers = [];
+  let current = 0;
+  const INTERVAL = 5500; // ms per slide
+
+  function cycle() {
+    const slides = host.querySelectorAll('.kb-slide');
+    if (!slides.length) return;
+    // Fade out current
+    slides[current].classList.remove('kb-active');
+    slides[current].classList.add('kb-out');
+    // Advance
+    current = (current + 1) % count;
+    // Fade in next
+    slides[current].classList.remove('kb-out');
+    slides[current].classList.add('kb-active');
+    // Remove 'out' after transition
+    const prev = (current - 1 + count) % count;
+    const t = setTimeout(() => slides[prev].classList.remove('kb-out'), 1200);
+    _kbTimers.push(t);
+    _kbTimers.push(setTimeout(cycle, INTERVAL));
+  }
+  _kbTimers.push(setTimeout(cycle, INTERVAL));
 }
 
 function renderGrid() {
@@ -510,7 +574,8 @@ function renderGrid() {
     const totalPrice = e.full_price || e.price || 0;
     return `
     <article class="event-card ${isSold ? 'sold' : ''}" onclick="openDrawer('${e.id}')">
-      <div class="photo" style="background-image:url('${photo}')">
+      <div class="photo">
+        <div class="photo-bg" style="background-image:url('${photo}')"></div>
         <div class="status ${b.cls}"><span class="dot"></span>${b.txt}</div>
         <div class="countdown">${cd}</div>
         ${e.featured ? `<div class="featured-mark">${T('featured_tag')}</div>` : ''}
@@ -558,9 +623,36 @@ async function openDrawer(id) {
     toast(T('toast_loading_session'));
     return;
   }
-  document.getElementById('dphoto').style.backgroundImage = `linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.4)),url('${e.photo_url || e.photo || '/static/images/placeholder.jpg'}')`;
-  document.getElementById('dphoto').style.backgroundSize = 'cover';
-  document.getElementById('dphoto').style.backgroundPosition = 'center';
+  // Drawer photo — Ken Burns if multiple photos available
+  const dphotoEl = document.getElementById('dphoto');
+  const drawerPhotos = (e.photos && e.photos.length) ? e.photos : [e.photo_url || e.photo || '/static/images/placeholder.jpg'];
+  // Clear old KB host if any
+  const oldKb = dphotoEl.querySelector('.kb-host');
+  if (oldKb) oldKb.remove();
+  dphotoEl.style.backgroundImage = '';
+  dphotoEl.style.backgroundSize = '';
+  dphotoEl.style.backgroundPosition = '';
+  if (drawerPhotos.length === 1) {
+    dphotoEl.style.backgroundImage = `linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.4)),url('${drawerPhotos[0]}')`;
+    dphotoEl.style.backgroundSize = 'cover';
+    dphotoEl.style.backgroundPosition = 'center';
+  } else {
+    const kbHost = document.createElement('div');
+    kbHost.className = 'kb-host';
+    kbHost.style.borderRadius = 'inherit';
+    drawerPhotos.forEach((src, i) => {
+      const slide = document.createElement('div');
+      slide.className = 'kb-slide' + (i === 0 ? ' kb-active' : '');
+      slide.style.backgroundImage = `url('${src}')`;
+      kbHost.appendChild(slide);
+    });
+    // Overlay gradient
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.45));z-index:1;pointer-events:none';
+    kbHost.appendChild(overlay);
+    dphotoEl.insertBefore(kbHost, dphotoEl.firstChild);
+    startKenBurns(kbHost, drawerPhotos.length);
+  }
   document.getElementById('dTitle').textContent = e.title;
   const dbody = document.getElementById('dbody');
 
