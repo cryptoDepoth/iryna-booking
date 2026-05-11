@@ -382,7 +382,10 @@ def check_single_email(email, bookings):
     if ambiguous:
         print(f"   ⚠️ Ambiguity: ${amount:.2f} matches {len(ambiguous)} bookings")
         _notify_admin_ambiguity(amount, ambiguous)
-        mark_message_processed(msg_id, None, amount)
+        # Do NOT mark ambiguous messages as processed.
+        # A common real-world case is two temporary reservations with the same
+        # deposit amount. One may expire moments later; keeping the message
+        # unprocessed lets the watcher retry and confirm the remaining booking.
         return None, ambiguous
 
     if matched is None:
