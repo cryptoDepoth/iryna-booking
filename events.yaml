@@ -8,7 +8,7 @@ events:
   session_length: 20
   break_length: 10
   slot_interval: 30
-  deposit: 100.0
+  deposit: 250.0
   full_price: 500.0
   location: Calgary — exact spot sent after booking
   session_type: mini
@@ -16,8 +16,8 @@ events:
   included:
   - 20 minutes among blooming lilacs
   - 15 professionally edited photos
-  - All original photos included
-  - Quick turnaround (within 48 hours)
+  - All original JPEGs included
+  - Quick turnaround within 48 hours
   photos:
   - /images/lilac-jun7_fc0f222e.jpg
   - /images/lilac-jun7_ee3244d9.jpeg
