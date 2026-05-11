@@ -6,7 +6,7 @@
 <title>Pashynska Photography — Mini Sessions</title>
 <meta name="description" content="Book a mini photo session with Iryna Pashynska in Calgary. Soft, sunlit moments among blooming flowers. Professional photography for families, couples, and individuals.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Tenor+Sans&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -18,56 +18,104 @@
   --amber:#92722a; --amber-bg:#fdf5e4;
   --red:#8b3535; --red-bg:#fdf0f0;
   --font-d:'Cormorant Garamond',Georgia,serif;
-  --font-b:'DM Sans',system-ui,sans-serif;
+  --font-h:'Tenor Sans','Cormorant Garamond',Georgia,serif;
+  --font-b:'Inter',system-ui,-apple-system,sans-serif;
 }
+html,body{overflow-x:hidden;max-width:100vw}
 body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
+img,picture,video{max-width:100%;height:auto;display:block}
 
 /* ── TOP NAV ── */
-.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(250,247,245,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:30}
-.nav .brand{font-family:var(--font-d);font-size:1.4rem;font-weight:500;letter-spacing:.04em}
-.nav .brand small{display:block;font-family:var(--font-b);font-size:.6rem;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);margin-top:2px}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(250,247,245,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:30;gap:10px}
+.nav .brand{font-family:var(--font-h);font-size:1.15rem;font-weight:400;letter-spacing:.18em;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav .brand small{display:block;font-family:var(--font-h);font-size:.55rem;font-weight:400;letter-spacing:.32em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+@media(min-width:680px){.nav{padding:18px 28px} .nav .brand{font-size:1.4rem}}
 
-/* ── HERO ── */
-.hero{padding:60px 28px 18px;text-align:center;max-width:760px;margin:0 auto}
-.hero .kicker{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--rose);font-weight:600;margin-bottom:14px}
-.hero h1{font-family:var(--font-d);font-size:clamp(2.2rem,5vw,3.4rem);font-weight:300;line-height:1.05;letter-spacing:-.005em}
-.hero h1 em{font-style:italic;color:var(--rose)}
-.hero p{margin-top:14px;color:var(--ink-3);font-size:1rem}
+/* ── PHOTO-FIRST HERO ── */
+.hero-photo{position:relative;width:100%;max-width:1280px;margin:0 auto;padding:14px 14px 0}
+@media(min-width:680px){.hero-photo{padding:22px 28px 0}}
+/* Two-column hero on desktop: photo left, info card right (no overlap) */
+.hero-photo .hero-grid{display:grid;grid-template-columns:1fr;gap:14px;align-items:stretch}
+@media(min-width:900px){.hero-photo .hero-grid{grid-template-columns:minmax(0,1.4fr) minmax(360px,1fr);gap:22px}}
+.hero-stage{position:relative;border-radius:16px;overflow:hidden;background:#dbcfca;box-shadow:0 14px 40px rgba(28,25,23,.10);aspect-ratio:4/5;width:100%}
+@media(min-width:680px){.hero-stage{aspect-ratio:3/2;border-radius:18px}}
+@media(min-width:900px){.hero-stage{aspect-ratio:auto;height:100%;min-height:520px;border-radius:20px}}
+.hero-stage .kb-host{position:absolute;inset:0;z-index:0}
+/* Subtle bottom gradient only — keeps photo clean & readable for the floating pills */
+.hero-stage::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(28,25,23,.18) 0%,rgba(28,25,23,0) 30%,rgba(28,25,23,0) 60%,rgba(28,25,23,.55) 100%)}
+.hero-pill-row{position:absolute;top:16px;left:16px;right:16px;display:flex;gap:8px;flex-wrap:wrap;z-index:3;pointer-events:none}
+.hero-pill{background:rgba(255,255,255,.96);color:var(--ink);padding:6px 12px;border-radius:30px;font:600 .66rem var(--font-b);text-transform:uppercase;letter-spacing:.1em;display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 14px rgba(0,0,0,.10)}
+.hero-pill.dark{background:rgba(28,25,23,.82);color:#fff;backdrop-filter:blur(6px)}
+.hero-pill.rose{background:var(--rose);color:#fff}
+.hero-pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+/* Mobile: caption inside the photo, restrained */
+.hero-stage-cap{position:absolute;left:18px;right:18px;bottom:16px;z-index:3;color:#fff;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.hero-stage-cap .t{font-family:var(--font-d);font-weight:300;font-size:1.6rem;line-height:1.1;text-shadow:0 2px 14px rgba(0,0,0,.4);letter-spacing:-.005em}
+.hero-stage-cap .s{font-size:.82rem;opacity:.92;text-shadow:0 1px 8px rgba(0,0,0,.4)}
+@media(min-width:900px){.hero-stage-cap{display:none}}
+
+/* Info card — solid surface, no photo behind, sharp typography */
+.hero-card{background:var(--surface);border:1px solid rgba(28,25,23,.06);border-radius:16px;padding:22px 22px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 14px 40px rgba(28,25,23,.06)}
+@media(min-width:900px){.hero-card{padding:30px 30px 26px;border-radius:20px;justify-content:center}}
+.hero-kicker{font:400 .7rem var(--font-h);letter-spacing:.32em;text-transform:uppercase;color:var(--rose);display:inline-flex;align-items:center;gap:10px}
+.hero-kicker::before{content:"";width:18px;height:1px;background:var(--rose)}
+.hero-title{font-family:var(--font-d);font-weight:300;font-size:clamp(2rem,4.6vw,3rem);line-height:1.04;letter-spacing:-.012em;color:var(--ink)}
+.hero-title em{font-style:italic;font-weight:300;color:var(--rose)}
+.hero-sub{font-family:var(--font-d);font-style:italic;font-weight:400;font-size:1.05rem;color:var(--ink-2);line-height:1.45;letter-spacing:.005em}
+.hero-facts{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border-top:1px solid var(--ink-5);border-bottom:1px solid var(--ink-5);margin-top:2px}
+.hero-facts .f{padding:12px 0 12px 0;display:flex;flex-direction:column;gap:3px;min-width:0;border-right:1px solid var(--ink-5)}
+.hero-facts .f:nth-child(2n){border-right:0}
+.hero-facts .f:nth-child(1),.hero-facts .f:nth-child(2){border-bottom:1px solid var(--ink-5)}
+.hero-facts .f:nth-child(odd){padding-right:14px}
+.hero-facts .f:nth-child(even){padding-left:14px}
+.hero-facts .f .k{font:400 .58rem var(--font-h);letter-spacing:.24em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-facts .f .v{font-family:var(--font-d);font-weight:400;font-size:1.4rem;line-height:1.05;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-facts .f .v small{font-family:var(--font-b);font-size:.66rem;font-weight:400;color:var(--ink-3);display:block;margin-top:4px;letter-spacing:.02em;text-transform:none}
+.hero-cta-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.hero-cta{flex:1 1 200px;background:var(--ink);color:#fff;padding:14px 22px;border:0;border-radius:11px;font:400 .78rem var(--font-h);letter-spacing:.16em;text-transform:uppercase;cursor:pointer;text-align:center;transition:transform .15s ease,background .15s ease}
+.hero-cta:hover{transform:translateY(-1px);background:#000}
+.hero-cta.outline{background:transparent;color:var(--ink);border:1px solid var(--ink-5);flex:0 1 auto;min-width:0}
+.hero-cta.outline:hover{background:transparent;border-color:var(--ink);transform:none}
 
 /* ── SOCIAL PROOF STRIP ── */
-.proof{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;padding:14px 28px 0;font-size:.82rem;color:var(--ink-3);max-width:760px;margin:0 auto}
+.proof{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;padding:22px 20px 0;font-size:.82rem;color:var(--ink-3);max-width:980px;margin:0 auto}
 .proof span strong{color:var(--ink);font-weight:600}
 .proof .sep{color:var(--ink-5)}
+@media(max-width:480px){.proof{gap:10px;font-size:.78rem}}
 
-/* ── HOW IT WORKS ── */
-.how{max-width:1000px;margin:38px auto 0;padding:0 28px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-@media(max-width:720px){.how{grid-template-columns:1fr}}
-.how .step{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}
-.how .step .num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:var(--rose);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-weight:600;font-size:1rem}
-.how .step h4{font-family:var(--font-d);font-size:1.2rem;font-weight:500;margin-bottom:2px}
-.how .step p{font-size:.82rem;color:var(--ink-3);line-height:1.45}
+/* ── COMPACT HOW (now below grid) ── */
+.how{max-width:1200px;margin:8px auto 0;padding:0 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:720px){.how{grid-template-columns:1fr;gap:10px}}
+.how-head{max-width:1200px;margin:48px auto 14px;padding:0 20px;display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.how-head h3{font-family:var(--font-d);font-size:1.6rem;font-weight:300;letter-spacing:-.005em}
+.how-head .sub{font-size:.82rem;color:var(--ink-3)}
+.how .step{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:16px 18px;display:flex;gap:12px;align-items:flex-start}
+.how .step .num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--rose);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-weight:600;font-size:.95rem}
+.how .step h4{font-family:var(--font-h);font-size:.8rem;font-weight:400;letter-spacing:.18em;text-transform:uppercase;margin-bottom:4px}
+.how .step p{font-size:.8rem;color:var(--ink-3);line-height:1.45}
 
-/* ── FEATURED BANNER ── */
-.featured-wrap{max-width:1200px;margin:46px auto 0;padding:0 28px}
-.featured{position:relative;border-radius:22px;overflow:hidden;min-height:280px;display:flex;align-items:flex-end;color:#fff;background:#dbcfca center/cover;box-shadow:0 14px 40px rgba(0,0,0,.08)}
-.featured::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(28,25,23,.78) 0%,rgba(28,25,23,.15) 55%,transparent 100%);z-index:1}
-.featured .featured-tag{position:absolute;top:18px;left:18px;background:rgba(255,255,255,.92);color:var(--ink);padding:6px 14px;border-radius:20px;font:600 .68rem var(--font-b);text-transform:uppercase;letter-spacing:.1em;z-index:2}
-.featured .featured-countdown{position:absolute;top:18px;right:18px;background:var(--rose);color:#fff;padding:6px 14px;border-radius:20px;font:600 .72rem var(--font-b);z-index:2}
-.featured .featured-content{position:relative;z-index:2;padding:28px 32px}
-.featured h2{font-family:var(--font-d);font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:300;line-height:1.1}
-.featured .meta{margin-top:8px;font-size:.85rem;opacity:.92}
-.featured .cta{margin-top:14px;display:inline-block;background:#fff;color:var(--ink);padding:11px 22px;border-radius:11px;font:600 .85rem var(--font-b);text-decoration:none;border:0;cursor:pointer}
+/* legacy .featured (kept for back-compat, hidden) */
+.featured-wrap{display:none}
+
+/* ── SECTION HEAD ── */
+.sec-head{max-width:1200px;margin:38px auto 8px;padding:0 20px;display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.sec-head h2{font-family:var(--font-d);font-size:clamp(1.6rem,3.4vw,2.2rem);font-weight:300;letter-spacing:-.005em}
+.sec-head .sub{font-size:.85rem;color:var(--ink-3)}
 
 /* ── FILTERS ── */
-.filters{max-width:1200px;margin:34px auto 14px;padding:0 28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.filters .chip{padding:8px 16px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:all .15s}
+.filters{max-width:1200px;margin:0 auto 14px;padding:0 20px;display:flex;gap:8px;align-items:center;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filters::-webkit-scrollbar{display:none}
+.filters .chip{flex-shrink:0;padding:8px 14px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:all .15s;white-space:nowrap}
 .filters .chip:hover{border-color:var(--rose);color:var(--rose)}
 .filters .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
-.filters .count{margin-left:auto;font-size:.82rem;color:var(--ink-3)}
+.filters .count{margin-left:auto;font-size:.82rem;color:var(--ink-3);flex-shrink:0;white-space:nowrap}
+@media(max-width:560px){.filters .count{display:none}}
 
 /* ── EVENT GRID ── */
-.events-wrap{max-width:1200px;margin:0 auto 60px;padding:0 28px}
-.events{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}
+.events-wrap{max-width:1200px;margin:0 auto 24px;padding:0 20px}
+.events{display:grid;grid-template-columns:1fr;gap:18px}
+@media(min-width:560px){.events{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}}
 .event-card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.04);display:flex;flex-direction:column;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;position:relative}
 .event-card:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,.08)}
 .event-card .photo{aspect-ratio:4/3;background:#dbcfca center/cover;position:relative}
@@ -79,9 +127,9 @@ body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-h
 .event-card .photo .countdown{position:absolute;top:12px;right:12px;background:rgba(28,25,23,.78);color:#fff;padding:5px 11px;border-radius:20px;font:600 .7rem var(--font-b);backdrop-filter:blur(8px)}
 .event-card .photo .featured-mark{position:absolute;bottom:12px;left:12px;background:var(--rose);color:#fff;padding:4px 10px;border-radius:6px;font:600 .65rem var(--font-b);text-transform:uppercase;letter-spacing:.08em}
 .event-card .body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
-.event-card .type-tag{font:600 .65rem var(--font-b);letter-spacing:.1em;text-transform:uppercase;color:var(--rose)}
-.event-card h3{font-family:var(--font-d);font-size:1.5rem;font-weight:500;line-height:1.15;color:var(--ink)}
-.event-card .subtitle{font-size:.85rem;color:var(--ink-3);font-style:italic}
+.event-card .type-tag{font:400 .65rem var(--font-h);letter-spacing:.24em;text-transform:uppercase;color:var(--rose)}
+.event-card h3{font-family:var(--font-d);font-size:1.45rem;font-weight:400;line-height:1.18;letter-spacing:-.005em;color:var(--ink)}
+.event-card .subtitle{font-family:var(--font-d);font-size:.95rem;color:var(--ink-2);font-style:italic;font-weight:400}
 .event-card .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:.78rem;color:var(--ink-3)}
 .event-card .meta span{display:inline-flex;align-items:center;gap:5px}
 .event-card .price-bar{display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto;padding-top:14px;border-top:1px solid var(--ink-5)}
@@ -280,12 +328,11 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
 <!-- ────────── PUBLIC LANDING ────────── -->
 <section id="public">
-  <div class="hero">
-    <div class="kicker" data-i18n="hero_kicker">Mini Sessions · 2026</div>
-    <h1 data-i18n="hero_title_html">Soft, sunlit moments<br>among <em>blooming flowers</em></h1>
-    <p data-i18n="hero_subtitle">Pick a session below — booking takes about 2 minutes.</p>
-  </div>
 
+  <!-- PHOTO-FIRST HERO (rendered by renderFeatured) -->
+  <div class="hero-photo" id="heroPhoto"></div>
+
+  <!-- SOCIAL PROOF STRIP -->
   <div class="proof">
     <span data-i18n="proof_reviews"><strong>★ 4.9</strong> · 80+ reviews</span>
     <span class="sep">·</span>
@@ -294,15 +341,14 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
     <span data-i18n="proof_award"><strong>Calgary</strong> local pick 2024 & 2025</span>
   </div>
 
-  <!-- HOW IT WORKS -->
-  <div class="how">
-    <div class="step"><div class="num">1</div><div><h4 data-i18n="how_step1_title">Pick a session</h4><p data-i18n="how_step1_desc">Browse upcoming dates and choose what fits — dress code & location come with confirmation.</p></div></div>
-    <div class="step"><div class="num">2</div><div><h4 data-i18n="how_step2_title">Reserve in 2 min</h4><p data-i18n="how_step2_desc">Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
-    <div class="step"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
-  </div>
-
-  <!-- FEATURED BANNER -->
+  <!-- legacy featured-wrap kept hidden so JS that targets it still works -->
   <div class="featured-wrap" id="featuredWrap"></div>
+
+  <!-- SECTION HEAD -->
+  <div class="sec-head">
+    <h2 data-i18n="sessions_heading">Upcoming sessions</h2>
+    <span class="sub" data-i18n="sessions_subhead">Pick one — booking takes about 2 minutes</span>
+  </div>
 
   <!-- FILTERS -->
   <div class="filters" id="filters">
@@ -330,6 +376,17 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
       <p data-i18n="no_sessions_title" style="font-size:1.1rem;font-weight:500;color:var(--ink);margin-bottom:8px">No sessions available right now</p>
       <p data-i18n="no_sessions_desc">Check back soon — new dates are added weekly.</p>
     </div>
+  </div>
+
+  <!-- HOW IT WORKS (moved below grid, compact) -->
+  <div class="how-head">
+    <h3 data-i18n="how_heading">How it works</h3>
+    <span class="sub" data-i18n="how_subhead">Three quick steps</span>
+  </div>
+  <div class="how">
+    <div class="step"><div class="num">1</div><div><h4 data-i18n="how_step1_title">Pick a session</h4><p data-i18n="how_step1_desc">Browse upcoming dates and choose what fits — dress code & location come with confirmation.</p></div></div>
+    <div class="step"><div class="num">2</div><div><h4 data-i18n="how_step2_title">Reserve in 2 min</h4><p data-i18n="how_step2_desc">Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
+    <div class="step"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
   </div>
 
   <!-- FAQ -->
@@ -489,10 +546,11 @@ function statusBadge(spots, total, status) {
 
 let _kbTimers = [];
 function renderFeatured() {
-  const wrap = document.getElementById('featuredWrap');
+  const host = document.getElementById('heroPhoto');
+  if (!host) return;
   const featured = visibleEvents().filter(e => e.featured).sort((a, b) => a.date.localeCompare(b.date))[0]
     || visibleEvents().sort((a, b) => a.date.localeCompare(b.date))[0];
-  if (!featured) { wrap.innerHTML = ''; return; }
+  if (!featured) { host.innerHTML = ''; return; }
   const cdText = countdownText(featured.date, false);
 
   // Build photos list — use photos array if available, fallback to single photo
@@ -505,20 +563,55 @@ function renderFeatured() {
     `<div class="kb-slide${i === 0 ? ' kb-active' : ''}" style="background-image:url('${src}')"></div>`
   ).join('');
 
-  wrap.innerHTML = `
-    <div class="featured" style="position:relative;">
-      <div class="kb-host">${slidesHtml}</div>
-      <div class="featured-tag">${T('featured_tag')}</div>
-      <div class="featured-countdown">${cdText}</div>
-      <div class="featured-content">
-        <h2>${featured.title}</h2>
-        <div class="meta">${fmtDate(featured.date)} · from $${featured.deposit || featured.price || 0} ${T('pay_row_deposit').toLowerCase()} · ${featured.location || 'Calgary'}</div>
-        <button class="cta" onclick="openDrawer('${featured.id}')">${T('view_slots_btn')}</button>
+  const deposit = featured.deposit || featured.price || 0;
+  const total = featured.full_price || featured.price || 0;
+  const left = featured.spots_left;
+  const totalSpots = featured.total_spots;
+  const isSold = left === 0;
+  const b = statusBadge(left, totalSpots, featured.status);
+  const dateStr = fmtDate(featured.date);
+  const len = featured.session_length || featured.length || '';
+  const loc = (featured.location || 'Calgary').split(',')[0];
+
+  // Spots fact: highlight scarcity
+  let spotsLabel = `${left}/${totalSpots}`;
+  if (isSold) spotsLabel = '—';
+  else if (left && left <= 2) spotsLabel = `${left} left`;
+
+  host.innerHTML = `
+    <div class="hero-grid">
+      <div class="hero-stage">
+        <div class="kb-host">${slidesHtml}</div>
+        <div class="hero-pill-row">
+          <span class="hero-pill rose">★ ${T('featured_tag').replace(/^★\s*/,'')}</span>
+          <span class="hero-pill dark"><span class="dot" style="background:${isSold?'#ff7575':'#7bd393'}"></span>${cdText}</span>
+        </div>
+        <div class="hero-stage-cap">
+          <div class="t">${featured.title}</div>
+          ${featured.subtitle ? `<div class="s">${featured.subtitle}</div>` : ''}
+        </div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-kicker" data-i18n="hero_kicker_label">Featured session</div>
+        <h1 class="hero-title">${featured.title}</h1>
+        ${featured.subtitle ? `<div class="hero-sub">${featured.subtitle}</div>` : ''}
+        <div class="hero-facts">
+          <div class="f"><div class="k" data-i18n="hf_date">Date</div><div class="v">${dateStr}${len?`<small>${len} min session</small>`:''}</div></div>
+          <div class="f"><div class="k" data-i18n="hf_deposit">Deposit today</div><div class="v">$${deposit}<small>CAD · e-Transfer</small></div></div>
+          <div class="f"><div class="k" data-i18n="hf_total">Total</div><div class="v">$${total}<small data-i18n="hf_total_sub">balance on session day</small></div></div>
+          <div class="f"><div class="k" data-i18n="hf_spots">${isSold?'Status':'Spots'}</div><div class="v">${spotsLabel}<small>${isSold?T('status_sold'):'@ '+loc}</small></div></div>
+        </div>
+        <div class="hero-cta-row">
+          <button class="hero-cta" onclick="openDrawer('${featured.id}')">
+            ${isSold ? T('join_waitlist_btn') : (T('view_slots_btn'))}
+          </button>
+          <button class="hero-cta outline" onclick="document.querySelector('.sec-head').scrollIntoView({behavior:'smooth',block:'start'})" data-i18n="see_all_btn">See all dates</button>
+        </div>
       </div>
     </div>`;
 
   // Start Ken Burns cycle if multiple photos
-  if (photos.length > 1) startKenBurns(wrap.querySelector('.kb-host'), photos.length);
+  if (photos.length > 1) startKenBurns(host.querySelector('.kb-host'), photos.length);
 }
 
 function startKenBurns(host, count) {
@@ -871,13 +964,15 @@ function goToPayment(eventId, eventDate) {
   const depositForLine = T('pay_deposit_for', {name: name});
   const bankMsg = `${e.title} — ${e.date} ${time}\n${depositForLine}`;
   const amt = e.deposit || 0;
+  if (currentBooking) currentBooking.amt = amt;
   const sessionMin = e.session_length || 20;
+  const remaining = Math.max(0, (e.full_price || 0) - amt);
   document.getElementById('dbody').innerHTML = `
     <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
       <button onclick="restoreDrawer('${eventId}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;cursor:pointer;font-size:14px">‹</button>
       <div>
-        <div style="font-weight:600;font-size:.92rem">${T('pay_complete_title')}</div>
-        <div style="font-size:.74rem;color:var(--ink-3)">${fmtDate(e.date)} · ${time}</div>
+        <div style="font-weight:600;font-size:.96rem">${T('pay_complete_title')}</div>
+        <div style="font-size:.76rem;color:var(--ink-3);line-height:1.35">${fmtDate(e.date)} · ${time} · ${T('pay_intro_soft')}</div>
       </div>
     </div>
 
@@ -890,9 +985,11 @@ function goToPayment(eventId, eventDate) {
       <div class="row"><span class="key">${T('pay_row_session')}</span><span>${T('pay_session_min', {title: e.title, min: sessionMin})}</span></div>
       <div class="row"><span class="key">${T('pay_row_date')}</span><span>${fmtDate(e.date)}</span></div>
       <div class="row"><span class="key">${T('pay_row_time')}</span><span>${time}</span></div>
-      <div class="row"><span class="key">${T('pay_row_balance')}</span><span>$${(e.full_price || 0) - amt} + GST</span></div>
+      <div class="row"><span class="key">${T('pay_row_balance')}</span><span>$${remaining} + GST</span></div>
       <div class="row"><span class="key">${T('pay_row_deposit')}</span><span class="val-rose">$${amt} CAD</span></div>
     </div>
+
+    <div style="font-size:.82rem;color:var(--ink-3);margin:-2px 0 12px;line-height:1.5">${T('pay_choose_method')}</div>
 
     <div class="transfer-box">
       <div class="eyebrow">${T('pay_eyebrow')}</div>
@@ -908,8 +1005,30 @@ function goToPayment(eventId, eventDate) {
       <div style="font-size:.74rem;color:var(--ink-4);margin-top:8px">${T('pay_autodeposit')}</div>
     </div>
 
+    ${STRIPE_ENABLED ? `
+    <div style="margin:14px 0 16px;padding:14px;border:1px solid var(--ink-5);border-radius:14px;background:#fff;">
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:4px;color:var(--ink)">${T('pay_card_title')}</div>
+      <div style="font-size:.74rem;color:var(--ink-3);margin-bottom:10px;line-height:1.45">${T('pay_card_desc')}</div>
+      <button id="stripe-btn" onclick="startStripeCheckout()"
+         style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+                background:var(--ink);color:#fff;
+                border:1.5px solid var(--ink);border-radius:12px;padding:13px 18px;
+                font-size:.86rem;font-weight:600;cursor:pointer;
+                transition:transform .15s ease,background .2s,color .2s;"
+         onmouseover="this.style.transform='translateY(-1px)';this.style.background='#000'"
+         onmouseout="this.style.transform='none';this.style.background='var(--ink)'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M2 10H22" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+        <span id="stripe-btn-text">${T('pay_card_btn', {amt: amt})}</span>
+      </button>
+      <div style="text-align:center;font-size:.68rem;color:var(--ink-4);margin-top:7px;">🔒 ${T('pay_card_secure') || 'Secure · Powered by Stripe'}</div>
+    </div>
+    ` : ''}
+
     <div style="font-size:.8rem;font-weight:600;margin-bottom:4px">${T('pay_ready_msg_title')}</div>
-    <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:8px">${T('pay_ready_msg_desc')}</div>
+    <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:8px;line-height:1.45">${T('pay_ready_msg_desc')}</div>
     <div class="bank-msg" onclick="copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">
       <button class="copy-pill" id="bankPill" onclick="event.stopPropagation();copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">${T('pay_copy')}</button>
       ${e.title} — ${e.date} ${time}<br>${depositForLine}
@@ -931,31 +1050,6 @@ function goToPayment(eventId, eventDate) {
 
     <button class="btn" onclick="confirmClientPayment('${e.id}')">${T('pay_confirm_btn', {amt: amt})}</button>
     <button class="btn-ghost" onclick="restoreDrawer('${e.id}')">${T('pay_back_btn')}</button>
-
-    ${STRIPE_ENABLED ? `
-    <div style="margin-top:20px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
-        <span style="font-size:.68rem;color:var(--ink-4);white-space:nowrap;letter-spacing:.04em;text-transform:uppercase;">${T('pay_no_etransfer') || "Can't do e-Transfer?"}</span>
-        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
-      </div>
-      <button id="stripe-btn" onclick="startStripeCheckout()"
-         style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
-                background:transparent;color:var(--ink-3);
-                border:1.5px solid var(--ink-5);border-radius:12px;padding:13px 18px;
-                font-size:.875rem;font-weight:500;cursor:pointer;
-                transition:border-color .2s,color .2s;"
-         onmouseover="this.style.borderColor='var(--ink-3)';this.style.color='var(--ink)'"
-         onmouseout="this.style.borderColor='var(--ink-5)';this.style.color='var(--ink-3)'">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="1.8"/>
-          <path d="M2 10H22" stroke="currentColor" stroke-width="1.8"/>
-        </svg>
-        <span id="stripe-btn-text">Pay $${amt} CAD — Card · Apple Pay · Google Pay</span>
-      </button>
-      <div style="text-align:center;font-size:.68rem;color:var(--ink-4);margin-top:6px;">🔒 ${T('pay_card_secure') || 'Secure · Powered by Stripe'}</div>
-    </div>
-    ` : ''}
   `;
   startPayTimer();
 }
@@ -1035,7 +1129,7 @@ async function startStripeCheckout() {
     } else {
       toast(data.error || 'Could not start card payment. Please try Interac e-Transfer.');
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-      if (txt) txt.textContent = `Pay $${currentBooking.amt || ''} CAD — Card · Apple Pay · Google Pay`;
+      if (txt) txt.textContent = T('pay_card_btn', {amt: currentBooking.amt || ''});
     }
   } catch (err) {
     toast('Network error. Please try Interac e-Transfer or refresh.');
@@ -1358,34 +1452,39 @@ const SITE_I18N = {
     err_phone: 'Please enter a valid Canadian phone number (e.g. 403-555-1234)',
     err_ig: 'Instagram handle: 1–30 characters, letters, numbers, . or _',
     /* payment view */
-    pay_complete_title: 'Complete Your Booking',
+    pay_complete_title: 'Almost done — your session is held',
+    pay_intro_soft: 'you’re one step away',
+    pay_choose_method: 'Choose the payment option that feels easiest. Interac e-Transfer is fastest for confirmation; card / Apple Pay / Google Pay is available right below.',
     pay_slot_reserved_for: 'Slot reserved for',
     pay_row_session: 'Session',
     pay_row_date: 'Date',
     pay_row_time: 'Time',
-    pay_row_balance: 'Balance at session',
-    pay_row_deposit: 'Deposit due now',
+    pay_row_balance: 'Remaining on session day',
+    pay_row_deposit: 'Deposit to secure your spot',
     pay_session_min: '{title} ({min} min)',
-    pay_eyebrow: 'Send via Interac e-Transfer',
+    pay_eyebrow: 'Recommended: Interac e-Transfer',
     pay_cad_label: 'CAD — Canadian dollars',
     pay_send_to: 'Send to',
     pay_copy: 'Copy',
     pay_copied: '✓ Copied',
-    pay_autodeposit: 'Auto-deposit enabled · no password needed',
-    pay_ready_msg_title: 'Ready-to-use bank message',
-    pay_ready_msg_desc: 'Paste this in the "Message" field when sending',
-    pay_howto_title: 'How to send Interac e-Transfer',
+    pay_autodeposit: 'Auto-deposit is enabled · no password or security question needed',
+    pay_card_title: 'Prefer to pay by card?',
+    pay_card_desc: 'Use this if e-Transfer is not convenient — card, Apple Pay and Google Pay are processed securely by Stripe.',
+    pay_card_btn: 'Pay ${amt} CAD by card',
+    pay_ready_msg_title: 'Message for your bank transfer',
+    pay_ready_msg_desc: 'Copy this into the bank “Message” field so I can match your deposit quickly.',
+    pay_howto_title: 'Sending by e-Transfer takes about a minute',
     pay_howto_step1: 'Open your banking app (RBC, TD, Scotiabank, etc.)',
     pay_howto_step2: 'Choose "Send Interac e-Transfer"',
-    pay_howto_step3: 'Tap the email above to copy, paste as recipient',
+    pay_howto_step3: 'Copy the email above and paste it as the recipient',
     pay_howto_step4: 'Enter amount: <strong>${amt}.00</strong>',
     pay_howto_step5: 'Add message: "{title} — {date} {time}"',
-    pay_howto_step6: 'Send the transfer',
-    pay_info_note: '💡 <strong>No password needed!</strong> This is auto-deposit. Money arrives instantly. I\'ll see it within minutes (Gmail-bot + Telegram alert) and confirm your booking.',
-    pay_confirm_btn: ' ✓ Yes, I\'ve Sent ${amt} — Confirm Booking',
+    pay_howto_step6: 'Send the transfer, then tap the confirmation button below',
+    pay_info_note: '💡 <strong>Your spot is safe while the timer runs.</strong> Interac auto-deposit usually appears within a few minutes. After you send it, tap the button below — I’ll receive an alert and your booking will be confirmed automatically or manually if needed.',
+    pay_confirm_btn: '✓ I sent ${amt} by e-Transfer — finish booking',
     pay_back_btn: '← Back to change time',
     pay_no_etransfer: "Can't do e-Transfer?",
-    pay_card_secure: 'Secure · Powered by Stripe',
+    pay_card_secure: 'Secure payment · Powered by Stripe',
     pay_deposit_for: 'Deposit for {name}',
     /* success */
     succ_pending_title: 'Payment Pending',
@@ -1485,31 +1584,36 @@ const SITE_I18N = {
     err_email_format: 'Введите корректный email (например, jane@example.com)',
     err_phone: 'Введите корректный канадский номер (напр. 403-555-1234)',
     err_ig: 'Instagram: 1–30 символов, буквы, цифры, . или _',
-    pay_complete_title: 'Завершите бронирование',
+    pay_complete_title: 'Почти готово — слот уже за вами',
+    pay_intro_soft: 'остался последний шаг',
+    pay_choose_method: 'Выберите удобный способ оплаты. Interac e-Transfer обычно подтверждается быстрее; если удобнее картой, Apple Pay или Google Pay — кнопка ниже.',
     pay_slot_reserved_for: 'Слот удерживается',
     pay_row_session: 'Сессия',
     pay_row_date: 'Дата',
     pay_row_time: 'Время',
     pay_row_balance: 'Остаток в день съёмки',
-    pay_row_deposit: 'Депозит сейчас',
+    pay_row_deposit: 'Депозит, чтобы закрепить слот',
     pay_session_min: '{title} ({min} мин)',
-    pay_eyebrow: 'Отправьте через Interac e-Transfer',
+    pay_eyebrow: 'Рекомендуемый способ: Interac e-Transfer',
     pay_cad_label: 'CAD — канадские доллары',
     pay_send_to: 'Получатель',
     pay_copy: 'Копировать',
     pay_copied: '✓ Скопировано',
-    pay_autodeposit: 'Автозачисление активно · пароль не нужен',
-    pay_ready_msg_title: 'Готовое сообщение для банка',
-    pay_ready_msg_desc: 'Вставьте это в поле "Сообщение" при отправке',
-    pay_howto_title: 'Как отправить Interac e-Transfer',
+    pay_autodeposit: 'Автозачисление активно · пароль и security question не нужны',
+    pay_card_title: 'Удобнее оплатить картой?',
+    pay_card_desc: 'Если e-Transfer сейчас неудобен — оплатите депозит картой, Apple Pay или Google Pay через безопасный Stripe.',
+    pay_card_btn: 'Оплатить ${amt} CAD картой',
+    pay_ready_msg_title: 'Сообщение для банковского перевода',
+    pay_ready_msg_desc: 'Скопируйте это в поле “Message”, чтобы депозит быстро сопоставился с вашей бронью.',
+    pay_howto_title: 'Как отправить e-Transfer — это займёт около минуты',
     pay_howto_step1: 'Откройте приложение банка (RBC, TD, Scotiabank и т.д.)',
     pay_howto_step2: 'Выберите "Send Interac e-Transfer"',
-    pay_howto_step3: 'Нажмите на email выше, чтобы скопировать — вставьте как получателя',
+    pay_howto_step3: 'Скопируйте email выше и вставьте его как получателя',
     pay_howto_step4: 'Введите сумму: <strong>${amt}.00</strong>',
     pay_howto_step5: 'Добавьте сообщение: "{title} — {date} {time}"',
-    pay_howto_step6: 'Отправьте перевод',
-    pay_info_note: '💡 <strong>Пароль не нужен!</strong> Это автозачисление. Деньги приходят мгновенно. Я увижу перевод в течение пары минут (Gmail-бот + Telegram) и подтвержу бронь.',
-    pay_confirm_btn: ' ✓ Да, я отправил(а) ${amt} — Подтвердить бронь',
+    pay_howto_step6: 'Отправьте перевод, затем нажмите кнопку подтверждения ниже',
+    pay_info_note: '💡 <strong>Ваш слот удерживается, пока идёт таймер.</strong> Interac auto-deposit обычно появляется за несколько минут. После отправки нажмите кнопку ниже — я получу уведомление, и бронь подтвердится автоматически или вручную, если понадобится.',
+    pay_confirm_btn: '✓ Я отправил(а) ${amt} через e-Transfer — завершить бронь',
     pay_back_btn: '← Назад изменить время',
     pay_no_etransfer: 'Не можете сделать e-Transfer?',
     pay_card_secure: 'Безопасная оплата · Stripe',

@@ -126,7 +126,131 @@
         }
         .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 
-        /* ── STATS ── */
+        /* ── OPERATIONAL DASHBOARD ── */
+        .ops-dash {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .ops-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        @media (max-width: 980px) {
+            .ops-dash { grid-template-columns: 1fr; }
+            .ops-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        .ops-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 18px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+            position: relative;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+        .ops-card .head {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px;
+            color: var(--text-3);
+        }
+        .ops-card .head .ico { font-size: 14px; }
+        .ops-card .big { font-size: 30px; font-weight: 700; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+        .ops-card .sub { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+        .ops-card.action {
+            background: linear-gradient(140deg, #fff7ed 0%, #fffbf5 100%);
+            border-color: #fed7aa;
+            grid-column: span 1;
+        }
+        .ops-card.action .big { color: var(--accent); }
+        .ops-card.action .pill-cta {
+            margin-top: 8px; align-self: flex-start;
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 14px; border-radius: 8px;
+            background: var(--accent); color: white;
+            font-size: 12px; font-weight: 600; cursor: pointer; border: none;
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+        .ops-card.action .pill-cta:hover { background: #ea580c; }
+        .ops-card.action::before {
+            content: ""; position: absolute; top: 0; right: 0; width: 70px; height: 70px;
+            background: radial-gradient(circle at top right, rgba(249,115,22,0.15), transparent 60%);
+            border-radius: var(--radius); pointer-events: none;
+        }
+        .ops-card.calm { background: linear-gradient(140deg, #f0fdf4 0%, #fafffb 100%); border-color: #bbf7d0; }
+        .ops-card.calm .big { color: var(--green-text); }
+        .ops-card.calm .sub { color: var(--green-text); opacity: 0.85; }
+
+        .ops-spotlight {
+            background: linear-gradient(140deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .ops-spotlight::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 90% 10%, rgba(249,115,22,0.18), transparent 50%);
+            pointer-events: none;
+        }
+        .ops-spotlight > * { position: relative; }
+        .ops-spotlight .eyebrow {
+            font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+            color: #fdba74;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .ops-spotlight .eyebrow::before {
+            content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fdba74;
+            box-shadow: 0 0 0 4px rgba(253,186,116,0.18);
+        }
+        .ops-spotlight h3 {
+            font-size: 18px; font-weight: 600; line-height: 1.25; margin: 0;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            letter-spacing: -0.005em;
+            font-weight: 500;
+            font-size: 22px;
+        }
+        .ops-spotlight .meta-row {
+            display: flex; flex-wrap: wrap; gap: 18px;
+            font-size: 13px; color: #cbd5e1;
+        }
+        .ops-spotlight .meta-row strong { color: white; font-weight: 600; }
+        .ops-spotlight .progress-wrap {
+            display: flex; align-items: center; gap: 12px;
+            margin-top: 4px;
+        }
+        .ops-spotlight .progress-bar {
+            flex: 1; height: 6px; background: rgba(255,255,255,0.12); border-radius: 99px; overflow: hidden;
+        }
+        .ops-spotlight .progress-bar > span {
+            display: block; height: 100%; background: linear-gradient(90deg, #fb923c, #fbbf24);
+            border-radius: 99px;
+        }
+        .ops-spotlight .progress-num {
+            font-size: 12px; color: #cbd5e1; font-variant-numeric: tabular-nums; white-space: nowrap;
+        }
+        .ops-spotlight .progress-num strong { color: white; font-weight: 700; }
+        .ops-spotlight .spotlight-empty {
+            color: #94a3b8; font-style: italic; font-size: 13px;
+        }
+
+        /* ── STATS (legacy, kept for layout) ── */
         .stats {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
@@ -608,11 +732,99 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
         <div class="page-title">
-            <h1>Bookings</h1>
-            <p>All sessions · Lilac Mini Sessions · June 7, 2026</p>
+            <h1>Today's Operations</h1>
+            <p>What's happening across your bookings & next session.</p>
         </div>
         <div class="page-actions">
+            <a href="#events-section" class="btn-outline" style="text-decoration:none;">✦ Manage events</a>
             <button class="btn-outline" onclick="location.reload()">↻ Refresh</button>
+        </div>
+    </div>
+
+    {# ─ figure out the next upcoming session ─ #}
+    {% set _today = (now.strftime('%Y-%m-%d') if now is defined and now else '') %}
+    {% set _ev_sorted = (events|sort(attribute='date')) if events else [] %}
+    {% set upcoming = none %}
+    {% if _ev_sorted %}
+        {% if _today %}
+            {% for ev in _ev_sorted if ev.date >= _today and (upcoming is none) %}{% set upcoming = ev %}{% endfor %}
+        {% endif %}
+        {% if upcoming is none %}{% set upcoming = _ev_sorted[0] %}{% endif %}
+    {% endif %}
+
+    <!-- OPERATIONAL DASHBOARD HERO -->
+    <div class="ops-dash">
+        {# LEFT — needs action OR all clear #}
+        {% if filtered_stats.pending and filtered_stats.pending > 0 %}
+        <div class="ops-card action">
+            <div class="head"><span>⚡ Needs your attention</span><span class="ico">⏳</span></div>
+            <div class="big">{{ filtered_stats.pending }} pending {{ 'payment' if filtered_stats.pending == 1 else 'payments' }}</div>
+            <div class="sub">Auto-verifier checks Gmail every minute. If a client paid early or in cash, confirm manually.</div>
+            <a href="#tbody" class="pill-cta" onclick="setStatusFilter('pending')">Review pending →</a>
+        </div>
+        {% else %}
+        <div class="ops-card calm">
+            <div class="head"><span>✓ All clear</span><span class="ico">🌿</span></div>
+            <div class="big">No pending payments</div>
+            <div class="sub">Every reserved slot has been confirmed. You're caught up — new bookings will surface here.</div>
+        </div>
+        {% endif %}
+
+        {# RIGHT — next upcoming session spotlight #}
+        <div class="ops-spotlight">
+            {% if upcoming %}
+            <span class="eyebrow">Next session</span>
+            <h3>{{ upcoming.title }}</h3>
+            <div class="meta-row">
+                <span>📅 <strong>{{ upcoming.date }}</strong>{% if upcoming.start_time %} · {{ upcoming.start_time }}{% endif %}</span>
+                {% if upcoming.location %}<span>📍 {{ upcoming.location.split(',')[0] }}</span>{% endif %}
+                {% if upcoming.session_type %}<span>🏷️ {{ upcoming.session_type }}</span>{% endif %}
+            </div>
+            {% if upcoming.total_spots %}
+            {% set _booked = upcoming.total_spots - (upcoming.spots_left if upcoming.spots_left is defined else upcoming.total_spots) %}
+            {% set _pct = (100 * _booked / upcoming.total_spots) | round(0, 'floor') %}
+            <div class="progress-wrap">
+                <div class="progress-bar"><span style="width: {{ _pct }}%"></span></div>
+                <div class="progress-num"><strong>{{ _booked }}</strong> / {{ upcoming.total_spots }} booked</div>
+            </div>
+            {% endif %}
+            {% else %}
+            <span class="eyebrow">Next session</span>
+            <h3>No upcoming sessions scheduled</h3>
+            <div class="spotlight-empty">Create one below to start taking bookings.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- KEY METRICS ROW -->
+    <div class="ops-row">
+        <div class="ops-card">
+            <div class="head"><span>Confirmed</span><span class="ico">✓</span></div>
+            <div class="big" style="color:var(--green-text)">{{ filtered_stats.confirmed }}</div>
+            <div class="sub">{% if filtered_stats.total %}{{ ((100 * filtered_stats.confirmed / filtered_stats.total) | round(0, 'floor')) }}% of {{ filtered_stats.total }} filtered{% else %}—{% endif %}</div>
+        </div>
+        <div class="ops-card">
+            <div class="head"><span>Pending</span><span class="ico">⏳</span></div>
+            <div class="big" style="color:var(--accent)">{{ filtered_stats.pending }}</div>
+            <div class="sub">Awaiting payment verification</div>
+        </div>
+        <div class="ops-card">
+            <div class="head"><span>Expected revenue</span><span class="ico">$</span></div>
+            <div class="big" style="color:var(--blue-text)">${{ "%.0f"|format(filtered_stats.total_expected) }}</div>
+            <div class="sub">CAD · deposits + balances on confirmed</div>
+        </div>
+        <div class="ops-card">
+            <div class="head"><span>Cancelled / Expired</span><span class="ico">✕</span></div>
+            <div class="big" style="color:var(--text-2)">{{ filtered_stats.cancelled + filtered_stats.expired }}</div>
+            <div class="sub">{{ filtered_stats.cancelled }} cancelled · {{ filtered_stats.expired }} expired</div>
+        </div>
+    </div>
+
+    <!-- BOOKINGS HEADER -->
+    <div class="page-header" style="margin-top:8px; margin-bottom:14px;">
+        <div class="page-title">
+            <h1 style="font-size:18px;">Bookings</h1>
+            <p>Showing {{ filtered_stats.total }} of {{ overall_stats.total }} total bookings</p>
         </div>
     </div>
 
@@ -624,37 +836,6 @@
             Payments are verified automatically via email every minute when e-Transfer arrives from <code>notify@payments.interac.ca</code>.
             Use the <strong>Confirm</strong> button below for manual confirmation (cash, early e-Transfer, etc).
         </span>
-    </div>
-
-    <!-- STATS -->
-    <div class="stats">
-        <div class="stat">
-            <div class="stat-label">Total</div>
-            <div class="stat-value">{{ filtered_stats.total }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">Confirmed</div>
-            <div class="stat-value green">{{ filtered_stats.confirmed }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">Pending</div>
-            <div class="stat-value orange">{{ filtered_stats.pending }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">Revenue</div>
-            <div class="stat-value blue">${{ "%.0f"|format(filtered_stats.total_expected) }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">Cancelled</div>
-            <div class="stat-value red">{{ filtered_stats.cancelled }}</div>
-        </div>
-        <div class="stat">
-            <div class="stat-label">Expired</div>
-            <div class="stat-value" style="color:var(--text-3)">{{ filtered_stats.expired }}</div>
-        </div>
-    </div>
-    <div style="margin-bottom:20px; font-size:12px; color:var(--text-3);">
-        Showing {{ filtered_stats.total }} of {{ overall_stats.total }} total bookings.
     </div>
 
     <!-- FILTERS -->
