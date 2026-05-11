@@ -50,7 +50,7 @@ body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-h
 /* ── FEATURED BANNER ── */
 .featured-wrap{max-width:1200px;margin:46px auto 0;padding:0 28px}
 .featured{position:relative;border-radius:22px;overflow:hidden;min-height:280px;display:flex;align-items:flex-end;color:#fff;background:#dbcfca center/cover;box-shadow:0 14px 40px rgba(0,0,0,.08)}
-.featured::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(28,25,23,.78) 0%,rgba(28,25,23,.15) 55%,transparent 100%)}
+.featured::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(28,25,23,.78) 0%,rgba(28,25,23,.15) 55%,transparent 100%);z-index:1}
 .featured .featured-tag{position:absolute;top:18px;left:18px;background:rgba(255,255,255,.92);color:var(--ink);padding:6px 14px;border-radius:20px;font:600 .68rem var(--font-b);text-transform:uppercase;letter-spacing:.1em;z-index:2}
 .featured .featured-countdown{position:absolute;top:18px;right:18px;background:var(--rose);color:#fff;padding:6px 14px;border-radius:20px;font:600 .72rem var(--font-b);z-index:2}
 .featured .featured-content{position:relative;z-index:2;padding:28px 32px}
@@ -508,9 +508,9 @@ function renderFeatured() {
   wrap.innerHTML = `
     <div class="featured" style="position:relative;">
       <div class="kb-host">${slidesHtml}</div>
-      <div class="featured-tag" style="position:relative;z-index:2;">${T('featured_tag')}</div>
-      <div class="featured-countdown" style="position:relative;z-index:2;">${cdText}</div>
-      <div class="featured-content" style="position:relative;z-index:2;">
+      <div class="featured-tag">${T('featured_tag')}</div>
+      <div class="featured-countdown">${cdText}</div>
+      <div class="featured-content">
         <h2>${featured.title}</h2>
         <div class="meta">${fmtDate(featured.date)} · from $${featured.deposit || featured.price || 0} ${T('pay_row_deposit').toLowerCase()} · ${featured.location || 'Calgary'}</div>
         <button class="cta" onclick="openDrawer('${featured.id}')">${T('view_slots_btn')}</button>
