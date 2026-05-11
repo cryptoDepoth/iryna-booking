@@ -1290,6 +1290,8 @@ def init_db():
         ("clients",   "first_booking_at",  "ALTER TABLE clients ADD COLUMN first_booking_at TEXT"),
         ("clients",   "last_booking_at",   "ALTER TABLE clients ADD COLUMN last_booking_at TEXT"),
         ("bookings",  "confirmation_token", "ALTER TABLE bookings ADD COLUMN confirmation_token TEXT"),
+        # Store expected deposit at booking time so checker doesn't need events.yaml lookup
+        ("bookings",  "deposit_amount",    "ALTER TABLE bookings ADD COLUMN deposit_amount REAL"),
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
     ]
@@ -1975,11 +1977,12 @@ def reserve_slot():
 
         token = secrets.token_urlsafe(16)
 
+        _deposit_amt = float(ev.get("deposit") or SESSION_PRICE)
         c.execute("""
             INSERT INTO bookings
-                (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id, confirmation_token)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?)
-        """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"], token))
+                (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id, confirmation_token, deposit_amount)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?)
+        """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"], token, _deposit_amt))
 
         if c.rowcount == 0:
             conn.rollback()

@@ -152,12 +152,24 @@ def extract_payment_info(body_text):
 
 
 def get_expected_amount_for_booking(booking_id):
-    """Get expected deposit amount for a specific booking from events.yaml."""
+    """Get expected deposit amount for a specific booking.
+
+    Priority:
+    1. bookings.deposit_amount column (stored at reserve time — most reliable)
+    2. events.yaml lookup by event_id (fallback for older rows)
+    3. Hard default $95.00
+    """
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT event_id FROM bookings WHERE id=?", (booking_id,))
+    c.execute("SELECT event_id, deposit_amount FROM bookings WHERE id=?", (booking_id,))
     row = c.fetchone()
     conn.close()
+
+    if row:
+        # Best case: amount was stored at booking time
+        stored = row["deposit_amount"]
+        if stored is not None:
+            return float(stored)
 
     event_id = row["event_id"] if row else None
 
@@ -178,16 +190,20 @@ def get_expected_amount_for_booking(booking_id):
     return 95.0
 
 
-def get_pending_bookings(within_minutes=30):
-    """Get bookings awaiting payment, created within recent window."""
+def get_pending_bookings(within_minutes=30, grace_minutes=60):
+    """Get bookings awaiting payment, created within recent window.
+
+    grace_minutes: also include bookings whose reservation expired up to
+    this many minutes ago.  Interac e-Transfer emails can arrive 10-40 min
+    after the client sends the payment, so we must not cut off the search the
+    moment reserved_until passes.
+    """
     conn = get_db()
     c = conn.cursor()
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # Only look at bookings created recently enough that a new email could match.
-    # Include BOTH statuses: some clients send the e-Transfer after reserving
-    # the slot but forget to click "I've sent the payment". In that case the
-    # system must still detect the payment before the hold expires.
-    cutoff = (datetime.now() - timedelta(minutes=within_minutes)).strftime('%Y-%m-%d %H:%M:%S')
+    now = datetime.now()
+    # Accept bookings that still have an active hold OR expired within the grace window
+    grace_cutoff = (now - timedelta(minutes=grace_minutes)).strftime('%Y-%m-%d %H:%M:%S')
+    created_cutoff = (now - timedelta(minutes=within_minutes + grace_minutes)).strftime('%Y-%m-%d %H:%M:%S')
     c.execute("""
         SELECT * FROM bookings
         WHERE status IN ('reserved', 'pending_payment')
@@ -196,7 +212,7 @@ def get_pending_bookings(within_minutes=30):
         AND paid = 0
         AND created_at > ?
         ORDER BY created_at DESC
-    """, (now, cutoff))
+    """, (grace_cutoff, created_cutoff))
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return rows
