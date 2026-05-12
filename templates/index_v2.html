@@ -414,7 +414,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
 <footer>
   <p><span data-i18n="footer_studio"><strong>Pashynska Photography</strong> · Calgary, AB · </span><a href="https://instagram.com/pashynska.photo" target="_blank">@pashynska.photo</a></p>
-  <p style="margin-top:6px;color:var(--ink-4)"><a href="/privacy">Privacy & browser storage</a> · <span data-i18n="footer_copyright">© 2026 Pashynska Photography — All rights reserved</span></p>
+  <p style="margin-top:6px;color:var(--ink-4)"><a href="/privacy" data-i18n="privacy_link">Privacy & browser storage</a> · <span data-i18n="footer_copyright">© 2026 Pashynska Photography — All rights reserved</span></p>
   <!-- Hidden admin access: tiny dot in footer -->
   <a href="/backstage" class="admin-hint" title="Admin access">·</a>
 </footer>
@@ -577,7 +577,7 @@ function renderFeatured() {
   // Spots fact: highlight scarcity
   let spotsLabel = `${left}/${totalSpots}`;
   if (isSold) spotsLabel = '—';
-  else if (left && left <= 2) spotsLabel = `${left} left`;
+  else if (left && left <= 2) spotsLabel = T('spots_left', {n: left});
 
   host.innerHTML = `
     <div class="hero-grid">
@@ -597,10 +597,10 @@ function renderFeatured() {
         <h1 class="hero-title">${featured.title}</h1>
         ${featured.subtitle ? `<div class="hero-sub">${featured.subtitle}</div>` : ''}
         <div class="hero-facts">
-          <div class="f"><div class="k" data-i18n="hf_date">Date</div><div class="v">${dateStr}${len?`<small>${len} min session</small>`:''}</div></div>
-          <div class="f"><div class="k" data-i18n="hf_deposit">Deposit today</div><div class="v">$${deposit}<small>CAD · e-Transfer</small></div></div>
+          <div class="f"><div class="k" data-i18n="hf_date">Date</div><div class="v">${dateStr}${len?`<small>${T('hf_duration', {n: len})}</small>`:''}</div></div>
+          <div class="f"><div class="k" data-i18n="hf_deposit">Deposit today</div><div class="v">$${deposit}<small>${T('hf_currency')}</small></div></div>
           <div class="f"><div class="k" data-i18n="hf_total">Total</div><div class="v">$${total}<small data-i18n="hf_total_sub">balance on session day</small></div></div>
-          <div class="f"><div class="k" data-i18n="hf_spots">${isSold?'Status':'Spots'}</div><div class="v">${spotsLabel}<small>${isSold?T('status_sold'):'@ '+loc}</small></div></div>
+          <div class="f"><div class="k" data-i18n="hf_spots">${isSold?T('hf_status'):T('hf_spots')}</div><div class="v">${spotsLabel}<small>${isSold?T('status_sold'):T('hf_location_prefix', {loc})}</small></div></div>
         </div>
         <div class="hero-cta-row">
           <button class="hero-cta" onclick="openDrawer('${featured.id}')">
@@ -675,7 +675,7 @@ function renderGrid() {
         ${e.featured ? `<div class="featured-mark">${T('featured_tag')}</div>` : ''}
       </div>
       <div class="body">
-        <div class="type-tag">${e.session_type || e.type || 'session'}</div>
+        <div class="type-tag">${e.session_type || e.type || T('session_type_fallback')}</div>
         <h3>${e.title}</h3>
         <div class="subtitle">${e.subtitle || e.description || ''}</div>
         <div class="meta">
@@ -1114,7 +1114,7 @@ async function startStripeCheckout() {
   const btn  = document.getElementById('stripe-btn');
   const txt  = document.getElementById('stripe-btn-text');
   if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
-  if (txt) txt.textContent = 'Redirecting to Stripe…';
+  if (txt) txt.textContent = T('stripe_redirecting');
   try {
     const res = await fetch('/stripe/create-checkout', {
       method: 'POST',
@@ -1369,6 +1369,25 @@ const SITE_I18N = {
     hero_title_html: 'Soft, sunlit moments<br>among <em>blooming flowers</em>',
     hero_subtitle: 'Pick a session below — booking takes about 2 minutes.',
     /* social proof */
+    hero_kicker_label: 'Featured session',
+    hf_date: 'Date',
+    hf_duration: '{n} min session',
+    hf_deposit: 'Deposit today',
+    hf_currency: 'CAD · e-Transfer',
+    hf_total: 'Total',
+    hf_total_sub: 'balance on session day',
+    hf_spots: 'Spots',
+    hf_status: 'Status',
+    hf_location_prefix: '@ {loc}',
+    spots_left: '{n} left',
+    see_all_btn: 'See all dates',
+    sessions_heading: 'Upcoming sessions',
+    sessions_subhead: 'Pick one — booking takes about 2 minutes',
+    how_heading: 'How it works',
+    how_subhead: 'Three quick steps',
+    session_type_fallback: 'session',
+    stripe_redirecting: 'Redirecting to Stripe…',
+    privacy_link: 'Privacy & browser storage',
     proof_reviews: '<strong>★ 4.9</strong> · 80+ reviews',
     proof_sessions: '<strong>120+</strong> sessions delivered',
     proof_award: '<strong>Calgary</strong> local pick 2024 & 2025',
@@ -1511,6 +1530,25 @@ const SITE_I18N = {
     hero_kicker: 'Мини-сессии · 2026',
     hero_title_html: 'Мягкий свет<br>среди <em>цветущих полей</em>',
     hero_subtitle: 'Выберите сессию ниже — бронирование занимает около 2 минут.',
+    hero_kicker_label: 'Избранная сессия',
+    hf_date: 'Дата',
+    hf_duration: '{n} мин сессия',
+    hf_deposit: 'Депозит сегодня',
+    hf_currency: 'CAD · e-Transfer',
+    hf_total: 'Итого',
+    hf_total_sub: 'остаток в день съёмки',
+    hf_spots: 'Места',
+    hf_status: 'Статус',
+    hf_location_prefix: '@ {loc}',
+    spots_left: 'осталось {n}',
+    see_all_btn: 'Все даты',
+    sessions_heading: 'Ближайшие сессии',
+    sessions_subhead: 'Выберите подходящую — бронирование займёт около 2 минут',
+    how_heading: 'Как это работает',
+    how_subhead: 'Три быстрых шага',
+    session_type_fallback: 'сессия',
+    stripe_redirecting: 'Переходим к безопасной оплате…',
+    privacy_link: 'Privacy и хранение в браузере',
     proof_reviews: '<strong>★ 4.9</strong> · 80+ отзывов',
     proof_sessions: '<strong>120+</strong> съёмок проведено',
     proof_award: '<strong>Калгари</strong> · локальный выбор 2024 и 2025',
@@ -1533,13 +1571,13 @@ const SITE_I18N = {
     no_sessions_desc: 'Загляните позже — новые даты добавляются каждую неделю.',
     faq_title: 'Часто задаваемые вопросы',
     faq_q1: 'Что нам надеть?',
-    faq_a1: 'После бронирования я отправлю гид по стилю — мягкие тона, слоистые текстуры, без больших логотипов.',
+    faq_a1: 'После бронирования я отправлю стайл-гайд — мягкие тона, многослойные текстуры, без больших логотипов.',
     faq_q2: 'А если будет дождь?',
     faq_a2: 'Перенесём бесплатно, без лишних вопросов. Я смотрю прогноз за 24 часа и сама свяжусь с вами.',
     faq_q3: 'Можно прийти с собакой?',
     faq_a3: 'Конечно — просто отметьте это в форме, чтобы я подобрала локацию.',
     faq_q4: 'Как работает депозит?',
-    faq_a4: 'Депозит не возвращается, но его можно перенести на другую сессию, если предупредить за 7 дней. Остаток оплачивается в день съёмки.',
+    faq_a4: 'Депозит не возвращается, но его можно перенести на другую сессию, если предупредить за 7+ дней. Остаток оплачивается в день съёмки.',
     faq_q5: 'Когда я получу фотографии?',
     faq_a5: 'В течение 48 часов для мини-сессий, 2 недель для полных сессий. Вы получаете личную галерею с возможностью скачать снимки.',
     footer_studio: '<strong>Pashynska Photography</strong> · Калгари, AB · ',
@@ -1600,7 +1638,7 @@ const SITE_I18N = {
     pay_send_to: 'Получатель',
     pay_copy: 'Копировать',
     pay_copied: '✓ Скопировано',
-    pay_autodeposit: 'Автозачисление активно · пароль и security question не нужны',
+    pay_autodeposit: 'Автозачисление активно · пароль и контрольный вопрос не нужны',
     pay_card_title: 'Удобнее оплатить картой?',
     pay_card_desc: 'Если e-Transfer сейчас неудобен — оплатите депозит картой, Apple Pay или Google Pay через безопасный Stripe.',
     pay_card_btn: 'Оплатить ${amt} CAD картой',
@@ -1613,7 +1651,7 @@ const SITE_I18N = {
     pay_howto_step4: 'Введите сумму: <strong>${amt}.00</strong>',
     pay_howto_step5: 'Добавьте сообщение: "{title} — {date} {time}"',
     pay_howto_step6: 'Отправьте перевод, затем нажмите кнопку подтверждения ниже',
-    pay_info_note: '💡 <strong>Ваш слот удерживается, пока идёт таймер.</strong> Interac auto-deposit обычно появляется за несколько минут. После отправки нажмите кнопку ниже — я получу уведомление, и бронь подтвердится автоматически или вручную, если понадобится.',
+    pay_info_note: '💡 <strong>Ваш слот удерживается, пока идёт таймер.</strong> Автозачисление Interac обычно проходит за несколько минут. После отправки нажмите кнопку ниже — я получу уведомление, и бронь подтвердится автоматически или вручную, если понадобится.',
     pay_confirm_btn: '✓ Я отправил(а) ${amt} через e-Transfer — завершить бронь',
     pay_back_btn: '← Назад изменить время',
     pay_no_etransfer: 'Не можете сделать e-Transfer?',
@@ -1641,6 +1679,25 @@ const SITE_I18N = {
     hero_kicker: 'मिनी सेशन · 2026',
     hero_title_html: 'धूप में नर्म पल<br><em>खिले फूलों</em> के बीच',
     hero_subtitle: 'नीचे एक सेशन चुनें — बुकिंग में लगभग 2 मिनट लगते हैं।',
+    hero_kicker_label: 'विशेष सेशन',
+    hf_date: 'तारीख',
+    hf_duration: '{n} मिनट का सेशन',
+    hf_deposit: 'आज डिपॉज़िट',
+    hf_currency: 'CAD · e-Transfer',
+    hf_total: 'कुल',
+    hf_total_sub: 'बाकी सेशन के दिन',
+    hf_spots: 'जगहें',
+    hf_status: 'स्थिति',
+    hf_location_prefix: '@ {loc}',
+    spots_left: '{n} बचे',
+    see_all_btn: 'सभी तारीखें देखें',
+    sessions_heading: 'आने वाले सेशन',
+    sessions_subhead: 'एक चुनें — बुकिंग में लगभग 2 मिनट लगते हैं',
+    how_heading: 'यह कैसे काम करता है',
+    how_subhead: 'तीन आसान चरण',
+    session_type_fallback: 'सेशन',
+    stripe_redirecting: 'सुरक्षित भुगतान पर भेजा जा रहा है…',
+    privacy_link: 'Privacy और browser storage',
     proof_reviews: '<strong>★ 4.9</strong> · 80+ समीक्षाएँ',
     proof_sessions: '<strong>120+</strong> सेशन पूरे',
     proof_award: '<strong>कैलगरी</strong> · लोकल चॉइस 2024 और 2025',
@@ -1729,6 +1786,11 @@ const SITE_I18N = {
     pay_copy: 'कॉपी',
     pay_copied: '✓ कॉपी हुआ',
     pay_autodeposit: 'ऑटो-डिपॉज़िट चालू · पासवर्ड की ज़रूरत नहीं',
+    pay_card_title: 'कार्ड से भुगतान करना चाहते हैं?',
+    pay_card_desc: 'अगर e-Transfer सुविधाजनक नहीं है, तो Stripe के ज़रिए कार्ड, Apple Pay या Google Pay से सुरक्षित भुगतान करें.',
+    pay_card_btn: '${amt} CAD कार्ड से भुगतान करें',
+    pay_choose_method: 'सबसे आसान भुगतान तरीका चुनें। Interac e-Transfer पुष्टि के लिए सबसे तेज़ है; कार्ड / Apple Pay / Google Pay नीचे उपलब्ध है।',
+    pay_intro_soft: 'बस एक कदम बाकी है',
     pay_ready_msg_title: 'बैंक के लिए तैयार संदेश',
     pay_ready_msg_desc: 'भेजते समय "Message" फ़ील्ड में यह पेस्ट करें',
     pay_howto_title: 'Interac e-Transfer कैसे भेजें',
@@ -1766,6 +1828,25 @@ const SITE_I18N = {
     hero_kicker: 'Міні-сесії · 2026',
     hero_title_html: 'М\'які сонячні моменти<br>серед <em>квітучих полів</em>',
     hero_subtitle: 'Оберіть сесію нижче — бронювання займає близько 2 хвилин.',
+    hero_kicker_label: 'Обрана сесія',
+    hf_date: 'Дата',
+    hf_duration: '{n} хв сесія',
+    hf_deposit: 'Депозит сьогодні',
+    hf_currency: 'CAD · e-Transfer',
+    hf_total: 'Разом',
+    hf_total_sub: 'залишок у день зйомки',
+    hf_spots: 'Місця',
+    hf_status: 'Статус',
+    hf_location_prefix: '@ {loc}',
+    spots_left: 'залишилось {n}',
+    see_all_btn: 'Усі дати',
+    sessions_heading: 'Найближчі сесії',
+    sessions_subhead: 'Оберіть сесію — бронювання займає близько 2 хвилин',
+    how_heading: 'Як це працює',
+    how_subhead: 'Три швидкі кроки',
+    session_type_fallback: 'сесія',
+    stripe_redirecting: 'Переходимо до безпечної оплати…',
+    privacy_link: 'Privacy і зберігання в браузері',
     proof_reviews: '<strong>★ 4.9</strong> · 80+ відгуків',
     proof_sessions: '<strong>120+</strong> сесій проведено',
     proof_award: '<strong>Калгарі</strong> · локальний вибір 2024 і 2025',
@@ -1825,7 +1906,7 @@ const SITE_I18N = {
     no_slots_msg: 'Немає доступних слотів для цієї сесії.',
     close_btn: 'Закрити',
     waitlist_join_msg: 'Ви у листі очікування! Напишу в Direct, як звільниться місце.',
-    fill_name_email: 'Заповніть ім\'я та email',
+    fill_name_email: 'Заповніть ім\'я та електронну пошту',
     toast_loading_slots: 'Завантажуємо доступний час…',
     toast_error_events: 'Помилка завантаження сесій. Оновіть сторінку.',
     toast_error_slots: 'Помилка завантаження часу. Спробуйте ще раз.',
@@ -1854,6 +1935,11 @@ const SITE_I18N = {
     pay_copy: 'Копіювати',
     pay_copied: '✓ Скопійовано',
     pay_autodeposit: 'Автозарахування активне · пароль не потрібен',
+    pay_card_title: 'Зручніше сплатити карткою?',
+    pay_card_desc: 'Якщо e-Transfer зараз незручний — сплатіть депозит карткою, Apple Pay або Google Pay через безпечний Stripe.',
+    pay_card_btn: 'Сплатити ${amt} CAD карткою',
+    pay_choose_method: 'Оберіть зручний спосіб оплати. Interac e-Transfer зазвичай підтверджується швидше; картка, Apple Pay або Google Pay доступні нижче.',
+    pay_intro_soft: 'залишився останній крок',
     pay_ready_msg_title: 'Готове повідомлення для банку',
     pay_ready_msg_desc: 'Вставте це у поле "Message" при відправці',
     pay_howto_title: 'Як надіслати Interac e-Transfer',
@@ -1863,14 +1949,14 @@ const SITE_I18N = {
     pay_howto_step4: 'Введіть суму: <strong>${amt}.00</strong>',
     pay_howto_step5: 'Додайте повідомлення: "{title} — {date} {time}"',
     pay_howto_step6: 'Надішліть переказ',
-    pay_info_note: '💡 <strong>Пароль не потрібен!</strong> Це автозарахування. Гроші приходять миттєво. Я побачу переказ за хвилини (Gmail-бот + Telegram) і підтверджу бронь.',
-    pay_confirm_btn: ' ✓ Так, я надіслав(ла) ${amt} — Підтвердити бронь',
+    pay_info_note: '💡 <strong>Пароль не потрібен!</strong> Це автозарахування. Гроші надходять миттєво. Я побачу переказ за кілька хвилин і підтверджу бронювання.',
+    pay_confirm_btn: '✓ Так, я надіслав(ла) ${amt} — підтвердити бронювання',
     pay_back_btn: '← Назад змінити час',
     pay_no_etransfer: 'Не можете зробити e-Transfer?',
     pay_card_secure: 'Безпечна оплата · Stripe',
     pay_deposit_for: 'Депозит за {name}',
     succ_pending_title: 'Платіж в обробці',
-    succ_pending_desc: 'Дякую{name}! <strong>Ваш платіж перевіряється.</strong>',
+    succ_pending_desc: 'Дякую, {name}! <strong>Ваш платіж перевіряється.</strong>',
     succ_pending_hint: 'Я побачу e-Transfer за кілька хвилин — сторінка оновиться автоматично.',
     succ_status_pending: 'В обробці ⏳',
     succ_booking_id_lbl: 'Номер броні',

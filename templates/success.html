@@ -534,7 +534,7 @@
       </div>
       {% if booking.instagram %}
       <div class="detail-row">
-        <span class="key">Instagram</span>
+        <span class="key" data-i18n="instagram_label">Instagram</span>
         <span class="val">@{{ booking.instagram }}</span>
       </div>
       {% endif %}
@@ -545,7 +545,7 @@
       </div>
       <div class="detail-row">
         <span class="key" data-i18n="payment_label">Payment</span>
-        <span class="val">Interac e-Transfer</span>
+        <span class="val" data-i18n="payment_method">Interac e-Transfer</span>
       </div>
       <div class="detail-row">
         <span class="key" data-i18n="amount_label">Amount</span>
@@ -633,12 +633,12 @@
   </div>
 
   <footer>
-    <p>Pashynska Photography — Calgary, AB</p>
+    <p data-i18n="studio_footer">Pashynska Photography — Calgary, AB</p>
     <p style="margin-top:6px">
       <span data-i18n="questions">Questions?</span>
       <a href="https://instagram.com/pashynska.photo" target="_blank" data-i18n="dm_link"> DM @pashynska.photo on Instagram</a>
     </p>
-    <p style="margin-top:6px"><a href="/privacy">Privacy & browser storage</a></p>
+    <p style="margin-top:6px"><a href="/privacy" data-i18n="privacy_link">Privacy & browser storage</a></p>
   </footer>
 
   <script>
@@ -691,6 +691,10 @@
       prep_tip_desc:      'The lilac backdrop attracts bees — stay calm, we can always work around them.',
       questions:          'Questions?',
       dm_link:            ' DM @pashynska.photo on Instagram',
+      instagram_label:    'Instagram',
+      payment_method:     'Interac e-Transfer',
+      studio_footer:      'Pashynska Photography — Calgary, AB',
+      privacy_link:       'Privacy & browser storage',
       cancelled_title:    'Booking Cancelled',
       cancelled_sub:      'This booking has been cancelled.',
     },
@@ -739,6 +743,10 @@
       prep_tip_desc:      'Кусты сирени привлекают пчёл — сохраняйте спокойствие, мы всегда найдём решение.',
       questions:          'Вопросы?',
       dm_link:            ' Написать @pashynska.photo в Instagram',
+      instagram_label:    'Instagram',
+      payment_method:     'Interac e-Transfer',
+      studio_footer:      'Pashynska Photography — Калгари, AB',
+      privacy_link:       'Privacy и хранение в браузере',
       cancelled_title:    'Бронирование отменено',
       cancelled_sub:      'Это бронирование было отменено.',
     },
@@ -787,6 +795,10 @@
       prep_tip_desc:      'लाइलक के फूल मधुमक्खियों को आकर्षित करते हैं — शांत रहें, हम साथ मिलकर संभाल लेंगे।',
       questions:          'कोई सवाल?',
       dm_link:            ' Instagram पर DM करें @pashynska.photo',
+      instagram_label:    'Instagram',
+      payment_method:     'Interac e-Transfer',
+      studio_footer:      'Pashynska Photography — कैलगरी, AB',
+      privacy_link:       'Privacy और browser storage',
       cancelled_title:    'बुकिंग रद्द हो गई',
       cancelled_sub:      'यह बुकिंग रद्द कर दी गई है।',
     },
@@ -819,7 +831,7 @@
       add_apple:           'В Apple',
       slot_reserved_msg:  'Ваш слот заброньовано',
       slot_reserved_body: ' поки оплата перевіряється. Є питання?',
-      ig_cta:             '· Питання? Напишіть мені',
+      ig_cta:             '· Питання? Напишіть мені в Instagram',
       prep_title:         'Як підготуватись',
       prep_wardrobe:      'Одяг',
       prep_wardrobe_desc: 'М\'які, пасуючі відтінки — бузковий, кремовий, пастелі або білий. Уникайте яскравих візерунків.',
@@ -831,10 +843,14 @@
       prep_kids_desc:     'Нагодуйте дітей перед сесією. Візьміть снеки, воду та улюблену іграшку.',
       prep_arrive:        'Приходьте на 5 хв раніше',
       prep_arrive_desc:   'Ваш слот — рівно 20 хвилин. Деталі щодо місця надішлю у DM ближче до дати.',
-      prep_tip:           'Бонус порада',
+      prep_tip:           'Корисна порада',
       prep_tip_desc:      'Кущі бузку приваблюють бджіл — зберігайте спокій, ми завжди знайдемо рішення.',
       questions:          'Питання?',
       dm_link:            ' Написати @pashynska.photo в Instagram',
+      instagram_label:    'Instagram',
+      payment_method:     'Interac e-Transfer',
+      studio_footer:      'Pashynska Photography — Калгарі, AB',
+      privacy_link:       'Privacy і зберігання в браузері',
       cancelled_title:    'Бронювання скасовано',
       cancelled_sub:      'Це бронювання було скасовано.',
     }
@@ -864,7 +880,7 @@
   function applyTranslations() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.dataset.i18n;
-      el.textContent = t(key);
+      el.innerHTML = t(key);
     });
   }
 

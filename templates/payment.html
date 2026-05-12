@@ -315,27 +315,27 @@
       <div class="card-title" data-i18n="booking_summary">Booking Summary</div>
       <div class="summary">
         <div class="summary-row">
-          <span class="key">Session</span>
-          <span>Mini Photo Session ({{ session_length }} min)</span>
+          <span class="key" data-i18n="summary_session">Session</span>
+          <span data-i18n="summary_session_value">Mini Photo Session ({{ session_length }} min)</span>
         </div>
         <div class="summary-row">
-          <span class="key">Date</span>
+          <span class="key" data-i18n="summary_date">Date</span>
           <span>{{ date }}</span>
         </div>
         <div class="summary-row">
-          <span class="key">Time</span>
+          <span class="key" data-i18n="summary_time">Time</span>
           <span>{{ booking.time }}</span>
         </div>
         <div class="summary-row">
-          <span class="key">Includes</span>
-          <span>15 edited photos + all originals</span>
+          <span class="key" data-i18n="summary_includes">Includes</span>
+          <span data-i18n="summary_includes_value">15 edited photos + all originals</span>
         </div>
         <div class="summary-row">
-          <span class="key">Balance at session</span>
+          <span class="key" data-i18n="summary_balance">Balance at session</span>
           <span>$95 + GST</span>
         </div>
         <div class="summary-row">
-          <span class="key">Deposit due now</span>
+          <span class="key" data-i18n="summary_deposit">Deposit due now</span>
           <span class="val-rose">${{ price }} CAD</span>
         </div>
       </div>
@@ -346,26 +346,26 @@
     <div class="transfer-box">
       <div class="transfer-eyebrow" data-i18n="send_via">Send via Interac e-Transfer</div>
       <div class="transfer-amount">${{ price }}</div>
-      <div class="transfer-currency">CAD — Canadian dollars</div>
+      <div class="transfer-currency" data-i18n="currency_label">CAD — Canadian dollars</div>
 
       <div class="email-copy" id="email-copy-box" onclick="copyEmail()">
         <div>
           <div class="email-copy-label" data-i18n="send_to">Send to</div>
           <div class="email-copy-val" id="email-value">{{ email }}</div>
         </div>
-        <button class="copy-pill" id="copy-pill" onclick="copyEmail(event)">Copy</button>
+        <button class="copy-pill" id="copy-pill" onclick="copyEmail(event)" data-i18n="copy">Copy</button>
       </div>
       <div class="transfer-note" data-i18n="auto_deposit">Auto-deposit enabled · no password needed</div>
     </div>
 
     <!-- Bank message template -->
     <div class="card">
-      <div style="font-size:0.82rem;font-weight:600;color:var(--ink-2);margin-bottom:4px">Ready-to-use bank message</div>
-      <div style="font-size:0.78rem;color:var(--ink-3);margin-bottom:10px">Paste this in the "Message" field when sending</div>
+      <div style="font-size:0.82rem;font-weight:600;color:var(--ink-2);margin-bottom:4px" data-i18n="bank_msg_title">Ready-to-use bank message</div>
+      <div style="font-size:0.78rem;color:var(--ink-3);margin-bottom:10px" data-i18n="bank_msg_desc">Paste this in the "Message" field when sending</div>
       <div class="bank-msg-wrap" id="bank-msg" onclick="copyBankMsg()">
-        <button class="bank-copy-btn" onclick="copyBankMsg(event)" id="bank-copy-btn">Copy</button>
+        <button class="bank-copy-btn" onclick="copyBankMsg(event)" id="bank-copy-btn" data-i18n="copy">Copy</button>
         {{ event_title }} — {{ date }} {{ booking.time }}<br>
-        Deposit for {{ booking.name }}
+        <span data-i18n="bank_msg_deposit_for">Deposit for</span> {{ booking.name }}
       </div>
     </div>
 
@@ -373,16 +373,16 @@
     <div class="how-to">
       <div class="how-to-title" data-i18n="how_to_title">How to send Interac e-Transfer</div>
       <ol>
-        <li>Open your banking app (RBC, TD, Scotiabank, etc.)</li>
-        <li>Choose "Send Interac e-Transfer"</li>
-        <li>Tap the email above to copy, paste as recipient</li>
-        <li>Enter amount: <strong>${{ price }}.00</strong></li>
-        <li>Add message: "{{ event_title }} — {{ date }} {{ booking.time }}"</li>
-        <li>Send the transfer</li>
+        <li data-i18n="how_step1">Open your banking app (RBC, TD, Scotiabank, etc.)</li>
+        <li data-i18n="how_step2">Choose "Send Interac e-Transfer"</li>
+        <li data-i18n="how_step3">Tap the email above to copy, paste as recipient</li>
+        <li data-i18n="how_step4">Enter amount: <strong>${{ price }}.00</strong></li>
+        <li data-i18n="how_step5">Add message: "{{ event_title }} — {{ date }} {{ booking.time }}"</li>
+        <li data-i18n="how_step6">Send the transfer</li>
       </ol>
     </div>
 
-    <div class="info-note">
+    <div class="info-note" data-i18n="no_pwd">
       💡 <strong>No password needed!</strong> This is an auto-deposit enabled email. The money arrives instantly.
     </div>
 
@@ -400,12 +400,12 @@
         <input type="hidden" id="session_type" value="{{ booking.session_type }}">
         <input type="hidden" id="event_id"     value="{{ booking.event_id }}">
 
-        <button type="submit" class="btn-primary" id="confirm-btn">
+        <button type="submit" class="btn-primary" id="confirm-btn" data-i18n="confirm_btn">
           ✓ Yes, I've Sent ${{ price }} — Confirm Booking
         </button>
       </form>
 
-      <button class="btn-ghost" onclick="window.location.href='/'">
+      <button class="btn-ghost" onclick="window.location.href='/'" data-i18n="back_btn">
         ← Back to Change Time
       </button>
     </div>
@@ -441,8 +441,8 @@
 
   <footer>
     <p>Pashynska Photography — Calgary, AB</p>
-    <p style="margin-top:6px">Questions? <a href="https://instagram.com/pashynska.photo" target="_blank">DM @pashynska.photo</a></p>
-    <p style="margin-top:6px"><a href="/privacy">Privacy & browser storage</a></p>
+    <p style="margin-top:6px"><span data-i18n="footer_questions">Questions?</span> <a href="https://instagram.com/pashynska.photo" target="_blank">DM @pashynska.photo</a></p>
+    <p style="margin-top:6px"><a href="/privacy" data-i18n="privacy_link">Privacy & browser storage</a></p>
   </footer>
 
   <script>
@@ -463,7 +463,7 @@
         return true;
       }
       if (data && data.status === 'cancelled') {
-        alert('This booking was cancelled. Please select a new time slot.');
+        alert(tr('booking_cancelled')); 
         window.location.href = '/';
         return true;
       }
@@ -502,7 +502,7 @@
         if (diff <= 300) box.classList.add('warning');
         if (diff <= 0) {
           clearInterval(timerInterval);
-          alert('Your reservation expired. Please select a new time slot.');
+          alert(tr('reservation_expired')); 
           window.location.href = '/';
         }
       }, 1000);
@@ -514,9 +514,9 @@
       const email = document.getElementById('email-value').textContent.trim();
       navigator.clipboard.writeText(email).catch(() => {});
       const pill = document.getElementById('copy-pill');
-      pill.textContent = '✓ Copied';
+      pill.textContent = tr('copied');
       pill.classList.add('copied');
-      setTimeout(() => { pill.textContent = 'Copy'; pill.classList.remove('copied'); }, 2500);
+      setTimeout(() => { pill.textContent = tr('copy'); pill.classList.remove('copied'); }, 2500);
     }
 
     // ── Copy bank message ──
@@ -525,8 +525,8 @@
       const msg = `{{ event_title }} — {{ date }} {{ booking.time }}\nDeposit for {{ booking.name }}`;
       navigator.clipboard.writeText(msg).catch(() => {});
       const btn = document.getElementById('bank-copy-btn');
-      btn.textContent = '✓ Copied';
-      setTimeout(() => btn.textContent = 'Copy', 2500);
+      btn.textContent = tr('copied');
+      setTimeout(() => btn.textContent = tr('copy'), 2500);
     }
 
     // ── Confirm payment ──
@@ -535,7 +535,7 @@
       const btn     = document.getElementById('stripe-btn');
       const btnText = document.getElementById('stripe-btn-text');
       btn.disabled  = true;
-      btnText.textContent = 'Redirecting to secure checkout…';
+      btnText.textContent = tr('stripe_redirecting');
       btn.style.opacity   = '0.7';
 
       try {
@@ -551,7 +551,7 @@
         if (data.checkout_url) {
           window.location.href = data.checkout_url;
         } else {
-          alert(data.error || 'Could not start card payment. Please use Interac e-Transfer above, or refresh the page.');
+          alert(data.error || tr('stripe_error'));
           btn.disabled = false;
           btnText.dataset.i18n = 'pay_by_card';
           btnText.textContent = PAY_I18N[_lang]?.pay_by_card || 'Pay ${{ price }} CAD — Card · Apple Pay · Google Pay';
@@ -559,7 +559,7 @@
           btn.style.color = '';
         }
       } catch (err) {
-        alert('Network error. Please use Interac e-Transfer above, or refresh the page.');
+        alert(tr('network_card_error'));
         btn.disabled = false;
         btnText.textContent = PAY_I18N[_lang]?.pay_by_card || 'Pay ${{ price }} CAD — Card · Apple Pay · Google Pay';
         btn.style.borderColor = '';
@@ -571,7 +571,7 @@
       e.preventDefault();
       const btn = document.getElementById('confirm-btn');
       btn.disabled = true;
-      btn.textContent = 'Processing…';
+      btn.textContent = tr('processing');
 
       const data = {
         booking_id: '{{ booking.id }}',
@@ -589,14 +589,14 @@
           sessionStorage.removeItem('reservationExpiry');
           window.location.href = '/success?booking_id=' + result.booking_id + '&token={{ booking.confirmation_token }}';
         } else {
-          alert(result.error || 'Something went wrong. Please try again.');
+          alert(result.error || tr('generic_error'));
           btn.disabled = false;
-          btn.textContent = `✓ Yes, I've Sent ${{ price }} — Confirm Booking`;
+          btn.textContent = tr('confirm_btn');
         }
       } catch (err) {
-        alert('Network error. Please try again.');
+        alert(tr('network_error'));
         btn.disabled = false;
-        btn.textContent = `✓ Yes, I've Sent ${{ price }} — Confirm Booking`;
+        btn.textContent = tr('confirm_btn');
       }
     });
 
@@ -619,7 +619,37 @@
       ive_sent_sub:     "Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.",
       confirm_btn:      "✓ Yes, I've Sent ${{ price }} — Confirm Booking",
       back_btn:         '← Back to Change Time',
-      no_pwd:           '💡 No password needed! This is an auto-deposit enabled email. The money arrives instantly.',
+      no_pwd:           '💡 <strong>No password needed!</strong> This is an auto-deposit enabled email. The money arrives instantly.',
+      summary_session:   'Session',
+      summary_session_value: 'Mini Photo Session ({{ session_length }} min)',
+      summary_date:      'Date',
+      summary_time:      'Time',
+      summary_includes:  'Includes',
+      summary_includes_value: '15 edited photos + all originals',
+      summary_balance:   'Balance at session',
+      summary_deposit:   'Deposit due now',
+      currency_label:    'CAD — Canadian dollars',
+      bank_msg_title:    'Ready-to-use bank message',
+      bank_msg_desc:     'Paste this in the "Message" field when sending',
+      bank_msg_deposit_for: 'Deposit for',
+      how_step1:         'Open your banking app (RBC, TD, Scotiabank, etc.)',
+      how_step2:         'Choose "Send Interac e-Transfer"',
+      how_step3:         'Tap the email above to copy, paste as recipient',
+      how_step4:         'Enter amount: <strong>${{ price }}.00</strong>',
+      how_step5:         'Add message: "{{ event_title }} — {{ date }} {{ booking.time }}"',
+      how_step6:         'Send the transfer',
+      footer_questions:  'Questions?',
+      privacy_link:      'Privacy & browser storage',
+      reservation_expired: 'Your reservation expired. Please select a new time slot.',
+      booking_cancelled: 'This booking was cancelled. Please select a new time slot.',
+      copied:            '✓ Copied',
+      copy:              'Copy',
+      stripe_redirecting:'Redirecting to secure checkout…',
+      stripe_error:      'Could not start card payment. Please use Interac e-Transfer above, or refresh the page.',
+      network_card_error:'Network error. Please use Interac e-Transfer above, or refresh the page.',
+      network_error:     'Network error. Please try again.',
+      generic_error:     'Something went wrong. Please try again.',
+      processing:        'Processing…',
       no_etransfer:     "Can't do e-Transfer?",
       pay_by_card:      'Pay ${{ price }} CAD — Card · Apple Pay · Google Pay',
       card_secure:      '🔒 Secure · Powered by Stripe',
@@ -627,7 +657,7 @@
     ru: {
       page_title:       'Оформление бронирования | Pashynska Photography',
       complete_booking: 'Оформите бронирование',
-      slot_reserved_for:'Слот забронирован на',
+      slot_reserved_for:'Слот удерживается',
       booking_summary:  'Детали бронирования',
       send_via:         'Отправить через Interac e-Transfer',
       send_to:          'Отправить на',
@@ -637,7 +667,37 @@
       ive_sent_sub:     'После отправки e-Transfer нажмите ниже. Я подтвержу ваше бронирование в течение нескольких минут.',
       confirm_btn:      '✓ Да, я отправил(а) ${{ price }} — Подтвердить',
       back_btn:         '← Назад, изменить время',
-      no_pwd:           '💡 Пароль не нужен! Это email с автодепозитом. Деньги поступают мгновенно.',
+      no_pwd:           '💡 <strong>Пароль не нужен!</strong> Это email с автоматическим зачислением. Деньги поступают мгновенно.',
+      summary_session:   'Сессия',
+      summary_session_value: 'Мини-фотосессия ({{ session_length }} мин)',
+      summary_date:      'Дата',
+      summary_time:      'Время',
+      summary_includes:  'Включено',
+      summary_includes_value: '15 отредактированных фото + все оригиналы',
+      summary_balance:   'Остаток на съёмке',
+      summary_deposit:   'Депозит сейчас',
+      currency_label:    'CAD — канадские доллары',
+      bank_msg_title:    'Готовое сообщение для банка',
+      bank_msg_desc:     'Вставьте это в поле “Message” при отправке',
+      bank_msg_deposit_for: 'Депозит за',
+      how_step1:         'Откройте приложение банка (RBC, TD, Scotiabank и т.д.)',
+      how_step2:         'Выберите "Send Interac e-Transfer"',
+      how_step3:         'Скопируйте email выше и вставьте его как получателя',
+      how_step4:         'Введите сумму: <strong>${{ price }}.00</strong>',
+      how_step5:         'Добавьте сообщение: "{{ event_title }} — {{ date }} {{ booking.time }}"',
+      how_step6:         'Отправьте перевод',
+      footer_questions:  'Вопросы?',
+      privacy_link:      'Privacy и хранение в браузере',
+      reservation_expired: 'Время удержания слота истекло. Выберите новое время.',
+      booking_cancelled: 'Это бронирование отменено. Выберите новое время.',
+      copied:            '✓ Скопировано',
+      copy:              'Копировать',
+      stripe_redirecting:'Переходим к безопасной оплате…',
+      stripe_error:      'Не удалось начать оплату картой. Используйте Interac e-Transfer выше или обновите страницу.',
+      network_card_error:'Ошибка сети. Используйте Interac e-Transfer выше или обновите страницу.',
+      network_error:     'Ошибка сети. Попробуйте ещё раз.',
+      generic_error:     'Что-то пошло не так. Попробуйте ещё раз.',
+      processing:        'Обрабатываем…',
       no_etransfer:     'Не можете сделать e-Transfer?',
       pay_by_card:      'Оплатить ${{ price }} CAD — карта · Apple Pay · Google Pay',
       card_secure:      '🔒 Безопасная оплата · Stripe',
@@ -655,7 +715,37 @@
       ive_sent_sub:     'e-Transfer भेजने के बाद नीचे दबाएं। मैं कुछ ही मिनटों में आपकी बुकिंग की पुष्टि कर दूंगी।',
       confirm_btn:      '✓ हाँ, मैंने ${{ price }} भेजे — बुकिंग पक्की करें',
       back_btn:         '← वापस जाएं और समय बदलें',
-      no_pwd:           '💡 पासवर्ड की ज़रूरत नहीं! यह ऑटो-डिपॉज़िट ईमेल है। पैसे तुरंत पहुंच जाते हैं।',
+      no_pwd:           '💡 <strong>पासवर्ड की ज़रूरत नहीं!</strong> यह ऑटो-डिपॉज़िट ईमेल है। पैसे तुरंत पहुंच जाते हैं।',
+      summary_session:   'सेशन',
+      summary_session_value: 'मिनी फोटो सेशन ({{ session_length }} मिनट)',
+      summary_date:      'तारीख',
+      summary_time:      'समय',
+      summary_includes:  'शामिल है',
+      summary_includes_value: '15 एडिटेड फोटो + सभी ओरिजिनल',
+      summary_balance:   'सेशन के दिन बाकी',
+      summary_deposit:   'अभी डिपॉज़िट',
+      currency_label:    'CAD — कैनेडियन डॉलर',
+      bank_msg_title:    'बैंक के लिए तैयार संदेश',
+      bank_msg_desc:     'भेजते समय इसे “Message” फ़ील्ड में पेस्ट करें',
+      bank_msg_deposit_for: 'इसके लिए डिपॉज़िट',
+      how_step1:         'अपना बैंकिंग ऐप खोलें (RBC, TD, Scotiabank, आदि)',
+      how_step2:         '"Send Interac e-Transfer" चुनें',
+      how_step3:         'ऊपर दिया email कॉपी करें और प्राप्तकर्ता में पेस्ट करें',
+      how_step4:         'राशि दर्ज करें: <strong>${{ price }}.00</strong>',
+      how_step5:         'संदेश जोड़ें: "{{ event_title }} — {{ date }} {{ booking.time }}"',
+      how_step6:         'ट्रांसफ़र भेजें',
+      footer_questions:  'सवाल?',
+      privacy_link:      'Privacy और browser storage',
+      reservation_expired: 'आपका रिज़र्वेशन समाप्त हो गया। कृपया नया समय चुनें।',
+      booking_cancelled: 'यह बुकिंग रद्द हो गई है। कृपया नया समय चुनें।',
+      copied:            '✓ कॉपी हुआ',
+      copy:              'कॉपी',
+      stripe_redirecting:'सुरक्षित checkout पर भेजा जा रहा है…',
+      stripe_error:      'कार्ड भुगतान शुरू नहीं हो सका। कृपया ऊपर Interac e-Transfer इस्तेमाल करें या पेज रिफ़्रेश करें।',
+      network_card_error:'नेटवर्क त्रुटि। कृपया ऊपर Interac e-Transfer इस्तेमाल करें या पेज रिफ़्रेश करें।',
+      network_error:     'नेटवर्क त्रुटि। फिर कोशिश करें।',
+      generic_error:     'कुछ गलत हुआ। फिर कोशिश करें।',
+      processing:        'प्रोसेस हो रहा है…',
       no_etransfer:     'e-Transfer नहीं कर सकते?',
       pay_by_card:      '${{ price }} CAD — कार्ड · Apple Pay · Google Pay से भुगतान करें',
       card_secure:      '🔒 सुरक्षित भुगतान · Stripe',
@@ -663,7 +753,7 @@
     uk: {
       page_title:       'Завершити бронювання | Pashynska Photography',
       complete_booking: 'Завершити бронювання',
-      slot_reserved_for:'Слот заброньовано на',
+      slot_reserved_for:'Слот утримується',
       booking_summary:  'Підсумок бронювання',
       send_via:         'Надіслати через Interac e-Transfer',
       send_to:          'Надіслати на',
@@ -673,7 +763,37 @@
       ive_sent_sub:     'Після відправки e-Transfer натисніть нижче. Я підтверджу ваше бронювання протягом кількох хвилин.',
       confirm_btn:      '✓ Так, я надіслав(ла) ${{ price }} — Підтвердити',
       back_btn:         '← Назад, змінити час',
-      no_pwd:           '💡 Пароль не потрібен! Це email із автодепозитом. Гроші надходять миттєво.',
+      no_pwd:           '💡 <strong>Пароль не потрібен!</strong> Це email із автоматичним зарахуванням. Гроші надходять миттєво.',
+      summary_session:   'Сесія',
+      summary_session_value: 'Міні-фотосесія ({{ session_length }} хв)',
+      summary_date:      'Дата',
+      summary_time:      'Час',
+      summary_includes:  'Включено',
+      summary_includes_value: '15 відредагованих фото + усі оригінали',
+      summary_balance:   'Залишок на сесії',
+      summary_deposit:   'Депозит зараз',
+      currency_label:    'CAD — канадські долари',
+      bank_msg_title:    'Готове повідомлення для банку',
+      bank_msg_desc:     'Вставте це у поле “Message” під час відправлення',
+      bank_msg_deposit_for: 'Депозит за',
+      how_step1:         'Відкрийте додаток банку (RBC, TD, Scotiabank тощо)',
+      how_step2:         'Оберіть "Send Interac e-Transfer"',
+      how_step3:         'Скопіюйте email вище та вставте як отримувача',
+      how_step4:         'Введіть суму: <strong>${{ price }}.00</strong>',
+      how_step5:         'Додайте повідомлення: "{{ event_title }} — {{ date }} {{ booking.time }}"',
+      how_step6:         'Надішліть переказ',
+      footer_questions:  'Питання?',
+      privacy_link:      'Privacy і зберігання в браузері',
+      reservation_expired: 'Час утримання слота завершився. Оберіть новий час.',
+      booking_cancelled: 'Це бронювання скасовано. Оберіть новий час.',
+      copied:            '✓ Скопійовано',
+      copy:              'Копіювати',
+      stripe_redirecting:'Переходимо до безпечної оплати…',
+      stripe_error:      'Не вдалося почати оплату карткою. Скористайтесь Interac e-Transfer вище або оновіть сторінку.',
+      network_card_error:'Помилка мережі. Скористайтесь Interac e-Transfer вище або оновіть сторінку.',
+      network_error:     'Помилка мережі. Спробуйте ще раз.',
+      generic_error:     'Щось пішло не так. Спробуйте ще раз.',
+      processing:        'Обробляємо…',
       no_etransfer:     'Не можете зробити e-Transfer?',
       pay_by_card:      'Сплатити ${{ price }} CAD — картка · Apple Pay · Google Pay',
       card_secure:      '🔒 Безпечна оплата · Stripe',
@@ -681,6 +801,10 @@
   };
 
   let _lang = localStorage.getItem('lang') || 'en';
+
+  function tr(key) {
+    return (PAY_I18N[_lang] && PAY_I18N[_lang][key]) || PAY_I18N.en[key] || key;
+  }
 
   function setLang(lang) {
     if (!PAY_I18N[lang]) return;
@@ -690,7 +814,7 @@
     document.title = T.page_title;
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const k = el.dataset.i18n;
-      if (T[k]) el.textContent = T[k];
+      if (T[k]) el.innerHTML = T[k];
     });
     document.querySelectorAll('.lang-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.lang === lang);
