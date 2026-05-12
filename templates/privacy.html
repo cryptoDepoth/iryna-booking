@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy & Browser Storage | Pashynska Photography</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --nude:#f5ede8; --rose:#c4857a; --ink:#1c1917; --ink-2:#44403c;
+      --ink-3:#78716c; --ink-4:#a8a29e; --ink-5:#e7e5e4; --page:#faf7f5;
+      --surface:#fff; --green:#3d6b4f; --font-d:'Cormorant Garamond', Georgia, serif;
+      --font-b:'DM Sans', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: var(--font-b); color: var(--ink); background:
+      radial-gradient(circle at 12% 0%, rgba(196,133,122,.18), transparent 30%),
+      linear-gradient(180deg, #fff 0%, var(--page) 48%, var(--nude) 100%);
+      line-height: 1.65; -webkit-font-smoothing: antialiased;
+    }
+    .wrap { width: min(860px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 52px; }
+    .nav { display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:36px; }
+    .brand { text-decoration:none; color:var(--ink); font-weight:600; letter-spacing:.02em; }
+    .back { color:var(--rose); text-decoration:none; font-weight:600; font-size:.92rem; }
+    .hero { background:rgba(255,255,255,.82); border:1px solid rgba(0,0,0,.06); border-radius:30px; padding:34px; box-shadow:0 24px 70px rgba(68,64,60,.09); }
+    .kicker { color:var(--green); text-transform:uppercase; letter-spacing:.12em; font-size:.74rem; font-weight:700; margin-bottom:8px; }
+    h1 { font-family:var(--font-d); font-size:clamp(2.4rem, 7vw, 4.6rem); line-height:.95; margin:0 0 16px; font-weight:500; }
+    .lead { color:var(--ink-2); font-size:1.05rem; max-width:690px; margin:0; }
+    .notice { margin-top:22px; padding:16px 18px; border-radius:20px; background:#edf5f0; color:#244732; border:1px solid rgba(61,107,79,.16); font-weight:600; }
+    .grid { display:grid; gap:16px; margin-top:22px; }
+    .card { background:var(--surface); border:1px solid rgba(0,0,0,.06); border-radius:24px; padding:22px; box-shadow:0 12px 38px rgba(68,64,60,.06); }
+    h2 { font-family:var(--font-d); font-size:1.75rem; line-height:1.1; margin:0 0 8px; font-weight:600; }
+    p { margin:0 0 10px; color:var(--ink-2); }
+    ul { margin:10px 0 0 20px; color:var(--ink-2); }
+    li { margin:7px 0; }
+    code { background:#f7f2ee; border:1px solid var(--ink-5); padding:2px 6px; border-radius:8px; font-size:.9em; }
+    .muted { color:var(--ink-3); font-size:.92rem; }
+    footer { text-align:center; padding:26px 0 0; color:var(--ink-3); font-size:.9rem; }
+    footer a { color:var(--rose); text-decoration:none; font-weight:600; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <nav class="nav">
+      <a class="brand" href="/">Pashynska Photography</a>
+      <a class="back" href="/">← Back to booking</a>
+    </nav>
+
+    <section class="hero">
+      <div class="kicker">Privacy & browser storage</div>
+      <h1>Simple privacy note.</h1>
+      <p class="lead">This booking site is designed to collect only what is needed to reserve and confirm a photography session.</p>
+      <div class="notice">No cookie banner: the public booking flow does not use advertising cookies, Google Analytics, Meta Pixel, Hotjar, or retargeting scripts.</div>
+    </section>
+
+    <section class="grid" aria-label="Privacy details">
+      <article class="card">
+        <h2>What information is collected</h2>
+        <p>When you reserve a session, the booking form asks for contact and appointment details:</p>
+        <ul>
+          <li>name</li>
+          <li>email</li>
+          <li>phone number</li>
+          <li>Instagram handle, if provided</li>
+          <li>selected session, date, time, and payment status</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Browser storage, not tracking cookies</h2>
+        <p>The site uses small browser storage only to make the booking flow smoother:</p>
+        <ul>
+          <li><code>localStorage</code> stores your selected language so pages stay in the same language.</li>
+          <li><code>sessionStorage</code> stores the temporary reservation countdown during checkout.</li>
+        </ul>
+        <p class="muted">This is not used for advertising or cross-site tracking.</p>
+      </article>
+
+      <article class="card">
+        <h2>Payments</h2>
+        <p>Interac e-Transfer is handled through your bank. If you choose card / Apple Pay / Google Pay, checkout is handled by Stripe. Stripe may process payment-related data according to Stripe’s own privacy and security policies.</p>
+      </article>
+
+      <article class="card">
+        <h2>How booking data is used</h2>
+        <p>Your details are used for practical session operations only:</p>
+        <ul>
+          <li>holding your selected time slot</li>
+          <li>confirming payment</li>
+          <li>sending session details and reminders</li>
+          <li>managing schedule, calendar, and client communication</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Questions or deletion requests</h2>
+        <p>If you want your booking details updated or removed, DM <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener">@pashynska.photo</a>.</p>
+      </article>
+    </section>
+
+    <footer>
+      <p>© 2026 Pashynska Photography · <a href="/">Booking</a> · <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener">Instagram</a></p>
+    </footer>
+  </main>
+</body>
+</html>

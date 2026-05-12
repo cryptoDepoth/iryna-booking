@@ -312,6 +312,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 }
 @keyframes slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
 </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
 </head>
 <body>
 
@@ -413,7 +414,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
 <footer>
   <p><span data-i18n="footer_studio"><strong>Pashynska Photography</strong> · Calgary, AB · </span><a href="https://instagram.com/pashynska.photo" target="_blank">@pashynska.photo</a></p>
-  <p data-i18n="footer_copyright" style="margin-top:6px;color:var(--ink-4)">© 2026 Pashynska Photography — All rights reserved</p>
+  <p style="margin-top:6px;color:var(--ink-4)"><a href="/privacy">Privacy & browser storage</a> · <span data-i18n="footer_copyright">© 2026 Pashynska Photography — All rights reserved</span></p>
   <!-- Hidden admin access: tiny dot in footer -->
   <a href="/backstage" class="admin-hint" title="Admin access">·</a>
 </footer>

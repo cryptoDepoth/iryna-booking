@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import hmac
+from html import escape as _html_escape
 import secrets  # used by /reserve to generate confirmation_token
 import sqlite3
 import requests
@@ -287,6 +288,11 @@ def _notify_admin(message, reply_markup=None):
     """Send notification to both Iryna and Andrzej via Telegram."""
     _tg_send(TELEGRAM_CHAT_ID, message, reply_markup=reply_markup)
     _tg_send(TELEGRAM_ADMIN_CHAT_ID, message, reply_markup=reply_markup)
+
+
+def _tg_escape(value):
+    """Escape client-provided text before inserting it into Telegram HTML."""
+    return _html_escape(str(value or ""), quote=False)
 
 
 def _notify_new_reservation(booking_id, client_name, client_email, event_date,
@@ -2215,10 +2221,22 @@ def success():
         price=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
         event_title=ev.get("title", "Photo Session") if ev else "Photo Session",
         session_length=ev.get("session_length", 20) if ev else 20,
+        timezone=ev.get("timezone", "America/Edmonton") if ev else "America/Edmonton",
         location=ev.get("location", "Calgary, AB") if ev else "Calgary, AB",
         booking=booking,
         confirmation_token=booking.get("confirmation_token") if booking else ""
     )
+
+@app.route("/privacy")
+def privacy():
+    """Plain-language privacy and browser storage disclosure for clients.
+
+    We intentionally avoid a cookie-consent popup because the public booking
+    flow does not set advertising/analytics cookies. This page keeps the site
+    transparent without adding conversion friction.
+    """
+    return render_template("privacy.html")
+
 
 @app.route("/calendar-ics/<booking_id>")
 def calendar_ics(booking_id):
@@ -2912,6 +2930,24 @@ def admin_confirm():
             booking_id=booking_id,
             location=ev.get("location")
         )
+
+    # Notify admin on Telegram so manual confirmations stay in sync with
+    # Stripe and automatic e-Transfer confirmations.
+    if booking:
+        try:
+            paid_amount_float = float(paid_amount)
+            msg = (
+                f"✅ <b>Booking Confirmed Manually</b>\n\n"
+                f"👤 {_tg_escape(booking.get('name', '?'))}\n"
+                f"📧 {_tg_escape(booking.get('email', '?'))}\n"
+                f"📅 {_tg_escape(booking.get('date', '?'))} @ {_tg_escape(booking.get('time', '?'))}\n"
+                f"💰 <b>${paid_amount_float:.2f} CAD</b>\n"
+                f"🆔 Booking #{booking_id}\n\n"
+                f"Email confirmation sent to client."
+            )
+            _notify_admin(msg)
+        except Exception as e:
+            log.error(f"[admin] Telegram notify error for #{booking_id}: {e}")
 
     log.info(f"[admin] Booking #{booking_id} confirmed, paid ${paid_amount}")
 
@@ -3748,37 +3784,51 @@ def telegram_webhook():
         event_title = ev.get("title", "Mini Session") if ev else "Mini Session"
         event_date = ev["date"] if ev else booking["date"]
 
-        create_calendar_event_for_booking(booking_id)
-        sync_to_notion(booking_id)
-        if ev and booking:
-            _send_client_email(
-                to_email=booking.get("email", ""),
-                client_name=booking.get("name", "Client"),
-                event_date=event_date,
-                slot_time=booking.get("time", ""),
-                event_title=event_title,
-                booking_id=booking_id,
-                location=ev.get("location")
-            )
-
+        # Keep the Telegram button feeling instant: update DB + Telegram first,
+        # then run slow integrations (Google Calendar, Notion, email) in the
+        # background. These integrations can take several seconds and made the
+        # inline button look broken even though the booking was already updated.
         log.info(f"[tg-webhook] Booking #{booking_id} confirmed by {from_user}")
         updated_text = (
-            f"✅ <b>CONFIRMED</b> by {from_user}\n\n"
-            f"👤 {booking.get('name', 'Client')}\n"
-            f"📅 {booking.get('date')} @ {booking.get('time')}\n"
-            f"🎉 {event_title}\n"
+            f"✅ <b>CONFIRMED</b> by {_tg_escape(from_user)}\n\n"
+            f"👤 {_tg_escape(booking.get('name', 'Client'))}\n"
+            f"📅 {_tg_escape(booking.get('date'))} @ {_tg_escape(booking.get('time'))}\n"
+            f"🎉 {_tg_escape(event_title)}\n"
             f"📋 Booking #{booking_id}\n"
-            f"📧 Email sent to client"
+            f"📧 Confirmation email is being sent"
         )
-        requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
-            json={"chat_id": chat_id, "message_id": message_id,
-                  "text": updated_text, "parse_mode": "HTML"},
-            timeout=5
-        )
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
+                json={"chat_id": chat_id, "message_id": message_id,
+                      "text": updated_text, "parse_mode": "HTML"},
+                timeout=5
+            )
+        except Exception as e:
+            log.warning(f"[tg-webhook] editMessageText failed for #{booking_id}: {e}")
         other_chat = TELEGRAM_ADMIN_CHAT_ID if str(chat_id) != TELEGRAM_ADMIN_CHAT_ID else TELEGRAM_CHAT_ID
         if other_chat:
             _tg_send(other_chat, updated_text)
+
+        def _run_confirm_side_effects():
+            try:
+                create_calendar_event_for_booking(booking_id)
+                sync_to_notion(booking_id)
+                if ev and booking:
+                    _send_client_email(
+                        to_email=booking.get("email", ""),
+                        client_name=booking.get("name", "Client"),
+                        event_date=event_date,
+                        slot_time=booking.get("time", ""),
+                        event_title=event_title,
+                        booking_id=booking_id,
+                        location=ev.get("location")
+                    )
+                log.info(f"[tg-webhook] Booking #{booking_id} side-effects complete")
+            except Exception as e:
+                log.error(f"[tg-webhook] side-effects failed for booking #{booking_id}: {e}")
+
+        _threading.Thread(target=_run_confirm_side_effects, daemon=True).start()
 
     elif action == "cancel":
         conn = db_conn()

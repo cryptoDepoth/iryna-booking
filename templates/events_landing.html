@@ -101,6 +101,7 @@
     footer{text-align:center;padding:32px;color:var(--ink-4);font-size:.85rem;border-top:1px solid rgba(0,0,0,.04)}
     footer a{color:var(--rose);text-decoration:none;font-weight:500}
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
 </head>
 <body>
 
@@ -215,6 +216,7 @@
 
 <footer>
   <p><strong>Pashynska Photography</strong> · Calgary, AB · <a href="https://instagram.com/{{ settings.photographer_instagram or 'pashynska.photo' }}">@{{ settings.photographer_instagram or 'pashynska.photo' }}</a></p>
+  <p style="margin-top:6px"><a href="/privacy">Privacy & browser storage</a></p>
 </footer>
 
 <script>

@@ -102,6 +102,134 @@
       100% { transform: var(--tx, 80px) var(--ty, -80px) scale(0); opacity: 0; }
     }
 
+    /* ── CAMERA FLASH ── */
+    #camera-flash {
+      position: fixed; inset: 0;
+      background: #fff;
+      z-index: 10000;
+      pointer-events: none;
+      opacity: 0;
+    }
+    #camera-flash.active {
+      animation: flash-bang 0.55s ease-out forwards;
+    }
+    @keyframes flash-bang {
+      0%   { opacity: 0.85; }
+      100% { opacity: 0; }
+    }
+
+    /* ── FILM STRIP ── */
+    .film-strip {
+      display: flex; gap: 10px; justify-content: center;
+      margin: 20px auto 8px; max-width: 320px;
+      opacity: 0; transform: translateY(10px);
+    }
+    .film-strip.show {
+      animation: film-in 0.5s ease 0.6s forwards;
+    }
+    @keyframes film-in {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .film-frame {
+      width: 56px; height: 44px;
+      border: 2px solid var(--ink-5);
+      border-radius: 5px;
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    }
+
+    /* ── CALENDAR CTA ── */
+    .calendar-panel {
+      display: none;
+      margin: 20px 0 18px;
+      padding: 18px;
+      border: 1px solid rgba(61,107,79,0.24);
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(196,133,122,0.20), transparent 32%),
+        linear-gradient(135deg, #ffffff 0%, #f0f8f3 100%);
+      box-shadow: 0 18px 44px rgba(61,107,79,0.16);
+      position: relative;
+      overflow: hidden;
+    }
+    .calendar-panel.show {
+      display: block;
+      animation: calendar-pop 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .calendar-panel::before {
+      content: '✨';
+      position: absolute;
+      right: 18px; top: 14px;
+      font-size: 1.35rem;
+      animation: twinkle 1.8s ease-in-out infinite;
+    }
+    @keyframes calendar-pop {
+      0% { opacity: 0; transform: translateY(18px) scale(0.96); }
+      70% { opacity: 1; transform: translateY(-2px) scale(1.01); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes twinkle { 0%,100% { transform: scale(1) rotate(0deg); opacity: .65; } 50% { transform: scale(1.22) rotate(12deg); opacity: 1; } }
+    .calendar-kicker {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 6px;
+    }
+    .calendar-title {
+      font-family: var(--font-d);
+      font-size: 1.45rem;
+      line-height: 1.1;
+      color: var(--ink);
+      margin-bottom: 5px;
+    }
+    .calendar-subtitle {
+      color: var(--ink-3);
+      font-size: 0.88rem;
+      margin-bottom: 14px;
+      max-width: 390px;
+    }
+    .calendar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .calendar-btn {
+      min-height: 58px;
+      border-radius: 16px;
+      padding: 12px 14px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      position: relative;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      isolation: isolate;
+    }
+    .calendar-btn::after {
+      content: ''; position: absolute; inset: -3px; border-radius: 19px; z-index: -1;
+      opacity: 0; transition: opacity 0.18s ease;
+      background: linear-gradient(120deg, rgba(196,133,122,0.55), rgba(61,107,79,0.45));
+    }
+    .calendar-btn:hover { transform: translateY(-2px); }
+    .calendar-btn:hover::after { opacity: 1; }
+    .calendar-btn.google {
+      background: #fff; color: #1f2937; border: 1px solid rgba(66,133,244,0.35);
+      box-shadow: 0 10px 24px rgba(66,133,244,0.14);
+      animation: cta-pulse 2.6s ease-in-out infinite;
+    }
+    .calendar-btn.apple {
+      background: var(--ink); color: #fff; border: 1px solid var(--ink);
+      box-shadow: 0 10px 24px rgba(28,25,23,0.16);
+      animation: cta-pulse 2.6s ease-in-out 0.35s infinite;
+    }
+    .calendar-icon { font-size: 1.35rem; line-height: 1; }
+    @keyframes cta-pulse {
+      0%, 100% { box-shadow: 0 10px 24px rgba(61,107,79,0.12); }
+      50% { box-shadow: 0 14px 34px rgba(196,133,122,0.28); }
+    }
+    @media (max-width: 430px) {
+      .calendar-actions { grid-template-columns: 1fr; }
+      .calendar-btn { min-height: 56px; }
+    }
+
     /* ── CONTAINER ── */
     .container { max-width: 520px; margin: 0 auto; padding: 36px 20px 64px; }
 
@@ -307,8 +435,12 @@
     }
     footer a { color: var(--rose); text-decoration: none; font-weight: 500; }
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
 </head>
 <body{% if booking and booking.confirmed %} class="confirmed-bg"{% endif %}>
+
+  <!-- Camera flash overlay -->
+  <div id="camera-flash"></div>
 
   <!-- Petal / confetti layer -->
   <div id="petal-canvas"></div>
@@ -352,11 +484,37 @@
       </span>
     </div>
 
-    <!-- Confirmed banner (shown on confirmation) -->
+    <!-- Confirmed calendar CTA (hidden until confirmed) -->
+    <div id="calendar-buttons" class="calendar-panel{% if booking and booking.confirmed %} show{% endif %}">
+      <div class="calendar-kicker"><span>📅</span><span data-i18n="calendar_kicker">Don't miss it</span></div>
+      <div class="calendar-title" data-i18n="calendar_title">Add your session to your calendar</div>
+      <div class="calendar-subtitle" data-i18n="calendar_subtitle">One tap now means no forgotten time, no scrolling through messages later.</div>
+      <div class="calendar-actions">
+        <a id="google-cal-link" href="#" target="_blank" rel="noopener" class="calendar-btn google" aria-label="Add booking to Google Calendar">
+          <span class="calendar-icon">🌈</span>
+          <span data-i18n="add_google">Add to Google</span>
+        </a>
+        <a id="apple-cal-link" href="#" class="calendar-btn apple" aria-label="Download Apple Calendar invite">
+          <span class="calendar-icon"></span>
+          <span data-i18n="add_apple">Add to Apple</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Confirmed banner -->
     <div class="confirmed-banner{% if booking and booking.confirmed %} show{% endif %}" id="confirmed-banner">
       <div class="banner-emoji">🌸</div>
       <div class="banner-title" data-i18n="confirmed_title">You're Confirmed!</div>
       <div class="banner-sub" data-i18n="confirmed_sub">Payment received. See you at the session!</div>
+    </div>
+
+    <!-- Film strip -->
+    <div class="film-strip{% if booking and booking.confirmed %} show{% endif %}" id="film-strip">
+      <div class="film-frame">📸</div>
+      <div class="film-frame">📷</div>
+      <div class="film-frame">✨</div>
+      <div class="film-frame">📸</div>
+      <div class="film-frame">🪻</div>
     </div>
 
     <!-- Booking details -->
@@ -410,20 +568,6 @@
     <div class="msg success" id="msg-confirmed" style="display:{% if booking and booking.confirmed %}block{% else %}none{% endif %}">
       🎉 <strong data-i18n="booking_confirmed_msg">Your booking is confirmed!</strong><br><br>
       <span data-i18n="booking_confirmed_body">Payment received. A confirmation has been noted. See you at the session!</span>
-    </div>
-
-    <!-- Confirmed calendar buttons (hidden until confirmed) -->
-    <div id="calendar-buttons" style="display:{% if booking and booking.confirmed %}block{% else %}none{% endif %}; margin-bottom: 16px;">
-      <div style="display:flex; gap: 10px; flex-wrap: wrap;">
-        <a id="google-cal-link" href="#" target="_blank" class="btn-cal" style="flex:1; min-width: 140px; background: #fff; border: 1px solid var(--ink-5); border-radius: 12px; padding: 12px 16px; text-decoration: none; color: var(--ink); font-size: 0.85rem; font-weight: 500; display:flex; align-items:center; justify-content:center; gap: 8px;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span data-i18n="add_google">Add to Google Calendar</span>
-        </a>
-        <a id="apple-cal-link" href="#" class="btn-cal" style="flex:1; min-width: 140px; background: #fff; border: 1px solid var(--ink-5); border-radius: 12px; padding: 12px 16px; text-decoration: none; color: var(--ink); font-size: 0.85rem; font-weight: 500; display:flex; align-items:center; justify-content:center; gap: 8px;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span data-i18n="add_apple">Apple Calendar (.ics)</span>
-        </a>
-      </div>
     </div>
 
     <!-- Warning -->
@@ -494,6 +638,7 @@
       <span data-i18n="questions">Questions?</span>
       <a href="https://instagram.com/pashynska.photo" target="_blank" data-i18n="dm_link"> DM @pashynska.photo on Instagram</a>
     </p>
+    <p style="margin-top:6px"><a href="/privacy">Privacy & browser storage</a></p>
   </footer>
 
   <script>
@@ -507,7 +652,7 @@
       verifying:          'Verifying Payment…',
       verifying_sub:      'Your e-Transfer is being verified. This usually takes under a minute.',
       checking:           'Checking payment…',
-      confirmed_title:    "You're Confirmed! 🌸",
+      confirmed_title:    "You're All Set! 🎞️",
       confirmed_sub:      'Payment received. See you at the session!',
       booking_id:         'Booking ID',
       name_label:         'Name',
@@ -523,6 +668,11 @@
       no_resend:          'Please do not resend the payment.',
       booking_confirmed_msg:  'Your booking is confirmed!',
       booking_confirmed_body: 'Payment received. A confirmation has been noted. See you at the session!',
+      calendar_kicker:     "Don't miss it",
+      calendar_title:      'Add your session to your calendar',
+      calendar_subtitle:   'One tap now means no forgotten time, no scrolling through messages later.',
+      add_google:          'Add to Google',
+      add_apple:           'Add to Apple',
       slot_reserved_msg:  'Your slot is reserved',
       slot_reserved_body: ' while payment verifies. Questions?',
       ig_cta:             '· Questions or changes? DM me',
@@ -550,7 +700,7 @@
       verifying:          'Проверка оплаты…',
       verifying_sub:      'Ваш e-Transfer проверяется. Обычно это занимает меньше минуты.',
       checking:           'Проверяем оплату…',
-      confirmed_title:    'Подтверждено! 🌸',
+      confirmed_title:    'Подтверждено! 🎞️',
       confirmed_sub:      'Оплата получена. До встречи на фотосессии!',
       booking_id:         'Номер брони',
       name_label:         'Имя',
@@ -566,6 +716,11 @@
       no_resend:          'Пожалуйста, не отправляйте оплату повторно.',
       booking_confirmed_msg:  'Ваше бронирование подтверждено!',
       booking_confirmed_body: 'Оплата получена. До встречи на фотосессии!',
+      calendar_kicker:     'Не пропустите',
+      calendar_title:      'Добавьте съёмку в календарь',
+      calendar_subtitle:   'Один клик сейчас — и время не потеряется в переписке.',
+      add_google:          'В Google',
+      add_apple:           'В Apple',
       slot_reserved_msg:  'Ваш слот забронирован',
       slot_reserved_body: ' пока идёт проверка. Есть вопросы?',
       ig_cta:             '· Вопросы? Напишите мне в Direct',
@@ -593,7 +748,7 @@
       verifying:          'भुगतान की जाँच हो रही है…',
       verifying_sub:      'आपके e-Transfer की जाँच हो रही है। इसमें आमतौर पर एक मिनट से कम समय लगता है।',
       checking:           'भुगतान जाँचा जा रहा है…',
-      confirmed_title:    'बुकिंग पक्की हो गई! 🌸',
+      confirmed_title:    'बुकिंग पक्की हो गई! 🎞️',
       confirmed_sub:      'भुगतान प्राप्त हुआ। सेशन पर मिलते हैं!',
       booking_id:         'बुकिंग ID',
       name_label:         'नाम',
@@ -609,6 +764,11 @@
       no_resend:          'कृपया दोबारा भुगतान न करें।',
       booking_confirmed_msg:  'आपकी बुकिंग पक्की हो गई!',
       booking_confirmed_body: 'भुगतान प्राप्त हुआ। सेशन पर मिलते हैं!',
+      calendar_kicker:     'इसे न भूलें',
+      calendar_title:      'सेशन को कैलेंडर में जोड़ें',
+      calendar_subtitle:   'अभी एक टैप करें — बाद में समय ढूँढना नहीं पड़ेगा।',
+      add_google:          'Google में जोड़ें',
+      add_apple:           'Apple में जोड़ें',
       slot_reserved_msg:  'आपका स्लॉट रिज़र्व है',
       slot_reserved_body: ' जाँच होने तक। कोई सवाल?',
       ig_cta:             '· सवाल? DM करें',
@@ -636,7 +796,7 @@
       verifying:          'Перевірка оплати…',
       verifying_sub:      'Ваш e-Transfer перевіряється. Зазвичай це займає менше хвилини.',
       checking:           'Перевіряємо оплату…',
-      confirmed_title:    'Підтверджено! 🌸',
+      confirmed_title:    'Підтверджено! 🎞️',
       confirmed_sub:      'Оплату отримано. До зустрічі на сесії!',
       booking_id:         'Номер бронювання',
       name_label:         'Ім\'я',
@@ -652,6 +812,11 @@
       no_resend:          'Будь ласка, не надсилайте оплату повторно.',
       booking_confirmed_msg:  'Ваше бронювання підтверджено!',
       booking_confirmed_body: 'Оплату отримано. До зустрічі на сесії!',
+      calendar_kicker:     'Не пропустіть',
+      calendar_title:      'Додайте сесію в календар',
+      calendar_subtitle:   'Один дотик зараз — і час не загубиться у повідомленнях.',
+      add_google:          'У Google',
+      add_apple:           'В Apple',
       slot_reserved_msg:  'Ваш слот заброньовано',
       slot_reserved_body: ' поки оплата перевіряється. Є питання?',
       ig_cta:             '· Питання? Напишіть мені',
@@ -713,8 +878,9 @@
     const canvas = document.getElementById('petal-canvas');
     canvas.style.display = 'block';
 
-    // Wave 1 — immediate burst
-    for (let i = 0; i < 55; i++) {
+    // Wave 1 — immediate burst. Keep this light on mobile: enough to feel
+    // celebratory without making the confirmation page sluggish.
+    for (let i = 0; i < 28; i++) {
       const p = document.createElement('div');
       p.className = 'petal';
       p.textContent = PETALS[Math.floor(Math.random() * PETALS.length)];
@@ -728,7 +894,7 @@
 
     // Wave 2 — delayed second burst
     setTimeout(() => {
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 14; i++) {
         const p = document.createElement('div');
         p.className = 'petal';
         p.textContent = PETALS[Math.floor(Math.random() * PETALS.length)];
@@ -792,6 +958,53 @@
     }
     window.applyConfirmedTranslations = applyConfirmedTranslations;
 
+    const CALENDAR_DATA = {
+      date: {{ date|tojson }},
+      time: {{ time|tojson }},
+      title: {{ event_title|tojson }},
+      location: {{ location|tojson }},
+      sessionLength: {{ session_length|tojson }},
+      timezone: {{ timezone|tojson }},
+      bookingId: {{ (booking.id if booking else '')|tojson }},
+      token: {{ confirmation_token|tojson }}
+    };
+
+    function googleDateStamp(date, time) {
+      return String(date || '').replace(/-/g, '') + 'T' + String(time || '00:00').replace(':', '') + '00';
+    }
+
+    function addMinutes(time, minutes) {
+      const [rawH, rawM] = String(time || '00:00').split(':').map(Number);
+      const total = ((rawH || 0) * 60) + (rawM || 0) + (Number(minutes) || 20);
+      const h = Math.floor(total / 60) % 24;
+      const m = total % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    }
+
+    function setupCalendarLinks() {
+      const panel = document.getElementById('calendar-buttons');
+      const google = document.getElementById('google-cal-link');
+      const apple = document.getElementById('apple-cal-link');
+      if (!panel || !google || !apple || !CALENDAR_DATA.bookingId || !CALENDAR_DATA.token) return;
+
+      const endTime = addMinutes(CALENDAR_DATA.time, CALENDAR_DATA.sessionLength);
+      const startIso = googleDateStamp(CALENDAR_DATA.date, CALENDAR_DATA.time);
+      const endIso = googleDateStamp(CALENDAR_DATA.date, endTime);
+      const details = 'Booking #' + CALENDAR_DATA.bookingId + ' with Pashynska Photography';
+
+      google.href = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+        '&text=' + encodeURIComponent(CALENDAR_DATA.title) +
+        '&dates=' + encodeURIComponent(startIso + '/' + endIso) +
+        '&ctz=' + encodeURIComponent(CALENDAR_DATA.timezone || 'America/Edmonton') +
+        '&location=' + encodeURIComponent(CALENDAR_DATA.location) +
+        '&details=' + encodeURIComponent(details);
+
+      apple.href = '/calendar-ics/' + encodeURIComponent(CALENDAR_DATA.bookingId) +
+        '?token=' + encodeURIComponent(CALENDAR_DATA.token);
+
+      panel.classList.add('show');
+    }
+
     function updateUI(data) {
       if (data.confirmed && !isConfirmed) {
         isConfirmed = true;
@@ -832,34 +1045,21 @@
         // Page title
         document.title = '✅ ' + t('confirmed_title') + ' | Pashynska Photography';
 
+        // Camera flash
+        const flash = document.getElementById('camera-flash');
+        if (flash) { flash.classList.add('active'); setTimeout(() => flash.classList.remove('active'), 600); }
+
         // Animations
         launchPetals();
 
-        // Show calendar buttons
-        document.getElementById('calendar-buttons').style.display = 'block';
-        const calDate = '{{ date }}';
-        const calTime = '{{ time }}';
-        const calTitle = '{{ event_title }}';
-        const calLoc = '{{ location }}';
-        const bookingId = '{{ booking.id if booking else "" }}';
-        const token = '{{ confirmation_token }}';
+        // Film strip
+        setTimeout(() => {
+          const strip = document.getElementById('film-strip');
+          if (strip) strip.classList.add('show');
+        }, 800);
 
-        // Google Calendar link
-        const startIso = calDate + 'T' + calTime.replace(':', '') + '00';
-        // Simple end: add 30 min (default)
-        const [h, m] = calTime.split(':').map(Number);
-        const endH = h + Math.floor((m + 30) / 60);
-        const endM = (m + 30) % 60;
-        const endIso = calDate + 'T' + String(endH).padStart(2,'0') + String(endM).padStart(2,'0') + '00';
-        document.getElementById('google-cal-link').href =
-          'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-          '&text=' + encodeURIComponent(calTitle) +
-          '&dates=' + startIso + '/' + endIso +
-          '&location=' + encodeURIComponent(calLoc) +
-          '&details=' + encodeURIComponent('Booking #' + bookingId + ' with Pashynska Photography');
-
-        // Apple Calendar (.ics) link
-        document.getElementById('apple-cal-link').href = '/calendar-ics/' + bookingId + '?token=' + token;
+        // Calendar links + animated CTA
+        setupCalendarLinks();
 
         stopPolling();
 
@@ -902,25 +1102,32 @@
     function stopPolling() { if (pollTimer) clearInterval(pollTimer); }
 
     if (isConfirmed) {
+      // ── Already confirmed: launch everything immediately ──
       document.title = '✅ ' + t('confirmed_title') + ' | Pashynska Photography';
-      const calDate = '{{ date }}';
-      const calTime = '{{ time }}';
-      const calTitle = '{{ event_title }}';
-      const calLoc = '{{ location }}';
-      const bookingIdForCal = '{{ booking.id if booking else "" }}';
-      const tokenForCal = '{{ confirmation_token }}';
-      const [h, m] = calTime.split(':').map(Number);
-      const startIso = calDate + 'T' + calTime.replace(':', '') + '00';
-      const endH = h + Math.floor((m + 30) / 60);
-      const endM = (m + 30) % 60;
-      const endIso = calDate + 'T' + String(endH).padStart(2,'0') + String(endM).padStart(2,'0') + '00';
-      document.getElementById('google-cal-link').href =
-        'https://calendar.google.com/calendar/render?action=TEMPLATE' +
-        '&text=' + encodeURIComponent(calTitle) +
-        '&dates=' + startIso + '/' + endIso +
-        '&location=' + encodeURIComponent(calLoc) +
-        '&details=' + encodeURIComponent('Booking #' + bookingIdForCal + ' with Pashynska Photography');
-      document.getElementById('apple-cal-link').href = '/calendar-ics/' + bookingIdForCal + '?token=' + tokenForCal;
+
+      // Camera flash
+      const flash = document.getElementById('camera-flash');
+      flash.classList.add('active');
+      setTimeout(() => flash.classList.remove('active'), 600);
+
+      // Petals + sparks
+      launchPetals();
+
+      // Film strip
+      setTimeout(() => {
+        const strip = document.getElementById('film-strip');
+        if (strip) strip.classList.add('show');
+      }, 800);
+
+      // Card entrance
+      document.querySelectorAll('.card, .prep-card').forEach((el, i) => {
+        el.style.animationDelay = (i * 0.08) + 's';
+        el.classList.add('animate-in');
+      });
+
+      // Calendar links + animated CTA
+      setupCalendarLinks();
+
       stopPolling();
     } else {
       pollTimer = setInterval(poll, 3000);

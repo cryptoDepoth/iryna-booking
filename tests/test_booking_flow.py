@@ -69,6 +69,73 @@ def _reserve(c, slot_time, event_id, *, name="Test Client", email="test@example.
     })
 
 
+def test_public_home_renders_without_undefined_template_config(client):
+    """Public landing page must render JS config values instead of Jinja Undefined.
+
+    Regression: index_v2.html uses `stripe_enabled | tojson`; if the route does
+    not pass stripe_enabled, Jinja raises TypeError: Undefined is not JSON
+    serializable and the public site returns HTTP 500.
+    """
+    c, _ = client
+
+    resp = c.get("/")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "const STRIPE_ENABLED =" in html
+    assert "Undefined" not in html
+
+
+def test_public_privacy_page_discloses_storage_without_cookie_banner(client):
+    """Best current UX: no intrusive cookie popup, but transparent privacy/storage disclosure."""
+    c, _ = client
+
+    resp = c.get("/privacy")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Privacy" in html
+    assert "No cookie banner" in html
+    assert "localStorage" in html
+    assert "sessionStorage" in html
+    assert "Stripe" in html
+    assert "Google Analytics" in html
+    assert "Meta Pixel" in html
+    assert "Set-Cookie" not in resp.headers
+
+
+def test_public_pages_link_to_privacy_without_cookie_consent_friction(client):
+    """Client-facing booking pages should expose privacy info but not block conversion with a consent popup."""
+    c, client_db = client
+
+    home = c.get("/")
+    assert home.status_code == 200
+    home_html = home.get_data(as_text=True)
+    assert 'href="/privacy"' in home_html
+    assert "Accept cookies" not in home_html
+    assert "Reject cookies" not in home_html
+    assert "Set-Cookie" not in home.headers
+
+    slot_time, date, event_id = _first_slot((c, client_db))
+    reserve = _reserve(c, slot_time, event_id, email="privacy-link@test.com")
+    booking_id = reserve.get_json()["booking_id"]
+    token = reserve.get_json()["confirmation_token"]
+
+    payment = c.get(f"/payment?booking_id={booking_id}&token={token}")
+    assert payment.status_code == 200
+    payment_html = payment.get_data(as_text=True)
+    assert 'href="/privacy"' in payment_html
+    assert "Accept cookies" not in payment_html
+    assert "Reject cookies" not in payment_html
+
+    success = c.get(f"/success?booking_id={booking_id}")
+    assert success.status_code == 200
+    success_html = success.get_data(as_text=True)
+    assert 'href="/privacy"' in success_html
+    assert "Accept cookies" not in success_html
+    assert "Reject cookies" not in success_html
+
+
 def test_reserve_and_confirm_flow(client):
     c, db_path = client_tuple = client
     slot_time, date, event_id = _first_slot(client_tuple)
@@ -191,6 +258,34 @@ def test_booking_status_shows_paid_amount(client):
     status = c.get(f"/booking-status?booking_id={booking_id}&token={token}").get_json()
     assert status["paid_amount"] == 97.50
     assert status["status"] == "confirmed"
+
+
+def test_admin_confirm_sends_telegram_confirmation_notification(client, monkeypatch):
+    """Manual confirmation in admin should send the same confirmed signal to Telegram."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+    sent_messages = []
+    monkeypatch.setattr(booking_app, "_notify_admin", lambda message, reply_markup=None: sent_messages.append(message), raising=False)
+
+    resp = _reserve(c, slot_time, event_id, name="Telegram Test", email="telegram-confirm@test.com")
+    booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
+    c.post("/confirm", json={"booking_id": booking_id, "confirmation_token": token})
+
+    admin = c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"}, json={
+        "booking_id": booking_id,
+        "paid_amount": 250.00,
+    })
+
+    assert admin.status_code == 200
+    assert sent_messages, "admin confirmation must notify Telegram admins"
+    message = sent_messages[-1]
+    assert "Booking #" in message
+    assert str(booking_id) in message
+    assert "Telegram Test" in message
+    assert "telegram-confirm@test.com" in message
+    assert "$250.00" in message
+    assert "Email confirmation sent to client" in message
 
 
 def test_success_page_initially_renders_confirmed_state_for_confirmed_booking(client):
@@ -535,3 +630,98 @@ def test_ics_uses_local_timezone(client):
     # DTSTART must use TZID, not end with Z (UTC)
     assert "DTSTART;TZID=" in ics_text, "DTSTART should use TZID= not bare UTC Z"
     assert "DTSTART:2" not in ics_text, "DTSTART must not be bare UTC format"
+
+
+def test_success_page_confirmed_has_animated_calendar_cta(client):
+    """Confirmed success page should make Google/Apple calendar actions obvious."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+
+    resp = _reserve(c, slot_time, event_id, email="calendar-cta@test.com")
+    booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
+
+    c.post("/confirm", json={"booking_id": booking_id, "confirmation_token": token})
+    c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"},
+           json={"booking_id": booking_id, "paid_amount": 100.0})
+
+    page = c.get(f"/success?booking_id={booking_id}")
+    assert page.status_code == 200
+    html = page.data.decode()
+
+    assert 'id="calendar-buttons" class="calendar-panel show"' in html
+    assert 'id="google-cal-link"' in html
+    assert 'id="apple-cal-link"' in html
+    assert 'data-i18n="calendar_title"' in html
+    assert 'setupCalendarLinks()' in html
+    assert 'sessionLength: 20' in html
+    assert "ctz=" in html
+    assert "/calendar-ics/" in html
+
+
+def test_success_page_calendar_cta_hidden_until_confirmation(client):
+    """Pending bookings should not show the calendar CTA before payment confirmation."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+
+    resp = _reserve(c, slot_time, event_id, email="calendar-pending@test.com")
+    booking_id = resp.get_json()["booking_id"]
+
+    page = c.get(f"/success?booking_id={booking_id}")
+    assert page.status_code == 200
+    html = page.data.decode()
+
+    assert 'id="calendar-buttons" class="calendar-panel"' in html
+    assert 'class="calendar-panel show"' not in html
+
+
+def test_public_booking_pages_include_premium_design_layer(client):
+    """Public booking pages should share the 21st-inspired premium CSS layer."""
+    c, db_path = client_tuple = client
+    stylesheet = '/static/css/booking-premium.css'
+
+    landing = c.get('/')
+    assert landing.status_code == 200
+    assert stylesheet in landing.data.decode()
+
+    slot_time, date, event_id = _first_slot(client_tuple)
+    resp = _reserve(c, slot_time, event_id, email="premium-css@test.com")
+    booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
+
+    payment = c.get(f'/payment?booking_id={booking_id}&token={token}')
+    assert payment.status_code == 200
+    assert stylesheet in payment.data.decode()
+
+    success = c.get(f'/success?booking_id={booking_id}')
+    assert success.status_code == 200
+    assert stylesheet in success.data.decode()
+
+
+def test_admin_confirm_telegram_notification_escapes_html(client, monkeypatch):
+    """Manual confirmation Telegram HTML must escape client-provided fields."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+    sent_messages = []
+    monkeypatch.setattr(booking_app, "_notify_admin", lambda message, reply_markup=None: sent_messages.append(message), raising=False)
+
+    resp = _reserve(c, slot_time, event_id, name="Escape Test", email="escape@test.com")
+    booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
+
+    conn = booking_app.db_conn()
+    conn.execute("UPDATE bookings SET name=? WHERE id=?", ("<b>Eve & Co</b>", booking_id))
+    conn.commit()
+    conn.close()
+
+    c.post("/confirm", json={"booking_id": booking_id, "confirmation_token": token})
+
+    admin = c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"}, json={
+        "booking_id": booking_id,
+        "paid_amount": 95.00,
+    })
+
+    assert admin.status_code == 200
+    message = sent_messages[-1]
+    assert "&lt;b&gt;Eve &amp; Co&lt;/b&gt;" in message
+    assert "<b>Eve & Co</b>" not in message
