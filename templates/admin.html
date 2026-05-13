@@ -1144,6 +1144,31 @@
                         <input type="text" id="location-{{ ev.id }}" value="{{ ev.location|default('') }}"
                                placeholder="e.g. Riley Park, Calgary — near Central Memorial Park">
                     </div>
+                    <div class="form-group">
+                        <label>Booking flow</label>
+                        <select id="booking-type-{{ ev.id }}" onchange="toggleBookingTypeFields('{{ ev.id }}')">
+                            <option value="fixed_slots" {% if (ev.booking_type or 'fixed_slots') == 'fixed_slots' %}selected{% endif %}%>Fixed slots (mini session)</option>
+                            <option value="rolling_availability" {% if ev.booking_type == 'rolling_availability' %}selected{% endif %}%>Rolling availability (individual)</option>
+                            <option value="inquiry_only" {% if ev.booking_type == 'inquiry_only' %}selected{% endif %}%>Inquiry only (wedding/custom)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Session type label</label>
+                        <select id="session-type-{{ ev.id }}">
+                            <option value="mini" {% if (ev.session_type or 'mini') == 'mini' %}selected{% endif %}%>Mini</option>
+                            <option value="individual" {% if ev.session_type == 'individual' %}selected{% endif %}%>Individual</option>
+                            <option value="wedding" {% if ev.session_type == 'wedding' %}selected{% endif %}%>Wedding</option>
+                            <option value="custom" {% if ev.session_type == 'custom' %}selected{% endif %}%>Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="horizon-group-{{ ev.id }}" style="{% if ev.booking_type != 'rolling_availability' %}display:none{% endif %}">
+                        <label>Availability horizon (days)</label>
+                        <input type="number" id="horizon-{{ ev.id }}" value="{{ ev.availability_horizon_days|default(90) }}" min="7" max="365">
+                    </div>
+                    <div class="form-group" id="blackout-group-{{ ev.id }}" style="{% if ev.booking_type != 'rolling_availability' %}display:none{% endif %}">
+                        <label>Blackout dates</label>
+                        <input type="text" id="blackout-{{ ev.id }}" value="{{ (ev.blackout_dates or [])|join(', ') }}" placeholder="e.g. 2026-07-01, 2026-07-02">
+                    </div>
                 </div>
                 <!-- Live slot preview -->
                 <div id="preview-{{ ev.id }}" class="slots-preview" style="margin-top:16px;">
@@ -1337,6 +1362,35 @@
                     <option value="upcoming">Upcoming (visible, no booking yet)</option>
                     <option value="active">Active (bookable now)</option>
                 </select>
+            </div>
+
+            <!-- Booking type -->
+            <div class="modal-section-label">📋 Booking type</div>
+
+            <div class="form-group">
+                <label>Booking flow</label>
+                <select id="new-booking-type" onchange="toggleCreateBookingTypeFields()">
+                    <option value="fixed_slots" selected>Fixed slots (mini session)</option>
+                    <option value="rolling_availability">Rolling availability (individual)</option>
+                    <option value="inquiry_only">Inquiry only (wedding/custom)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Session type label</label>
+                <select id="new-session-type">
+                    <option value="mini" selected>Mini</option>
+                    <option value="individual">Individual</option>
+                    <option value="wedding">Wedding</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div class="form-group" id="new-horizon-group">
+                <label>Availability horizon (days)</label>
+                <input type="number" id="new-horizon" value="90" min="7" max="365">
+            </div>
+            <div class="form-group" id="new-blackout-group">
+                <label>Blackout dates</label>
+                <input type="text" id="new-blackout" placeholder="e.g. 2026-07-01, 2026-07-02, 2026-07-15">
             </div>
 
             <!-- What's included -->
@@ -1611,6 +1665,10 @@
             full_price:     parseFloat(document.getElementById(`fullprice-${eventId}`)?.value),
             status:         document.getElementById(`evstatus-${eventId}`)?.value,
             location:       document.getElementById(`location-${eventId}`)?.value,
+            booking_type:   document.getElementById(`booking-type-${eventId}`)?.value,
+            session_type:   document.getElementById(`session-type-${eventId}`)?.value,
+            availability_horizon_days: parseInt(document.getElementById(`horizon-${eventId}`)?.value) || 90,
+            blackout_dates: (document.getElementById(`blackout-${eventId}`)?.value || '').split(',').map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)),
         };
 
         // --- META payload (new route) ---
@@ -1661,9 +1719,18 @@
         btn.textContent = '💾 Save changes';
     }
 
-    /* ══════════════════════════════════════════════════════════
-       TAB SWITCHING
-    ══════════════════════════════════════════════════════════ */
+    function toggleBookingTypeFields(eventId) {
+        const bt = document.getElementById(`booking-type-${eventId}`).value;
+        const hg = document.getElementById(`horizon-group-${eventId}`);
+        const bg = document.getElementById(`blackout-group-${eventId}`);
+        if (bt === 'rolling_availability') {
+            if (hg) hg.style.display = '';
+            if (bg) bg.style.display = '';
+        } else {
+            if (hg) hg.style.display = 'none';
+            if (bg) bg.style.display = 'none';
+        }
+    }
     function switchTab(eventId, tab) {
         // Hide all panels for this event
         ['schedule','info','included','photos'].forEach(t => {
@@ -1707,7 +1774,21 @@
         const d = new Date(); d.setDate(d.getDate() + 7);
         const iso = d.toISOString().split('T')[0];
         document.getElementById('new-date').value = iso;
+        toggleCreateBookingTypeFields();
         setTimeout(() => document.getElementById('new-title').focus(), 100);
+    }
+
+    function toggleCreateBookingTypeFields() {
+        const bt = document.getElementById('new-booking-type').value;
+        const hg = document.getElementById('new-horizon-group');
+        const bg = document.getElementById('new-blackout-group');
+        if (bt === 'rolling_availability') {
+            if (hg) hg.style.display = '';
+            if (bg) bg.style.display = '';
+        } else {
+            if (hg) hg.style.display = 'none';
+            if (bg) bg.style.display = 'none';
+        }
     }
 
     function closeCreateModal() {
@@ -1748,6 +1829,14 @@
         const includedInputs = document.querySelectorAll('#new-included-list .included-input');
         const included = Array.from(includedInputs).map(i => i.value.trim()).filter(Boolean);
 
+        const bookingType = document.getElementById('new-booking-type').value;
+        const sessionType = document.getElementById('new-session-type').value;
+        const horizon = parseInt(document.getElementById('new-horizon').value) || 90;
+        const blackoutRaw = document.getElementById('new-blackout').value.trim();
+        const blackoutDates = blackoutRaw
+            ? blackoutRaw.split(',').map(s => s.trim()).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s))
+            : [];
+
         const payload = {
             title,
             subtitle:       document.getElementById('new-subtitle').value.trim(),
@@ -1762,6 +1851,10 @@
             location:       document.getElementById('new-location').value.trim(),
             featured:       document.getElementById('new-featured').checked,
             included,
+            booking_type:   bookingType,
+            session_type:   sessionType,
+            availability_horizon_days: bookingType === 'rolling_availability' ? horizon : undefined,
+            blackout_dates: bookingType === 'rolling_availability' ? blackoutDates : undefined,
         };
 
         const btn = document.getElementById('create-submit-btn');
