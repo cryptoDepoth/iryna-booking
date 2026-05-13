@@ -1234,16 +1234,6 @@ def _rolling_date_unavailable_reason(ev, date_str):
         return "outside_horizon"
     if date_str in _event_blackout_dates(ev):
         return "blackout"
-    # If Iryna has a fixed-slot mini session on that date, individual sessions
-    # should not silently overlap the mini-session day unless explicitly allowed.
-    if not ev.get("allow_overlap_fixed_events", False):
-        for other in EVENTS:
-            if other.get("id") == ev.get("id"):
-                continue
-            if other.get("status") not in ("active", "upcoming") or other.get("hidden"):
-                continue
-            if _booking_type(other) == "fixed_slots" and other.get("date") == date_str:
-                return "fixed_event"
     return None
 
 
@@ -1949,12 +1939,15 @@ def get_slots(date_str):
     # Single query instead of one per slot (N+1 → 1). Intentionally global by
     # date+time to prevent double-booking Iryna across different event cards.
     c.execute("""
-        SELECT time FROM bookings
+        SELECT time, event_id FROM bookings
         WHERE date=?
           AND status NOT IN ('cancelled', 'expired')
           AND (confirmed=1 OR reserved_until > ?)
     """, (booking_date, now.isoformat()))
-    booked_times = {row["time"] for row in c.fetchall()}
+    booked_rows = c.fetchall()
+    booked_times = {row["time"] for row in booked_rows}
+    # Detect if any booking belongs to a different event (global cross-event block)
+    foreign_booked = any(row["event_id"] != ev["id"] for row in booked_rows)
     conn.close()
 
     available_slots = [
@@ -1972,6 +1965,7 @@ def get_slots(date_str):
         "slots": available_slots,
         "total": len(slots),
         "available": len(available_slots),
+        "foreign_booked": foreign_booked,
         # Fallback shown in frontend when all slots are booked
         "sold_out_message": (
             f"All spots are taken! DM {instagram_handle} on Instagram — "
@@ -2110,15 +2104,23 @@ def reserve_slot():
 
         # Slot is taken if there is a confirmed booking OR an active (non-expired) reservation
         c.execute("""
-            SELECT id FROM bookings
+            SELECT id, event_id FROM bookings
             WHERE date=? AND time=?
               AND status NOT IN ('cancelled', 'expired')
               AND (confirmed=1 OR reserved_until > ?)
         """, (event_date, slot_time, now.isoformat()))
-        if c.fetchone():
+        conflict = c.fetchone()
+        if conflict:
             conn.rollback()
             conn.close()
-            return jsonify({"success": False, "error": "Slot is no longer available"})
+            # Distinguish same-event sold-out vs cross-event global block
+            if conflict["event_id"] != ev["id"]:
+                return jsonify({
+                    "success": False,
+                    "error": "This time is reserved for another session. Please DM Iryna on Instagram to check alternatives.",
+                    "foreign_event": True,
+                }), 409
+            return jsonify({"success": False, "error": "Slot is no longer available"}), 409
 
         # Remove stale rows: cancelled, expired, and past-deadline reserved/pending
         # so the INSERT doesn't hit the UNIQUE(date, time) constraint.

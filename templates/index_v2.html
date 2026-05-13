@@ -841,7 +841,7 @@ async function openDrawer(id) {
           <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
         `).join('')}
       </div>
-      <div id="slotEmptyMsg" style="display:${availableSlots.length ? 'none' : 'block'};background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;font-size:.86rem;margin-bottom:14px;text-align:center">${T('no_slots_msg')}</div>
+      <div id="slotEmptyMsg" style="display:${availableSlots.length ? 'none' : 'block'};background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;font-size:.86rem;margin-bottom:14px;text-align:center">${slotsData.foreign_booked ? T('slot_foreign_msg', {ig: slotsData.instagram_handle || '@pashynska.photo'}) : T('no_slots_msg')}</div>
       <div class="form">
         <input data-ph="full_name" placeholder="${T('full_name')}" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
         <input data-ph="phone_ph" placeholder="${T('phone_ph')}" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
@@ -1518,11 +1518,12 @@ const SITE_I18N = {
     available_slots_lbl: 'Available time slots',
     waitlist_msg: 'This session is fully booked. Join the waitlist — I\'ll DM you the moment a spot opens.',
     no_slots_msg: 'No slots available for this session.',
+    slot_foreign_msg: 'This time is reserved for another session. DM {ig} on Instagram — cancellations happen and I\'d love to fit you in.',
     close_btn: 'Close',
     waitlist_join_msg: 'Waitlist joined! I\'ll DM you when a spot opens.',
     fill_name_email: 'Please fill in name and email',
     /* toasts */
-    toast_loading_slots: 'Loading available slots…',
+    reserve_error: 'Something went wrong. Please try again.',
     toast_error_events: 'Error loading sessions. Please refresh.',
     toast_error_slots: 'Error loading slots. Please try again.',
     toast_loading_session: 'Loading session info… please try again in a moment.',
@@ -1672,6 +1673,7 @@ const SITE_I18N = {
     available_slots_lbl: 'Доступное время',
     waitlist_msg: 'Эта сессия полностью забронирована. Запишитесь в лист ожидания — я напишу вам в Direct, как только освободится место.',
     no_slots_msg: 'Нет доступных слотов для этой сессии.',
+    slot_foreign_msg: 'Это время занято другой сессией. Напишите мне в Instagram Direct ({ig}) — при отмене я обязательно вас уведомлю.',
     close_btn: 'Закрыть',
     waitlist_join_msg: 'Вы в листе ожидания! Я напишу в Direct, когда освободится место.',
     fill_name_email: 'Заполните имя и email',
@@ -1821,6 +1823,7 @@ const SITE_I18N = {
     available_slots_lbl: 'उपलब्ध समय',
     waitlist_msg: 'यह सेशन पूरी तरह बुक है। वेटलिस्ट में शामिल हों — जगह खुलते ही मैं DM करूँगी।',
     no_slots_msg: 'इस सेशन के लिए कोई स्लॉट उपलब्ध नहीं।',
+    slot_foreign_msg: 'यह समय दूसरे सेशन के लिए रिज़र्व है। मुझे Instagram DM करें ({ig}) — कैंसिल होने पर मैं आपको बता दूँगी।',
     close_btn: 'बंद करें',
     waitlist_join_msg: 'आप वेटलिस्ट में हैं! जगह खुलते ही DM करूँगी।',
     fill_name_email: 'कृपया नाम और ईमेल भरें',
@@ -1970,6 +1973,7 @@ const SITE_I18N = {
     available_slots_lbl: 'Доступний час',
     waitlist_msg: 'Ця сесія повністю заброньована. Запишіться у лист очікування — напишу в Direct, як з\'явиться місце.',
     no_slots_msg: 'Немає доступних слотів для цієї сесії.',
+    slot_foreign_msg: 'Цей час зарезервовано для іншої сесії. Напишіть мені в Instagram Direct ({ig}) — при скасуванні обов\'язково повідомлю.',
     close_btn: 'Закрити',
     waitlist_join_msg: 'Ви у листі очікування! Напишу в Direct, як звільниться місце.',
     fill_name_email: 'Заповніть ім\'я та електронну пошту',
