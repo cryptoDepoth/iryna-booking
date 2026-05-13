@@ -286,9 +286,10 @@ def _event_lines(events: list[dict[str, Any]], today: str | None = None) -> list
     for event in visible[:8]:
         included = "; ".join(str(x) for x in (event.get("included") or [])[:4])
         lines.append(
-            "- {title}: {date}, {start}-{end}, deposit ${deposit} CAD, full price ${full} CAD, "
+            "- {title} ({booking_type}): {date}, {start}-{end}, deposit ${deposit} CAD, full price ${full} CAD, "
             "location: {location}, includes: {included}".format(
                 title=event.get("title", "Photo session"),
+                booking_type=event.get("booking_type", "fixed_slots"),
                 date=event.get("date", ""),
                 start=event.get("start_time", ""),
                 end=event.get("end_time", ""),
@@ -357,17 +358,19 @@ Primary goal: help visitors choose and book photo sessions with clear, warm, con
 
 1. NEVER confirm, verify, or acknowledge any payment. You have zero access to payment systems or bank accounts. If a visitor says "I paid" or "I sent money" — respond warmly but explain that payment confirmation comes automatically by email from Iryna's system, and they should check their inbox. NEVER say "your booking is confirmed", "payment received", or anything implying you verified a transaction.
 
-2. NEVER confirm a booking. Bookings are created only through the website booking form. If someone claims they booked or asks you to confirm their booking — explain that confirmation comes by email automatically after the deposit is received. Direct them to check their email or DM Iryna on Instagram if they have concerns.
+2. NEVER confirm a booking. Bookings are created only through the website booking form.
 
 3. ONLY mention sessions that appear in the "Current public sessions" section below. Do not invent, guess, or recall sessions from conversation history that are not in the current list. If no sessions are listed — say so honestly.
 
 4. NEVER make up slot times, dates, prices, or locations not in the provided facts.
 
-5. For booking intent — never send website links. Instead tell visitors to DM Iryna on Instagram (@pashynska.photo) for the fastest booking. Do not collect name, email, or payment info in chat.
+5. For booking — guide visitors to use the booking drawer on the WEBSITE. Tell them to click the session card they want and pick an available time slot. For sessions that show "Inquiry only" (weddings, custom packages), direct them to DM Iryna on Instagram @pashynska.photo. Do not collect name, email, or payment info in chat.
 
 6. If someone asks to see photos or portfolio — direct them to Instagram @pashynska.photo where all current work is posted.
 
 7. If the question is completely unrelated to photography, booking, pricing, outfits, weather, location, or photo delivery — politely say this assistant only helps with session questions, and suggest DM-ing Iryna on Instagram for anything else.
+
+8. IMPORTANT — the visitor is ALREADY on the website. Do NOT tell them to "DM Iryna on Instagram" for sessions that can be booked on the site (fixed_slots and rolling_availability). Only send to Instagram for inquiry-only sessions (weddings, custom packages).
 
 == Correct response examples ==
 
@@ -377,7 +380,11 @@ Correct: "Thank you! Payment confirmation is sent automatically by email — ple
 
 Visitor: "Book me for June 7th"
 Wrong: "Sure, you're booked for June 7th!"
-Correct: "To book your spot, DM Iryna on Instagram @pashynska.photo — she'll send you the link and available slots. Your slot will be held for {{reservation_minutes}} minutes after you start."
+Correct: "Great choice! Click the Spring Mini Session card on the site, pick June 7th from the date picker, then choose a time slot that works for you. Your slot will be held for {{reservation_minutes}} minutes after you start."
+
+Visitor: "How do I book?"
+Wrong: "DM Iryna on Instagram @pashynska.photo to book"
+Correct: "Click any session card that catches your eye, choose an available time, fill in your details, and pay the deposit via e-Transfer. Your spot will be held for {{reservation_minutes}} minutes once you start."
 
 == Style ==
 - Reply in the same language as the visitor. UI language hint: {lang}.
@@ -411,7 +418,8 @@ Current public sessions:
 Available time slots for {slot_event_title}:
 {slots}
 
-To book: DM Iryna on Instagram {instagram}
+How to book: Click the session card on the site → choose an available time → fill in your details → pay the deposit via e-Transfer. Your spot is held for {reservation_minutes} minutes.
+For inquiry-only sessions (weddings, custom packages): DM Iryna on Instagram {instagram}
 Payment details: {deposit_instructions}
 
 Relevant sanitized past examples:
@@ -587,18 +595,19 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
     if any(k in lower for k in ["price", "cost", "deposit", "payment", "сколько", "цена", "депозит", "оплат"]):
         slots = facts.get("available_slots", "")
         deposit_instr = facts.get("deposit_instructions", "")
+        booking_url = facts.get("booking_url", "https://pashynska.agency")
         if is_ru:
             return (
-                f"{first_event or 'Актуальная сессия — уточните детали у Ирины'}. "
+                f"{first_event or 'Сейчас открыта запись на сессии — см. ниже'}. "
                 f"{slots and f'Свободные слоты: {slots}. ' or ''}"
                 f"{deposit_instr and f'Оплата: {deposit_instr} ' or ''}"
-                f"Для бронирования напишите Ирине в Instagram {facts['instagram']} — она ответит быстрее всего."
+                f"Для бронирования просто выберите сессию на сайте и кликните на карточку. "
             )
         return (
-            f"{first_event or 'Current session — ask Iryna for details'}. "
+            f"{first_event or 'Sessions are currently open for booking — see below'}. "
             f"{slots and f'Available slots: {slots}. ' or ''}"
             f"{deposit_instr and f'Payment: {deposit_instr} ' or ''}"
-            f"To book, DM Iryna on Instagram {facts['instagram']} — fastest way to get a spot."
+            f"To book, just click the session card on the site and choose your time."
         )
 
     if any(k in lower for k in ["book", "reserve", "забронировать", "бронь", "записаться", "slot", "time", "время", "сегодня", "завтра", "когда"]):
@@ -606,13 +615,15 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
         if is_ru:
             return (
                 f"{slots and f'Свободные слоты: {slots}. ' or ''}"
-                f"Напишите Ирине в Instagram {facts['instagram']} для бронирования — она пришлёт ссылку и подтвердит слот. "
-                f"Депозит ${facts.get('deposit', '')} CAD через e-Transfer на {facts['email']}. Остаток — в день съемки."
+                f"Просто выберите сессию на сайте, кликните карточку, выберите время и заполните форму. "
+                f"Слот резервируется на {facts.get('reservation_minutes', 15)} минут. "
+                f"Депозит осуществляется через e-Transfer на {facts['email']}, остаток — в день съёмки."
             )
         return (
             f"{slots and f'Available slots: {slots}. ' or ''}"
-            f"DM Iryna on Instagram {facts['instagram']} to book — she'll send the link and confirm your spot. "
-            f"Deposit ${facts.get('deposit', '')} CAD via e-Transfer to {facts['email']}. Balance due on session day."
+            f"Just click the session card you like, choose an available time, and fill out your details. "
+            f"Your slot is held for {facts.get('reservation_minutes', 15)} minutes. "
+            f"Deposit via e-Transfer to {facts['email']}. Balance due on session day."
         )
 
     if any(k in lower for k in ["wear", "outfit", "clothes", "одеть", "одяг", "вдяг"]):
@@ -636,10 +647,10 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
     if any(k in lower for k in ["location", "where", "address", "parking", "локац", "адрес", "парков"]):
         return (
             "Точная локация приходит после бронирования, потому что она зависит от выбранной сессии и состояния цветов/погоды. "
-            f"Если нужно уточнить заранее, напишите Ирине в Instagram {facts['instagram']}."
+            f"Все актуальные сессии со слотами видно прямо на сайте — выберите подходящую и бронируйте за пару кликов."
             if is_ru else
             "The exact location is sent after booking because it depends on the selected session and current bloom/weather conditions. "
-            f"For anything very specific, DM Iryna at {facts['instagram']}."
+            f"All current sessions with available slots are shown on the site — just pick the one that fits you."
         )
 
     if any(k in lower for k in ["ready", "delivery", "gallery", "retouch", "photo", "готов", "галере", "ретуш"]):
@@ -662,11 +673,11 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
         )
 
     return (
-        f"Я помогу с радостью. Выберите подходящую сессию на сайте, а если вопрос нестандартный, лучше написать Ирине в Instagram {facts['instagram']}. "
-        "Так она сможет точно ответить по датам, локации и деталям съемки."
+        f"Я помогу с радостью. Выберите подходящую сессию на сайте и кликните на карточку — там всё для бронирования. "
+        f"Если вопрос нестандартный (свадьба, специальный запрос), лучше написать Ирине в Instagram {facts['instagram']}."
         if is_ru else
-        f"I'd be happy to help. Please choose the session that fits you best on the site, and for anything custom, DM Iryna at {facts['instagram']}. "
-        "That is the best way to confirm dates, location details, and special requests."
+        f"I'd be happy to help. Choose a session that looks right for you on the site and click the card — everything you need to book is there. "
+        f"For anything custom (weddings, special requests), DM Iryna at {facts['instagram']}."
     )
 
 
