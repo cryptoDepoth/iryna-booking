@@ -1182,6 +1182,74 @@ def get_event_by_id(event_id):
             return ev
     return None
 
+
+def _booking_type(ev):
+    """Admin-selected booking behavior for an event.
+
+    Backward-compatible mapping:
+    - mini/fixed_slots: one configured date with generated slots
+    - individual/rolling_availability: client chooses a date inside horizon
+    - wedding/inquiry_only: no instant checkout, route to inquiry/DM
+    """
+    if not ev:
+        return "fixed_slots"
+    explicit = ev.get("booking_type") or ev.get("booking_mode") or ev.get("availability_mode")
+    if explicit in ("fixed_slots", "rolling_availability", "inquiry_only"):
+        return explicit
+    st = (ev.get("session_type") or ev.get("type") or "mini").lower()
+    if st in ("individual", "full", "portrait"):
+        return "rolling_availability"
+    if st in ("wedding", "custom", "inquiry"):
+        return "inquiry_only"
+    return "fixed_slots"
+
+
+def _event_blackout_dates(ev):
+    vals = []
+    for key in ("blackout_dates", "unavailable_dates", "blocked_dates"):
+        raw = ev.get(key) or []
+        if isinstance(raw, str):
+            raw = [p.strip() for p in raw.replace("\n", ",").split(",")]
+        vals.extend(str(v).strip() for v in raw if str(v).strip())
+    return set(vals)
+
+
+def _rolling_horizon_days(ev):
+    try:
+        return max(1, min(365, int(ev.get("availability_horizon_days") or ev.get("booking_horizon_days") or 90)))
+    except (TypeError, ValueError):
+        return 90
+
+
+def _rolling_date_unavailable_reason(ev, date_str):
+    """Return None if rolling event can be booked on date_str, else reason."""
+    try:
+        requested = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return "invalid_date"
+    today = datetime.now().date()
+    if requested < today:
+        return "past"
+    if (requested - today).days > _rolling_horizon_days(ev):
+        return "outside_horizon"
+    if date_str in _event_blackout_dates(ev):
+        return "blackout"
+    # If Iryna has a fixed-slot mini session on that date, individual sessions
+    # should not silently overlap the mini-session day unless explicitly allowed.
+    if not ev.get("allow_overlap_fixed_events", False):
+        for other in EVENTS:
+            if other.get("id") == ev.get("id"):
+                continue
+            if other.get("status") not in ("active", "upcoming") or other.get("hidden"):
+                continue
+            if _booking_type(other) == "fixed_slots" and other.get("date") == date_str:
+                return "fixed_event"
+    return None
+
+
+def _event_date_for_booking(ev, requested_date=None):
+    return requested_date if _booking_type(ev) == "rolling_availability" and requested_date else ev.get("date", "")
+
 # Convenience accessors (backward-compatible)
 _active = get_active_event() or {}
 EVENT_TITLE = _active.get("title", "Mini Sessions")
@@ -1752,17 +1820,39 @@ def list_events():
             and str(ev.get("date", "")) >= today
         ):
             # Calculate total and available spots
+            booking_type = _booking_type(ev)
             slots = generate_slots(ev)
             total_spots = len(slots)
 
-            c.execute("""
-                SELECT time FROM bookings
-                WHERE date=?
-                  AND status NOT IN ('cancelled', 'expired')
-                  AND (confirmed=1 OR reserved_until > ?)
-            """, (ev["date"], now.isoformat()))
-            booked_times = {row["time"] for row in c.fetchall()}
-            available_spots = len([s for s in slots if s["time"] not in booked_times])
+            if booking_type == "inquiry_only":
+                available_spots = 1
+            elif booking_type == "rolling_availability":
+                horizon = _rolling_horizon_days(ev)
+                available_spots = 0
+                today_d = now.date()
+                for offset in range(horizon + 1):
+                    day = (today_d + timedelta(days=offset)).isoformat()
+                    if _rolling_date_unavailable_reason(ev, day):
+                        continue
+                    c.execute("""
+                        SELECT time FROM bookings
+                        WHERE date=?
+                          AND event_id=?
+                          AND status NOT IN ('cancelled', 'expired')
+                          AND (confirmed=1 OR reserved_until > ?)
+                    """, (day, ev["id"], now.isoformat()))
+                    booked_times = {row["time"] for row in c.fetchall()}
+                    available_spots += len([s for s in slots if s["time"] not in booked_times])
+                total_spots = len(slots) * (horizon + 1)
+            else:
+                c.execute("""
+                    SELECT time FROM bookings
+                    WHERE date=?
+                      AND status NOT IN ('cancelled', 'expired')
+                      AND (confirmed=1 OR reserved_until > ?)
+                """, (ev["date"], now.isoformat()))
+                booked_times = {row["time"] for row in c.fetchall()}
+                available_spots = len([s for s in slots if s["time"] not in booked_times])
 
             # Get first photo URL
             photos = ev.get("photos", [])
@@ -1784,6 +1874,10 @@ def list_events():
                 "price": ev.get("deposit", SESSION_PRICE),
                 "location": ev.get("location", "Calgary"),
                 "status": ev.get("status", ""),
+                "booking_type": booking_type,
+                "availability_horizon_days": _rolling_horizon_days(ev) if booking_type == "rolling_availability" else None,
+                "blackout_dates": sorted(_event_blackout_dates(ev)),
+                "inquiry_only": booking_type == "inquiry_only",
                 "session_type": ev.get("session_type", "mini"),
                 "type": ev.get("session_type", "mini"),
                 "featured": ev.get("featured", False),
@@ -1809,18 +1903,57 @@ def get_slots(date_str):
     if not ev:
         return jsonify({"slots": [], "message": f"No event on {date_str}"})
 
+    booking_type = _booking_type(ev)
     slots = generate_slots(ev)
     now = datetime.now()
+    instagram_url = SETTINGS.get("photographer_instagram_url", "https://instagram.com/pashynska.photo")
+    instagram_handle = SETTINGS.get("photographer_instagram", "@pashynska.photo")
+
+    if booking_type == "inquiry_only":
+        return jsonify({
+            "date": date_str,
+            "event_id": ev["id"],
+            "event_title": ev.get("title", ""),
+            "booking_type": booking_type,
+            "inquiry_only": True,
+            "slots": [],
+            "total": 0,
+            "available": 0,
+            "message": "This session is inquiry-only. Please contact Iryna to discuss details.",
+            "instagram_url": instagram_url,
+            "instagram_handle": instagram_handle,
+        })
+
+    if booking_type == "rolling_availability":
+        reason = _rolling_date_unavailable_reason(ev, date_str)
+        if reason:
+            return jsonify({
+                "date": date_str,
+                "event_id": ev["id"],
+                "event_title": ev.get("title", ""),
+                "booking_type": booking_type,
+                "slots": [],
+                "total": len(slots),
+                "available": 0,
+                "unavailable_reason": reason,
+                "instagram_url": instagram_url,
+                "instagram_handle": instagram_handle,
+            })
+        booking_date = date_str
+    else:
+        booking_date = ev["date"]
+
     conn = db_conn()
     c = conn.cursor()
 
-    # Single query instead of one per slot (N+1 → 1)
+    # Single query instead of one per slot (N+1 → 1). Intentionally global by
+    # date+time to prevent double-booking Iryna across different event cards.
     c.execute("""
         SELECT time FROM bookings
         WHERE date=?
           AND status NOT IN ('cancelled', 'expired')
           AND (confirmed=1 OR reserved_until > ?)
-    """, (ev["date"], now.isoformat()))
+    """, (booking_date, now.isoformat()))
     booked_times = {row["time"] for row in c.fetchall()}
     conn.close()
 
@@ -1830,13 +1963,12 @@ def get_slots(date_str):
         if s["time"] not in booked_times
     ]
 
-    instagram_url = SETTINGS.get("photographer_instagram_url", "https://instagram.com/pashynska.photo")
-    instagram_handle = SETTINGS.get("photographer_instagram", "@pashynska.photo")
-
     return jsonify({
-        "date": date_str,
+        "date": booking_date,
+        "requested_date": date_str,
         "event_id": ev["id"],
         "event_title": ev.get("title", ""),
+        "booking_type": booking_type,
         "slots": available_slots,
         "total": len(slots),
         "available": len(available_slots),
@@ -1901,6 +2033,7 @@ def reserve_slot():
     data = request.json or {}
     slot_time = data.get("time")
     event_id = data.get("event_id") or data.get("date")  # accept either
+    requested_date = (data.get("date") or "").strip()
     client_name = (data.get("name") or "").strip()
     client_email = (data.get("email") or "").strip().lower()
     client_phone = (data.get("phone") or "").strip()
@@ -1936,7 +2069,24 @@ def reserve_slot():
     ev = get_event_by_id(event_id) if event_id else get_active_event()
     if not ev:
         return jsonify({"success": False, "error": "Event not found"}), 404
-    event_date = ev["date"]
+
+    booking_type = _booking_type(ev)
+    if booking_type == "inquiry_only":
+        return jsonify({"success": False, "error": "This session is inquiry-only. Please contact Iryna to discuss details."}), 400
+
+    event_date = _event_date_for_booking(ev, requested_date)
+    if booking_type == "rolling_availability":
+        if not requested_date:
+            return jsonify({"success": False, "error": "Please choose a booking date"}), 400
+        reason = _rolling_date_unavailable_reason(ev, requested_date)
+        if reason:
+            return jsonify({"success": False, "error": f"Selected date is not available ({reason})"}), 400
+    elif requested_date and requested_date != ev.get("date"):
+        return jsonify({"success": False, "error": "Selected date does not match this event"}), 400
+
+    valid_slot_times = {s["time"] for s in generate_slots(ev)}
+    if slot_time not in valid_slot_times:
+        return jsonify({"success": False, "error": "Selected time is not available for this event"}), 400
 
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     if isinstance(ip, str) and ',' in ip:
@@ -3040,6 +3190,28 @@ def admin_update_event(event_id):
             event["status"] = data["status"]
         if "location" in data:
             event["location"] = str(data["location"])[:300]
+        if "booking_type" in data:
+            bt = str(data["booking_type"])
+            if bt not in ("fixed_slots", "rolling_availability", "inquiry_only"):
+                return jsonify({"error": "booking_type must be fixed_slots, rolling_availability, or inquiry_only"}), 400
+            event["booking_type"] = bt
+        if "session_type" in data:
+            event["session_type"] = str(data["session_type"])[:40]
+        if "availability_horizon_days" in data:
+            horizon = int(data["availability_horizon_days"])
+            if not (1 <= horizon <= 365):
+                return jsonify({"error": "availability_horizon_days must be 1–365"}), 400
+            event["availability_horizon_days"] = horizon
+        if "blackout_dates" in data:
+            dates = data.get("blackout_dates") or []
+            if isinstance(dates, str):
+                dates = [d.strip() for d in dates.replace("\n", ",").split(",") if d.strip()]
+            cleaned = []
+            for d in dates:
+                d = str(d).strip()
+                datetime.strptime(d, "%Y-%m-%d")
+                cleaned.append(d)
+            event["blackout_dates"] = cleaned
     except ValueError as e:
         return jsonify({"error": f"Invalid value: {e}"}), 400
 
@@ -3259,6 +3431,21 @@ def admin_create_event():
 
     session_len = int(data.get("session_length", 20))
     break_len = int(data.get("break_length", 10))
+    booking_type = str(data.get("booking_type") or "fixed_slots")
+    if booking_type not in ("fixed_slots", "rolling_availability", "inquiry_only"):
+        return jsonify({"error": "booking_type must be fixed_slots, rolling_availability, or inquiry_only"}), 400
+    blackout_dates = data.get("blackout_dates") or []
+    if isinstance(blackout_dates, str):
+        blackout_dates = [d.strip() for d in blackout_dates.replace("\n", ",").split(",") if d.strip()]
+    blackout_dates = [str(d).strip() for d in blackout_dates if str(d).strip()]
+    try:
+        for d in blackout_dates:
+            datetime.strptime(d, "%Y-%m-%d")
+        availability_horizon_days = int(data.get("availability_horizon_days", 90))
+        if not (1 <= availability_horizon_days <= 365):
+            return jsonify({"error": "availability_horizon_days must be 1–365"}), 400
+    except ValueError as e:
+        return jsonify({"error": f"Invalid availability setting: {e}"}), 400
 
     new_event = {
         "id": event_id,
@@ -3273,7 +3460,10 @@ def admin_create_event():
         "deposit": float(data.get("deposit", 100)),
         "full_price": float(data.get("full_price", 300)),
         "location": str(data.get("location", "")).strip(),
-        "session_type": "mini",
+        "session_type": str(data.get("session_type") or ("individual" if booking_type == "rolling_availability" else "wedding" if booking_type == "inquiry_only" else "mini")),
+        "booking_type": booking_type,
+        "availability_horizon_days": availability_horizon_days,
+        "blackout_dates": blackout_dates,
         "featured": bool(data.get("featured", False)),
         "status": data.get("status", "upcoming"),
         "included": [i.strip() for i in data.get("included", []) if str(i).strip()],

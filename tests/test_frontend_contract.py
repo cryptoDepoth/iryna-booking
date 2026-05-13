@@ -16,7 +16,8 @@ def test_drawer_requests_slots_by_date_and_event_id():
     html = TEMPLATE.read_text()
 
     assert "slots: async (date, eventId)" in html
-    assert "API.slots(e.date, e.id)" in html
+    assert "API.slots(" in html
+    assert ", e.id)" in html
     assert "?event_id=${encodeURIComponent(eventId)}" in html
 
     # Do not reintroduce the old one-argument contract.

@@ -496,6 +496,19 @@ function fmtDate(iso) {
     weekday: "short", month: "long", day: "numeric", year: "numeric"
   });
 }
+
+function todayISO() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function addDaysISO(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
 function daysUntil(iso) {
   return Math.ceil((new Date(iso + "T00:00:00") - new Date()) / 86400000);
 }
@@ -766,12 +779,34 @@ async function openDrawer(id) {
     return;
   }
 
+  if (e.booking_type === 'inquiry_only' || e.inquiry_only) {
+    dbody.innerHTML = `
+      <p style="color:var(--ink-3);font-style:italic;margin-bottom:14px">${e.subtitle || e.description || ''}</p>
+      <div class="price-row">
+        <div>
+          <span class="p">Custom</span>
+          <small>Wedding and custom sessions are planned personally.</small>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.78rem;color:var(--ink-3)">${e.location || 'Calgary'}</div>
+        </div>
+      </div>
+      <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center;line-height:1.45">
+        Tell Iryna your date, location, and vision — she will confirm availability and package options manually.
+      </div>
+      <a class="btn" href="https://instagram.com/pashynska.photo" target="_blank" style="display:block;text-align:center;text-decoration:none">Message on Instagram</a>
+      <button class="btn-ghost" onclick="closeDrawer()">${T('close_btn')}</button>`;
+    document.getElementById('drawer').classList.add('open');
+    return;
+  }
+
   // BOOKING mode — load real slots from API
   try {
     toast(T('toast_loading_slots'));
-    const slotsData = await API.slots(e.date, e.id);
+    const selectedDate = e.booking_type === 'rolling_availability' ? todayISO() : e.date;
+    const slotsData = await API.slots(selectedDate, e.id);
     const availableSlots = slotsData.slots || [];
-    if (availableSlots.length === 0) {
+    if (availableSlots.length === 0 && e.booking_type !== 'rolling_availability') {
       dbody.innerHTML = `
         <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center">
           ${T('no_slots_msg')}
@@ -781,6 +816,12 @@ async function openDrawer(id) {
       return;
     }
 
+    const isRolling = e.booking_type === 'rolling_availability';
+    const rollingDateControl = isRolling ? `
+      <div class="lbl">Choose date</div>
+      <input class="full" id="bookingDate" type="date" min="${todayISO()}" max="${addDaysISO(e.availability_horizon_days || 90)}" value="${selectedDate}" onchange="reloadSlotsForSelectedDate('${e.id}')" style="width:100%;box-sizing:border-box;margin-bottom:14px;padding:12px;border:1.5px solid var(--ink-5);border-radius:10px;font:500 .9rem var(--font-b)">
+    ` : '';
+
     dbody.innerHTML = `
       <p style="color:var(--ink-3);font-style:italic;margin-bottom:14px">${e.subtitle || e.description || ''}</p>
       <div class="price-row">
@@ -789,23 +830,25 @@ async function openDrawer(id) {
           <small>${T('deposit_total_cad', {total: e.full_price || 0})}</small>
         </div>
         <div style="text-align:right">
-          <div style="font-size:.78rem;color:var(--ink-3)">${fmtDate(e.date)}</div>
+          <div id="drawerDateLabel" style="font-size:.78rem;color:var(--ink-3)">${fmtDate(selectedDate)}</div>
           <div style="font-size:.78rem;color:var(--ink-3);margin-top:2px">${e.location || 'Calgary'}</div>
         </div>
       </div>
+      ${rollingDateControl}
       <div class="lbl">${T('available_slots_lbl')}</div>
       <div class="slots" id="slotsBox">
         ${availableSlots.map((s, i) => `
           <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
         `).join('')}
       </div>
+      <div id="slotEmptyMsg" style="display:${availableSlots.length ? 'none' : 'block'};background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;font-size:.86rem;margin-bottom:14px;text-align:center">${T('no_slots_msg')}</div>
       <div class="form">
         <input data-ph="full_name" placeholder="${T('full_name')}" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
         <input data-ph="phone_ph" placeholder="${T('phone_ph')}" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
         <input data-ph="email_ph" placeholder="${T('email_ph')}" id="fEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
         <input data-ph="ig_ph" placeholder="${T('ig_ph')}" id="fIg" autocomplete="off" oninput="clearFieldError(this)">
       </div>
-      <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', '${e.date}')">${T('continue_btn')}</button>
+      <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', document.getElementById('bookingDate')?.value || '${selectedDate}')">${T('continue_btn')}</button>
       <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">${T('pay_note')}</p>`;
     document.getElementById('drawer').classList.add('open');
   } catch (err) {
@@ -817,6 +860,27 @@ async function openDrawer(id) {
 function pickSlot(btn) {
   btn.parentNode.querySelectorAll('.slot').forEach(s => s.classList.remove('sel'));
   btn.classList.add('sel');
+}
+
+async function reloadSlotsForSelectedDate(eventId) {
+  const e = eventsData.find(x => x.id === eventId);
+  const input = document.getElementById('bookingDate');
+  const slotsBox = document.getElementById('slotsBox');
+  const empty = document.getElementById('slotEmptyMsg');
+  if (!e || !input || !slotsBox) return;
+  try {
+    const data = await API.slots(input.value, eventId);
+    const slots = data.slots || [];
+    slotsBox.innerHTML = slots.map((s, i) => `
+      <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
+    `).join('');
+    if (empty) empty.style.display = slots.length ? 'none' : 'block';
+    const dateLabel = document.getElementById('drawerDateLabel');
+    if (dateLabel) dateLabel.textContent = fmtDate(input.value);
+  } catch (err) {
+    console.error('Failed to reload slots:', err);
+    toast(T('toast_error_slots'));
+  }
 }
 
 // ── FIELD VALIDATION HELPERS ──
@@ -919,6 +983,7 @@ async function reserveSlot(eventId, eventDate) {
   try {
     const result = await API.reserve({
       event_id: eventId,
+      date: eventDate,
       time: time,
       name: name,
       email: email,
@@ -930,6 +995,7 @@ async function reserveSlot(eventId, eventDate) {
     if (result.success) {
       currentBooking = {
         event_id: eventId,
+        date: eventDate,
         time: time,
         booking_id: result.booking_id,
         confirmation_token: result.confirmation_token,  // identity-safe API token
@@ -963,7 +1029,7 @@ function goToPayment(eventId, eventDate) {
   dphoto.querySelector('h2').style.display = 'none';
 
   const depositForLine = T('pay_deposit_for', {name: name});
-  const bankMsg = `${e.title} — ${e.date} ${time}\n${depositForLine}`;
+  const bankMsg = `${e.title} — ${eventDate} ${time}\n${depositForLine}`;
   const amt = e.deposit || 0;
   if (currentBooking) currentBooking.amt = amt;
   const sessionMin = e.session_length || 20;
@@ -973,7 +1039,7 @@ function goToPayment(eventId, eventDate) {
       <button onclick="restoreDrawer('${eventId}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;cursor:pointer;font-size:14px">‹</button>
       <div>
         <div style="font-weight:600;font-size:.96rem">${T('pay_complete_title')}</div>
-        <div style="font-size:.76rem;color:var(--ink-3);line-height:1.35">${fmtDate(e.date)} · ${time} · ${T('pay_intro_soft')}</div>
+        <div style="font-size:.76rem;color:var(--ink-3);line-height:1.35">${fmtDate(eventDate)} · ${time} · ${T('pay_intro_soft')}</div>
       </div>
     </div>
 
@@ -984,7 +1050,7 @@ function goToPayment(eventId, eventDate) {
 
     <div class="pay-summary">
       <div class="row"><span class="key">${T('pay_row_session')}</span><span>${T('pay_session_min', {title: e.title, min: sessionMin})}</span></div>
-      <div class="row"><span class="key">${T('pay_row_date')}</span><span>${fmtDate(e.date)}</span></div>
+      <div class="row"><span class="key">${T('pay_row_date')}</span><span>${fmtDate(eventDate)}</span></div>
       <div class="row"><span class="key">${T('pay_row_time')}</span><span>${time}</span></div>
       <div class="row"><span class="key">${T('pay_row_balance')}</span><span>$${remaining} + GST</span></div>
       <div class="row"><span class="key">${T('pay_row_deposit')}</span><span class="val-rose">$${amt} CAD</span></div>
@@ -1032,7 +1098,7 @@ function goToPayment(eventId, eventDate) {
     <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:8px;line-height:1.45">${T('pay_ready_msg_desc')}</div>
     <div class="bank-msg" onclick="copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">
       <button class="copy-pill" id="bankPill" onclick="event.stopPropagation();copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">${T('pay_copy')}</button>
-      ${e.title} — ${e.date} ${time}<br>${depositForLine}
+      ${e.title} — ${eventDate} ${time}<br>${depositForLine}
     </div>
 
     <div class="how-to">
@@ -1042,7 +1108,7 @@ function goToPayment(eventId, eventDate) {
         <li>${T('pay_howto_step2')}</li>
         <li>${T('pay_howto_step3')}</li>
         <li>${T('pay_howto_step4', {amt: amt})}</li>
-        <li>${T('pay_howto_step5', {title: e.title, date: e.date, time: time})}</li>
+        <li>${T('pay_howto_step5', {title: e.title, date: eventDate, time: time})}</li>
         <li>${T('pay_howto_step6')}</li>
       </ol>
     </div>
