@@ -4280,7 +4280,12 @@ def admin_confirm():
 
     log.info(f"[admin] Booking #{booking_id} confirmed, paid ${paid_amount}")
 
-    return jsonify({"success": True, "calendar_event": event_url})
+    return jsonify({
+        "success": True,
+        "calendar_event": event_url,
+        "message": "Email confirmation sent to client." if email_sent
+                    else "⚠️ Email confirmation FAILED — check client email address/logs.",
+    })
 
 
 @app.route("/admin/request-balance", methods=["POST"])
