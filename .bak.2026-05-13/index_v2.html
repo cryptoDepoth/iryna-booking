@@ -1,0 +1,2276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pashynska Photography — Mini Sessions</title>
+<meta name="description" content="Book a mini photo session with Iryna Pashynska in Calgary. Soft, sunlit moments among blooming flowers. Professional photography for families, couples, and individuals.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Tenor+Sans&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --nude:#f5ede8; --blush:#e8c8c0; --rose:#c4857a; --rose-deep:#a3685e;
+  --rose-glow:rgba(196,133,122,.18);
+  --ink:#1c1917; --ink-2:#44403c; --ink-3:#78716c; --ink-4:#a8a29e; --ink-5:#e7e5e4;
+  --page-bg:#faf7f5; --surface:#fff;
+  --green:#3d6b4f; --green-bg:#edf5f0;
+  --amber:#92722a; --amber-bg:#fdf5e4;
+  --red:#8b3535; --red-bg:#fdf0f0;
+  --font-d:'Cormorant Garamond',Georgia,serif;
+  --font-h:'Tenor Sans','Cormorant Garamond',Georgia,serif;
+  --font-b:'Inter',system-ui,-apple-system,sans-serif;
+}
+html,body{overflow-x:hidden;max-width:100vw}
+body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
+img,picture,video{max-width:100%;height:auto;display:block}
+
+/* ── TOP NAV ── */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(250,247,245,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:30;gap:10px}
+.nav .brand{font-family:var(--font-h);font-size:1.15rem;font-weight:400;letter-spacing:.18em;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav .brand small{display:block;font-family:var(--font-h);font-size:.55rem;font-weight:400;letter-spacing:.32em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+@media(min-width:680px){.nav{padding:18px 28px} .nav .brand{font-size:1.4rem}}
+
+/* ── PHOTO-FIRST HERO ── */
+.hero-photo{position:relative;width:100%;max-width:1280px;margin:0 auto;padding:14px 14px 0}
+@media(min-width:680px){.hero-photo{padding:22px 28px 0}}
+/* Two-column hero on desktop: photo left, info card right (no overlap) */
+.hero-photo .hero-grid{display:grid;grid-template-columns:1fr;gap:14px;align-items:stretch}
+@media(min-width:900px){.hero-photo .hero-grid{grid-template-columns:minmax(0,1.4fr) minmax(360px,1fr);gap:22px}}
+.hero-stage{position:relative;border-radius:16px;overflow:hidden;background:#dbcfca;box-shadow:0 14px 40px rgba(28,25,23,.10);aspect-ratio:4/5;width:100%}
+@media(min-width:680px){.hero-stage{aspect-ratio:3/2;border-radius:18px}}
+@media(min-width:900px){.hero-stage{aspect-ratio:auto;height:100%;min-height:520px;border-radius:20px}}
+.hero-stage .kb-host{position:absolute;inset:0;z-index:0}
+/* Subtle bottom gradient only — keeps photo clean & readable for the floating pills */
+.hero-stage::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(28,25,23,.18) 0%,rgba(28,25,23,0) 30%,rgba(28,25,23,0) 60%,rgba(28,25,23,.55) 100%)}
+.hero-pill-row{position:absolute;top:16px;left:16px;right:16px;display:flex;gap:8px;flex-wrap:wrap;z-index:3;pointer-events:none}
+.hero-pill{background:rgba(255,255,255,.96);color:var(--ink);padding:6px 12px;border-radius:30px;font:600 .66rem var(--font-b);text-transform:uppercase;letter-spacing:.1em;display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 14px rgba(0,0,0,.10)}
+.hero-pill.dark{background:rgba(28,25,23,.82);color:#fff;backdrop-filter:blur(6px)}
+.hero-pill.rose{background:var(--rose);color:#fff}
+.hero-pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+/* Mobile: caption inside the photo, restrained */
+.hero-stage-cap{position:absolute;left:18px;right:18px;bottom:16px;z-index:3;color:#fff;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.hero-stage-cap .t{font-family:var(--font-d);font-weight:300;font-size:1.6rem;line-height:1.1;text-shadow:0 2px 14px rgba(0,0,0,.4);letter-spacing:-.005em}
+.hero-stage-cap .s{font-size:.82rem;opacity:.92;text-shadow:0 1px 8px rgba(0,0,0,.4)}
+@media(min-width:900px){.hero-stage-cap{display:none}}
+
+/* Info card — solid surface, no photo behind, sharp typography */
+.hero-card{background:var(--surface);border:1px solid rgba(28,25,23,.06);border-radius:16px;padding:22px 22px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 14px 40px rgba(28,25,23,.06)}
+@media(min-width:900px){.hero-card{padding:30px 30px 26px;border-radius:20px;justify-content:center}}
+.hero-kicker{font:400 .7rem var(--font-h);letter-spacing:.32em;text-transform:uppercase;color:var(--rose);display:inline-flex;align-items:center;gap:10px}
+.hero-kicker::before{content:"";width:18px;height:1px;background:var(--rose)}
+.hero-title{font-family:var(--font-d);font-weight:300;font-size:clamp(2rem,4.6vw,3rem);line-height:1.04;letter-spacing:-.012em;color:var(--ink)}
+.hero-title em{font-style:italic;font-weight:300;color:var(--rose)}
+.hero-sub{font-family:var(--font-d);font-style:italic;font-weight:400;font-size:1.05rem;color:var(--ink-2);line-height:1.45;letter-spacing:.005em}
+.hero-facts{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border-top:1px solid var(--ink-5);border-bottom:1px solid var(--ink-5);margin-top:2px}
+.hero-facts .f{padding:12px 0 12px 0;display:flex;flex-direction:column;gap:3px;min-width:0;border-right:1px solid var(--ink-5)}
+.hero-facts .f:nth-child(2n){border-right:0}
+.hero-facts .f:nth-child(1),.hero-facts .f:nth-child(2){border-bottom:1px solid var(--ink-5)}
+.hero-facts .f:nth-child(odd){padding-right:14px}
+.hero-facts .f:nth-child(even){padding-left:14px}
+.hero-facts .f .k{font:400 .58rem var(--font-h);letter-spacing:.24em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-facts .f .v{font-family:var(--font-d);font-weight:400;font-size:1.4rem;line-height:1.05;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-facts .f .v small{font-family:var(--font-b);font-size:.66rem;font-weight:400;color:var(--ink-3);display:block;margin-top:4px;letter-spacing:.02em;text-transform:none}
+.hero-cta-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.hero-cta{flex:1 1 200px;background:var(--ink);color:#fff;padding:14px 22px;border:0;border-radius:11px;font:400 .78rem var(--font-h);letter-spacing:.16em;text-transform:uppercase;cursor:pointer;text-align:center;transition:transform .15s ease,background .15s ease}
+.hero-cta:hover{transform:translateY(-1px);background:#000}
+.hero-cta.outline{background:transparent;color:var(--ink);border:1px solid var(--ink-5);flex:0 1 auto;min-width:0}
+.hero-cta.outline:hover{background:transparent;border-color:var(--ink);transform:none}
+
+/* ── SOCIAL PROOF STRIP ── */
+.proof{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;padding:22px 20px 0;font-size:.82rem;color:var(--ink-3);max-width:980px;margin:0 auto}
+.proof span strong{color:var(--ink);font-weight:600}
+.proof .sep{color:var(--ink-5)}
+@media(max-width:480px){.proof{gap:10px;font-size:.78rem}}
+
+/* ── COMPACT HOW (now below grid) ── */
+.how{max-width:1200px;margin:8px auto 0;padding:0 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:720px){.how{grid-template-columns:1fr;gap:10px}}
+.how-head{max-width:1200px;margin:48px auto 14px;padding:0 20px;display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.how-head h3{font-family:var(--font-d);font-size:1.6rem;font-weight:300;letter-spacing:-.005em}
+.how-head .sub{font-size:.82rem;color:var(--ink-3)}
+.how .step{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:16px 18px;display:flex;gap:12px;align-items:flex-start}
+.how .step .num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--rose);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-weight:600;font-size:.95rem}
+.how .step h4{font-family:var(--font-h);font-size:.8rem;font-weight:400;letter-spacing:.18em;text-transform:uppercase;margin-bottom:4px}
+.how .step p{font-size:.8rem;color:var(--ink-3);line-height:1.45}
+
+/* legacy .featured (kept for back-compat, hidden) */
+.featured-wrap{display:none}
+
+/* ── SECTION HEAD ── */
+.sec-head{max-width:1200px;margin:38px auto 8px;padding:0 20px;display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.sec-head h2{font-family:var(--font-d);font-size:clamp(1.6rem,3.4vw,2.2rem);font-weight:300;letter-spacing:-.005em}
+.sec-head .sub{font-size:.85rem;color:var(--ink-3)}
+
+/* ── FILTERS ── */
+.filters{max-width:1200px;margin:0 auto 14px;padding:0 20px;display:flex;gap:8px;align-items:center;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filters::-webkit-scrollbar{display:none}
+.filters .chip{flex-shrink:0;padding:8px 14px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.filters .chip:hover{border-color:var(--rose);color:var(--rose)}
+.filters .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.filters .count{margin-left:auto;font-size:.82rem;color:var(--ink-3);flex-shrink:0;white-space:nowrap}
+@media(max-width:560px){.filters .count{display:none}}
+
+/* ── EVENT GRID ── */
+.events-wrap{max-width:1200px;margin:0 auto 24px;padding:0 20px}
+.events{display:grid;grid-template-columns:1fr;gap:18px}
+@media(min-width:560px){.events{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}}
+.event-card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.04);display:flex;flex-direction:column;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;position:relative}
+.event-card:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,.08)}
+.event-card .photo{aspect-ratio:4/3;background:#dbcfca center/cover;position:relative}
+.event-card .photo .status{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:5px 11px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.event-card .photo .status.open{color:var(--green)}
+.event-card .photo .status.low{color:var(--amber)}
+.event-card .photo .status.sold{color:var(--red)}
+.event-card .photo .status .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
+.event-card .photo .countdown{position:absolute;top:12px;right:12px;background:rgba(28,25,23,.78);color:#fff;padding:5px 11px;border-radius:20px;font:600 .7rem var(--font-b);backdrop-filter:blur(8px)}
+.event-card .photo .featured-mark{position:absolute;bottom:12px;left:12px;background:var(--rose);color:#fff;padding:4px 10px;border-radius:6px;font:600 .65rem var(--font-b);text-transform:uppercase;letter-spacing:.08em}
+.event-card .body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
+.event-card .type-tag{font:400 .65rem var(--font-h);letter-spacing:.24em;text-transform:uppercase;color:var(--rose)}
+.event-card h3{font-family:var(--font-d);font-size:1.45rem;font-weight:400;line-height:1.18;letter-spacing:-.005em;color:var(--ink)}
+.event-card .subtitle{font-family:var(--font-d);font-size:.95rem;color:var(--ink-2);font-style:italic;font-weight:400}
+.event-card .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:.78rem;color:var(--ink-3)}
+.event-card .meta span{display:inline-flex;align-items:center;gap:5px}
+.event-card .price-bar{display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto;padding-top:14px;border-top:1px solid var(--ink-5)}
+.event-card .price-bar .price{font-family:var(--font-d);font-size:1.6rem;font-weight:500;color:var(--rose);line-height:1}
+.event-card .price-bar .price small{font-family:var(--font-b);font-size:.7rem;color:var(--ink-3);font-weight:500;display:block;margin-top:4px;letter-spacing:.05em;text-transform:uppercase}
+.event-card .price-bar .cta{background:var(--ink);color:#fff;border:0;padding:11px 18px;border-radius:11px;font:600 13px var(--font-b);cursor:pointer;letter-spacing:.02em}
+.event-card .price-bar .cta:hover{background:var(--ink-2)}
+.event-card.sold .price-bar .cta{background:var(--ink-5);color:var(--ink-2)}
+
+/* ── DRAWER ── */
+.drawer-bg{position:fixed;inset:0;background:rgba(28,25,23,.5);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:80;padding:24px}
+.drawer-bg.open{display:flex}
+.drawer{background:var(--page-bg);border-radius:20px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.3)}
+.drawer .dphoto{aspect-ratio:16/9;background:#dbcfca center/cover;border-radius:20px 20px 0 0;position:relative}
+.drawer .dphoto .close{position:absolute;top:14px;right:14px;width:36px;height:36px;background:rgba(255,255,255,.92);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;border:0}
+.drawer .dphoto h2{position:absolute;bottom:18px;left:22px;color:#fff;font-family:var(--font-d);font-size:1.8rem;font-weight:300;text-shadow:0 2px 14px rgba(0,0,0,.4)}
+.drawer .dbody{padding:22px}
+.drawer .price-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--ink-5)}
+.drawer .price-row .p{font-family:var(--font-d);font-size:2.2rem;font-weight:500;color:var(--rose)}
+.drawer .price-row .p small{font-family:var(--font-b);font-size:.8rem;color:var(--ink-3);font-weight:500}
+.drawer .lbl{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:10px}
+.drawer .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
+.drawer .slot{padding:11px 4px;border:1.5px solid var(--ink-5);border-radius:10px;background:#fff;font:500 .85rem var(--font-b);text-align:center;cursor:pointer}
+.drawer .slot:hover{border-color:var(--rose);color:var(--rose)}
+.drawer .slot.sel{background:var(--rose);border-color:var(--rose);color:#fff}
+.drawer .slot.taken{background:var(--ink-5);border-color:var(--ink-5);color:var(--ink-4);cursor:not-allowed;opacity:0.6}
+.drawer .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.drawer .form .full{grid-column:1/-1}
+.drawer input{width:100%;padding:12px 14px;background:#fff;border:1.5px solid var(--ink-5);border-radius:10px;font:.92rem var(--font-b);outline:none}
+.drawer input:focus{border-color:var(--rose);box-shadow:0 0 0 3px rgba(196,133,122,.12)}
+.field-error{display:block;color:#e53e3e;font-size:.72rem;margin-top:4px;}
+.drawer .btn{display:block;width:100%;padding:15px;background:var(--ink);color:#fff;border:0;border-radius:12px;font:600 .92rem var(--font-b);cursor:pointer;margin-top:18px;letter-spacing:.02em}
+.drawer .btn:hover{background:var(--ink-2)}
+.drawer .btn:disabled{opacity:0.5;cursor:not-allowed}
+
+/* ── PAYMENT VIEW ── */
+.pay-timer{display:flex;align-items:center;justify-content:space-between;background:var(--amber-bg);border:1px solid rgba(146,114,42,.2);border-radius:12px;padding:13px 16px;margin-bottom:18px}
+.pay-timer .lbl-t{font-size:.85rem;color:var(--amber);font-weight:500}
+.pay-timer .cnt{font-family:var(--font-d);font-size:1.6rem;font-weight:600;color:var(--amber)}
+.pay-summary{border-radius:12px;overflow:hidden;border:1px solid var(--ink-5);margin-bottom:16px}
+.pay-summary .row{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--ink-5);font-size:.88rem}
+.pay-summary .row:last-child{border-bottom:none;font-weight:600;background:var(--nude)}
+.pay-summary .row .key{color:var(--ink-3)}
+.pay-summary .row .val-rose{color:var(--rose);font-family:var(--font-d);font-size:1.2rem}
+.transfer-box{background:linear-gradient(135deg,#fdf8f6,#f7ede9);border:1px solid rgba(196,133,122,.2);border-radius:18px;padding:22px 18px;text-align:center;margin-bottom:14px}
+.transfer-box .eyebrow{font-size:.66rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+.transfer-box .amount{font-family:var(--font-d);font-size:4rem;font-weight:500;color:var(--rose);line-height:1}
+.transfer-box .ccy{font-size:.78rem;color:var(--ink-3);margin-bottom:14px}
+.email-copy{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1.5px dashed rgba(196,133,122,.45);border-radius:11px;padding:12px 14px;cursor:pointer;transition:.2s}
+.email-copy:hover{border-style:solid;background:#fdf7f6}
+.email-copy .lbl-e{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-4);margin-bottom:3px}
+.email-copy .val-e{font-family:'Courier New',monospace;font-size:.92rem;font-weight:600;color:var(--rose)}
+.copy-pill{background:var(--rose);color:#fff;border:0;border-radius:20px;padding:5px 12px;font:600 .7rem var(--font-b);cursor:pointer}
+.copy-pill.copied{background:var(--green)}
+.bank-msg{background:#fff;border:1.5px dashed var(--ink-5);border-radius:10px;padding:14px;font-family:'Courier New',monospace;font-size:.82rem;color:var(--ink-2);line-height:1.5;position:relative;cursor:pointer;margin-bottom:14px}
+.bank-msg .copy-pill{position:absolute;top:8px;right:8px}
+.how-to{background:var(--nude);border-radius:14px;padding:16px;margin-bottom:14px}
+.how-to .t{font-size:.8rem;font-weight:600;margin-bottom:10px}
+.how-to ol{padding-left:18px;display:flex;flex-direction:column;gap:5px}
+.how-to li{font-size:.85rem;color:var(--ink-3);line-height:1.45}
+.info-note{background:#eef4fb;border-left:3px solid #5b9bd5;border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:14px;font-size:.85rem;color:#1e3a5f}
+.btn-ghost{display:block;width:100%;padding:13px;background:transparent;color:var(--ink-3);border:1.5px solid var(--ink-5);border-radius:12px;font:.88rem var(--font-b);cursor:pointer;margin-top:8px}
+.btn-ghost:hover{border-color:var(--ink-3);color:var(--ink)}
+.success-state{text-align:center;padding:30px 20px;position:relative;overflow:hidden}
+.success-state .check{width:64px;height:64px;border-radius:50%;background:var(--green-bg);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px}
+.success-state h3{font-family:var(--font-d);font-size:1.6rem;font-weight:500;margin-bottom:8px}
+.success-state p{font-size:.9rem;color:var(--ink-3);margin-bottom:6px}
+
+/* ── Pending hourglass spin ── */
+.pending-icon{font-size:44px;display:inline-block;animation:hourglass-spin 2.4s ease-in-out infinite;margin-bottom:8px}
+@keyframes hourglass-spin{
+  0%,40%{transform:rotate(0deg)}
+  50%,90%{transform:rotate(180deg)}
+  100%{transform:rotate(360deg)}
+}
+/* Pulsing pending dot */
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-right:6px;animation:pulse-amber 1.4s infinite ease-in-out;vertical-align:middle}
+@keyframes pulse-amber{0%,100%{opacity:.4;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+
+/* ── Confirmed — animated checkmark in big ring ── */
+.confirm-ring{width:96px;height:96px;border-radius:50%;background:var(--green-bg);margin:0 auto 18px;display:flex;align-items:center;justify-content:center;position:relative;animation:ring-pop .7s cubic-bezier(.34,1.56,.64,1)}
+.confirm-ring::before{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--green);opacity:0;animation:ring-wave 1.6s .35s ease-out 2}
+@keyframes ring-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
+@keyframes ring-wave{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.6);opacity:0}}
+.confirm-ring svg{width:48px;height:48px}
+.confirm-ring svg path{
+  fill:none;stroke:var(--green);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:55;stroke-dashoffset:55;
+  animation:check-draw .55s .35s cubic-bezier(.65,0,.45,1) forwards;
+}
+@keyframes check-draw{to{stroke-dashoffset:0}}
+
+/* ── Confetti ── */
+.confetti-host{position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden}
+.confetti-piece{position:absolute;width:9px;height:14px;top:-20px;border-radius:2px;will-change:transform,opacity;animation:confetti-fall var(--d,3.2s) var(--delay,0s) cubic-bezier(.2,.6,.4,1) forwards;opacity:0}
+@keyframes confetti-fall{
+  0%{opacity:0;transform:translate3d(0,-10vh,0) rotate(0deg)}
+  10%{opacity:1}
+  90%{opacity:1}
+  100%{opacity:0;transform:translate3d(var(--x,0px),110vh,0) rotate(var(--r,720deg))}
+}
+
+/* Glow pulse behind ring on confirm */
+.confirm-glow{position:absolute;left:50%;top:42px;transform:translate(-50%,-50%);width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(61,107,79,.18),transparent 70%);animation:glow-fade 1.6s ease-out forwards;pointer-events:none}
+@keyframes glow-fade{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}40%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.4)}}
+
+/* What's next list */
+.next-list{text-align:left;margin:18px auto 0;max-width:380px;display:flex;flex-direction:column;gap:9px}
+.next-list .nl-item{display:flex;gap:11px;align-items:flex-start;font-size:.86rem;color:var(--ink-2);line-height:1.45}
+.next-list .nl-item .nl-dot{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--green-bg);color:var(--green);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.78rem}
+.next-list .nl-title{font-weight:600;font-size:.9rem;margin:18px 0 8px;color:var(--ink);text-align:center;font-family:var(--font-d)}
+
+.fade-swap{animation:fade-swap-in .55s ease both}
+@keyframes fade-swap-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── FAQ ── */
+.faq{max-width:760px;margin:0 auto 60px;padding:0 28px}
+.faq h2{font-family:var(--font-d);font-size:2rem;font-weight:400;text-align:center;margin-bottom:24px}
+.faq details{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;padding:0;margin-bottom:10px;overflow:hidden}
+.faq summary{padding:16px 20px;cursor:pointer;font-weight:500;font-size:.95rem;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-size:1.4rem;color:var(--rose);transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details[open] summary{border-bottom:1px solid var(--ink-5)}
+.faq .a{padding:14px 20px 18px;font-size:.9rem;color:var(--ink-2);line-height:1.6}
+
+footer{text-align:center;padding:32px;color:var(--ink-4);font-size:.85rem;border-top:1px solid rgba(0,0,0,.04)}
+footer a{color:var(--rose);text-decoration:none;font-weight:500}
+
+.toast{position:fixed;bottom:24px;right:24px;background:#1c1917;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(8px);transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:translateY(0)}
+
+.assistant-launch{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border-radius:50%;border:0;background:var(--ink);color:#fff;box-shadow:0 14px 34px rgba(0,0,0,.22);z-index:70;cursor:pointer;font:700 22px var(--font-b);display:flex;align-items:center;justify-content:center;transition:transform .18s,background .18s}
+.assistant-launch:hover{transform:translateY(-2px);background:var(--ink-2)}
+.assistant-launch .dot{position:absolute;right:7px;top:7px;width:12px;height:12px;border-radius:50%;background:var(--rose);border:2px solid #fff}
+.assistant-panel{position:fixed;right:22px;bottom:90px;width:min(380px,calc(100vw - 32px));max-height:min(620px,calc(100vh - 118px));background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.22);z-index:75;display:none;overflow:hidden;flex-direction:column}
+.assistant-panel.open{display:flex}
+.assistant-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--ink-5);background:var(--page-bg)}
+.assistant-title{font:600 .92rem var(--font-b);color:var(--ink)}
+.assistant-sub{font-size:.72rem;color:var(--ink-3);line-height:1.35;margin-top:1px}
+.assistant-close{width:32px;height:32px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;color:var(--ink-2);cursor:pointer;font-size:18px;line-height:1}
+.assistant-messages{padding:14px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:240px;max-height:430px;background:#fdfaf8}
+.assistant-msg{max-width:86%;border-radius:14px;padding:10px 12px;font-size:.86rem;line-height:1.45;white-space:pre-wrap}
+.assistant-msg.bot{align-self:flex-start;background:#fff;border:1px solid var(--ink-5);color:var(--ink-2)}
+.assistant-msg.user{align-self:flex-end;background:var(--ink);color:#fff}
+.assistant-msg.loading{color:var(--ink-3);font-style:italic}
+.assistant-form{display:flex;gap:8px;padding:12px;border-top:1px solid var(--ink-5);background:#fff}
+.assistant-form input{flex:1;border:1.5px solid var(--ink-5);border-radius:13px;padding:11px 12px;font:.86rem var(--font-b);outline:none;min-width:0}
+.assistant-form input:focus{border-color:var(--rose);box-shadow:0 0 0 3px rgba(196,133,122,.12)}
+.assistant-send{width:42px;height:42px;border-radius:50%;border:0;background:var(--rose);color:#fff;font-size:18px;font-weight:700;cursor:pointer;flex:0 0 auto}
+.assistant-send:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:560px){
+  .assistant-launch{right:16px;bottom:16px;width:54px;height:54px}
+  .assistant-panel{left:12px;right:12px;bottom:82px;width:auto;max-height:calc(100vh - 100px)}
+  .assistant-messages{max-height:calc(100vh - 250px)}
+}
+
+/* Hidden admin hint */
+.admin-hint{opacity:0;transition:opacity .3s;font-size:10px;color:var(--ink-5);text-decoration:none;cursor:default}
+.admin-hint:hover{opacity:1;color:var(--ink-4)}
+
+/* ── KEN BURNS SLIDESHOW ── */
+.kb-host{position:absolute;inset:0;overflow:hidden;border-radius:inherit;z-index:0}
+.kb-slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;will-change:transform,opacity;transition:opacity 1.1s ease}
+.kb-slide.kb-active{opacity:1;animation:kb-zoom 7s ease-in-out forwards}
+.kb-slide.kb-out{opacity:0}
+@keyframes kb-zoom{0%{transform:scale(1) translate(0,0)}100%{transform:scale(1.09) translate(-1%,.5%)}}
+
+/* ── CARD PHOTO HOVER ZOOM ── */
+.event-card .photo{overflow:hidden}
+.event-card .photo .photo-bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .55s ease;will-change:transform}
+.event-card:hover .photo .photo-bg{transform:scale(1.07)}
+
+/* ── MOBILE BOTTOM SHEET DRAWER ── */
+@media(max-width:640px){
+  .drawer-bg{align-items:flex-end;padding:0;padding-bottom:env(safe-area-inset-bottom,0)}
+  .drawer{border-radius:24px 24px 0 0;max-width:100%;width:100%;max-height:92vh;animation:slide-up .32s cubic-bezier(.32,1,.28,1)}
+  .drawer .dphoto{border-radius:24px 24px 0 0}
+  .drawer .dphoto h2{font-size:1.4rem}
+}
+@keyframes slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand">Pashynska Photography<small>Calgary, Alberta</small></div>
+  <!-- Language switcher -->
+  <div id="lang-sw" style="display:flex;gap:3px;background:rgba(0,0,0,0.05);border-radius:20px;padding:3px;">
+    <button class="lbtn active" onclick="setLang('en')" data-lang="en" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:white;color:var(--rose);box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all .2s;font-family:inherit;">EN</button>
+    <button class="lbtn" onclick="setLang('ru')" data-lang="ru" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">РУ</button>
+    <button class="lbtn" onclick="setLang('hi')" data-lang="hi" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">हिं</button>
+    <button class="lbtn" onclick="setLang('uk')" data-lang="uk" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">УК</button>
+  </div>
+</nav>
+
+<!-- ────────── PUBLIC LANDING ────────── -->
+<section id="public">
+
+  <!-- PHOTO-FIRST HERO (rendered by renderFeatured) -->
+  <div class="hero-photo" id="heroPhoto"></div>
+
+  <!-- SOCIAL PROOF STRIP -->
+  <div class="proof">
+    <span data-i18n="proof_reviews"><strong>★ 4.9</strong> · 80+ reviews</span>
+    <span class="sep">·</span>
+    <span data-i18n="proof_sessions"><strong>120+</strong> sessions delivered</span>
+    <span class="sep">·</span>
+    <span data-i18n="proof_award"><strong>Calgary</strong> local pick 2024 & 2025</span>
+  </div>
+
+  <!-- legacy featured-wrap kept hidden so JS that targets it still works -->
+  <div class="featured-wrap" id="featuredWrap"></div>
+
+  <!-- SECTION HEAD -->
+  <div class="sec-head">
+    <h2 data-i18n="sessions_heading">Upcoming sessions</h2>
+    <span class="sub" data-i18n="sessions_subhead">Pick one — booking takes about 2 minutes</span>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters" id="filters">
+    <button class="chip on" data-filter="all" data-i18n="filter_all">All</button>
+    <button class="chip" data-filter="month" data-i18n="filter_month">This month</button>
+    <button class="chip" data-filter="mini" data-i18n="filter_mini">Mini</button>
+    <button class="chip" data-filter="individual" data-i18n="filter_individual">Individual</button>
+    <button class="chip" data-filter="wedding" data-i18n="filter_wedding">Wedding</button>
+    <button class="chip" data-filter="family" data-i18n="filter_family">Family</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="events-wrap">
+    <!-- Loading state -->
+    <div id="gridLoading" style="text-align:center;padding:60px 20px;color:var(--ink-3)">
+      <div style="width:40px;height:40px;border:3px solid var(--ink-5);border-top-color:var(--rose);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px"></div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+      <span data-i18n="loading_sessions">Loading sessions...</span>
+    </div>
+    <!-- Events grid -->
+    <div class="events" id="grid" style="display:none"></div>
+    <!-- Empty state -->
+    <div id="gridEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--ink-3)">
+      <div style="font-size:3rem;margin-bottom:12px">📸</div>
+      <p data-i18n="no_sessions_title" style="font-size:1.1rem;font-weight:500;color:var(--ink);margin-bottom:8px">No sessions available right now</p>
+      <p data-i18n="no_sessions_desc">Check back soon — new dates are added weekly.</p>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS (moved below grid, compact) -->
+  <div class="how-head">
+    <h3 data-i18n="how_heading">How it works</h3>
+    <span class="sub" data-i18n="how_subhead">Three quick steps</span>
+  </div>
+  <div class="how">
+    <div class="step"><div class="num">1</div><div><h4 data-i18n="how_step1_title">Pick a session</h4><p data-i18n="how_step1_desc">Browse upcoming dates and choose what fits — dress code & location come with confirmation.</p></div></div>
+    <div class="step"><div class="num">2</div><div><h4 data-i18n="how_step2_title">Reserve in 2 min</h4><p data-i18n="how_step2_desc">Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
+    <div class="step"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="faq">
+    <h2 data-i18n="faq_title">Quick answers</h2>
+    <details><summary data-i18n="faq_q1">What should we wear?</summary><div class="a" data-i18n="faq_a1">I send a styling guide after booking — soft tones, layered textures, nothing with big logos.</div></details>
+    <details><summary data-i18n="faq_q2">What if it rains?</summary><div class="a" data-i18n="faq_a2">We reschedule for free, no questions asked. I check the forecast 24h before and reach out.</div></details>
+    <details><summary data-i18n="faq_q3">Can I bring our dog?</summary><div class="a" data-i18n="faq_a3">Always yes — just let me know on the form so I plan the spot.</div></details>
+    <details><summary data-i18n="faq_q4">How does the deposit work?</summary><div class="a" data-i18n="faq_a4">The deposit is non-refundable but transferable to another session if you give 7+ days notice. The remaining balance is due on session day.</div></details>
+    <details><summary data-i18n="faq_q5">When do I get the photos?</summary><div class="a" data-i18n="faq_a5">Within 48 hours for mini sessions, 2 weeks for full sessions. You get a private gallery with download.</div></details>
+  </div>
+</section>
+
+<!-- ────────── BOOKING DRAWER ────────── -->
+<div class="drawer-bg" id="drawer">
+  <div class="drawer" id="drawerCard">
+    <div class="dphoto" id="dphoto">
+      <button class="close" onclick="closeDrawer()">&times;</button>
+      <h2 id="dTitle"></h2>
+    </div>
+    <div class="dbody" id="dbody"></div>
+  </div>
+</div>
+
+<footer>
+  <p><span data-i18n="footer_studio"><strong>Pashynska Photography</strong> · Calgary, AB · </span><a href="https://instagram.com/pashynska.photo" target="_blank">@pashynska.photo</a></p>
+  <p style="margin-top:6px;color:var(--ink-4)"><a href="/privacy" data-i18n="privacy_link">Privacy & browser storage</a> · <span data-i18n="footer_copyright">© 2026 Pashynska Photography — All rights reserved</span></p>
+  <!-- Hidden admin access: tiny dot in footer -->
+  <a href="/backstage" class="admin-hint" title="Admin access">·</a>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<div class="assistant-widget" id="assistantWidget">
+  <button class="assistant-launch" id="assistantLaunch" type="button" aria-label="Open assistant" onclick="toggleAssistant()">
+    ?
+    <span class="dot" aria-hidden="true"></span>
+  </button>
+  <section class="assistant-panel" id="assistantPanel" aria-live="polite">
+    <div class="assistant-head">
+      <div>
+        <div class="assistant-title" id="assistantTitle">Iryna's assistant</div>
+        <div class="assistant-sub" id="assistantSubtitle">Replies with current booking details</div>
+      </div>
+      <button class="assistant-close" type="button" aria-label="Close assistant" onclick="toggleAssistant(false)">&times;</button>
+    </div>
+    <div class="assistant-messages" id="assistantMessages"></div>
+    <form class="assistant-form" onsubmit="sendAssistantMessage(event)">
+      <input id="assistantInput" type="text" maxlength="500" autocomplete="off" placeholder="Ask a question">
+      <button class="assistant-send" id="assistantSend" type="submit" aria-label="Send">›</button>
+    </form>
+  </section>
+</div>
+
+<script>
+// ──────────────────────────────────────
+// API INTEGRATION WITH FLASK BACKEND
+// ──────────────────────────────────────
+const API = {
+  events: async () => {
+    const r = await fetch('/events');
+    if (!r.ok) throw new Error('Failed to load events');
+    return r.json();
+  },
+  slots: async (date, eventId) => {
+    const qs = eventId ? `?event_id=${encodeURIComponent(eventId)}` : '';
+    const r = await fetch(`/slots/${encodeURIComponent(date)}${qs}`);
+    if (!r.ok) throw new Error('Failed to load slots');
+    return r.json();
+  },
+  reserve: async (data) => {
+    const r = await fetch('/reserve', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    return r.json();
+  },
+  confirm: async (data) => {
+    const r = await fetch('/confirm', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    return r.json();
+  }
+};
+
+let eventsData = [];
+let activeFilter = "all";
+let currentBooking = null; // {event_id, time, booking_id, expires_at}
+const ETRANSFER_EMAIL = "iryna.pashynska@gmail.com";
+const STRIPE_ENABLED = {{ stripe_enabled | tojson }};
+let payTimer = null;
+
+const toast = (msg) => {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+};
+
+function fmtDate(iso) {
+  const loc = (typeof dateLocale === 'function') ? dateLocale() : 'en-CA';
+  return new Date(iso + "T00:00:00").toLocaleDateString(loc, {
+    weekday: "short", month: "long", day: "numeric", year: "numeric"
+  });
+}
+
+function todayISO() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function addDaysISO(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+function daysUntil(iso) {
+  return Math.ceil((new Date(iso + "T00:00:00") - new Date()) / 86400000);
+}
+// Countdown text used on cards and featured banner
+function countdownText(iso, short) {
+  const days = daysUntil(iso);
+  if (days <= 0) return T('today');
+  if (days === 1) return T('tomorrow');
+  return T(short ? 'in_days_short' : 'in_days', {n: days});
+}
+
+// ── LOAD EVENTS FROM API ──
+async function loadEvents() {
+  try {
+    const data = await API.events();
+    // data is {events: [...]}
+    eventsData = data.events || [];
+    renderAll();
+  } catch (err) {
+    console.error('Failed to load events:', err);
+    toast(T('toast_error_events'));
+  }
+}
+
+function visibleEvents() {
+  return eventsData.filter(e => e.status !== "completed");
+}
+
+function applyFilter(list) {
+  if (activeFilter === "all") return list;
+  if (activeFilter === "month") {
+    const now = new Date();
+    return list.filter(e => {
+      const d = new Date(e.date + "T00:00:00");
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+  }
+  return list.filter(e => e.session_type === activeFilter || e.type === activeFilter);
+}
+
+function statusBadge(spots, total, status) {
+  if (status === "completed") return { cls: "sold", txt: T('status_past') };
+  // Calculate spots from API data
+  const available = Number(spots) || 0;
+  if (available === 0) return { cls: "sold", txt: T('status_sold') };
+  if (available <= 2) return { cls: "low", txt: T('status_low', {n: available}) };
+  return { cls: "open", txt: T('status_open', {n: available, total: total}) };
+}
+
+let _kbTimers = [];
+function renderFeatured() {
+  const host = document.getElementById('heroPhoto');
+  if (!host) return;
+  const featured = visibleEvents().filter(e => e.featured).sort((a, b) => a.date.localeCompare(b.date))[0]
+    || visibleEvents().sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (!featured) { host.innerHTML = ''; return; }
+  const cdText = countdownText(featured.date, false);
+
+  // Build photos list — use photos array if available, fallback to single photo
+  const photos = (featured.photos && featured.photos.length)
+    ? featured.photos
+    : [featured.photo_url || featured.photo || '/static/images/placeholder.jpg'];
+
+  // Build KB slides HTML
+  const slidesHtml = photos.map((src, i) =>
+    `<div class="kb-slide${i === 0 ? ' kb-active' : ''}" style="background-image:url('${src}')"></div>`
+  ).join('');
+
+  const deposit = featured.deposit || featured.price || 0;
+  const total = featured.full_price || featured.price || 0;
+  const left = featured.spots_left;
+  const totalSpots = featured.total_spots;
+  const isSold = left === 0;
+  const b = statusBadge(left, totalSpots, featured.status);
+  const dateStr = fmtDate(featured.date);
+  const len = featured.session_length || featured.length || '';
+  const loc = (featured.location || 'Calgary').split(',')[0];
+
+  // Spots fact: highlight scarcity
+  let spotsLabel = `${left}/${totalSpots}`;
+  if (isSold) spotsLabel = '—';
+  else if (left && left <= 2) spotsLabel = T('spots_left', {n: left});
+
+  host.innerHTML = `
+    <div class="hero-grid">
+      <div class="hero-stage">
+        <div class="kb-host">${slidesHtml}</div>
+        <div class="hero-pill-row">
+          <span class="hero-pill rose">★ ${T('featured_tag').replace(/^★\s*/,'')}</span>
+          <span class="hero-pill dark"><span class="dot" style="background:${isSold?'#ff7575':'#7bd393'}"></span>${cdText}</span>
+        </div>
+        <div class="hero-stage-cap">
+          <div class="t">${featured.title}</div>
+          ${featured.subtitle ? `<div class="s">${featured.subtitle}</div>` : ''}
+        </div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-kicker" data-i18n="hero_kicker_label">Featured session</div>
+        <h1 class="hero-title">${featured.title}</h1>
+        ${featured.subtitle ? `<div class="hero-sub">${featured.subtitle}</div>` : ''}
+        <div class="hero-facts">
+          <div class="f"><div class="k" data-i18n="hf_date">Date</div><div class="v">${dateStr}${len?`<small>${T('hf_duration', {n: len})}</small>`:''}</div></div>
+          <div class="f"><div class="k" data-i18n="hf_deposit">Deposit today</div><div class="v">$${deposit}<small>${T('hf_currency')}</small></div></div>
+          <div class="f"><div class="k" data-i18n="hf_total">Total</div><div class="v">$${total}<small data-i18n="hf_total_sub">balance on session day</small></div></div>
+          <div class="f"><div class="k" data-i18n="hf_spots">${isSold?T('hf_status'):T('hf_spots')}</div><div class="v">${spotsLabel}<small>${isSold?T('status_sold'):T('hf_location_prefix', {loc})}</small></div></div>
+        </div>
+        <div class="hero-cta-row">
+          <button class="hero-cta" onclick="openDrawer('${featured.id}')">
+            ${isSold ? T('join_waitlist_btn') : (T('view_slots_btn'))}
+          </button>
+          <button class="hero-cta outline" onclick="document.querySelector('.sec-head').scrollIntoView({behavior:'smooth',block:'start'})" data-i18n="see_all_btn">See all dates</button>
+        </div>
+      </div>
+    </div>`;
+
+  // Start Ken Burns cycle if multiple photos
+  if (photos.length > 1) startKenBurns(host.querySelector('.kb-host'), photos.length);
+}
+
+function startKenBurns(host, count) {
+  // Clear any previous timers
+  _kbTimers.forEach(clearTimeout);
+  _kbTimers = [];
+  let current = 0;
+  const INTERVAL = 5500; // ms per slide
+
+  function cycle() {
+    const slides = host.querySelectorAll('.kb-slide');
+    if (!slides.length) return;
+    // Fade out current
+    slides[current].classList.remove('kb-active');
+    slides[current].classList.add('kb-out');
+    // Advance
+    current = (current + 1) % count;
+    // Fade in next
+    slides[current].classList.remove('kb-out');
+    slides[current].classList.add('kb-active');
+    // Remove 'out' after transition
+    const prev = (current - 1 + count) % count;
+    const t = setTimeout(() => slides[prev].classList.remove('kb-out'), 1200);
+    _kbTimers.push(t);
+    _kbTimers.push(setTimeout(cycle, INTERVAL));
+  }
+  _kbTimers.push(setTimeout(cycle, INTERVAL));
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const loading = document.getElementById('gridLoading');
+  const empty = document.getElementById('gridEmpty');
+
+  loading.style.display = 'none';
+
+  const list = applyFilter(visibleEvents()).sort((a, b) => a.date.localeCompare(b.date));
+  document.getElementById('count').textContent = T(list.length === 1 ? 'sessions_count_one' : 'sessions_count_many', {n: list.length});
+
+  if (!list.length) {
+    grid.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+
+  grid.style.display = '';
+  empty.style.display = 'none';
+  grid.innerHTML = list.map(e => {
+    const b = statusBadge(e.spots_left, e.total_spots, e.status);
+    const cd = countdownText(e.date, true);
+    const isSold = e.spots_left === 0;
+    const photo = e.photo_url || e.photo || '/static/images/placeholder.jpg';
+    const totalPrice = e.full_price || e.price || 0;
+    return `
+    <article class="event-card ${isSold ? 'sold' : ''}" onclick="openDrawer('${e.id}')">
+      <div class="photo">
+        <div class="photo-bg" style="background-image:url('${photo}')"></div>
+        <div class="status ${b.cls}"><span class="dot"></span>${b.txt}</div>
+        <div class="countdown">${cd}</div>
+        ${e.featured ? `<div class="featured-mark">${T('featured_tag')}</div>` : ''}
+      </div>
+      <div class="body">
+        <div class="type-tag">${e.session_type || e.type || T('session_type_fallback')}</div>
+        <h3>${e.title}</h3>
+        <div class="subtitle">${e.subtitle || e.description || ''}</div>
+        <div class="meta">
+          <span>📅 ${fmtDate(e.date)}</span>
+          <span>📍 ${(e.location || 'Calgary').split(',')[0]}</span>
+        </div>
+        <div class="price-bar">
+          <div class="price">$${e.deposit || e.price || 0}<small>${T('deposit_caption', {total: totalPrice})}</small></div>
+          <button class="cta">${isSold ? T('join_waitlist_btn') : T('view_dates_btn')}</button>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+/* filters */
+document.getElementById('filters').addEventListener('click', (e) => {
+  if (!e.target.classList.contains('chip')) return;
+  document.querySelectorAll('#filters .chip').forEach(c => c.classList.remove('on'));
+  e.target.classList.add('on');
+  activeFilter = e.target.dataset.filter;
+  renderGrid();
+});
+
+/* drawer */
+async function openDrawer(id) {
+  let e = eventsData.find(x => x.id === id);
+  // Fallback: if events not loaded yet, fetch from API
+  if (!e) {
+    try {
+      const data = await API.events();
+      eventsData = data.events || [];
+      e = eventsData.find(x => x.id === id);
+    } catch (err) {
+      console.error('Failed to load events:', err);
+    }
+  }
+  if (!e) {
+    toast(T('toast_loading_session'));
+    return;
+  }
+  // Drawer photo — Ken Burns if multiple photos available
+  const dphotoEl = document.getElementById('dphoto');
+  const drawerPhotos = (e.photos && e.photos.length) ? e.photos : [e.photo_url || e.photo || '/static/images/placeholder.jpg'];
+  // Clear old KB host if any
+  const oldKb = dphotoEl.querySelector('.kb-host');
+  if (oldKb) oldKb.remove();
+  dphotoEl.style.backgroundImage = '';
+  dphotoEl.style.backgroundSize = '';
+  dphotoEl.style.backgroundPosition = '';
+  if (drawerPhotos.length === 1) {
+    dphotoEl.style.backgroundImage = `linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.4)),url('${drawerPhotos[0]}')`;
+    dphotoEl.style.backgroundSize = 'cover';
+    dphotoEl.style.backgroundPosition = 'center';
+  } else {
+    const kbHost = document.createElement('div');
+    kbHost.className = 'kb-host';
+    kbHost.style.borderRadius = 'inherit';
+    drawerPhotos.forEach((src, i) => {
+      const slide = document.createElement('div');
+      slide.className = 'kb-slide' + (i === 0 ? ' kb-active' : '');
+      slide.style.backgroundImage = `url('${src}')`;
+      kbHost.appendChild(slide);
+    });
+    // Overlay gradient
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.45));z-index:1;pointer-events:none';
+    kbHost.appendChild(overlay);
+    dphotoEl.insertBefore(kbHost, dphotoEl.firstChild);
+    startKenBurns(kbHost, drawerPhotos.length);
+  }
+  document.getElementById('dTitle').textContent = e.title;
+  const dbody = document.getElementById('dbody');
+
+  if (e.spots_left === 0) {
+    // WAITLIST mode
+    dbody.innerHTML = `
+      <div style="background:var(--red-bg);color:var(--red);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center">
+        ${T('waitlist_msg')}
+      </div>
+      <div class="form">
+        <input class="full" placeholder="${T('full_name').replace(/ \*$/, '')}" id="wName">
+        <input placeholder="${T('email_ph').replace(/ \*$/, '')}" id="wEmail">
+        <input placeholder="${T('ig_ph')}" id="wIg">
+      </div>
+      <button class="btn" onclick="joinWaitlist('${e.id}')">${T('join_waitlist_btn')}</button>`;
+    document.getElementById('drawer').classList.add('open');
+    return;
+  }
+
+  if (e.booking_type === 'inquiry_only' || e.inquiry_only) {
+    dbody.innerHTML = `
+      <p style="color:var(--ink-3);font-style:italic;margin-bottom:14px">${e.subtitle || e.description || ''}</p>
+      <div class="price-row">
+        <div>
+          <span class="p">Custom</span>
+          <small>Wedding and custom sessions are planned personally.</small>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.78rem;color:var(--ink-3)">${e.location || 'Calgary'}</div>
+        </div>
+      </div>
+      <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center;line-height:1.45">
+        Tell Iryna your date, location, and vision — she will confirm availability and package options manually.
+      </div>
+      <a class="btn" href="https://instagram.com/pashynska.photo" target="_blank" style="display:block;text-align:center;text-decoration:none">Message on Instagram</a>
+      <button class="btn-ghost" onclick="closeDrawer()">${T('close_btn')}</button>`;
+    document.getElementById('drawer').classList.add('open');
+    return;
+  }
+
+  // BOOKING mode — load real slots from API
+  try {
+    toast(T('toast_loading_slots'));
+    const selectedDate = e.booking_type === 'rolling_availability' ? todayISO() : e.date;
+    const slotsData = await API.slots(selectedDate, e.id);
+    const availableSlots = slotsData.slots || [];
+    if (availableSlots.length === 0 && e.booking_type !== 'rolling_availability') {
+      dbody.innerHTML = `
+        <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:14px;font-size:.92rem;margin-bottom:18px;text-align:center">
+          ${T('no_slots_msg')}
+        </div>
+        <button class="btn" onclick="closeDrawer()">${T('close_btn')}</button>`;
+      document.getElementById('drawer').classList.add('open');
+      return;
+    }
+
+    const isRolling = e.booking_type === 'rolling_availability';
+    const rollingDateControl = isRolling ? `
+      <div class="lbl">Choose date</div>
+      <input class="full" id="bookingDate" type="date" min="${todayISO()}" max="${addDaysISO(e.availability_horizon_days || 90)}" value="${selectedDate}" onchange="reloadSlotsForSelectedDate('${e.id}')" style="width:100%;box-sizing:border-box;margin-bottom:14px;padding:12px;border:1.5px solid var(--ink-5);border-radius:10px;font:500 .9rem var(--font-b)">
+    ` : '';
+
+    dbody.innerHTML = `
+      <p style="color:var(--ink-3);font-style:italic;margin-bottom:14px">${e.subtitle || e.description || ''}</p>
+      <div class="price-row">
+        <div>
+          <span class="p">$${e.deposit || 0}</span>
+          <small>${T('deposit_total_cad', {total: e.full_price || 0})}</small>
+        </div>
+        <div style="text-align:right">
+          <div id="drawerDateLabel" style="font-size:.78rem;color:var(--ink-3)">${fmtDate(selectedDate)}</div>
+          <div style="font-size:.78rem;color:var(--ink-3);margin-top:2px">${e.location || 'Calgary'}</div>
+        </div>
+      </div>
+      ${rollingDateControl}
+      <div class="lbl">${T('available_slots_lbl')}</div>
+      <div class="slots" id="slotsBox">
+        ${availableSlots.map((s, i) => `
+          <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
+        `).join('')}
+      </div>
+      <div id="slotEmptyMsg" style="display:${availableSlots.length ? 'none' : 'block'};background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;font-size:.86rem;margin-bottom:14px;text-align:center">${slotsData.foreign_booked ? T('slot_foreign_msg', {ig: slotsData.instagram_handle || '@pashynska.photo'}) : T('no_slots_msg')}</div>
+      <div class="form">
+        <input data-ph="full_name" placeholder="${T('full_name')}" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
+        <input data-ph="phone_ph" placeholder="${T('phone_ph')}" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
+        <input data-ph="email_ph" placeholder="${T('email_ph')}" id="fEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
+        <input data-ph="ig_ph" placeholder="${T('ig_ph')}" id="fIg" autocomplete="off" oninput="clearFieldError(this)">
+      </div>
+      <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', document.getElementById('bookingDate')?.value || '${selectedDate}')">${T('continue_btn')}</button>
+      <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">${T('pay_note')}</p>`;
+    document.getElementById('drawer').classList.add('open');
+  } catch (err) {
+    console.error('Failed to load slots:', err);
+    toast(T('toast_error_slots'));
+  }
+}
+
+function pickSlot(btn) {
+  btn.parentNode.querySelectorAll('.slot').forEach(s => s.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+async function reloadSlotsForSelectedDate(eventId) {
+  const e = eventsData.find(x => x.id === eventId);
+  const input = document.getElementById('bookingDate');
+  const slotsBox = document.getElementById('slotsBox');
+  const empty = document.getElementById('slotEmptyMsg');
+  if (!e || !input || !slotsBox) return;
+  try {
+    const data = await API.slots(input.value, eventId);
+    const slots = data.slots || [];
+    slotsBox.innerHTML = slots.map((s, i) => `
+      <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
+    `).join('');
+    if (empty) empty.style.display = slots.length ? 'none' : 'block';
+    const dateLabel = document.getElementById('drawerDateLabel');
+    if (dateLabel) dateLabel.textContent = fmtDate(input.value);
+  } catch (err) {
+    console.error('Failed to reload slots:', err);
+    toast(T('toast_error_slots'));
+  }
+}
+
+// ── FIELD VALIDATION HELPERS ──
+function clearFieldError(el) {
+  el.style.borderColor = '';
+  const err = el.parentNode.querySelector('.field-error[data-for="' + el.id + '"]');
+  if (err) err.remove();
+}
+
+function showFieldError(elId, msg) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.style.borderColor = '#e53e3e';
+  el.focus();
+  // Remove existing error
+  const old = el.parentNode.querySelector('.field-error[data-for="' + elId + '"]');
+  if (old) old.remove();
+  const span = document.createElement('span');
+  span.className = 'field-error';
+  span.dataset.for = elId;
+  span.style.cssText = 'display:block; color:#e53e3e; font-size:.73rem; margin-top:4px; grid-column:1/-1;';
+  span.textContent = msg;
+  el.insertAdjacentElement('afterend', span);
+}
+
+function validateBookingForm() {
+  const name  = document.getElementById('fName')?.value.trim() || '';
+  const phone = document.getElementById('fPhone')?.value.trim() || '';
+  const email = document.getElementById('fEmail')?.value.trim() || '';
+  const ig    = document.getElementById('fIg')?.value.trim() || '';
+  let valid = true;
+
+  // Name: letters, spaces, hyphens, apostrophes — 2-80 chars
+  // Accept Latin, Cyrillic, Devanagari (Hindi)
+  if (name.length < 2) {
+    showFieldError('fName', T('err_name_required'));
+    valid = false;
+  } else if (!/^[A-Za-zÀ-ÖØ-öø-ÿА-Яа-яЁёЇїІіЄєҐґऀ-ॿ'\- ]{2,80}$/.test(name)) {
+    showFieldError('fName', T('err_name_format'));
+    valid = false;
+  }
+
+  // Email
+  if (!email) {
+    showFieldError('fEmail', T('err_email_required'));
+    valid = false;
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    showFieldError('fEmail', T('err_email_format'));
+    valid = false;
+  }
+
+  // Phone: accept Canadian (10 digits) or international (+country code, 7-15 digits)
+  if (phone) {
+    const raw = phone.trim();
+    let digits = raw.replace(/\D/g, '');
+    if (raw.startsWith('+')) {
+      // International format — just check digit count
+      if (digits.length < 7 || digits.length > 15) {
+        showFieldError('fPhone', T('err_phone'));
+        valid = false;
+      }
+    } else {
+      // North American — strip leading 1 if 11 digits
+      if (digits.startsWith('1') && digits.length === 11) digits = digits.slice(1);
+      if (digits.length !== 10 || ['0','1'].includes(digits[0]) || ['0','1'].includes(digits[3])) {
+        showFieldError('fPhone', T('err_phone'));
+        valid = false;
+      }
+    }
+  }
+
+  // Instagram: optional, but if provided must be valid handle
+  if (ig) {
+    const handle = ig.startsWith('@') ? ig.slice(1) : ig;
+    if (!/^[A-Za-z0-9_.]{1,30}$/.test(handle)) {
+      showFieldError('fIg', T('err_ig'));
+      valid = false;
+    }
+  }
+
+  return valid;
+}
+
+// ── RESERVE SLOT ──
+async function reserveSlot(eventId, eventDate) {
+  const selBtn = document.querySelector('#slotsBox .slot.sel');
+  if (!selBtn) { toast(T('pick_slot')); return; }
+  const time = selBtn.dataset.time;
+  const name  = document.getElementById('fName').value.trim();
+  const phone = document.getElementById('fPhone').value.trim();
+  const email = document.getElementById('fEmail').value.trim();
+  const ig    = document.getElementById('fIg').value.trim();
+
+  if (!validateBookingForm()) return;
+
+  // Prevent double-submit while the request is in flight
+  const reserveBtn = document.getElementById('reserve-btn');
+  if (reserveBtn) { reserveBtn.disabled = true; reserveBtn.style.opacity = '.6'; }
+
+  try {
+    const result = await API.reserve({
+      event_id: eventId,
+      date: eventDate,
+      time: time,
+      name: name,
+      email: email,
+      phone: phone,
+      instagram: ig,
+      session_type: eventsData.find(e => e.id === eventId)?.session_type || 'mini'
+    });
+
+    if (result.success) {
+      currentBooking = {
+        event_id: eventId,
+        date: eventDate,
+        time: time,
+        booking_id: result.booking_id,
+        confirmation_token: result.confirmation_token,  // identity-safe API token
+        expires_at: result.expires_at,
+        name: name,
+        email: email,
+        phone: phone,
+        instagram: ig
+      };
+      goToPayment(eventId, eventDate);
+    } else {
+      toast(result.error || T('toast_slot_unavailable'));
+      if (reserveBtn) { reserveBtn.disabled = false; reserveBtn.style.opacity = '1'; }
+    }
+  } catch (err) {
+    console.error('Reserve failed:', err);
+    toast(T('toast_network_error'));
+    if (reserveBtn) { reserveBtn.disabled = false; reserveBtn.style.opacity = '1'; }
+  }
+}
+
+// ── PAYMENT SCREEN ──
+function goToPayment(eventId, eventDate) {
+  const e = eventsData.find(x => x.id === eventId); if (!e) return;
+  const time = currentBooking?.time || '10:00';
+  const name = currentBooking?.name || 'Client';
+
+  const dphoto = document.getElementById('dphoto');
+  dphoto.style.aspectRatio = "auto";
+  dphoto.style.height = "0";
+  dphoto.querySelector('h2').style.display = 'none';
+
+  const depositForLine = T('pay_deposit_for', {name: name});
+  const bankMsg = `${e.title} — ${eventDate} ${time}\n${depositForLine}`;
+  const amt = e.deposit || 0;
+  if (currentBooking) currentBooking.amt = amt;
+  const sessionMin = e.session_length || 20;
+  const remaining = Math.max(0, (e.full_price || 0) - amt);
+  document.getElementById('dbody').innerHTML = `
+    <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <button onclick="restoreDrawer('${eventId}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;cursor:pointer;font-size:14px">‹</button>
+      <div>
+        <div style="font-weight:600;font-size:.96rem">${T('pay_complete_title')}</div>
+        <div style="font-size:.76rem;color:var(--ink-3);line-height:1.35">${fmtDate(eventDate)} · ${time} · ${T('pay_intro_soft')}</div>
+      </div>
+    </div>
+
+    <div class="pay-timer" id="payTimerBox">
+      <span class="lbl-t">${T('pay_slot_reserved_for')}</span>
+      <span class="cnt" id="payCnt">15:00</span>
+    </div>
+
+    <div class="pay-summary">
+      <div class="row"><span class="key">${T('pay_row_session')}</span><span>${T('pay_session_min', {title: e.title, min: sessionMin})}</span></div>
+      <div class="row"><span class="key">${T('pay_row_date')}</span><span>${fmtDate(eventDate)}</span></div>
+      <div class="row"><span class="key">${T('pay_row_time')}</span><span>${time}</span></div>
+      <div class="row"><span class="key">${T('pay_row_balance')}</span><span>$${remaining} + GST</span></div>
+      <div class="row"><span class="key">${T('pay_row_deposit')}</span><span class="val-rose">$${amt} CAD</span></div>
+    </div>
+
+    <div style="font-size:.82rem;color:var(--ink-3);margin:-2px 0 12px;line-height:1.5">${T('pay_choose_method')}</div>
+
+    <div class="transfer-box">
+      <div class="eyebrow">${T('pay_eyebrow')}</div>
+      <div class="amount">$${amt}</div>
+      <div class="ccy">${T('pay_cad_label')}</div>
+      <div class="email-copy" onclick="copyText('${ETRANSFER_EMAIL}','copyPill')">
+        <div>
+          <div class="lbl-e">${T('pay_send_to')}</div>
+          <div class="val-e">${ETRANSFER_EMAIL}</div>
+        </div>
+        <button class="copy-pill" id="copyPill" onclick="event.stopPropagation();copyText('${ETRANSFER_EMAIL}','copyPill')">${T('pay_copy')}</button>
+      </div>
+      <div style="font-size:.74rem;color:var(--ink-4);margin-top:8px">${T('pay_autodeposit')}</div>
+    </div>
+
+    ${STRIPE_ENABLED ? `
+    <div style="margin:14px 0 16px;padding:14px;border:1px solid var(--ink-5);border-radius:14px;background:#fff;">
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:4px;color:var(--ink)">${T('pay_card_title')}</div>
+      <div style="font-size:.74rem;color:var(--ink-3);margin-bottom:10px;line-height:1.45">${T('pay_card_desc')}</div>
+      <button id="stripe-btn" onclick="startStripeCheckout()"
+         style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+                background:var(--ink);color:#fff;
+                border:1.5px solid var(--ink);border-radius:12px;padding:13px 18px;
+                font-size:.86rem;font-weight:600;cursor:pointer;
+                transition:transform .15s ease,background .2s,color .2s;"
+         onmouseover="this.style.transform='translateY(-1px)';this.style.background='#000'"
+         onmouseout="this.style.transform='none';this.style.background='var(--ink)'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M2 10H22" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+        <span id="stripe-btn-text">${T('pay_card_btn', {amt: amt})}</span>
+      </button>
+      <div style="text-align:center;font-size:.68rem;color:var(--ink-4);margin-top:7px;">🔒 ${T('pay_card_secure') || 'Secure · Powered by Stripe'}</div>
+    </div>
+    ` : ''}
+
+    <div style="font-size:.8rem;font-weight:600;margin-bottom:4px">${T('pay_ready_msg_title')}</div>
+    <div style="font-size:.76rem;color:var(--ink-3);margin-bottom:8px;line-height:1.45">${T('pay_ready_msg_desc')}</div>
+    <div class="bank-msg" onclick="copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">
+      <button class="copy-pill" id="bankPill" onclick="event.stopPropagation();copyText(\`${bankMsg.replace(/`/g, '\\`')}\`,'bankPill')">${T('pay_copy')}</button>
+      ${e.title} — ${eventDate} ${time}<br>${depositForLine}
+    </div>
+
+    <div class="how-to">
+      <div class="t">${T('pay_howto_title')}</div>
+      <ol>
+        <li>${T('pay_howto_step1')}</li>
+        <li>${T('pay_howto_step2')}</li>
+        <li>${T('pay_howto_step3')}</li>
+        <li>${T('pay_howto_step4', {amt: amt})}</li>
+        <li>${T('pay_howto_step5', {title: e.title, date: eventDate, time: time})}</li>
+        <li>${T('pay_howto_step6')}</li>
+      </ol>
+    </div>
+
+    <div class="info-note">${T('pay_info_note')}</div>
+
+    <button class="btn" onclick="confirmClientPayment('${e.id}')">${T('pay_confirm_btn', {amt: amt})}</button>
+    <button class="btn-ghost" onclick="restoreDrawer('${e.id}')">${T('pay_back_btn')}</button>
+  `;
+  startPayTimer();
+}
+
+function restoreDrawer(eventId) {
+  // Stop timer + status polling
+  if (payTimer) clearInterval(payTimer);
+  if (typeof stopStatusPolling === 'function') stopStatusPolling();
+  // Cancel the unconfirmed reservation so the slot opens back up immediately.
+  // Fire-and-forget — don't block the UI on this.
+  if (currentBooking?.booking_id && currentBooking?.confirmation_token) {
+    fetch('/cancel-reservation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        booking_id: currentBooking.booking_id,
+        token: currentBooking.confirmation_token
+      })
+    }).catch(() => {});  // silent — slot will expire anyway after 15 min
+  }
+  currentBooking = null;
+  openDrawer(eventId);
+}
+
+function startPayTimer() {
+  if (payTimer) clearInterval(payTimer);
+  let total = 15 * 60;
+  const cnt = document.getElementById('payCnt');
+  const box = document.getElementById('payTimerBox');
+  payTimer = setInterval(() => {
+    total--;
+    if (total <= 0) {
+      clearInterval(payTimer);
+      cnt.textContent = "0:00";
+      toast(T('toast_reservation_expired'));
+      return;
+    }
+    const m = Math.floor(total / 60), s = total % 60;
+    cnt.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    if (total <= 300) {
+      box.style.background = "var(--red-bg)";
+      box.style.borderColor = "rgba(139,53,53,.2)";
+      cnt.style.color = "var(--red)";
+      box.querySelector('.lbl-t').style.color = "var(--red)";
+    }
+  }, 1000);
+}
+
+function copyText(txt, pillId) {
+  navigator.clipboard.writeText(txt).catch(() => { });
+  const p = document.getElementById(pillId);
+  if (!p) return;
+  const orig = p.textContent;
+  p.textContent = T('pay_copied'); p.classList.add('copied');
+  setTimeout(() => { p.textContent = orig; p.classList.remove('copied') }, 2200);
+}
+
+// ── STRIPE CHECKOUT ──
+async function startStripeCheckout() {
+  if (!currentBooking) { toast(T('toast_no_reservation')); return; }
+  const btn  = document.getElementById('stripe-btn');
+  const txt  = document.getElementById('stripe-btn-text');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+  if (txt) txt.textContent = T('stripe_redirecting');
+  try {
+    const res = await fetch('/stripe/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        booking_id: currentBooking.booking_id,
+        token: currentBooking.confirmation_token
+      })
+    });
+    const data = await res.json();
+    if (data.checkout_url || data.url) {
+      window.location.href = data.checkout_url || data.url;
+    } else {
+      toast(data.error || 'Could not start card payment. Please try Interac e-Transfer.');
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      if (txt) txt.textContent = T('pay_card_btn', {amt: currentBooking.amt || ''});
+    }
+  } catch (err) {
+    toast('Network error. Please try Interac e-Transfer or refresh.');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  }
+}
+
+// ── CONFIRM PAYMENT (CLIENT SIDE) ──
+async function confirmClientPayment(eventId) {
+  if (!currentBooking) { toast(T('toast_no_reservation')); return; }
+  if (payTimer) clearInterval(payTimer);
+
+  try {
+    const result = await API.confirm({
+      booking_id: currentBooking.booking_id,
+      confirmation_token: currentBooking.confirmation_token
+    });
+
+    if (result.success) {
+      showSuccess(currentBooking.name);
+    } else {
+      toast(result.error || T('toast_network_error'));
+    }
+  } catch (err) {
+    console.error('Confirm failed:', err);
+    // Still show success UI since e-Transfer will be verified manually
+    showSuccess(currentBooking.name);
+  }
+}
+
+// Track polling state so it can be stopped on close/back/confirm
+let statusPollHandle = null;
+
+function showSuccess(name) {
+  const e = eventsData.find(x => x.id === currentBooking?.event_id);
+  const firstName = name ? name.split(' ')[0] : '';
+  const namePart = firstName ? ', ' + firstName : '';
+  const bookingId = currentBooking?.booking_id || '';
+  document.getElementById('dbody').innerHTML = `
+    <div class="success-state" id="successState">
+      <div class="pending-icon">⏳</div>
+      <h3>${T('succ_pending_title')}</h3>
+      <p>${T('succ_pending_desc', {name: namePart})}</p>
+      <p style="font-size:.78rem;color:var(--ink-4);margin-top:4px">${T('succ_pending_hint')}</p>
+      <div style="background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;margin:18px 0;font-size:.85rem">
+        <span class="live-dot"></span><strong>${T('succ_status_lbl')}:</strong> ${T('succ_status_pending')}<br>
+        <strong>${T('succ_booking_id_lbl')}:</strong> #${bookingId}
+      </div>
+      <p style="margin-top:18px;font-size:.85rem">${e?.title || ''}<br><strong>${fmtDate(e?.date || '')} · ${currentBooking?.time || ''}</strong></p>
+      <button class="btn" style="margin-top:24px" onclick="closeDrawer(); currentBooking=null;">${T('succ_done_btn')}</button>
+    </div>`;
+
+  // Start polling for confirmation; if it never confirms, that's fine — user
+  // closes the drawer eventually and gets email when payment is verified.
+  startStatusPolling(bookingId);
+}
+
+function startStatusPolling(bookingId) {
+  if (!bookingId) return;
+  stopStatusPolling();
+  let attempts = 0;
+  const tick = async () => {
+    attempts++;
+    const token = currentBooking?.confirmation_token || '';
+    // Stop after 30 minutes (450 attempts at 4s) — page may stay open in
+    // a tab that the client forgot about. Email always lands eventually.
+    if (attempts > 450) { stopStatusPolling(); return; }
+    try {
+      const r = await fetch('/booking-status?booking_id=' + encodeURIComponent(bookingId) + '&token=' + encodeURIComponent(token));
+      if (!r.ok) return;
+      const data = await r.json();
+      if (data.confirmed) {
+        stopStatusPolling();
+        showConfirmed(data.name || currentBooking?.name || '');
+      } else if (data.status === 'cancelled' || data.status === 'expired') {
+        stopStatusPolling();
+      }
+    } catch (_) { /* network blip — keep polling */ }
+  };
+  // First check almost immediately, then every 4s
+  tick();
+  statusPollHandle = setInterval(tick, 4000);
+}
+
+function stopStatusPolling() {
+  if (statusPollHandle) { clearInterval(statusPollHandle); statusPollHandle = null; }
+}
+
+function showConfirmed(name) {
+  const e = eventsData.find(x => x.id === currentBooking?.event_id);
+  const firstName = (name || currentBooking?.name || '').split(' ')[0] || '';
+  const namePart = firstName ? ', ' + firstName : '';
+  const bookingId = currentBooking?.booking_id || '';
+  const dbody = document.getElementById('dbody');
+  if (!dbody) return;
+
+  dbody.innerHTML = `
+    <div class="success-state fade-swap">
+      <div class="confirm-glow"></div>
+      <div class="confirm-ring">
+        <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M14 31 L26 43 L46 19" />
+        </svg>
+      </div>
+      <h3>${T('succ_confirmed_title')}</h3>
+      <p>${T('succ_confirmed_desc', {name: namePart})}</p>
+      <p style="font-size:.85rem;color:var(--green);margin-top:6px">📧 ${T('succ_email_sent')}</p>
+      <div style="background:var(--green-bg);color:var(--green);border-radius:10px;padding:12px;margin:18px 0;font-size:.85rem">
+        <strong>${T('succ_status_lbl')}:</strong> ${T('succ_status_confirmed')}<br>
+        <strong>${T('succ_booking_id_lbl')}:</strong> #${bookingId}
+      </div>
+      <p style="margin-top:14px;font-size:.92rem"><span style="color:var(--ink-3)">${T('succ_see_you')}:</span><br><strong>${fmtDate(e?.date || '')} · ${currentBooking?.time || ''}</strong></p>
+      <div class="next-list">
+        <div class="nl-title">${T('succ_what_next_title')}</div>
+        <div class="nl-item"><span class="nl-dot">1</span><span>${T('succ_what_next_1')}</span></div>
+        <div class="nl-item"><span class="nl-dot">2</span><span>${T('succ_what_next_2')}</span></div>
+        <div class="nl-item"><span class="nl-dot">3</span><span>${T('succ_what_next_3')}</span></div>
+      </div>
+      <p style="margin-top:18px;font-size:.85rem"><a href="https://instagram.com/pashynska.photo" target="_blank" style="color:var(--rose);text-decoration:none;font-weight:500">📸 ${T('succ_dm_question')} →</a></p>
+      <button class="btn" style="margin-top:18px" onclick="closeDrawer(); currentBooking=null;">${T('succ_done_btn')}</button>
+    </div>`;
+
+  // Fire confetti + a soft chime (best-effort, will silently fail if blocked)
+  launchConfetti();
+  try { playChime(); } catch (_) {}
+}
+
+// ── Confetti — pure CSS, no library ──
+function launchConfetti() {
+  // Avoid stacking multiple bursts
+  document.querySelectorAll('.confetti-host').forEach(n => n.remove());
+  const host = document.createElement('div');
+  host.className = 'confetti-host';
+  document.body.appendChild(host);
+
+  const palette = ['#c4857a', '#e8c8c0', '#3d6b4f', '#92722a', '#f5ede8', '#a3685e', '#fdf5e4', '#1c1917'];
+  const N = 110;
+  for (let i = 0; i < N; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    const startX = Math.random() * 100;          // start position 0-100vw
+    const driftX = (Math.random() * 60 - 30);    // -30..+30 vw drift
+    const dur     = 2.6 + Math.random() * 2.2;   // 2.6-4.8s
+    const delay   = Math.random() * 0.6;
+    const rot     = (Math.random() * 1080 - 540).toFixed(0) + 'deg';
+    const w       = 6 + Math.random() * 8;
+    const h       = 10 + Math.random() * 12;
+    const color   = palette[Math.floor(Math.random() * palette.length)];
+    const isCircle = Math.random() < 0.25;
+    piece.style.left      = startX + 'vw';
+    piece.style.background = color;
+    piece.style.width      = w + 'px';
+    piece.style.height     = h + 'px';
+    piece.style.borderRadius = isCircle ? '50%' : '2px';
+    piece.style.setProperty('--x', driftX + 'vw');
+    piece.style.setProperty('--r', rot);
+    piece.style.setProperty('--d', dur + 's');
+    piece.style.setProperty('--delay', delay + 's');
+    host.appendChild(piece);
+  }
+  // Clean up after animations finish
+  setTimeout(() => host.remove(), 6000);
+}
+
+// ── Soft chime on confirm (Web Audio, no asset) ──
+function playChime() {
+  if (!('AudioContext' in window || 'webkitAudioContext' in window)) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  const notes = [659.25, 783.99, 987.77]; // E5 G5 B5 — pleasant major arpeggio
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    osc.connect(gain).connect(ctx.destination);
+    const start = ctx.currentTime + i * 0.11;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(0.18, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.7);
+    osc.start(start);
+    osc.stop(start + 0.75);
+  });
+  setTimeout(() => ctx.close(), 1500);
+}
+
+function joinWaitlist(eventId) {
+  const name = document.getElementById('wName')?.value?.trim();
+  const email = document.getElementById('wEmail')?.value?.trim();
+  const ig = document.getElementById('wIg')?.value?.trim();
+  if (!name || !email) { toast(T('fill_name_email')); return; }
+  toast(T('waitlist_join_msg'));
+  closeDrawer();
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  if (payTimer) clearInterval(payTimer);
+  if (typeof stopStatusPolling === 'function') stopStatusPolling();
+  // Restore drawer photo aspect ratio
+  setTimeout(() => {
+    const dphoto = document.getElementById('dphoto');
+    dphoto.style.aspectRatio = "16/9";
+    dphoto.style.height = "";
+    dphoto.querySelector('h2').style.display = '';
+  }, 300);
+}
+
+document.getElementById('drawer').addEventListener('click', (e) => { if (e.target.id === 'drawer') closeDrawer() });
+
+// Keyboard: Escape closes drawer, Enter on slot selects it
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeDrawer();
+});
+
+function renderAll() {
+  renderFeatured();
+  renderGrid();
+}
+
+// ── INIT ──
+loadEvents().then(() => {
+  // Auto-open drawer if direct_event_id is provided
+  {% if direct_event_id %}
+  setTimeout(() => openDrawer('{{ direct_event_id }}'), 500);
+  {% endif %}
+});
+</script>
+
+<!-- ══ i18n ══ -->
+<script>
+const SITE_I18N = {
+  en: {
+    /* hero */
+    hero_kicker: 'Mini Sessions · 2026',
+    hero_title_html: 'Soft, sunlit moments<br>among <em>blooming flowers</em>',
+    hero_subtitle: 'Pick a session below — booking takes about 2 minutes.',
+    /* social proof */
+    hero_kicker_label: 'Featured session',
+    hf_date: 'Date',
+    hf_duration: '{n} min session',
+    hf_deposit: 'Deposit today',
+    hf_currency: 'CAD · e-Transfer',
+    hf_total: 'Total',
+    hf_total_sub: 'balance on session day',
+    hf_spots: 'Spots',
+    hf_status: 'Status',
+    hf_location_prefix: '@ {loc}',
+    spots_left: '{n} left',
+    see_all_btn: 'See all dates',
+    sessions_heading: 'Upcoming sessions',
+    sessions_subhead: 'Pick one — booking takes about 2 minutes',
+    how_heading: 'How it works',
+    how_subhead: 'Three quick steps',
+    session_type_fallback: 'session',
+    stripe_redirecting: 'Redirecting to Stripe…',
+    privacy_link: 'Privacy & browser storage',
+    proof_reviews: '<strong>★ 4.9</strong> · 80+ reviews',
+    proof_sessions: '<strong>120+</strong> sessions delivered',
+    proof_award: '<strong>Calgary</strong> local pick 2024 & 2025',
+    /* how it works */
+    how_step1_title: 'Pick a session',
+    how_step1_desc:  'Browse upcoming dates and choose what fits — dress code & location come with confirmation.',
+    how_step2_title: 'Reserve in 2 min',
+    how_step2_desc:  'Pick a time slot, fill in your details. Slot is held for you for 15 minutes.',
+    how_step3_title: 'Pay deposit by e-Transfer',
+    how_step3_desc:  'Send the deposit — auto-confirmed. Final balance only on session day.',
+    /* filters */
+    filter_all: 'All',
+    filter_month: 'This month',
+    filter_mini: 'Mini',
+    filter_individual: 'Individual',
+    filter_wedding: 'Wedding',
+    filter_family: 'Family',
+    sessions_count_one: '{n} session',
+    sessions_count_many: '{n} sessions',
+    /* loading & empty */
+    loading_sessions: 'Loading sessions…',
+    no_sessions_title: 'No sessions available right now',
+    no_sessions_desc: 'Check back soon — new dates are added weekly.',
+    /* faq */
+    faq_title: 'Quick answers',
+    faq_q1: 'What should we wear?',
+    faq_a1: 'I send a styling guide after booking — soft tones, layered textures, nothing with big logos.',
+    faq_q2: 'What if it rains?',
+    faq_a2: 'We reschedule for free, no questions asked. I check the forecast 24h before and reach out.',
+    faq_q3: 'Can I bring our dog?',
+    faq_a3: 'Always yes — just let me know on the form so I plan the spot.',
+    faq_q4: 'How does the deposit work?',
+    faq_a4: 'The deposit is non-refundable but transferable to another session if you give 7+ days notice. The remaining balance is due on session day.',
+    faq_q5: 'When do I get the photos?',
+    faq_a5: 'Within 48 hours for mini sessions, 2 weeks for full sessions. You get a private gallery with download.',
+    /* footer */
+    footer_studio: '<strong>Pashynska Photography</strong> · Calgary, AB · ',
+    footer_copyright: '© 2026 Pashynska Photography — All rights reserved',
+    /* card / featured */
+    featured_tag: '★ Featured',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    in_days: 'in {n} days',
+    in_days_short: 'in {n}d',
+    status_sold: 'Sold out',
+    status_low: 'Only {n} left',
+    status_open: '{n} of {total} open',
+    status_past: 'Past session',
+    deposit_caption: 'deposit · ${total} total',
+    deposit_total_cad: 'deposit · ${total} total CAD',
+    view_dates_btn: 'View dates →',
+    join_waitlist_btn: 'Join waitlist',
+    view_slots_btn: 'View time slots →',
+    /* drawer / booking form */
+    full_name:    'Full name *',
+    phone_ph:     'Phone (e.g. 403-555-1234) *',
+    email_ph:     'Email *',
+    ig_ph:        '@instagram (optional)',
+    continue_btn: 'Continue to Payment →',
+    pick_slot:    'Pick a time slot first',
+    pay_note: 'Pay deposit via e-Transfer · remaining due on session day',
+    available_slots_lbl: 'Available time slots',
+    waitlist_msg: 'This session is fully booked. Join the waitlist — I\'ll DM you the moment a spot opens.',
+    no_slots_msg: 'No slots available for this session.',
+    slot_foreign_msg: 'This time is reserved for another session. DM {ig} on Instagram — cancellations happen and I\'d love to fit you in.',
+    close_btn: 'Close',
+    waitlist_join_msg: 'Waitlist joined! I\'ll DM you when a spot opens.',
+    fill_name_email: 'Please fill in name and email',
+    /* toasts */
+    reserve_error: 'Something went wrong. Please try again.',
+    toast_error_events: 'Error loading sessions. Please refresh.',
+    toast_error_slots: 'Error loading slots. Please try again.',
+    toast_loading_session: 'Loading session info… please try again in a moment.',
+    toast_no_reservation: 'No active reservation',
+    toast_network_error: 'Network error. Please try again.',
+    toast_slot_unavailable: 'Slot is no longer available',
+    toast_reservation_expired: 'Reservation expired. Please select a new slot.',
+    /* validation errors */
+    err_name_required: 'Please enter your full name',
+    err_name_format: 'Name should contain only letters, spaces, or hyphens',
+    err_email_required: 'Email is required',
+    err_email_format: 'Please enter a valid email (e.g. jane@example.com)',
+    err_phone: 'Please enter a valid Canadian phone number (e.g. 403-555-1234)',
+    err_ig: 'Instagram handle: 1–30 characters, letters, numbers, . or _',
+    /* payment view */
+    pay_complete_title: 'Almost done — your session is held',
+    pay_intro_soft: 'you’re one step away',
+    pay_choose_method: 'Choose the payment option that feels easiest. Interac e-Transfer is fastest for confirmation; card / Apple Pay / Google Pay is available right below.',
+    pay_slot_reserved_for: 'Slot reserved for',
+    pay_row_session: 'Session',
+    pay_row_date: 'Date',
+    pay_row_time: 'Time',
+    pay_row_balance: 'Remaining on session day',
+    pay_row_deposit: 'Deposit to secure your spot',
+    pay_session_min: '{title} ({min} min)',
+    pay_eyebrow: 'Recommended: Interac e-Transfer',
+    pay_cad_label: 'CAD — Canadian dollars',
+    pay_send_to: 'Send to',
+    pay_copy: 'Copy',
+    pay_copied: '✓ Copied',
+    pay_autodeposit: 'Auto-deposit is enabled · no password or security question needed',
+    pay_card_title: 'Prefer to pay by card?',
+    pay_card_desc: 'Use this if e-Transfer is not convenient — card, Apple Pay and Google Pay are processed securely by Stripe.',
+    pay_card_btn: 'Pay ${amt} CAD by card',
+    pay_ready_msg_title: 'Message for your bank transfer',
+    pay_ready_msg_desc: 'Copy this into the bank “Message” field so I can match your deposit quickly.',
+    pay_howto_title: 'Sending by e-Transfer takes about a minute',
+    pay_howto_step1: 'Open your banking app (RBC, TD, Scotiabank, etc.)',
+    pay_howto_step2: 'Choose "Send Interac e-Transfer"',
+    pay_howto_step3: 'Copy the email above and paste it as the recipient',
+    pay_howto_step4: 'Enter amount: <strong>${amt}.00</strong>',
+    pay_howto_step5: 'Add message: "{title} — {date} {time}"',
+    pay_howto_step6: 'Send the transfer, then tap the confirmation button below',
+    pay_info_note: '💡 <strong>Your spot is safe while the timer runs.</strong> Interac auto-deposit usually appears within a few minutes. After you send it, tap the button below — I’ll receive an alert and your booking will be confirmed automatically or manually if needed.',
+    pay_confirm_btn: '✓ I sent ${amt} by e-Transfer — finish booking',
+    pay_back_btn: '← Back to change time',
+    pay_no_etransfer: "Can't do e-Transfer?",
+    pay_card_secure: 'Secure payment · Powered by Stripe',
+    pay_deposit_for: 'Deposit for {name}',
+    /* success */
+    succ_pending_title: 'Payment Pending',
+    succ_pending_desc: 'Thanks{name}! <strong>Your payment is being reviewed.</strong>',
+    succ_pending_hint: 'I\'ll see your e-Transfer within minutes — this page will update automatically.',
+    succ_status_pending: 'Pending ⏳',
+    succ_booking_id_lbl: 'Booking ID',
+    succ_status_lbl: 'Status',
+    succ_done_btn: 'Done',
+    /* confirmed state */
+    succ_confirmed_title: '🎉 Booking Confirmed!',
+    succ_confirmed_desc: 'Thank you{name}! Your spot is locked in.',
+    succ_status_confirmed: 'Confirmed ✓',
+    succ_email_sent: 'Confirmation details sent to your email.',
+    succ_see_you: 'See you on',
+    succ_what_next_title: 'What\'s next?',
+    succ_what_next_1: 'I\'ll send a styling guide 1–2 days before the session',
+    succ_what_next_2: 'Weather check 24h before — we\'ll reschedule for free if needed',
+    succ_what_next_3: 'Final balance is due on session day',
+    succ_dm_question: 'Questions? DM me on Instagram',
+  },
+  ru: {
+    hero_kicker: 'Мини-сессии · 2026',
+    hero_title_html: 'Мягкий свет<br>среди <em>цветущих полей</em>',
+    hero_subtitle: 'Выберите сессию ниже — бронирование занимает около 2 минут.',
+    hero_kicker_label: 'Избранная сессия',
+    hf_date: 'Дата',
+    hf_duration: '{n} мин сессия',
+    hf_deposit: 'Депозит сегодня',
+    hf_currency: 'CAD · e-Transfer',
+    hf_total: 'Итого',
+    hf_total_sub: 'остаток в день съёмки',
+    hf_spots: 'Места',
+    hf_status: 'Статус',
+    hf_location_prefix: '@ {loc}',
+    spots_left: 'осталось {n}',
+    see_all_btn: 'Все даты',
+    sessions_heading: 'Ближайшие сессии',
+    sessions_subhead: 'Выберите подходящую — бронирование займёт около 2 минут',
+    how_heading: 'Как это работает',
+    how_subhead: 'Три быстрых шага',
+    session_type_fallback: 'сессия',
+    stripe_redirecting: 'Переходим к безопасной оплате…',
+    privacy_link: 'Privacy и хранение в браузере',
+    proof_reviews: '<strong>★ 4.9</strong> · 80+ отзывов',
+    proof_sessions: '<strong>120+</strong> съёмок проведено',
+    proof_award: '<strong>Калгари</strong> · локальный выбор 2024 и 2025',
+    how_step1_title: 'Выберите сессию',
+    how_step1_desc:  'Просмотрите даты и выберите подходящую — рекомендации по одежде и локация придут с подтверждением.',
+    how_step2_title: 'Забронируйте за 2 минуты',
+    how_step2_desc:  'Выберите время и заполните данные. Слот удерживается за вами 15 минут.',
+    how_step3_title: 'Оплатите депозит через e-Transfer',
+    how_step3_desc:  'Отправьте депозит — подтверждение автоматическое. Остаток оплачивается в день съёмки.',
+    filter_all: 'Все',
+    filter_month: 'В этом месяце',
+    filter_mini: 'Мини',
+    filter_individual: 'Индивидуальная',
+    filter_wedding: 'Свадьба',
+    filter_family: 'Семья',
+    sessions_count_one: '{n} сессия',
+    sessions_count_many: '{n} сессий',
+    loading_sessions: 'Загружаем сессии…',
+    no_sessions_title: 'Сейчас нет доступных сессий',
+    no_sessions_desc: 'Загляните позже — новые даты добавляются каждую неделю.',
+    faq_title: 'Часто задаваемые вопросы',
+    faq_q1: 'Что нам надеть?',
+    faq_a1: 'После бронирования я отправлю стайл-гайд — мягкие тона, многослойные текстуры, без больших логотипов.',
+    faq_q2: 'А если будет дождь?',
+    faq_a2: 'Перенесём бесплатно, без лишних вопросов. Я смотрю прогноз за 24 часа и сама свяжусь с вами.',
+    faq_q3: 'Можно прийти с собакой?',
+    faq_a3: 'Конечно — просто отметьте это в форме, чтобы я подобрала локацию.',
+    faq_q4: 'Как работает депозит?',
+    faq_a4: 'Депозит не возвращается, но его можно перенести на другую сессию, если предупредить за 7+ дней. Остаток оплачивается в день съёмки.',
+    faq_q5: 'Когда я получу фотографии?',
+    faq_a5: 'В течение 48 часов для мини-сессий, 2 недель для полных сессий. Вы получаете личную галерею с возможностью скачать снимки.',
+    footer_studio: '<strong>Pashynska Photography</strong> · Калгари, AB · ',
+    footer_copyright: '© 2026 Pashynska Photography — Все права защищены',
+    featured_tag: '★ Избранное',
+    today: 'Сегодня',
+    tomorrow: 'Завтра',
+    in_days: 'через {n} дн.',
+    in_days_short: 'через {n}д',
+    status_sold: 'Мест нет',
+    status_low: 'Осталось всего {n}',
+    status_open: '{n} из {total} свободны',
+    status_past: 'Прошедшая сессия',
+    deposit_caption: 'депозит · ${total} всего',
+    deposit_total_cad: 'депозит · ${total} всего CAD',
+    view_dates_btn: 'Смотреть даты →',
+    join_waitlist_btn: 'В лист ожидания',
+    view_slots_btn: 'Смотреть время →',
+    full_name:    'Полное имя *',
+    phone_ph:     'Телефон (напр. 403-555-1234) *',
+    email_ph:     'Эл. почта *',
+    ig_ph:        '@instagram (необязательно)',
+    continue_btn: 'Перейти к оплате →',
+    pick_slot:    'Сначала выберите время',
+    pay_note: 'Депозит через e-Transfer · остаток в день съёмки',
+    available_slots_lbl: 'Доступное время',
+    waitlist_msg: 'Эта сессия полностью забронирована. Запишитесь в лист ожидания — я напишу вам в Direct, как только освободится место.',
+    no_slots_msg: 'Нет доступных слотов для этой сессии.',
+    slot_foreign_msg: 'Это время занято другой сессией. Напишите мне в Instagram Direct ({ig}) — при отмене я обязательно вас уведомлю.',
+    close_btn: 'Закрыть',
+    waitlist_join_msg: 'Вы в листе ожидания! Я напишу в Direct, когда освободится место.',
+    fill_name_email: 'Заполните имя и email',
+    toast_loading_slots: 'Загружаем доступное время…',
+    toast_error_events: 'Ошибка загрузки сессий. Обновите страницу.',
+    toast_error_slots: 'Ошибка загрузки времени. Попробуйте ещё раз.',
+    toast_loading_session: 'Загружаем информацию о сессии… попробуйте через секунду.',
+    toast_no_reservation: 'Нет активной брони',
+    toast_network_error: 'Ошибка сети. Попробуйте ещё раз.',
+    toast_slot_unavailable: 'Слот больше недоступен',
+    toast_reservation_expired: 'Бронь истекла. Выберите новое время.',
+    err_name_required: 'Пожалуйста, введите своё полное имя',
+    err_name_format: 'Имя должно содержать только буквы, пробелы и дефисы',
+    err_email_required: 'Email обязателен',
+    err_email_format: 'Введите корректный email (например, jane@example.com)',
+    err_phone: 'Введите корректный канадский номер (напр. 403-555-1234)',
+    err_ig: 'Instagram: 1–30 символов, буквы, цифры, . или _',
+    pay_complete_title: 'Почти готово — слот уже за вами',
+    pay_intro_soft: 'остался последний шаг',
+    pay_choose_method: 'Выберите удобный способ оплаты. Interac e-Transfer обычно подтверждается быстрее; если удобнее картой, Apple Pay или Google Pay — кнопка ниже.',
+    pay_slot_reserved_for: 'Слот удерживается',
+    pay_row_session: 'Сессия',
+    pay_row_date: 'Дата',
+    pay_row_time: 'Время',
+    pay_row_balance: 'Остаток в день съёмки',
+    pay_row_deposit: 'Депозит, чтобы закрепить слот',
+    pay_session_min: '{title} ({min} мин)',
+    pay_eyebrow: 'Рекомендуемый способ: Interac e-Transfer',
+    pay_cad_label: 'CAD — канадские доллары',
+    pay_send_to: 'Получатель',
+    pay_copy: 'Копировать',
+    pay_copied: '✓ Скопировано',
+    pay_autodeposit: 'Автозачисление активно · пароль и контрольный вопрос не нужны',
+    pay_card_title: 'Удобнее оплатить картой?',
+    pay_card_desc: 'Если e-Transfer сейчас неудобен — оплатите депозит картой, Apple Pay или Google Pay через безопасный Stripe.',
+    pay_card_btn: 'Оплатить ${amt} CAD картой',
+    pay_ready_msg_title: 'Сообщение для банковского перевода',
+    pay_ready_msg_desc: 'Скопируйте это в поле “Message”, чтобы депозит быстро сопоставился с вашей бронью.',
+    pay_howto_title: 'Как отправить e-Transfer — это займёт около минуты',
+    pay_howto_step1: 'Откройте приложение банка (RBC, TD, Scotiabank и т.д.)',
+    pay_howto_step2: 'Выберите "Send Interac e-Transfer"',
+    pay_howto_step3: 'Скопируйте email выше и вставьте его как получателя',
+    pay_howto_step4: 'Введите сумму: <strong>${amt}.00</strong>',
+    pay_howto_step5: 'Добавьте сообщение: "{title} — {date} {time}"',
+    pay_howto_step6: 'Отправьте перевод, затем нажмите кнопку подтверждения ниже',
+    pay_info_note: '💡 <strong>Ваш слот удерживается, пока идёт таймер.</strong> Автозачисление Interac обычно проходит за несколько минут. После отправки нажмите кнопку ниже — я получу уведомление, и бронь подтвердится автоматически или вручную, если понадобится.',
+    pay_confirm_btn: '✓ Я отправил(а) ${amt} через e-Transfer — завершить бронь',
+    pay_back_btn: '← Назад изменить время',
+    pay_no_etransfer: 'Не можете сделать e-Transfer?',
+    pay_card_secure: 'Безопасная оплата · Stripe',
+    pay_deposit_for: 'Депозит за {name}',
+    succ_pending_title: 'Платёж в обработке',
+    succ_pending_desc: 'Спасибо{name}! <strong>Ваш платёж проверяется.</strong>',
+    succ_pending_hint: 'Я увижу e-Transfer в течение нескольких минут — страница обновится автоматически.',
+    succ_status_pending: 'В обработке ⏳',
+    succ_booking_id_lbl: 'Номер брони',
+    succ_status_lbl: 'Статус',
+    succ_done_btn: 'Готово',
+    succ_confirmed_title: '🎉 Бронь подтверждена!',
+    succ_confirmed_desc: 'Спасибо{name}! Ваше место зафиксировано.',
+    succ_status_confirmed: 'Подтверждено ✓',
+    succ_email_sent: 'Детали подтверждения отправлены на ваш email.',
+    succ_see_you: 'Увидимся',
+    succ_what_next_title: 'Что дальше?',
+    succ_what_next_1: 'За 1–2 дня до сессии пришлю стайл-гайд',
+    succ_what_next_2: 'За 24 часа проверим погоду — при необходимости перенесём бесплатно',
+    succ_what_next_3: 'Остаток оплачивается в день съёмки',
+    succ_dm_question: 'Вопросы? Напишите мне в Instagram',
+  },
+  hi: {
+    hero_kicker: 'मिनी सेशन · 2026',
+    hero_title_html: 'धूप में नर्म पल<br><em>खिले फूलों</em> के बीच',
+    hero_subtitle: 'नीचे एक सेशन चुनें — बुकिंग में लगभग 2 मिनट लगते हैं।',
+    hero_kicker_label: 'विशेष सेशन',
+    hf_date: 'तारीख',
+    hf_duration: '{n} मिनट का सेशन',
+    hf_deposit: 'आज डिपॉज़िट',
+    hf_currency: 'CAD · e-Transfer',
+    hf_total: 'कुल',
+    hf_total_sub: 'बाकी सेशन के दिन',
+    hf_spots: 'जगहें',
+    hf_status: 'स्थिति',
+    hf_location_prefix: '@ {loc}',
+    spots_left: '{n} बचे',
+    see_all_btn: 'सभी तारीखें देखें',
+    sessions_heading: 'आने वाले सेशन',
+    sessions_subhead: 'एक चुनें — बुकिंग में लगभग 2 मिनट लगते हैं',
+    how_heading: 'यह कैसे काम करता है',
+    how_subhead: 'तीन आसान चरण',
+    session_type_fallback: 'सेशन',
+    stripe_redirecting: 'सुरक्षित भुगतान पर भेजा जा रहा है…',
+    privacy_link: 'Privacy और browser storage',
+    proof_reviews: '<strong>★ 4.9</strong> · 80+ समीक्षाएँ',
+    proof_sessions: '<strong>120+</strong> सेशन पूरे',
+    proof_award: '<strong>कैलगरी</strong> · लोकल चॉइस 2024 और 2025',
+    how_step1_title: 'सेशन चुनें',
+    how_step1_desc:  'आगामी तारीखें देखें और जो उपयुक्त हो वो चुनें — ड्रेस कोड और लोकेशन पुष्टि के साथ आते हैं।',
+    how_step2_title: '2 मिनट में बुक करें',
+    how_step2_desc:  'समय चुनें और अपनी जानकारी भरें। स्लॉट आपके लिए 15 मिनट तक रखा जाता है।',
+    how_step3_title: 'e-Transfer से डिपॉज़िट भेजें',
+    how_step3_desc:  'डिपॉज़िट भेजें — स्वतः पुष्टि। बाकी राशि सेशन के दिन।',
+    filter_all: 'सभी',
+    filter_month: 'इस महीने',
+    filter_mini: 'मिनी',
+    filter_individual: 'व्यक्तिगत',
+    filter_wedding: 'शादी',
+    filter_family: 'परिवार',
+    sessions_count_one: '{n} सेशन',
+    sessions_count_many: '{n} सेशन',
+    loading_sessions: 'सेशन लोड हो रहे हैं…',
+    no_sessions_title: 'अभी कोई सेशन उपलब्ध नहीं',
+    no_sessions_desc: 'जल्द ही देखें — नई तारीखें हर हफ़्ते जोड़ी जाती हैं।',
+    faq_title: 'अक्सर पूछे जाने वाले सवाल',
+    faq_q1: 'हमें क्या पहनना चाहिए?',
+    faq_a1: 'बुकिंग के बाद मैं स्टाइलिंग गाइड भेजूँगी — हल्के रंग, परतदार बनावट, बड़े लोगो वाले नहीं।',
+    faq_q2: 'अगर बारिश हो जाए?',
+    faq_a2: 'हम मुफ़्त में पुनर्निर्धारित करेंगे, कोई सवाल नहीं। मैं 24 घंटे पहले मौसम जाँचती हूँ और संपर्क करती हूँ।',
+    faq_q3: 'क्या मैं अपने कुत्ते को ला सकता/सकती हूँ?',
+    faq_a3: 'हमेशा हाँ — बस फ़ॉर्म में बता दें ताकि मैं जगह की योजना बना सकूँ।',
+    faq_q4: 'डिपॉज़िट कैसे काम करता है?',
+    faq_a4: 'डिपॉज़िट वापसी योग्य नहीं है, लेकिन 7+ दिनों की सूचना देने पर दूसरे सेशन में स्थानांतरित किया जा सकता है। बाकी राशि सेशन के दिन देय है।',
+    faq_q5: 'मुझे फ़ोटो कब मिलेंगी?',
+    faq_a5: 'मिनी सेशन के लिए 48 घंटे में, फ़ुल सेशन के लिए 2 हफ़्ते में। आपको डाउनलोड के साथ निजी गैलरी मिलती है।',
+    footer_studio: '<strong>Pashynska Photography</strong> · कैलगरी, AB · ',
+    footer_copyright: '© 2026 Pashynska Photography — सर्वाधिकार सुरक्षित',
+    featured_tag: '★ विशेष',
+    today: 'आज',
+    tomorrow: 'कल',
+    in_days: '{n} दिन में',
+    in_days_short: '{n}दि में',
+    status_sold: 'सब भर गया',
+    status_low: 'सिर्फ़ {n} बचे',
+    status_open: '{n}/{total} उपलब्ध',
+    status_past: 'पिछला सेशन',
+    deposit_caption: 'डिपॉज़िट · कुल ${total}',
+    deposit_total_cad: 'डिपॉज़िट · कुल ${total} CAD',
+    view_dates_btn: 'तारीखें देखें →',
+    join_waitlist_btn: 'वेटलिस्ट में जुड़ें',
+    view_slots_btn: 'समय देखें →',
+    full_name:    'पूरा नाम *',
+    phone_ph:     'फ़ोन (जैसे 403-555-1234) *',
+    email_ph:     'ईमेल *',
+    ig_ph:        '@इंस्टाग्राम (वैकल्पिक)',
+    continue_btn: 'भुगतान की ओर जारी रखें →',
+    pick_slot:    'पहले समय चुनें',
+    pay_note: 'e-Transfer से डिपॉज़िट · बाकी सेशन के दिन',
+    available_slots_lbl: 'उपलब्ध समय',
+    waitlist_msg: 'यह सेशन पूरी तरह बुक है। वेटलिस्ट में शामिल हों — जगह खुलते ही मैं DM करूँगी।',
+    no_slots_msg: 'इस सेशन के लिए कोई स्लॉट उपलब्ध नहीं।',
+    slot_foreign_msg: 'यह समय दूसरे सेशन के लिए रिज़र्व है। मुझे Instagram DM करें ({ig}) — कैंसिल होने पर मैं आपको बता दूँगी।',
+    close_btn: 'बंद करें',
+    waitlist_join_msg: 'आप वेटलिस्ट में हैं! जगह खुलते ही DM करूँगी।',
+    fill_name_email: 'कृपया नाम और ईमेल भरें',
+    toast_loading_slots: 'उपलब्ध समय लोड हो रहा है…',
+    toast_error_events: 'सेशन लोड नहीं हुए। पेज ताज़ा करें।',
+    toast_error_slots: 'समय लोड नहीं हुआ। फिर कोशिश करें।',
+    toast_loading_session: 'सेशन की जानकारी लोड हो रही है… एक पल में फिर कोशिश करें।',
+    toast_no_reservation: 'कोई सक्रिय बुकिंग नहीं',
+    toast_network_error: 'नेटवर्क त्रुटि। फिर कोशिश करें।',
+    toast_slot_unavailable: 'यह स्लॉट अब उपलब्ध नहीं है',
+    toast_reservation_expired: 'बुकिंग समाप्त हो गई। नया समय चुनें।',
+    err_name_required: 'कृपया अपना पूरा नाम दर्ज करें',
+    err_name_format: 'नाम में केवल अक्षर, खाली जगह या हाइफ़न होना चाहिए',
+    err_email_required: 'ईमेल आवश्यक है',
+    err_email_format: 'सही ईमेल दर्ज करें (जैसे jane@example.com)',
+    err_phone: 'सही कैनेडियन फ़ोन नंबर दर्ज करें (जैसे 403-555-1234)',
+    err_ig: 'Instagram: 1–30 अक्षर, संख्या, . या _',
+    pay_complete_title: 'अपनी बुकिंग पूरी करें',
+    pay_slot_reserved_for: 'स्लॉट आरक्षित',
+    pay_row_session: 'सेशन',
+    pay_row_date: 'तारीख',
+    pay_row_time: 'समय',
+    pay_row_balance: 'सेशन पर बाकी',
+    pay_row_deposit: 'अभी देय डिपॉज़िट',
+    pay_session_min: '{title} ({min} मिन)',
+    pay_eyebrow: 'Interac e-Transfer से भेजें',
+    pay_cad_label: 'CAD — कैनेडियन डॉलर',
+    pay_send_to: 'प्राप्तकर्ता',
+    pay_copy: 'कॉपी',
+    pay_copied: '✓ कॉपी हुआ',
+    pay_autodeposit: 'ऑटो-डिपॉज़िट चालू · पासवर्ड की ज़रूरत नहीं',
+    pay_card_title: 'कार्ड से भुगतान करना चाहते हैं?',
+    pay_card_desc: 'अगर e-Transfer सुविधाजनक नहीं है, तो Stripe के ज़रिए कार्ड, Apple Pay या Google Pay से सुरक्षित भुगतान करें.',
+    pay_card_btn: '${amt} CAD कार्ड से भुगतान करें',
+    pay_choose_method: 'सबसे आसान भुगतान तरीका चुनें। Interac e-Transfer पुष्टि के लिए सबसे तेज़ है; कार्ड / Apple Pay / Google Pay नीचे उपलब्ध है।',
+    pay_intro_soft: 'बस एक कदम बाकी है',
+    pay_ready_msg_title: 'बैंक के लिए तैयार संदेश',
+    pay_ready_msg_desc: 'भेजते समय "Message" फ़ील्ड में यह पेस्ट करें',
+    pay_howto_title: 'Interac e-Transfer कैसे भेजें',
+    pay_howto_step1: 'अपना बैंकिंग ऐप खोलें (RBC, TD, Scotiabank, आदि)',
+    pay_howto_step2: '"Send Interac e-Transfer" चुनें',
+    pay_howto_step3: 'ऊपर ईमेल पर टैप करके कॉपी करें, प्राप्तकर्ता के रूप में पेस्ट करें',
+    pay_howto_step4: 'राशि दर्ज करें: <strong>${amt}.00</strong>',
+    pay_howto_step5: 'संदेश जोड़ें: "{title} — {date} {time}"',
+    pay_howto_step6: 'ट्रांसफ़र भेजें',
+    pay_info_note: '💡 <strong>पासवर्ड नहीं चाहिए!</strong> यह ऑटो-डिपॉज़िट है। पैसे तुरंत आते हैं। मैं कुछ मिनटों में देख लूँगी (Gmail-बॉट + Telegram अलर्ट) और बुकिंग की पुष्टि करूँगी।',
+    pay_confirm_btn: ' ✓ हाँ, मैंने ${amt} भेज दिए — बुकिंग की पुष्टि करें',
+    pay_back_btn: '← समय बदलने के लिए वापस',
+    pay_no_etransfer: 'e-Transfer नहीं कर सकते?',
+    pay_card_secure: 'सुरक्षित भुगतान · Stripe',
+    pay_deposit_for: '{name} के लिए डिपॉज़िट',
+    succ_pending_title: 'भुगतान विचाराधीन',
+    succ_pending_desc: 'धन्यवाद{name}! <strong>आपके भुगतान की समीक्षा हो रही है।</strong>',
+    succ_pending_hint: 'मैं कुछ मिनटों में आपका e-Transfer देख लूँगी — यह पेज अपने आप अपडेट हो जाएगा।',
+    succ_status_pending: 'विचाराधीन ⏳',
+    succ_booking_id_lbl: 'बुकिंग ID',
+    succ_status_lbl: 'स्थिति',
+    succ_done_btn: 'पूर्ण',
+    succ_confirmed_title: '🎉 बुकिंग की पुष्टि हो गई!',
+    succ_confirmed_desc: 'धन्यवाद{name}! आपकी जगह पक्की हो गई।',
+    succ_status_confirmed: 'पुष्टि हो गई ✓',
+    succ_email_sent: 'पुष्टि की जानकारी आपके ईमेल पर भेज दी गई।',
+    succ_see_you: 'मिलते हैं',
+    succ_what_next_title: 'आगे क्या?',
+    succ_what_next_1: 'सेशन से 1–2 दिन पहले स्टाइलिंग गाइड भेजूँगी',
+    succ_what_next_2: '24 घंटे पहले मौसम जाँचूँगी — ज़रूरत पड़ी तो मुफ़्त में पुनर्निर्धारण',
+    succ_what_next_3: 'बाकी राशि सेशन के दिन देय है',
+    succ_dm_question: 'सवाल हैं? Instagram पर DM करें',
+  },
+  uk: {
+    hero_kicker: 'Міні-сесії · 2026',
+    hero_title_html: 'М\'які сонячні моменти<br>серед <em>квітучих полів</em>',
+    hero_subtitle: 'Оберіть сесію нижче — бронювання займає близько 2 хвилин.',
+    hero_kicker_label: 'Обрана сесія',
+    hf_date: 'Дата',
+    hf_duration: '{n} хв сесія',
+    hf_deposit: 'Депозит сьогодні',
+    hf_currency: 'CAD · e-Transfer',
+    hf_total: 'Разом',
+    hf_total_sub: 'залишок у день зйомки',
+    hf_spots: 'Місця',
+    hf_status: 'Статус',
+    hf_location_prefix: '@ {loc}',
+    spots_left: 'залишилось {n}',
+    see_all_btn: 'Усі дати',
+    sessions_heading: 'Найближчі сесії',
+    sessions_subhead: 'Оберіть сесію — бронювання займає близько 2 хвилин',
+    how_heading: 'Як це працює',
+    how_subhead: 'Три швидкі кроки',
+    session_type_fallback: 'сесія',
+    stripe_redirecting: 'Переходимо до безпечної оплати…',
+    privacy_link: 'Privacy і зберігання в браузері',
+    proof_reviews: '<strong>★ 4.9</strong> · 80+ відгуків',
+    proof_sessions: '<strong>120+</strong> сесій проведено',
+    proof_award: '<strong>Калгарі</strong> · локальний вибір 2024 і 2025',
+    how_step1_title: 'Оберіть сесію',
+    how_step1_desc:  'Перегляньте дати й оберіть, що підходить — рекомендації з одягу та локація приходять із підтвердженням.',
+    how_step2_title: 'Забронюйте за 2 хвилини',
+    how_step2_desc:  'Оберіть час і заповніть свої дані. Слот тримається за вами 15 хвилин.',
+    how_step3_title: 'Сплатіть депозит через e-Transfer',
+    how_step3_desc:  'Надішліть депозит — підтвердження автоматичне. Залишок у день зйомки.',
+    filter_all: 'Усі',
+    filter_month: 'Цього місяця',
+    filter_mini: 'Міні',
+    filter_individual: 'Індивідуальна',
+    filter_wedding: 'Весілля',
+    filter_family: 'Сім\'я',
+    sessions_count_one: '{n} сесія',
+    sessions_count_many: '{n} сесій',
+    loading_sessions: 'Завантажуємо сесії…',
+    no_sessions_title: 'Зараз немає доступних сесій',
+    no_sessions_desc: 'Загляньте пізніше — нові дати додаються щотижня.',
+    faq_title: 'Поширені питання',
+    faq_q1: 'Що нам одягнути?',
+    faq_a1: 'Після бронювання я надішлю стайл-гайд — м\'які тони, шарувата текстура, без великих логотипів.',
+    faq_q2: 'А якщо буде дощ?',
+    faq_a2: 'Перенесемо безкоштовно, без зайвих питань. Я перевіряю прогноз за 24 години і сама зв\'яжусь.',
+    faq_q3: 'Чи можна привести собаку?',
+    faq_a3: 'Завжди так — лише позначте у формі, щоб я підібрала локацію.',
+    faq_q4: 'Як працює депозит?',
+    faq_a4: 'Депозит не повертається, але можна перенести на іншу сесію, якщо повідомити за 7+ днів. Залишок у день зйомки.',
+    faq_q5: 'Коли я отримаю фотографії?',
+    faq_a5: 'Протягом 48 годин для міні-сесій, 2 тижнів для повних сесій. Отримуєте приватну галерею з можливістю завантажити.',
+    footer_studio: '<strong>Pashynska Photography</strong> · Калгарі, AB · ',
+    footer_copyright: '© 2026 Pashynska Photography — Усі права захищені',
+    featured_tag: '★ Обране',
+    today: 'Сьогодні',
+    tomorrow: 'Завтра',
+    in_days: 'через {n} дн.',
+    in_days_short: 'через {n}д',
+    status_sold: 'Місць немає',
+    status_low: 'Залишилось {n}',
+    status_open: '{n} з {total} вільні',
+    status_past: 'Минула сесія',
+    deposit_caption: 'депозит · ${total} всього',
+    deposit_total_cad: 'депозит · ${total} всього CAD',
+    view_dates_btn: 'Дивитися дати →',
+    join_waitlist_btn: 'У лист очікування',
+    view_slots_btn: 'Дивитися час →',
+    full_name:    'Повне ім\'я *',
+    phone_ph:     'Телефон (напр. 403-555-1234) *',
+    email_ph:     'Електронна пошта *',
+    ig_ph:        '@instagram (необов\'язково)',
+    continue_btn: 'Перейти до оплати →',
+    pick_slot:    'Спочатку оберіть час',
+    pay_note: 'Депозит через e-Transfer · залишок у день зйомки',
+    available_slots_lbl: 'Доступний час',
+    waitlist_msg: 'Ця сесія повністю заброньована. Запишіться у лист очікування — напишу в Direct, як з\'явиться місце.',
+    no_slots_msg: 'Немає доступних слотів для цієї сесії.',
+    slot_foreign_msg: 'Цей час зарезервовано для іншої сесії. Напишіть мені в Instagram Direct ({ig}) — при скасуванні обов\'язково повідомлю.',
+    close_btn: 'Закрити',
+    waitlist_join_msg: 'Ви у листі очікування! Напишу в Direct, як звільниться місце.',
+    fill_name_email: 'Заповніть ім\'я та електронну пошту',
+    toast_loading_slots: 'Завантажуємо доступний час…',
+    toast_error_events: 'Помилка завантаження сесій. Оновіть сторінку.',
+    toast_error_slots: 'Помилка завантаження часу. Спробуйте ще раз.',
+    toast_loading_session: 'Завантажуємо інформацію про сесію… спробуйте через секунду.',
+    toast_no_reservation: 'Немає активної броні',
+    toast_network_error: 'Помилка мережі. Спробуйте ще раз.',
+    toast_slot_unavailable: 'Слот більше недоступний',
+    toast_reservation_expired: 'Бронь закінчилась. Оберіть новий час.',
+    err_name_required: 'Введіть своє повне ім\'я',
+    err_name_format: 'Ім\'я має містити лише літери, пробіли та дефіси',
+    err_email_required: 'Email обов\'язковий',
+    err_email_format: 'Введіть коректний email (напр. jane@example.com)',
+    err_phone: 'Введіть коректний канадський номер (напр. 403-555-1234)',
+    err_ig: 'Instagram: 1–30 символів, літери, цифри, . або _',
+    pay_complete_title: 'Завершіть бронювання',
+    pay_slot_reserved_for: 'Слот тримається',
+    pay_row_session: 'Сесія',
+    pay_row_date: 'Дата',
+    pay_row_time: 'Час',
+    pay_row_balance: 'Залишок у день зйомки',
+    pay_row_deposit: 'Депозит зараз',
+    pay_session_min: '{title} ({min} хв)',
+    pay_eyebrow: 'Надішліть через Interac e-Transfer',
+    pay_cad_label: 'CAD — канадські долари',
+    pay_send_to: 'Отримувач',
+    pay_copy: 'Копіювати',
+    pay_copied: '✓ Скопійовано',
+    pay_autodeposit: 'Автозарахування активне · пароль не потрібен',
+    pay_card_title: 'Зручніше сплатити карткою?',
+    pay_card_desc: 'Якщо e-Transfer зараз незручний — сплатіть депозит карткою, Apple Pay або Google Pay через безпечний Stripe.',
+    pay_card_btn: 'Сплатити ${amt} CAD карткою',
+    pay_choose_method: 'Оберіть зручний спосіб оплати. Interac e-Transfer зазвичай підтверджується швидше; картка, Apple Pay або Google Pay доступні нижче.',
+    pay_intro_soft: 'залишився останній крок',
+    pay_ready_msg_title: 'Готове повідомлення для банку',
+    pay_ready_msg_desc: 'Вставте це у поле "Message" при відправці',
+    pay_howto_title: 'Як надіслати Interac e-Transfer',
+    pay_howto_step1: 'Відкрийте додаток банку (RBC, TD, Scotiabank тощо)',
+    pay_howto_step2: 'Оберіть "Send Interac e-Transfer"',
+    pay_howto_step3: 'Натисніть на email вище, щоб скопіювати — вставте як отримувача',
+    pay_howto_step4: 'Введіть суму: <strong>${amt}.00</strong>',
+    pay_howto_step5: 'Додайте повідомлення: "{title} — {date} {time}"',
+    pay_howto_step6: 'Надішліть переказ',
+    pay_info_note: '💡 <strong>Пароль не потрібен!</strong> Це автозарахування. Гроші надходять миттєво. Я побачу переказ за кілька хвилин і підтверджу бронювання.',
+    pay_confirm_btn: '✓ Так, я надіслав(ла) ${amt} — підтвердити бронювання',
+    pay_back_btn: '← Назад змінити час',
+    pay_no_etransfer: 'Не можете зробити e-Transfer?',
+    pay_card_secure: 'Безпечна оплата · Stripe',
+    pay_deposit_for: 'Депозит за {name}',
+    succ_pending_title: 'Платіж в обробці',
+    succ_pending_desc: 'Дякую, {name}! <strong>Ваш платіж перевіряється.</strong>',
+    succ_pending_hint: 'Я побачу e-Transfer за кілька хвилин — сторінка оновиться автоматично.',
+    succ_status_pending: 'В обробці ⏳',
+    succ_booking_id_lbl: 'Номер броні',
+    succ_status_lbl: 'Статус',
+    succ_done_btn: 'Готово',
+    succ_confirmed_title: '🎉 Бронь підтверджено!',
+    succ_confirmed_desc: 'Дякую{name}! Ваше місце зафіксовано.',
+    succ_status_confirmed: 'Підтверджено ✓',
+    succ_email_sent: 'Деталі підтвердження надіслано на ваш email.',
+    succ_see_you: 'Зустрінемось',
+    succ_what_next_title: 'Що далі?',
+    succ_what_next_1: 'За 1–2 дні до сесії надішлю стайл-гайд',
+    succ_what_next_2: 'За 24 години перевіримо погоду — при потребі перенесемо безкоштовно',
+    succ_what_next_3: 'Залишок сплачується у день зйомки',
+    succ_dm_question: 'Питання? Напишіть мені в Instagram',
+  }
+};
+
+let CURRENT_LANG = (localStorage.getItem('lang') || 'en');
+if (!SITE_I18N[CURRENT_LANG]) CURRENT_LANG = 'en';
+
+// Translation helper. Supports {placeholder} interpolation.
+function T(key, vars) {
+  const dict = SITE_I18N[CURRENT_LANG] || SITE_I18N.en;
+  let s = (dict[key] !== undefined ? dict[key] : (SITE_I18N.en[key] || ''));
+  if (vars) {
+    for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+  }
+  return s;
+}
+
+// Locale code for Date.toLocaleDateString
+function dateLocale(){
+  return {en:'en-CA', ru:'ru-RU', hi:'hi-IN', uk:'uk-UA'}[CURRENT_LANG] || 'en-CA';
+}
+
+function applyStaticI18n(){
+  const dict = SITE_I18N[CURRENT_LANG] || SITE_I18N.en;
+  // Elements with data-i18n -> set innerHTML (translations may include <strong>, <em>, <br>)
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.dataset.i18n;
+    if (dict[k] !== undefined) el.innerHTML = dict[k];
+  });
+  // Placeholders
+  document.querySelectorAll('[data-ph]').forEach(el => {
+    const k = el.dataset.ph;
+    if (dict[k] !== undefined) el.placeholder = dict[k];
+  });
+  // <html lang>
+  document.documentElement.setAttribute('lang', CURRENT_LANG);
+}
+
+function setLang(lang) {
+  if (!SITE_I18N[lang]) return;
+  CURRENT_LANG = lang;
+  localStorage.setItem('lang', lang);
+
+  applyStaticI18n();
+
+  // Lang switcher active state
+  document.querySelectorAll('.lbtn').forEach(b => {
+    const isActive = b.dataset.lang === lang;
+    b.style.background  = isActive ? 'white' : 'transparent';
+    b.style.color       = isActive ? 'var(--rose)' : '#a8a29e';
+    b.style.boxShadow   = isActive ? '0 1px 4px rgba(0,0,0,0.1)' : 'none';
+  });
+
+  // Re-render dynamic content (event grid, featured banner) in the new language
+  if (typeof renderAll === 'function' && Array.isArray(eventsData) && eventsData.length) {
+    renderAll();
+  }
+  // Update reserve button if drawer is open
+  const rb = document.getElementById('reserve-btn');
+  if (rb) rb.textContent = T('continue_btn');
+  if (typeof updateAssistantLang === 'function') updateAssistantLang();
+}
+
+// Init from stored preference
+document.addEventListener('DOMContentLoaded', () => {
+  applyStaticI18n();
+  // Active button highlight
+  setLang(CURRENT_LANG);
+});
+</script>
+<script>
+const ASSISTANT_I18N = {
+  en: {
+    title: "Iryna's assistant",
+    subtitle: "Current booking details",
+    welcome: "Hi! Ask me about dates, pricing, outfits, weather, location, or photo delivery.",
+    placeholder: "Ask a question",
+    error: "Sorry, I could not answer just now. Please try again or DM Iryna on Instagram.",
+    typing: "Typing...",
+    open: "Open assistant",
+    close: "Close assistant",
+    send: "Send"
+  },
+  ru: {
+    title: "Помощник Ирины",
+    subtitle: "Актуальные детали бронирования",
+    welcome: "Здравствуйте! Можете спросить про даты, цену, одежду, погоду, локацию или готовность фотографий.",
+    placeholder: "Задайте вопрос",
+    error: "Извините, сейчас не получилось ответить. Попробуйте ещё раз или напишите Ирине в Instagram.",
+    typing: "Печатает...",
+    open: "Открыть помощника",
+    close: "Закрыть помощника",
+    send: "Отправить"
+  },
+  uk: {
+    title: "Помічник Ірини",
+    subtitle: "Актуальні деталі бронювання",
+    welcome: "Вітаю! Можете запитати про дати, ціну, одяг, погоду, локацію або готовність фотографій.",
+    placeholder: "Поставте питання",
+    error: "Вибачте, зараз не вдалося відповісти. Спробуйте ще раз або напишіть Ірині в Instagram.",
+    typing: "Друкує...",
+    open: "Відкрити помічника",
+    close: "Закрити помічника",
+    send: "Надіслати"
+  },
+  hi: {
+    title: "Iryna assistant",
+    subtitle: "Current booking details",
+    welcome: "Hi! Ask me about dates, pricing, outfits, weather, location, or photo delivery.",
+    placeholder: "Ask a question",
+    error: "Sorry, I could not answer just now. Please try again or DM Iryna on Instagram.",
+    typing: "Typing...",
+    open: "Open assistant",
+    close: "Close assistant",
+    send: "Send"
+  }
+};
+
+let assistantHistory = [];
+let assistantHasWelcome = false;
+
+function assistantCopy(key) {
+  const lang = (typeof CURRENT_LANG !== 'undefined' && ASSISTANT_I18N[CURRENT_LANG]) ? CURRENT_LANG : 'en';
+  return (ASSISTANT_I18N[lang] && ASSISTANT_I18N[lang][key]) || ASSISTANT_I18N.en[key] || '';
+}
+
+function escapeAssistantHtml(text) {
+  return String(text || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  }[ch]));
+}
+
+function updateAssistantLang() {
+  const title = document.getElementById('assistantTitle');
+  const subtitle = document.getElementById('assistantSubtitle');
+  const input = document.getElementById('assistantInput');
+  const launch = document.getElementById('assistantLaunch');
+  const close = document.querySelector('.assistant-close');
+  const send = document.getElementById('assistantSend');
+  if (title) title.textContent = assistantCopy('title');
+  if (subtitle) subtitle.textContent = assistantCopy('subtitle');
+  if (input) input.placeholder = assistantCopy('placeholder');
+  if (launch) launch.setAttribute('aria-label', assistantCopy('open'));
+  if (close) close.setAttribute('aria-label', assistantCopy('close'));
+  if (send) send.setAttribute('aria-label', assistantCopy('send'));
+  if (!assistantHasWelcome) seedAssistantWelcome();
+}
+
+function seedAssistantWelcome() {
+  const box = document.getElementById('assistantMessages');
+  if (!box) return;
+  box.innerHTML = '';
+  addAssistantMessage('bot', assistantCopy('welcome'));
+  assistantHasWelcome = true;
+}
+
+function toggleAssistant(force) {
+  const panel = document.getElementById('assistantPanel');
+  if (!panel) return;
+  const shouldOpen = typeof force === 'boolean' ? force : !panel.classList.contains('open');
+  panel.classList.toggle('open', shouldOpen);
+  if (shouldOpen) {
+    updateAssistantLang();
+    setTimeout(() => document.getElementById('assistantInput')?.focus(), 80);
+  }
+}
+
+function addAssistantMessage(role, text, state) {
+  const box = document.getElementById('assistantMessages');
+  if (!box) return null;
+  const msg = document.createElement('div');
+  msg.className = 'assistant-msg ' + (role === 'user' ? 'user' : 'bot') + (state ? ' ' + state : '');
+  msg.innerHTML = escapeAssistantHtml(text);
+  box.appendChild(msg);
+  box.scrollTop = box.scrollHeight;
+  return msg;
+}
+
+async function sendAssistantMessage(event) {
+  event.preventDefault();
+  const input = document.getElementById('assistantInput');
+  const send = document.getElementById('assistantSend');
+  const text = input?.value.trim() || '';
+  if (!text) return;
+
+  input.value = '';
+  addAssistantMessage('user', text);
+  assistantHistory.push({role: 'user', content: text});
+
+  const typing = addAssistantMessage('bot', assistantCopy('typing'), 'loading');
+  if (send) send.disabled = true;
+  if (input) input.disabled = true;
+
+  try {
+    const response = await fetch('/assistant/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        message: text,
+        lang: typeof CURRENT_LANG !== 'undefined' ? CURRENT_LANG : 'en',
+        history: assistantHistory.slice(-8)
+      })
+    });
+    const data = await response.json();
+    const answer = data.answer || data.error || assistantCopy('error');
+    if (typing) {
+      typing.classList.remove('loading');
+      typing.innerHTML = escapeAssistantHtml(answer);
+    } else {
+      addAssistantMessage('bot', answer);
+    }
+    assistantHistory.push({role: 'assistant', content: answer});
+    assistantHistory = assistantHistory.slice(-10);
+  } catch (err) {
+    if (typing) {
+      typing.classList.remove('loading');
+      typing.innerHTML = escapeAssistantHtml(assistantCopy('error'));
+    } else {
+      addAssistantMessage('bot', assistantCopy('error'));
+    }
+  } finally {
+    if (send) send.disabled = false;
+    if (input) {
+      input.disabled = false;
+      input.focus();
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', updateAssistantLang);
+</script>
+</body>
+</html>

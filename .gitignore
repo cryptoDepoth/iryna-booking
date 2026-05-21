@@ -1,0 +1,31 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+bookings.db
+uploads/
+*.log
+logs/
+*.lock
+.timed_cron_state.json
+
+# Google Calendar OAuth secrets
+credentials.json
+token.json
+
+# Local event config — keep example committed via event.json.example, not the live file
+event.json
+
+# Backups
+backups/
+disabled_launchagents/
+
+# AI assistant generated knowledge (contains sanitized but private business chat patterns)
+assistant_knowledge*.jsonl
+
+# Tunnel logs
+tunnel.log
+flask.log
+*.tokens
+FLY_API_TOKEN.txt

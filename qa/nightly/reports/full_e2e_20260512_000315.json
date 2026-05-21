@@ -1,0 +1,22 @@
+{
+  "result": {
+    "status": "failed",
+    "error": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"button[type='submit']\").first\n    - locator resolved to <button type=\"submit\" aria-label=\"Send\" id=\"assistantSend\" class=\"assistant-send\">\u203a</button>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n    - waiting 20ms\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n      - waiting 100ms\n    51 \u00d7 waiting for element to be visible, enabled and stable\n       - element is not visible\n     - retrying click action\n       - waiting 500ms\n",
+    "email": "qa-e2e-000239@example.com"
+  },
+  "log": [
+    "[00:02:39] \ud83d\ude80 STARTING FULL E2E TEST",
+    "[00:02:40] Step 1: Opening landing page...",
+    "[00:02:43] \u2705 Landing page loaded",
+    "[00:02:43] Step 2: Clicking event card...",
+    "[00:02:43] \u2705 Clicked event card (article[onclick])",
+    "[00:02:45] \u2705 Drawer opened",
+    "[00:02:45] Step 3: Waiting for form to render...",
+    "[00:02:45] Step 3: Filling reserve form...",
+    "[00:02:45] \u2705 Form filled",
+    "[00:03:15] \u274c ERROR: TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"button[type='submit']\").first\n    - locator resolved to <button type=\"submit\" aria-label=\"Send\" id=\"assistantSend\" class=\"assistant-send\">\u203a</button>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n    - waiting 20ms\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n      - waiting 100ms\n    51 \u00d7 waiting for element to be visible, enabled and stable\n       - element is not visible\n     - retrying click action\n       - waiting 500ms\n",
+    "[00:03:15] Step 9: Cleanup...",
+    "[00:03:15] \u2705 Cleaned 0 test booking(s)",
+    "[00:03:15] \ud83c\udfc1 E2E TEST COMPLETE"
+  ]
+}

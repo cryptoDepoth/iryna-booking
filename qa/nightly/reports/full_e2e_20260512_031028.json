@@ -1,0 +1,53 @@
+{
+  "result": {
+    "status": "skipped",
+    "reason": "rate_limit",
+    "email": "qa-e2e-031020@example.com",
+    "requests": [
+      {
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3ZmX5slCNuHLi8bLeY9MK7whWMhyjYrEtImSqn7B6D.woff2",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "http://127.0.0.1:5001/slots/2026-06-07?event_id=lilac-jun7",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "http://127.0.0.1:5001/slots/2026-06-07?event_id=lilac-jun7",
+        "status": 200,
+        "method": "GET"
+      },
+      {
+        "url": "http://127.0.0.1:5001/reserve",
+        "method": "POST",
+        "post_data": "{\"event_id\":\"lilac-jun7\",\"time\":\"15:00\",\"name\":\"QA EndToEnd Client\",\"email\":\"qa-e2e-031020@example.com\",\"phone\":\"403-555-0199\",\"instagram\":\"@qae2e\",\"session_type\":\"mini\"}"
+      },
+      {
+        "url": "http://127.0.0.1:5001/reserve",
+        "status": 429,
+        "method": "POST"
+      }
+    ]
+  },
+  "log": [
+    "[03:10:20] \ud83d\ude80 STARTING FULL E2E TEST",
+    "[03:10:21] Step 1: Opening landing page...",
+    "[03:10:23] \u2705 Landing page loaded",
+    "[03:10:23] Step 2: Clicking event card...",
+    "[03:10:23] \u2705 Clicked event card (article[onclick])",
+    "[03:10:25] \u2705 Drawer opened",
+    "[03:10:25] Step 2.5: Selecting available slot...",
+    "[03:10:25] \u2705 Selected slot (8 available)",
+    "[03:10:25] \u2705 Slot selection confirmed",
+    "[03:10:26] Step 3: Waiting for form to render...",
+    "[03:10:26] Step 3: Filling reserve form...",
+    "[03:10:26] \u2705 Form filled",
+    "[03:10:26] \u2705 Form submitted",
+    "[03:10:28] \u26a0\ufe0f Rate limited \u2014 skipping rest of test",
+    "[03:10:28] Step 9: Cleanup...",
+    "[03:10:28] \u2705 Cleaned 0 test booking(s)",
+    "[03:10:28] \ud83c\udfc1 E2E TEST COMPLETE"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "result": {
+    "status": "passed",
+    "booking_id": 176,
+    "email": "qa-e2e-170101@example.com",
+    "timestamp": "2026-05-12T17:01:10.471990",
+    "requests": [
+      {
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd58jDOjw.ttf",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "http://127.0.0.1:5001/slots/2026-06-07?event_id=lilac-jun7",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "http://127.0.0.1:5001/slots/2026-06-07?event_id=lilac-jun7",
+        "status": 200,
+        "method": "GET"
+      },
+      {
+        "url": "http://127.0.0.1:5001/reserve",
+        "method": "POST",
+        "post_data": "{\"event_id\":\"lilac-jun7\",\"time\":\"15:30\",\"name\":\"QA EndToEnd Client\",\"email\":\"qa-e2e-170101@example.com\",\"phone\":\"403-555-0199\",\"instagram\":\"@qae2e\",\"session_type\":\"mini\"}"
+      },
+      {
+        "url": "http://127.0.0.1:5001/reserve",
+        "status": 200,
+        "method": "POST"
+      }
+    ]
+  },
+  "log": [
+    "[17:01:01] \ud83d\ude80 STARTING FULL E2E TEST",
+    "[17:01:02] Step 1: Opening landing page...",
+    "[17:01:03] \u2705 Landing page loaded",
+    "[17:01:03] Step 2: Clicking event card...",
+    "[17:01:03] \u2705 Clicked event card (article[onclick])",
+    "[17:01:05] \u2705 Drawer opened",
+    "[17:01:05] Step 2.5: Selecting available slot...",
+    "[17:01:05] \u2705 Selected slot (7 available)",
+    "[17:01:05] \u2705 Slot selection confirmed",
+    "[17:01:06] Step 3: Waiting for form to render...",
+    "[17:01:06] Step 3: Filling reserve form...",
+    "[17:01:06] \u2705 Form filled",
+    "[17:01:06] \u2705 Form submitted",
+    "[17:01:09] \u2705 Booking submitted",
+    "[17:01:09] Step 4: Verifying database...",
+    "[17:01:10] \u2705 Booking found in DB: id=176, status=reserved",
+    "[17:01:10] \u2139\ufe0f Skipping admin login \u2014 no ADMIN_PASS configured",
+    "[17:01:10] Step 9: Cleanup...",
+    "[17:01:10] \u2705 Cleaned 1 test booking(s)",
+    "[17:01:10] \ud83c\udfc1 E2E TEST COMPLETE"
+  ]
+}

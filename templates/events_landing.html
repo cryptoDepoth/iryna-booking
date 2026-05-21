@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sessions | Pashynska Photography</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --nude:#f5ede8; --rose:#c4857a; --rose-deep:#a3685e; --rose-glow:rgba(196,133,122,.18);
+      --ink:#1c1917; --ink-2:#44403c; --ink-3:#78716c; --ink-4:#a8a29e; --ink-5:#e7e5e4;
+      --page-bg:#faf7f5; --surface:#fff;
+      --green:#3d6b4f; --green-bg:#edf5f0;
+      --amber:#92722a; --amber-bg:#fdf5e4;
+      --red:#8b3535; --red-bg:#fdf0f0;
+      --font-d:'Cormorant Garamond',Georgia,serif;
+      --font-b:'DM Sans',system-ui,sans-serif;
+    }
+    html{font-size:16px}
+    body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
+
+    /* HERO */
+    .hero{padding:60px 28px 18px;text-align:center;max-width:760px;margin:0 auto}
+    .hero .kicker{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--rose);font-weight:600;margin-bottom:14px}
+    .hero h1{font-family:var(--font-d);font-size:clamp(2.2rem,5vw,3.4rem);font-weight:300;line-height:1.05;letter-spacing:-.005em}
+    .hero h1 em{font-style:italic;color:var(--rose)}
+    .hero p{margin-top:14px;color:var(--ink-3);font-size:1rem}
+
+    /* SOCIAL PROOF */
+    .proof{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;padding:14px 28px 0;font-size:.82rem;color:var(--ink-3);max-width:760px;margin:0 auto}
+    .proof span strong{color:var(--ink);font-weight:600}
+    .proof .sep{color:var(--ink-5)}
+
+    /* HOW IT WORKS */
+    .how{max-width:1000px;margin:38px auto 0;padding:0 28px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    @media(max-width:720px){.how{grid-template-columns:1fr}}
+    .how .step{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}
+    .how .step .num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:var(--rose);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-weight:600;font-size:1rem}
+    .how .step h4{font-family:var(--font-d);font-size:1.2rem;font-weight:500;margin-bottom:2px}
+    .how .step p{font-size:.82rem;color:var(--ink-3);line-height:1.45}
+
+    /* FEATURED */
+    .featured-wrap{max-width:1200px;margin:46px auto 0;padding:0 28px}
+    .featured{position:relative;border-radius:22px;overflow:hidden;min-height:280px;display:flex;align-items:flex-end;color:#fff;background:#dbcfca center/cover;box-shadow:0 14px 40px rgba(0,0,0,.08);text-decoration:none}
+    .featured::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(28,25,23,.78) 0%,rgba(28,25,23,.15) 55%,transparent 100%)}
+    .featured .featured-tag{position:absolute;top:18px;left:18px;background:rgba(255,255,255,.92);color:var(--ink);padding:6px 14px;border-radius:20px;font:600 .68rem var(--font-b);text-transform:uppercase;letter-spacing:.1em;z-index:2}
+    .featured .featured-countdown{position:absolute;top:18px;right:18px;background:var(--rose);color:#fff;padding:6px 14px;border-radius:20px;font:600 .72rem var(--font-b);z-index:2}
+    .featured .featured-content{position:relative;z-index:2;padding:28px 32px}
+    .featured h2{font-family:var(--font-d);font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:300;line-height:1.1;color:#fff}
+    .featured .meta{margin-top:8px;font-size:.85rem;opacity:.92}
+    .featured .cta{margin-top:14px;display:inline-block;background:#fff;color:var(--ink);padding:11px 22px;border-radius:11px;font:600 .85rem var(--font-b);text-decoration:none}
+
+    /* FILTERS */
+    .filters{max-width:1200px;margin:34px auto 14px;padding:0 28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .filters .chip{padding:8px 16px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:all .15s}
+    .filters .chip:hover{border-color:var(--rose);color:var(--rose)}
+    .filters .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+    .filters .count{margin-left:auto;font-size:.82rem;color:var(--ink-3)}
+
+    /* GRID */
+    .events-wrap{max-width:1200px;margin:0 auto 60px;padding:0 28px}
+    .events{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}
+    .event-card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.04);display:flex;flex-direction:column;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;position:relative;text-decoration:none;color:inherit}
+    .event-card:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,.08)}
+    .event-card .photo{aspect-ratio:4/3;background:#dbcfca center/cover;position:relative}
+    .event-card .photo .status{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:5px 11px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+    .event-card .photo .status.open{color:var(--green)}
+    .event-card .photo .status.low{color:var(--amber)}
+    .event-card .photo .status.sold{color:var(--red)}
+    .event-card .photo .status .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
+    .event-card .photo .countdown{position:absolute;top:12px;right:12px;background:rgba(28,25,23,.78);color:#fff;padding:5px 11px;border-radius:20px;font:600 .7rem var(--font-b);backdrop-filter:blur(8px)}
+    .event-card .photo .featured-mark{position:absolute;bottom:12px;left:12px;background:var(--rose);color:#fff;padding:4px 10px;border-radius:6px;font:600 .65rem var(--font-b);text-transform:uppercase;letter-spacing:.08em}
+    .event-card .body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
+    .event-card .type-tag{font:600 .65rem var(--font-b);letter-spacing:.1em;text-transform:uppercase;color:var(--rose)}
+    .event-card h3{font-family:var(--font-d);font-size:1.5rem;font-weight:500;line-height:1.15;color:var(--ink)}
+    .event-card .subtitle{font-size:.85rem;color:var(--ink-3);font-style:italic}
+    .event-card .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:.78rem;color:var(--ink-3)}
+    .event-card .meta span{display:inline-flex;align-items:center;gap:5px}
+    .event-card .price-bar{display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto;padding-top:14px;border-top:1px solid var(--ink-5)}
+    .event-card .price-bar .price{font-family:var(--font-d);font-size:1.6rem;font-weight:500;color:var(--rose);line-height:1}
+    .event-card .price-bar .price small{font-family:var(--font-b);font-size:.7rem;color:var(--ink-3);font-weight:500;display:block;margin-top:4px;letter-spacing:.05em;text-transform:uppercase}
+    .event-card .price-bar .cta{background:var(--ink);color:#fff;border:0;padding:11px 18px;border-radius:11px;font:600 13px var(--font-b);cursor:pointer;letter-spacing:.02em;text-decoration:none}
+    .event-card .price-bar .cta:hover{background:var(--ink-2)}
+
+    .empty{text-align:center;padding:60px 28px;color:var(--ink-3)}
+    .empty .ico{font-size:3rem;margin-bottom:12px}
+    .inquiry-panel{max-width:760px;margin:0 auto;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:22px;padding:34px 28px;text-align:left;box-shadow:0 14px 40px rgba(0,0,0,.06)}
+    .inquiry-panel .eyebrow{font:600 .7rem var(--font-b);letter-spacing:.16em;text-transform:uppercase;color:var(--rose);margin-bottom:10px}
+    .inquiry-panel h2{font-family:var(--font-d);font-size:clamp(1.9rem,4vw,2.6rem);font-weight:300;line-height:1.08;margin-bottom:12px}
+    .inquiry-panel p{color:var(--ink-3);font-size:.95rem;margin-bottom:18px}
+    .inquiry-points{list-style:none;display:grid;gap:8px;margin:20px 0 24px;color:var(--ink-2);font-size:.9rem}
+    .inquiry-points li::before{content:"✓";color:var(--rose);font-weight:700;margin-right:9px}
+    .inquiry-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .inquiry-btn{display:inline-block;background:var(--ink);color:#fff;text-decoration:none;border-radius:11px;padding:13px 20px;font:600 .82rem var(--font-b);letter-spacing:.04em}
+    .inquiry-btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--ink-5)}
+
+    /* FAQ */
+    .faq{max-width:760px;margin:0 auto 60px;padding:0 28px}
+    .faq h2{font-family:var(--font-d);font-size:2rem;font-weight:400;text-align:center;margin-bottom:24px}
+    .faq details{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:12px;padding:0;margin-bottom:10px;overflow:hidden}
+    .faq summary{padding:16px 20px;cursor:pointer;font-weight:500;font-size:.95rem;list-style:none;display:flex;justify-content:space-between;align-items:center}
+    .faq summary::-webkit-details-marker{display:none}
+    .faq summary::after{content:"+";font-size:1.4rem;color:var(--rose);transition:transform .2s}
+    .faq details[open] summary::after{transform:rotate(45deg)}
+    .faq details[open] summary{border-bottom:1px solid var(--ink-5)}
+    .faq .a{padding:14px 20px 18px;font-size:.9rem;color:var(--ink-2);line-height:1.6}
+
+    footer{text-align:center;padding:32px;color:var(--ink-4);font-size:.85rem;border-top:1px solid rgba(0,0,0,.04)}
+    footer a{color:var(--rose);text-decoration:none;font-weight:500}
+  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
+</head>
+<body>
+
+<div class="hero">
+  <div class="kicker">Pashynska Photography · Calgary</div>
+  {% if inquiry_mode %}
+  <h1>Wedding photography<br>planned <em>personally</em></h1>
+  <p>Share your date and vision — Iryna will confirm availability, coverage options, and next steps.</p>
+  {% else %}
+  <h1>Soft, sunlit moments<br>among <em>blooming flowers</em></h1>
+  <p>Pick a session below — booking takes about 2 minutes.</p>
+  {% endif %}
+</div>
+
+<div class="proof">
+  <span><strong>★ 4.9</strong> · {{ stats.reviews if stats and stats.reviews else '80+' }} reviews</span>
+  <span class="sep">·</span>
+  <span><strong>{{ stats.delivered if stats and stats.delivered else '120+' }}</strong> sessions delivered</span>
+  <span class="sep">·</span>
+  <span><strong>Calgary</strong> local pick</span>
+</div>
+
+<div class="how">
+  {% if inquiry_mode %}
+  <div class="step"><div class="num">1</div><div><h4>Send your date</h4><p>Share the wedding date, location, guest count, and the kind of coverage you need.</p></div></div>
+  <div class="step"><div class="num">2</div><div><h4>Get availability</h4><p>Iryna replies with availability, package direction, and any travel/location notes.</p></div></div>
+  <div class="step"><div class="num">3</div><div><h4>Plan the coverage</h4><p>Finalize timeline, portraits, previews, and gallery delivery before anything is confirmed.</p></div></div>
+  {% else %}
+  <div class="step"><div class="num">1</div><div><h4>Pick a session</h4><p>Browse upcoming dates and choose what fits — dress code & exact spot come with confirmation.</p></div></div>
+  <div class="step"><div class="num">2</div><div><h4>Reserve in 2 min</h4><p>Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
+  <div class="step"><div class="num">3</div><div><h4>Pay deposit by e-Transfer</h4><p>Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
+  {% endif %}
+</div>
+
+{% if featured %}
+<div class="featured-wrap">
+  <a class="featured" href="{{ url_for('index') }}?event={{ featured.id }}"
+     style="background-image:url('{{ (featured.photos[0] if featured.photos else '') }}')">
+    <div class="featured-tag">★ Featured</div>
+    <div class="featured-countdown">
+      {% if featured.days_until <= 0 %}Today
+      {% elif featured.days_until == 1 %}Tomorrow
+      {% else %}in {{ featured.days_until }} days{% endif %}
+    </div>
+    <div class="featured-content">
+      <h2>{{ featured.title }}</h2>
+      <div class="meta">{{ featured.date_pretty }} · from ${{ "%.0f"|format(featured.deposit) }} deposit · {{ featured.location or 'Calgary' }}</div>
+      <span class="cta">View time slots →</span>
+    </div>
+  </a>
+</div>
+{% endif %}
+
+<div class="filters" id="filters">
+  <button class="chip on" data-filter="all">All</button>
+  <button class="chip" data-filter="month">This month</button>
+  {% set known_types = ['mini','individual','wedding','family','maternity'] %}
+  {% for t in known_types %}
+    {% if events | selectattr('type','equalto',t) | list | length > 0 %}
+    <button class="chip" data-filter="{{ t }}">{{ t|capitalize }}</button>
+    {% endif %}
+  {% endfor %}
+  <span class="count" id="count">{{ events|length }} {{ 'session' if events|length == 1 else 'sessions' }}</span>
+</div>
+
+<div class="events-wrap">
+  {% if events|length == 0 %}
+    {% if inquiry_mode %}
+    <div class="inquiry-panel">
+      <div class="eyebrow">Wedding inquiry</div>
+      <h2>Tell Iryna about your wedding</h2>
+      <p>Weddings, elopements, and custom coverage are planned personally — not squeezed into a mini-session checkout. Share your date, location, and coverage needs, and Iryna will reply with availability and next steps.</p>
+      <ul class="inquiry-points">
+        <li>Calgary, Canmore, Banff, and Bow Valley coverage</li>
+        <li>Intimate ceremonies, engagements, and custom timelines</li>
+        <li>Preview gallery within 48 hours, full gallery within 2 weeks</li>
+      </ul>
+      <div class="inquiry-actions">
+        <a class="inquiry-btn" href="mailto:{{ settings.photographer_email }}?subject={{ inquiry_subject|urlencode }}&body={{ inquiry_body }}">Send wedding inquiry</a>
+        <a class="inquiry-btn secondary" href="/wedding">View wedding packages</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty">
+      <div class="ico">🪻</div>
+      <p>No upcoming sessions yet — check back soon, or DM <a href="https://instagram.com/{{ settings.photographer_instagram or 'pashynska.photo' }}" style="color:var(--rose)">@{{ settings.photographer_instagram or 'pashynska.photo' }}</a> for a custom date.</p>
+    </div>
+    {% endif %}
+  {% else %}
+    <div class="events" id="grid">
+      {% for ev in events %}
+      <a class="event-card"
+         href="{{ url_for('index') }}?event={{ ev.id }}"
+         data-type="{{ ev.type }}"
+         data-month="{{ ev.date[:7] }}">
+        <div class="photo" style="background-image:url('{{ (ev.photos[0] if ev.photos else '') }}')">
+          {% set s = ev.spots %}
+          {% if s.left == 0 %}
+            <div class="status sold"><span class="dot"></span>Sold out</div>
+          {% elif s.left <= 2 %}
+            <div class="status low"><span class="dot"></span>Only {{ s.left }} left</div>
+          {% else %}
+            <div class="status open"><span class="dot"></span>{{ s.left }} of {{ s.total }} open</div>
+          {% endif %}
+
+          <div class="countdown">
+            {% if ev.days_until <= 0 %}Today
+            {% elif ev.days_until == 1 %}Tomorrow
+            {% else %}in {{ ev.days_until }}d{% endif %}
+          </div>
+          {% if ev.featured %}<div class="featured-mark">★ Featured</div>{% endif %}
+        </div>
+        <div class="body">
+          <div class="type-tag">{{ ev.type }}</div>
+          <h3>{{ ev.title }}</h3>
+          <div class="subtitle">{{ ev.subtitle or '' }}</div>
+          <div class="meta">
+            <span>📅 {{ ev.date_pretty }}</span>
+            {% if ev.location %}<span>📍 {{ ev.location.split(',')[0] }}</span>{% endif %}
+          </div>
+          <div class="price-bar">
+            <div class="price">${{ "%.0f"|format(ev.deposit) }}<small>deposit · ${{ "%.0f"|format(ev.full_price) }} total</small></div>
+            <span class="cta">{% if s.left == 0 %}Join waitlist{% else %}View dates →{% endif %}</span>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<div class="faq">
+  <h2>Quick answers</h2>
+  <details><summary>What should we wear?</summary><div class="a">I send a styling guide after booking — soft tones, layered textures, nothing with big logos.</div></details>
+  <details><summary>What if it rains?</summary><div class="a">We reschedule for free, no questions asked. I check the forecast 24h before and reach out.</div></details>
+  <details><summary>Can I bring our dog?</summary><div class="a">Always yes 🐕 — just let me know on the form so I plan the spot.</div></details>
+  <details><summary>How does the deposit work?</summary><div class="a">The deposit is non-refundable but transferable to another session if you give 7+ days notice. The remaining balance is due on session day.</div></details>
+  <details><summary>When do I get the photos?</summary><div class="a">Within 48 hours for mini sessions, 2 weeks for full sessions. You get a private gallery with download.</div></details>
+</div>
+
+<footer>
+  <p><strong>Pashynska Photography</strong> · Calgary, AB · <a href="https://instagram.com/{{ settings.photographer_instagram or 'pashynska.photo' }}">@{{ settings.photographer_instagram or 'pashynska.photo' }}</a></p>
+  <p style="margin-top:6px"><a href="/privacy">Privacy & browser storage</a></p>
+</footer>
+
+<script>
+  /* client-side filtering only (server already filtered hidden/completed) */
+  const grid = document.getElementById('grid');
+  const countEl = document.getElementById('count');
+  const filters = document.getElementById('filters');
+  const todayMonth = new Date().toISOString().slice(0,7);
+
+  /* Auto-select filter from URL ?type= parameter */
+  const urlType = new URLSearchParams(location.search).get('type');
+  if (urlType && filters) {
+    const targetChip = filters.querySelector(`.chip[data-filter="${urlType}"]`);
+    if (targetChip) targetChip.click();
+  }
+
+  if (filters) filters.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('chip')) return;
+    filters.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    e.target.classList.add('on');
+    const f = e.target.dataset.filter;
+    let visible = 0;
+    if (grid) grid.querySelectorAll('.event-card').forEach(card => {
+      const show = f === 'all'
+        || (f === 'month' && card.dataset.month === todayMonth)
+        || card.dataset.type === f;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    if (countEl) countEl.textContent = `${visible} ${visible === 1 ? 'session' : 'sessions'}`;
+  });
+</script>
+
+</body>
+</html>

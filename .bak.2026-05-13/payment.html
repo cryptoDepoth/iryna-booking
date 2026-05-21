@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="page_title">Complete Your Booking | Pashynska Photography</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --nude:       #f5ede8;
+      --rose:       #c4857a;
+      --rose-deep:  #a3685e;
+      --rose-glow:  rgba(196,133,122,0.18);
+      --ink:        #1c1917;
+      --ink-2:      #44403c;
+      --ink-3:      #78716c;
+      --ink-4:      #a8a29e;
+      --ink-5:      #e7e5e4;
+      --page-bg:    #faf7f5;
+      --surface:    #ffffff;
+      --green:      #3d6b4f;
+      --green-bg:   #edf5f0;
+      --amber:      #92722a;
+      --amber-bg:   #fdf5e4;
+      --red:        #8b3535;
+      --red-bg:     #fdf0f0;
+      --font-d:     'Cormorant Garamond', Georgia, serif;
+      --font-b:     'DM Sans', system-ui, sans-serif;
+    }
+
+    html { font-size: 16px; }
+    body {
+      font-family: var(--font-b);
+      background: var(--page-bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* ── Sticky header ── */
+    .top-bar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,247,245,0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--ink-5);
+      padding: 14px 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .back-btn {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1px solid var(--ink-5); background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: var(--ink-2); line-height: 1;
+      cursor: pointer; text-decoration: none;
+      transition: border-color 0.2s;
+      flex-shrink: 0;
+    }
+    .back-btn:hover { border-color: var(--rose); color: var(--rose); }
+    .top-bar-info { flex: 1; }
+    .top-bar-title { font-size: 0.95rem; font-weight: 600; color: var(--ink); line-height: 1; }
+    .top-bar-sub   { font-size: 0.75rem; color: var(--ink-3); margin-top: 2px; }
+    .progress-dots { display: flex; gap: 5px; align-items: center; }
+    .pdot {
+      height: 6px; border-radius: 3px;
+      background: var(--rose); transition: width 0.3s;
+    }
+
+    /* ── Container ── */
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 24px 20px 64px;
+    }
+
+    /* ── Timer ── */
+    .timer-box {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--amber-bg);
+      border: 1px solid rgba(146,114,42,0.2);
+      border-radius: 13px; padding: 14px 18px; margin-bottom: 20px;
+    }
+    .timer-box.warning {
+      background: var(--red-bg);
+      border-color: rgba(139,53,53,0.2);
+      animation: pulse 1s ease-in-out infinite;
+    }
+    .timer-label { font-size: 0.85rem; color: var(--amber); font-weight: 500; }
+    .timer-count {
+      font-family: var(--font-d);
+      font-size: 1.8rem; font-weight: 600; color: var(--amber);
+      letter-spacing: 0.02em;
+    }
+    .timer-box.warning .timer-label,
+    .timer-box.warning .timer-count { color: var(--red); }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.01)} }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+      padding: 22px 20px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-family: var(--font-d);
+      font-size: 1.3rem; font-weight: 500;
+      color: var(--ink); margin-bottom: 16px;
+    }
+
+    /* ── Summary rows ── */
+    .summary { border-radius: 12px; overflow: hidden; border: 1px solid var(--ink-5); margin-bottom: 0; }
+    .summary-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px; border-bottom: 1px solid var(--ink-5);
+      font-size: 0.9rem;
+    }
+    .summary-row:last-child {
+      border-bottom: none; font-weight: 600;
+      background: var(--nude); font-size: 0.95rem;
+    }
+    .summary-row .key { color: var(--ink-3); }
+    .summary-row .val-rose { color: var(--rose); font-family: var(--font-d); font-size: 1.2rem; }
+
+    /* ── Transfer box ── */
+    .transfer-box {
+      background: linear-gradient(135deg, #fdf8f6 0%, #f7ede9 100%);
+      border: 1px solid rgba(196,133,122,0.2);
+      border-radius: 20px; padding: 26px 22px;
+      text-align: center; margin-bottom: 16px;
+    }
+    .transfer-eyebrow {
+      font-size: 0.68rem; font-weight: 600;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--ink-3); margin-bottom: 8px;
+    }
+    .transfer-amount {
+      font-family: var(--font-d);
+      font-size: 5rem; font-weight: 500;
+      color: var(--rose); line-height: 1; margin-bottom: 4px;
+    }
+    .transfer-currency { font-size: 0.82rem; color: var(--ink-3); margin-bottom: 18px; }
+
+    /* ── Email copy ── */
+    .email-copy {
+      display: flex; align-items: center; justify-content: space-between;
+      background: white;
+      border: 1.5px dashed rgba(196,133,122,0.45);
+      border-radius: 11px; padding: 13px 14px;
+      cursor: pointer; margin-bottom: 8px;
+      transition: all 0.2s;
+    }
+    .email-copy:hover { border-style: solid; background: #fdf7f6; }
+    .email-copy-label {
+      font-size: 0.68rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--ink-4); margin-bottom: 4px;
+    }
+    .email-copy-val {
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem; font-weight: 600; color: var(--rose);
+    }
+    .copy-pill {
+      background: var(--rose); color: white;
+      font-size: 0.72rem; font-weight: 600;
+      padding: 5px 12px; border-radius: 20px;
+      letter-spacing: 0.04em; flex-shrink: 0;
+      transition: background 0.2s; border: none; cursor: pointer;
+      font-family: var(--font-b);
+    }
+    .copy-pill:hover { background: var(--rose-deep); }
+    .copy-pill.copied { background: var(--green); }
+    .transfer-note { font-size: 0.78rem; color: var(--ink-4); margin-top: 6px; }
+
+    /* ── Bank message ── */
+    .bank-msg-wrap {
+      background: white;
+      border: 1.5px dashed var(--ink-5);
+      border-radius: 10px; padding: 14px;
+      cursor: pointer; position: relative;
+      margin: 12px 0 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem; color: var(--ink-2);
+      line-height: 1.5; text-align: left;
+      transition: border-color 0.2s;
+    }
+    .bank-msg-wrap:hover { border-color: var(--rose); }
+    .bank-copy-btn {
+      position: absolute; top: 8px; right: 8px;
+      background: var(--rose); color: white;
+      border: none; border-radius: 8px;
+      padding: 5px 10px; font-size: 0.72rem; font-weight: 600;
+      cursor: pointer; font-family: var(--font-b);
+      transition: background 0.2s;
+    }
+    .bank-copy-btn:hover { background: var(--rose-deep); }
+
+    /* ── Instructions ── */
+    .how-to {
+      background: var(--nude); border-radius: 14px;
+      padding: 18px 18px; margin-bottom: 16px;
+    }
+    .how-to-title { font-size: 0.82rem; font-weight: 600; color: var(--ink-2); margin-bottom: 12px; }
+    .how-to ol { padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+    .how-to li { font-size: 0.875rem; color: var(--ink-3); line-height: 1.5; }
+
+    /* ── Info note ── */
+    .info-note {
+      background: #eef4fb;
+      border-left: 3px solid #5b9bd5;
+      border-radius: 0 10px 10px 0;
+      padding: 14px 16px; margin-bottom: 16px;
+      font-size: 0.875rem; color: #1e3a5f;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      display: block; width: 100%;
+      padding: 16px 24px;
+      background: var(--ink); color: white;
+      border: none; border-radius: 13px;
+      font-family: var(--font-b);
+      font-size: 0.95rem; font-weight: 600;
+      letter-spacing: 0.02em; cursor: pointer;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      text-align: center; text-decoration: none;
+    }
+    .btn-primary:hover {
+      background: var(--ink-2);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+    }
+    .btn-primary:disabled { opacity: 0.38; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-ghost {
+      display: block; width: 100%;
+      padding: 14px 24px;
+      background: transparent; color: var(--ink-3);
+      border: 1.5px solid var(--ink-5); border-radius: 13px;
+      font-family: var(--font-b); font-size: 0.9rem;
+      cursor: pointer; margin-top: 10px;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-ghost:hover { border-color: var(--ink-3); color: var(--ink); }
+
+    footer {
+      text-align: center; padding: 24px;
+      font-size: 0.85rem; color: var(--ink-4);
+    }
+    footer a { color: var(--rose); text-decoration: none; font-weight: 500; }
+
+    /* ── LANGUAGE SWITCHER ── */
+    .lang-switcher {
+      display: flex; gap: 3px;
+      background: rgba(0,0,0,0.05);
+      border-radius: 20px; padding: 3px;
+    }
+    .lang-btn {
+      padding: 4px 9px; border-radius: 16px; border: none;
+      font-family: var(--font-b); font-size: 11px; font-weight: 600;
+      cursor: pointer; background: transparent; color: var(--ink-3);
+      transition: all 0.2s; line-height: 1;
+    }
+    .lang-btn:hover { color: var(--rose); }
+    .lang-btn.active { background: white; color: var(--rose); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+    /* ── ENTRY ANIMATION ── */
+    @keyframes fade-slide { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+    .card, .transfer-box, .how-to, .info-note { animation: fade-slide 0.4s ease both; }
+    .card:nth-child(1)  { animation-delay: 0.05s; }
+    .card:nth-child(2)  { animation-delay: 0.1s; }
+    .card:nth-child(3)  { animation-delay: 0.15s; }
+    .transfer-box       { animation-delay: 0.2s; }
+    .how-to             { animation-delay: 0.25s; }
+    .info-note          { animation-delay: 0.3s; }
+  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
+</head>
+<body>
+
+  <!-- Sticky top bar -->
+  <div class="top-bar">
+    <a class="back-btn" href="/">‹</a>
+    <div class="top-bar-info">
+      <div class="top-bar-title" data-i18n="complete_booking">Complete Your Booking</div>
+      <div class="top-bar-sub">{{ date }} · {{ booking.time }}</div>
+    </div>
+    <div class="lang-switcher" role="group" aria-label="Language">
+      <button class="lang-btn active" onclick="setLang('en')" data-lang="en">EN</button>
+      <button class="lang-btn" onclick="setLang('ru')" data-lang="ru">РУ</button>
+      <button class="lang-btn" onclick="setLang('hi')" data-lang="hi">हिं</button>
+      <button class="lang-btn" onclick="setLang('uk')" data-lang="uk">УК</button>
+    </div>
+    <div class="progress-dots" style="margin-left:8px">
+      <div class="pdot" style="width:6px;opacity:0.4"></div>
+      <div class="pdot" style="width:18px"></div>
+      <div class="pdot" style="width:6px;opacity:0.4"></div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Timer -->
+    <div class="timer-box" id="timer-box">
+      <span class="timer-label" data-i18n="slot_reserved_for">Slot reserved for</span>
+      <span class="timer-count" id="timer-count">15:00</span>
+    </div>
+
+    <!-- Summary -->
+    <div class="card">
+      <div class="card-title" data-i18n="booking_summary">Booking Summary</div>
+      <div class="summary">
+        <div class="summary-row">
+          <span class="key" data-i18n="summary_session">Session</span>
+          <span data-i18n="summary_session_value">Mini Photo Session ({{ session_length }} min)</span>
+        </div>
+        <div class="summary-row">
+          <span class="key" data-i18n="summary_date">Date</span>
+          <span>{{ date }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="key" data-i18n="summary_time">Time</span>
+          <span>{{ booking.time }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="key" data-i18n="summary_includes">Includes</span>
+          <span data-i18n="summary_includes_value">15 edited photos + all originals</span>
+        </div>
+        <div class="summary-row">
+          <span class="key" data-i18n="summary_balance">Balance at session</span>
+          <span>$95 + GST</span>
+        </div>
+        <div class="summary-row">
+          <span class="key" data-i18n="summary_deposit">Deposit due now</span>
+          <span class="val-rose">${{ price }} CAD</span>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Transfer instructions -->
+    <div class="transfer-box">
+      <div class="transfer-eyebrow" data-i18n="send_via">Send via Interac e-Transfer</div>
+      <div class="transfer-amount">${{ price }}</div>
+      <div class="transfer-currency" data-i18n="currency_label">CAD — Canadian dollars</div>
+
+      <div class="email-copy" id="email-copy-box" onclick="copyEmail()">
+        <div>
+          <div class="email-copy-label" data-i18n="send_to">Send to</div>
+          <div class="email-copy-val" id="email-value">{{ email }}</div>
+        </div>
+        <button class="copy-pill" id="copy-pill" onclick="copyEmail(event)" data-i18n="copy">Copy</button>
+      </div>
+      <div class="transfer-note" data-i18n="auto_deposit">Auto-deposit enabled · no password needed</div>
+    </div>
+
+    <!-- Bank message template -->
+    <div class="card">
+      <div style="font-size:0.82rem;font-weight:600;color:var(--ink-2);margin-bottom:4px" data-i18n="bank_msg_title">Ready-to-use bank message</div>
+      <div style="font-size:0.78rem;color:var(--ink-3);margin-bottom:10px" data-i18n="bank_msg_desc">Paste this in the "Message" field when sending</div>
+      <div class="bank-msg-wrap" id="bank-msg" onclick="copyBankMsg()">
+        <button class="bank-copy-btn" onclick="copyBankMsg(event)" id="bank-copy-btn" data-i18n="copy">Copy</button>
+        {{ event_title }} — {{ date }} {{ booking.time }}<br>
+        <span data-i18n="bank_msg_deposit_for">Deposit for</span> {{ booking.name }}
+      </div>
+    </div>
+
+    <!-- How to send -->
+    <div class="how-to">
+      <div class="how-to-title" data-i18n="how_to_title">How to send Interac e-Transfer</div>
+      <ol>
+        <li data-i18n="how_step1">Open your banking app (RBC, TD, Scotiabank, etc.)</li>
+        <li data-i18n="how_step2">Choose "Send Interac e-Transfer"</li>
+        <li data-i18n="how_step3">Tap the email above to copy, paste as recipient</li>
+        <li data-i18n="how_step4">Enter amount: <strong>${{ price }}.00</strong></li>
+        <li data-i18n="how_step5">Add message: "{{ event_title }} — {{ date }} {{ booking.time }}"</li>
+        <li data-i18n="how_step6">Send the transfer</li>
+      </ol>
+    </div>
+
+    <div class="info-note" data-i18n="no_pwd">
+      💡 <strong>No password needed!</strong> This is an auto-deposit enabled email. The money arrives instantly.
+    </div>
+
+    <!-- Confirm form -->
+    <div class="card">
+      <div class="card-title" data-i18n="ive_sent_title">I've Sent the Payment</div>
+      <p style="font-size:0.875rem;color:var(--ink-3);margin-bottom:20px" data-i18n="ive_sent_sub">Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.</p>
+
+      <form id="confirm-form">
+        <input type="hidden" id="time"         value="{{ booking.time }}">
+        <input type="hidden" id="name"         value="{{ booking.name }}">
+        <input type="hidden" id="email"        value="{{ booking.email }}">
+        <input type="hidden" id="phone"        value="{{ booking.phone }}">
+        <input type="hidden" id="instagram"    value="{{ booking.instagram }}">
+        <input type="hidden" id="session_type" value="{{ booking.session_type }}">
+        <input type="hidden" id="event_id"     value="{{ booking.event_id }}">
+
+        <button type="submit" class="btn-primary" id="confirm-btn" data-i18n="confirm_btn">
+          ✓ Yes, I've Sent ${{ price }} — Confirm Booking
+        </button>
+      </form>
+
+      <button class="btn-ghost" onclick="window.location.href='/'" data-i18n="back_btn">
+        ← Back to Change Time
+      </button>
+    </div>
+
+    {% if stripe_enabled %}
+    <!-- ── Card payment — secondary fallback ── -->
+    <div id="stripe-section" style="margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
+        <span style="font-size:0.72rem;color:var(--ink-4);white-space:nowrap;letter-spacing:.04em;text-transform:uppercase;" data-i18n="no_etransfer">Can't do e-Transfer?</span>
+        <div style="flex:1;height:1px;background:var(--ink-5)"></div>
+      </div>
+
+      <button id="stripe-btn" onclick="startStripeCheckout()"
+         style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+                background:transparent;color:var(--ink-3);
+                border:1.5px solid var(--ink-5);border-radius:12px;padding:13px 18px;
+                font-family:var(--font-b);font-size:0.875rem;font-weight:500;
+                cursor:pointer;transition:border-color .2s,color .2s,background .2s;"
+         onmouseover="this.style.borderColor='var(--ink-3)';this.style.color='var(--ink)'"
+         onmouseout="this.style.borderColor='var(--ink-5)';this.style.color='var(--ink-3)'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M2 10H22" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+        <span id="stripe-btn-text" data-i18n="pay_by_card">Pay ${{ price }} CAD — Card · Apple Pay · Google Pay</span>
+      </button>
+      <div style="text-align:center;font-size:0.7rem;color:var(--ink-4);margin-top:7px;" data-i18n="card_secure">🔒 Secure · Powered by Stripe</div>
+    </div>
+    {% endif %}
+
+  </div><!-- /container -->
+
+  <footer>
+    <p>Pashynska Photography — Calgary, AB</p>
+    <p style="margin-top:6px"><span data-i18n="footer_questions">Questions?</span> <a href="https://instagram.com/pashynska.photo" target="_blank">DM @pashynska.photo</a></p>
+    <p style="margin-top:6px"><a href="/privacy" data-i18n="privacy_link">Privacy & browser storage</a></p>
+  </footer>
+
+  <script>
+    // ── Populate hidden fields from URL params (fallback) ──
+    const urlParams = new URLSearchParams(window.location.search);
+    // Identity-safe: booking data comes from server, not URL params
+    const urlBookingId = urlParams.get('booking_id');
+    const urlToken     = urlParams.get('token');
+
+    // ── Timer ──
+    let timerInterval = null;
+    let expiresAt = null;
+
+    function redirectIfConfirmed(data) {
+      if (data && (data.confirmed || data.status === 'confirmed')) {
+        sessionStorage.removeItem('reservationExpiry');
+        window.location.href = '/success?booking_id=' + encodeURIComponent(urlBookingId) + '&token=' + encodeURIComponent(urlToken);
+        return true;
+      }
+      if (data && data.status === 'cancelled') {
+        alert(tr('booking_cancelled')); 
+        window.location.href = '/';
+        return true;
+      }
+      return false;
+    }
+
+    function pollBookingStatus() {
+      if (!urlBookingId || !urlToken) return;
+      fetch('/booking-status?booking_id=' + encodeURIComponent(urlBookingId) + '&token=' + encodeURIComponent(urlToken))
+        .then(r => r.ok ? r.json() : null)
+        .then(redirectIfConfirmed)
+        .catch(() => {});
+    }
+
+    // If the e-Transfer is auto-detected while the client is still on this page,
+    // move them to the confirmed status page without requiring a button click.
+    setInterval(pollBookingStatus, 3000);
+    pollBookingStatus();
+
+    function initTimer() {
+      const saved = sessionStorage.getItem('reservationExpiry');
+      expiresAt = saved ? new Date(saved) : new Date(Date.now() + 15 * 60 * 1000);
+      if (!saved) sessionStorage.setItem('reservationExpiry', expiresAt.toISOString());
+      runTimer();
+    }
+
+    function runTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      const countEl = document.getElementById('timer-count');
+      const box     = document.getElementById('timer-box');
+
+      timerInterval = setInterval(() => {
+        const diff = Math.max(0, Math.floor((expiresAt - new Date()) / 1000));
+        const m = Math.floor(diff / 60), s = diff % 60;
+        countEl.textContent = `${m}:${String(s).padStart(2,'0')}`;
+        if (diff <= 300) box.classList.add('warning');
+        if (diff <= 0) {
+          clearInterval(timerInterval);
+          alert(tr('reservation_expired')); 
+          window.location.href = '/';
+        }
+      }, 1000);
+    }
+
+    // ── Copy email ──
+    function copyEmail(e) {
+      if (e) e.stopPropagation();
+      const email = document.getElementById('email-value').textContent.trim();
+      navigator.clipboard.writeText(email).catch(() => {});
+      const pill = document.getElementById('copy-pill');
+      pill.textContent = tr('copied');
+      pill.classList.add('copied');
+      setTimeout(() => { pill.textContent = tr('copy'); pill.classList.remove('copied'); }, 2500);
+    }
+
+    // ── Copy bank message ──
+    function copyBankMsg(e) {
+      if (e) e.stopPropagation();
+      const msg = `{{ event_title }} — {{ date }} {{ booking.time }}\nDeposit for {{ booking.name }}`;
+      navigator.clipboard.writeText(msg).catch(() => {});
+      const btn = document.getElementById('bank-copy-btn');
+      btn.textContent = tr('copied');
+      setTimeout(() => btn.textContent = tr('copy'), 2500);
+    }
+
+    // ── Confirm payment ──
+    // ── Stripe Checkout ──────────────────────────────────────────────────────
+    async function startStripeCheckout() {
+      const btn     = document.getElementById('stripe-btn');
+      const btnText = document.getElementById('stripe-btn-text');
+      btn.disabled  = true;
+      btnText.textContent = tr('stripe_redirecting');
+      btn.style.opacity   = '0.7';
+
+      try {
+        const res = await fetch('/stripe/create-checkout', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            booking_id:         '{{ booking.id }}',
+            confirmation_token: '{{ booking.confirmation_token }}'
+          })
+        });
+        const data = await res.json();
+        if (data.checkout_url) {
+          window.location.href = data.checkout_url;
+        } else {
+          alert(data.error || tr('stripe_error'));
+          btn.disabled = false;
+          btnText.dataset.i18n = 'pay_by_card';
+          btnText.textContent = PAY_I18N[_lang]?.pay_by_card || 'Pay ${{ price }} CAD — Card · Apple Pay · Google Pay';
+          btn.style.borderColor = '';
+          btn.style.color = '';
+        }
+      } catch (err) {
+        alert(tr('network_card_error'));
+        btn.disabled = false;
+        btnText.textContent = PAY_I18N[_lang]?.pay_by_card || 'Pay ${{ price }} CAD — Card · Apple Pay · Google Pay';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }
+    }
+
+    document.getElementById('confirm-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('confirm-btn');
+      btn.disabled = true;
+      btn.textContent = tr('processing');
+
+      const data = {
+        booking_id: '{{ booking.id }}',
+        confirmation_token: '{{ booking.confirmation_token }}'
+      };
+
+      try {
+        const res = await fetch('/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (result.success) {
+          sessionStorage.removeItem('reservationExpiry');
+          window.location.href = '/success?booking_id=' + result.booking_id + '&token={{ booking.confirmation_token }}';
+        } else {
+          alert(result.error || tr('generic_error'));
+          btn.disabled = false;
+          btn.textContent = tr('confirm_btn');
+        }
+      } catch (err) {
+        alert(tr('network_error'));
+        btn.disabled = false;
+        btn.textContent = tr('confirm_btn');
+      }
+    });
+
+    initTimer();
+  </script>
+
+  <!-- ══ i18n ══ -->
+  <script>
+  const PAY_I18N = {
+    en: {
+      page_title:       'Complete Your Booking | Pashynska Photography',
+      complete_booking: 'Complete Your Booking',
+      slot_reserved_for:'Slot reserved for',
+      booking_summary:  'Booking Summary',
+      send_via:         'Send via Interac e-Transfer',
+      send_to:          'Send to',
+      auto_deposit:     'Auto-deposit enabled · no password needed',
+      how_to_title:     'How to send Interac e-Transfer',
+      ive_sent_title:   "I've Sent the Payment",
+      ive_sent_sub:     "Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.",
+      confirm_btn:      "✓ Yes, I've Sent ${{ price }} — Confirm Booking",
+      back_btn:         '← Back to Change Time',
+      no_pwd:           '💡 <strong>No password needed!</strong> This is an auto-deposit enabled email. The money arrives instantly.',
+      summary_session:   'Session',
+      summary_session_value: 'Mini Photo Session ({{ session_length }} min)',
+      summary_date:      'Date',
+      summary_time:      'Time',
+      summary_includes:  'Includes',
+      summary_includes_value: '15 edited photos + all originals',
+      summary_balance:   'Balance at session',
+      summary_deposit:   'Deposit due now',
+      currency_label:    'CAD — Canadian dollars',
+      bank_msg_title:    'Ready-to-use bank message',
+      bank_msg_desc:     'Paste this in the "Message" field when sending',
+      bank_msg_deposit_for: 'Deposit for',
+      how_step1:         'Open your banking app (RBC, TD, Scotiabank, etc.)',
+      how_step2:         'Choose "Send Interac e-Transfer"',
+      how_step3:         'Tap the email above to copy, paste as recipient',
+      how_step4:         'Enter amount: <strong>${{ price }}.00</strong>',
+      how_step5:         'Add message: "{{ event_title }} — {{ date }} {{ booking.time }}"',
+      how_step6:         'Send the transfer',
+      footer_questions:  'Questions?',
+      privacy_link:      'Privacy & browser storage',
+      reservation_expired: 'Your reservation expired. Please select a new time slot.',
+      booking_cancelled: 'This booking was cancelled. Please select a new time slot.',
+      copied:            '✓ Copied',
+      copy:              'Copy',
+      stripe_redirecting:'Redirecting to secure checkout…',
+      stripe_error:      'Could not start card payment. Please use Interac e-Transfer above, or refresh the page.',
+      network_card_error:'Network error. Please use Interac e-Transfer above, or refresh the page.',
+      network_error:     'Network error. Please try again.',
+      generic_error:     'Something went wrong. Please try again.',
+      processing:        'Processing…',
+      no_etransfer:     "Can't do e-Transfer?",
+      pay_by_card:      'Pay ${{ price }} CAD — Card · Apple Pay · Google Pay',
+      card_secure:      '🔒 Secure · Powered by Stripe',
+    },
+    ru: {
+      page_title:       'Оформление бронирования | Pashynska Photography',
+      complete_booking: 'Оформите бронирование',
+      slot_reserved_for:'Слот удерживается',
+      booking_summary:  'Детали бронирования',
+      send_via:         'Отправить через Interac e-Transfer',
+      send_to:          'Отправить на',
+      auto_deposit:     'Автодепозит включён · пароль не нужен',
+      how_to_title:     'Как отправить Interac e-Transfer',
+      ive_sent_title:   'Я отправил(а) оплату',
+      ive_sent_sub:     'После отправки e-Transfer нажмите ниже. Я подтвержу ваше бронирование в течение нескольких минут.',
+      confirm_btn:      '✓ Да, я отправил(а) ${{ price }} — Подтвердить',
+      back_btn:         '← Назад, изменить время',
+      no_pwd:           '💡 <strong>Пароль не нужен!</strong> Это email с автоматическим зачислением. Деньги поступают мгновенно.',
+      summary_session:   'Сессия',
+      summary_session_value: 'Мини-фотосессия ({{ session_length }} мин)',
+      summary_date:      'Дата',
+      summary_time:      'Время',
+      summary_includes:  'Включено',
+      summary_includes_value: '15 отредактированных фото + все оригиналы',
+      summary_balance:   'Остаток на съёмке',
+      summary_deposit:   'Депозит сейчас',
+      currency_label:    'CAD — канадские доллары',
+      bank_msg_title:    'Готовое сообщение для банка',
+      bank_msg_desc:     'Вставьте это в поле “Message” при отправке',
+      bank_msg_deposit_for: 'Депозит за',
+      how_step1:         'Откройте приложение банка (RBC, TD, Scotiabank и т.д.)',
+      how_step2:         'Выберите "Send Interac e-Transfer"',
+      how_step3:         'Скопируйте email выше и вставьте его как получателя',
+      how_step4:         'Введите сумму: <strong>${{ price }}.00</strong>',
+      how_step5:         'Добавьте сообщение: "{{ event_title }} — {{ date }} {{ booking.time }}"',
+      how_step6:         'Отправьте перевод',
+      footer_questions:  'Вопросы?',
+      privacy_link:      'Privacy и хранение в браузере',
+      reservation_expired: 'Время удержания слота истекло. Выберите новое время.',
+      booking_cancelled: 'Это бронирование отменено. Выберите новое время.',
+      copied:            '✓ Скопировано',
+      copy:              'Копировать',
+      stripe_redirecting:'Переходим к безопасной оплате…',
+      stripe_error:      'Не удалось начать оплату картой. Используйте Interac e-Transfer выше или обновите страницу.',
+      network_card_error:'Ошибка сети. Используйте Interac e-Transfer выше или обновите страницу.',
+      network_error:     'Ошибка сети. Попробуйте ещё раз.',
+      generic_error:     'Что-то пошло не так. Попробуйте ещё раз.',
+      processing:        'Обрабатываем…',
+      no_etransfer:     'Не можете сделать e-Transfer?',
+      pay_by_card:      'Оплатить ${{ price }} CAD — карта · Apple Pay · Google Pay',
+      card_secure:      '🔒 Безопасная оплата · Stripe',
+    },
+    hi: {
+      page_title:       'बुकिंग पूरी करें | Pashynska Photography',
+      complete_booking: 'अपनी बुकिंग पूरी करें',
+      slot_reserved_for:'स्लॉट रिज़र्व है',
+      booking_summary:  'बुकिंग सारांश',
+      send_via:         'Interac e-Transfer से भेजें',
+      send_to:          'इस पते पर भेजें',
+      auto_deposit:     'ऑटो-डिपॉज़िट चालू है · पासवर्ड की ज़रूरत नहीं',
+      how_to_title:     'Interac e-Transfer कैसे भेजें',
+      ive_sent_title:   'मैंने भुगतान भेज दिया',
+      ive_sent_sub:     'e-Transfer भेजने के बाद नीचे दबाएं। मैं कुछ ही मिनटों में आपकी बुकिंग की पुष्टि कर दूंगी।',
+      confirm_btn:      '✓ हाँ, मैंने ${{ price }} भेजे — बुकिंग पक्की करें',
+      back_btn:         '← वापस जाएं और समय बदलें',
+      no_pwd:           '💡 <strong>पासवर्ड की ज़रूरत नहीं!</strong> यह ऑटो-डिपॉज़िट ईमेल है। पैसे तुरंत पहुंच जाते हैं।',
+      summary_session:   'सेशन',
+      summary_session_value: 'मिनी फोटो सेशन ({{ session_length }} मिनट)',
+      summary_date:      'तारीख',
+      summary_time:      'समय',
+      summary_includes:  'शामिल है',
+      summary_includes_value: '15 एडिटेड फोटो + सभी ओरिजिनल',
+      summary_balance:   'सेशन के दिन बाकी',
+      summary_deposit:   'अभी डिपॉज़िट',
+      currency_label:    'CAD — कैनेडियन डॉलर',
+      bank_msg_title:    'बैंक के लिए तैयार संदेश',
+      bank_msg_desc:     'भेजते समय इसे “Message” फ़ील्ड में पेस्ट करें',
+      bank_msg_deposit_for: 'इसके लिए डिपॉज़िट',
+      how_step1:         'अपना बैंकिंग ऐप खोलें (RBC, TD, Scotiabank, आदि)',
+      how_step2:         '"Send Interac e-Transfer" चुनें',
+      how_step3:         'ऊपर दिया email कॉपी करें और प्राप्तकर्ता में पेस्ट करें',
+      how_step4:         'राशि दर्ज करें: <strong>${{ price }}.00</strong>',
+      how_step5:         'संदेश जोड़ें: "{{ event_title }} — {{ date }} {{ booking.time }}"',
+      how_step6:         'ट्रांसफ़र भेजें',
+      footer_questions:  'सवाल?',
+      privacy_link:      'Privacy और browser storage',
+      reservation_expired: 'आपका रिज़र्वेशन समाप्त हो गया। कृपया नया समय चुनें।',
+      booking_cancelled: 'यह बुकिंग रद्द हो गई है। कृपया नया समय चुनें।',
+      copied:            '✓ कॉपी हुआ',
+      copy:              'कॉपी',
+      stripe_redirecting:'सुरक्षित checkout पर भेजा जा रहा है…',
+      stripe_error:      'कार्ड भुगतान शुरू नहीं हो सका। कृपया ऊपर Interac e-Transfer इस्तेमाल करें या पेज रिफ़्रेश करें।',
+      network_card_error:'नेटवर्क त्रुटि। कृपया ऊपर Interac e-Transfer इस्तेमाल करें या पेज रिफ़्रेश करें।',
+      network_error:     'नेटवर्क त्रुटि। फिर कोशिश करें।',
+      generic_error:     'कुछ गलत हुआ। फिर कोशिश करें।',
+      processing:        'प्रोसेस हो रहा है…',
+      no_etransfer:     'e-Transfer नहीं कर सकते?',
+      pay_by_card:      '${{ price }} CAD — कार्ड · Apple Pay · Google Pay से भुगतान करें',
+      card_secure:      '🔒 सुरक्षित भुगतान · Stripe',
+    },
+    uk: {
+      page_title:       'Завершити бронювання | Pashynska Photography',
+      complete_booking: 'Завершити бронювання',
+      slot_reserved_for:'Слот утримується',
+      booking_summary:  'Підсумок бронювання',
+      send_via:         'Надіслати через Interac e-Transfer',
+      send_to:          'Надіслати на',
+      auto_deposit:     'Автодепозит увімкнено · пароль не потрібен',
+      how_to_title:     'Як надіслати Interac e-Transfer',
+      ive_sent_title:   'Я надіслав(ла) оплату',
+      ive_sent_sub:     'Після відправки e-Transfer натисніть нижче. Я підтверджу ваше бронювання протягом кількох хвилин.',
+      confirm_btn:      '✓ Так, я надіслав(ла) ${{ price }} — Підтвердити',
+      back_btn:         '← Назад, змінити час',
+      no_pwd:           '💡 <strong>Пароль не потрібен!</strong> Це email із автоматичним зарахуванням. Гроші надходять миттєво.',
+      summary_session:   'Сесія',
+      summary_session_value: 'Міні-фотосесія ({{ session_length }} хв)',
+      summary_date:      'Дата',
+      summary_time:      'Час',
+      summary_includes:  'Включено',
+      summary_includes_value: '15 відредагованих фото + усі оригінали',
+      summary_balance:   'Залишок на сесії',
+      summary_deposit:   'Депозит зараз',
+      currency_label:    'CAD — канадські долари',
+      bank_msg_title:    'Готове повідомлення для банку',
+      bank_msg_desc:     'Вставте це у поле “Message” під час відправлення',
+      bank_msg_deposit_for: 'Депозит за',
+      how_step1:         'Відкрийте додаток банку (RBC, TD, Scotiabank тощо)',
+      how_step2:         'Оберіть "Send Interac e-Transfer"',
+      how_step3:         'Скопіюйте email вище та вставте як отримувача',
+      how_step4:         'Введіть суму: <strong>${{ price }}.00</strong>',
+      how_step5:         'Додайте повідомлення: "{{ event_title }} — {{ date }} {{ booking.time }}"',
+      how_step6:         'Надішліть переказ',
+      footer_questions:  'Питання?',
+      privacy_link:      'Privacy і зберігання в браузері',
+      reservation_expired: 'Час утримання слота завершився. Оберіть новий час.',
+      booking_cancelled: 'Це бронювання скасовано. Оберіть новий час.',
+      copied:            '✓ Скопійовано',
+      copy:              'Копіювати',
+      stripe_redirecting:'Переходимо до безпечної оплати…',
+      stripe_error:      'Не вдалося почати оплату карткою. Скористайтесь Interac e-Transfer вище або оновіть сторінку.',
+      network_card_error:'Помилка мережі. Скористайтесь Interac e-Transfer вище або оновіть сторінку.',
+      network_error:     'Помилка мережі. Спробуйте ще раз.',
+      generic_error:     'Щось пішло не так. Спробуйте ще раз.',
+      processing:        'Обробляємо…',
+      no_etransfer:     'Не можете зробити e-Transfer?',
+      pay_by_card:      'Сплатити ${{ price }} CAD — картка · Apple Pay · Google Pay',
+      card_secure:      '🔒 Безпечна оплата · Stripe',
+    }
+  };
+
+  let _lang = localStorage.getItem('lang') || 'en';
+
+  function tr(key) {
+    return (PAY_I18N[_lang] && PAY_I18N[_lang][key]) || PAY_I18N.en[key] || key;
+  }
+
+  function setLang(lang) {
+    if (!PAY_I18N[lang]) return;
+    _lang = lang;
+    localStorage.setItem('lang', lang);
+    const T = PAY_I18N[lang];
+    document.title = T.page_title;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.dataset.i18n;
+      if (T[k]) el.innerHTML = T[k];
+    });
+    document.querySelectorAll('.lang-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.lang === lang);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => setLang(_lang));
+  </script>
+</body>
+</html>

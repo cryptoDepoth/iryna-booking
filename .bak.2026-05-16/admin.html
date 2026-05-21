@@ -1,0 +1,2488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin · Pashynska Photography</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --surface-2: #f7f8fa;
+            --border: #e4e7ec;
+            --border-strong: #d1d5db;
+            --text: #111827;
+            --text-2: #6b7280;
+            --text-3: #9ca3af;
+            --accent: #f97316;
+            --accent-light: #fff7ed;
+            --green: #16a34a;
+            --green-light: #dcfce7;
+            --green-text: #15803d;
+            --red: #dc2626;
+            --red-light: #fee2e2;
+            --red-text: #991b1b;
+            --yellow: #d97706;
+            --yellow-light: #fef3c7;
+            --yellow-text: #92400e;
+            --blue: #2563eb;
+            --blue-light: #eff6ff;
+            --blue-text: #1d4ed8;
+            --gray-light: #f3f4f6;
+            --gray-text: #4b5563;
+            --radius: 10px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* ── TOP BAR ── */
+        .topbar {
+            background: #111827;
+            padding: 0 24px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .topbar-brand .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .topbar-badge {
+            background: rgba(249,115,22,0.15);
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(249,115,22,0.3);
+        }
+        .topbar-link {
+            color: #9ca3af;
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+        .topbar-link:hover { color: white; }
+
+        /* ── PAGE ── */
+        .page { max-width: 1280px; margin: 0 auto; padding: 28px 24px 60px; }
+
+        /* ── PAGE HEADER ── */
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .page-title h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .page-title p { color: var(--text-2); font-size: 13px; margin-top: 2px; }
+        .page-actions { display: flex; gap: 10px; }
+        .btn-outline {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 16px;
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
+            background: white;
+            color: var(--text-2);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── OPERATIONAL DASHBOARD ── */
+        .ops-dash {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .ops-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        @media (max-width: 980px) {
+            .ops-dash { grid-template-columns: 1fr; }
+            .ops-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        .ops-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 18px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+            position: relative;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+        .ops-card .head {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px;
+            color: var(--text-3);
+        }
+        .ops-card .head .ico { font-size: 14px; }
+        .ops-card .big { font-size: 30px; font-weight: 700; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+        .ops-card .sub { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+        .ops-card.action {
+            background: linear-gradient(140deg, #fff7ed 0%, #fffbf5 100%);
+            border-color: #fed7aa;
+            grid-column: span 1;
+        }
+        .ops-card.action .big { color: var(--accent); }
+        .ops-card.action .pill-cta {
+            margin-top: 8px; align-self: flex-start;
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 14px; border-radius: 8px;
+            background: var(--accent); color: white;
+            font-size: 12px; font-weight: 600; cursor: pointer; border: none;
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+        .ops-card.action .pill-cta:hover { background: #ea580c; }
+        .ops-card.action::before {
+            content: ""; position: absolute; top: 0; right: 0; width: 70px; height: 70px;
+            background: radial-gradient(circle at top right, rgba(249,115,22,0.15), transparent 60%);
+            border-radius: var(--radius); pointer-events: none;
+        }
+        .ops-card.calm { background: linear-gradient(140deg, #f0fdf4 0%, #fafffb 100%); border-color: #bbf7d0; }
+        .ops-card.calm .big { color: var(--green-text); }
+        .ops-card.calm .sub { color: var(--green-text); opacity: 0.85; }
+
+        .ops-spotlight {
+            background: linear-gradient(140deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .ops-spotlight::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 90% 10%, rgba(249,115,22,0.18), transparent 50%);
+            pointer-events: none;
+        }
+        .ops-spotlight > * { position: relative; }
+        .ops-spotlight .eyebrow {
+            font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+            color: #fdba74;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .ops-spotlight .eyebrow::before {
+            content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fdba74;
+            box-shadow: 0 0 0 4px rgba(253,186,116,0.18);
+        }
+        .ops-spotlight h3 {
+            font-size: 18px; font-weight: 600; line-height: 1.25; margin: 0;
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            letter-spacing: -0.005em;
+            font-weight: 500;
+            font-size: 22px;
+        }
+        .ops-spotlight .meta-row {
+            display: flex; flex-wrap: wrap; gap: 18px;
+            font-size: 13px; color: #cbd5e1;
+        }
+        .ops-spotlight .meta-row strong { color: white; font-weight: 600; }
+        .ops-spotlight .progress-wrap {
+            display: flex; align-items: center; gap: 12px;
+            margin-top: 4px;
+        }
+        .ops-spotlight .progress-bar {
+            flex: 1; height: 6px; background: rgba(255,255,255,0.12); border-radius: 99px; overflow: hidden;
+        }
+        .ops-spotlight .progress-bar > span {
+            display: block; height: 100%; background: linear-gradient(90deg, #fb923c, #fbbf24);
+            border-radius: 99px;
+        }
+        .ops-spotlight .progress-num {
+            font-size: 12px; color: #cbd5e1; font-variant-numeric: tabular-nums; white-space: nowrap;
+        }
+        .ops-spotlight .progress-num strong { color: white; font-weight: 700; }
+        .ops-spotlight .spotlight-empty {
+            color: #94a3b8; font-style: italic; font-size: 13px;
+        }
+
+        /* ── STATS (legacy, kept for layout) ── */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .stat {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            box-shadow: var(--shadow);
+        }
+        .stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-3);
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+        }
+        .stat-value.green { color: var(--green); }
+        .stat-value.orange { color: var(--accent); }
+        .stat-value.red { color: var(--red); }
+        .stat-value.blue { color: var(--blue); }
+
+        /* ── NOTICE BOX ── */
+        .notice {
+            background: var(--blue-light);
+            border: 1px solid #bfdbfe;
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: var(--blue-text);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .notice-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+        /* ── TOOLBAR ── */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: white;
+            color: var(--text-2);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .filter-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .search-wrap {
+            margin-left: auto;
+            position: relative;
+        }
+        .search-icon {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: var(--text-3); font-size: 14px; pointer-events: none;
+        }
+        .search-input {
+            padding: 7px 12px 7px 34px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-family: inherit;
+            font-size: 13px;
+            width: 260px;
+            background: white;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .search-input:focus { border-color: var(--accent); }
+
+        /* ── TABLE ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead th {
+            background: var(--surface-2);
+            padding: 10px 16px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-2);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        tbody td {
+            padding: 13px 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: #fafbfc; }
+
+        /* row tints */
+        tbody tr.row-pending_payment td { background: #fffdf4; }
+        tbody tr.row-pending_payment:hover td { background: #fffae8; }
+        tbody tr.row-confirmed td { background: #f9fffe; }
+        tbody tr.row-confirmed:hover td { background: #f0fdf4; }
+        tbody tr.row-cancelled td, tbody tr.row-expired td { opacity: 0.55; }
+
+        /* ── BADGES ── */
+        .badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+        .b-reserved { background: var(--yellow-light); color: var(--yellow-text); }
+        .b-reserved .badge-dot { background: var(--yellow); animation: blink 1.5s infinite; }
+        .b-pending_payment { background: var(--yellow-light); color: var(--yellow-text); }
+        .b-pending_payment .badge-dot { background: #f59e0b; animation: blink 1.5s infinite; }
+        .b-confirmed { background: var(--green-light); color: var(--green-text); }
+        .b-confirmed .badge-dot { background: var(--green); }
+        .b-cancelled { background: var(--red-light); color: var(--red-text); }
+        .b-cancelled .badge-dot { background: var(--red); }
+        .b-expired { background: var(--gray-light); color: var(--gray-text); }
+        .b-expired .badge-dot { background: #9ca3af; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── CELL HELPERS ── */
+        .cell-id { color: var(--text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+        .cell-name { font-weight: 600; }
+        .cell-email a { color: var(--accent); text-decoration: none; }
+        .cell-email a:hover { text-decoration: underline; }
+        .cell-ig a { color: #e1306c; text-decoration: none; font-size: 13px; }
+        .cell-ig a:hover { text-decoration: underline; }
+        .cell-time { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .cell-amount { font-weight: 600; color: var(--green-text); font-variant-numeric: tabular-nums; }
+        .cell-amount.none { color: var(--text-3); font-weight: 400; }
+
+        /* ── ACTION BUTTONS ── */
+        .actions { display: flex; gap: 6px; }
+        .btn-confirm {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px;
+            background: var(--green);
+            color: white;
+            border: none;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        .btn-confirm:hover { background: var(--green-text); }
+        .btn-cancel {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px;
+            background: transparent;
+            color: var(--red);
+            border: 1px solid #fca5a5;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .btn-cancel:hover { background: var(--red-light); border-color: var(--red); }
+        .btn-done {
+            padding: 6px 12px;
+            background: var(--gray-light);
+            color: var(--text-3);
+            border: none;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: default;
+        }
+        .btn-reschedule {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px;
+            background: transparent;
+            color: #92722a;
+            border: 1px solid #f3d27b;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .btn-reschedule:hover { background: #fdf5e4; border-color: #d4a942; color: #6b521b; }
+        .btn-balance {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px;
+            background: transparent;
+            color: #7c3aed;
+            border: 1px solid #c4b5fd;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .btn-balance:hover { background: #f5f3ff; border-color: #8b5cf6; color: #5b21b6; }
+
+        /* ── RESCHEDULE MODAL ── */
+        .resched-modal {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(28,25,23,.55);
+            backdrop-filter: blur(4px);
+            z-index: 200;
+            align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        .resched-modal.open { display: flex; }
+        .resched-box {
+            background: #fff;
+            border-radius: 16px;
+            width: 100%; max-width: 480px;
+            max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 30px 80px rgba(0,0,0,.3);
+            padding: 24px;
+        }
+        .resched-box h3 {
+            font-size: 18px; margin-bottom: 4px;
+        }
+        .resched-box .sub {
+            font-size: 13px; color: var(--text-3); margin-bottom: 18px;
+        }
+        .resched-old {
+            background: var(--gray-light);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px; color: var(--text-2);
+            margin-bottom: 14px;
+        }
+        .resched-old b { color: var(--text-1); }
+        .resched-field {
+            margin-bottom: 14px;
+        }
+        .resched-field label {
+            display: block;
+            font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .08em;
+            color: var(--text-3); margin-bottom: 6px;
+        }
+        .resched-field select,
+        .resched-field input[type="date"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid var(--border, #e7e5e4);
+            border-radius: 8px;
+            font: inherit;
+            font-size: 14px;
+            background: #fff;
+        }
+        .resched-field select:focus,
+        .resched-field input[type="date"]:focus {
+            outline: 0;
+            border-color: #c4857a;
+            box-shadow: 0 0 0 3px rgba(196,133,122,.18);
+        }
+        .resched-slots {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            min-height: 44px;
+        }
+        .resched-slot {
+            padding: 9px 4px;
+            border: 1.5px solid var(--border, #e7e5e4);
+            border-radius: 8px;
+            background: #fff;
+            font-size: 13px; font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .resched-slot:hover { border-color: #c4857a; color: #c4857a; }
+        .resched-slot.sel { background: #c4857a; border-color: #c4857a; color: #fff; }
+        .resched-slot.taken { background: var(--gray-light); color: var(--text-3); cursor: not-allowed; opacity: .55; }
+        .resched-actions {
+            display: flex; gap: 8px; margin-top: 18px;
+        }
+        .resched-actions button {
+            flex: 1;
+            padding: 11px 14px;
+            border-radius: 8px;
+            font: 600 13px inherit;
+            cursor: pointer;
+            border: 0;
+            min-height: 44px;
+        }
+        .resched-actions .submit {
+            background: var(--text-1, #1c1917);
+            color: #fff;
+        }
+        .resched-actions .submit:disabled { opacity: .4; cursor: not-allowed; }
+        .resched-actions .cancel {
+            background: transparent;
+            color: var(--text-2);
+            border: 1px solid var(--border, #e7e5e4);
+        }
+        .resched-empty {
+            grid-column: 1/-1;
+            text-align: center;
+            color: var(--text-3);
+            font-size: 13px;
+            padding: 12px 0;
+        }
+
+        /* ── EMPTY STATE ── */
+        .empty {
+            padding: 60px 24px;
+            text-align: center;
+            color: var(--text-3);
+        }
+        .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
+        .empty p { font-size: 14px; }
+
+        /* ── TOAST ── */
+        #toast {
+            position: fixed; bottom: 28px; right: 28px;
+            background: #111827; color: white;
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: var(--shadow-md);
+            opacity: 0;
+            transform: translateY(8px);
+            transition: all 0.25s;
+            z-index: 999;
+            pointer-events: none;
+        }
+        #toast.show { opacity: 1; transform: translateY(0); }
+        #toast.success { background: var(--green); }
+        #toast.error { background: var(--red); }
+
+        /* ── EVENT SETTINGS ── */
+        .event-settings-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .event-settings-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .event-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-2);
+            margin-bottom: 6px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-strong);
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 14px;
+            color: var(--text);
+            background: white;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+        .slots-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--accent-light);
+            border: 1px solid rgba(249,115,22,0.25);
+            border-radius: 7px;
+            font-size: 13px;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+        .slots-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .slot-chip {
+            padding: 3px 10px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--text-2);
+            font-variant-numeric: tabular-nums;
+        }
+        .btn-save {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 18px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-save:hover { background: #ea6c0a; }
+        .btn-save:disabled { opacity: 0.6; cursor: default; }
+
+        /* ── EVENT TABS ── */
+        .ev-tab {
+            padding: 10px 18px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-2);
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: -1px;
+        }
+        .ev-tab:hover { color: var(--accent); }
+        .ev-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* ── CREATE EVENT MODAL ── */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(2px);
+            z-index: 9000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: all; }
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            transform: translateY(16px);
+            transition: transform 0.2s;
+        }
+        .modal-overlay.open .modal { transform: translateY(0); }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .modal-subtitle {
+            font-size: 13px;
+            color: var(--text-2);
+            margin-bottom: 24px;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+        .modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .modal-section-label {
+            grid-column: 1/-1;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-3);
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            margin-top: 4px;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 1100px) {
+            .stats { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .page { padding: 20px 16px; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .topbar { padding: 0 16px; }
+            .search-input { width: 180px; }
+            table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            thead th, tbody td { padding: 10px 12px; }
+            .event-settings-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        /* ── PAGINATION ── */
+        .pagination {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+        .pagination a {
+            text-decoration: none;
+            padding: 6px 12px;
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
+            background: white;
+            color: var(--text-2);
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+        .pagination a:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .pagination span {
+            color: var(--text-2);
+            font-size: 13px;
+        }
+
+        /* Preset chips for What's included */
+        .preset-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--surface-2);
+            color: var(--text-2);
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .preset-chip:hover {
+            background: var(--accent-light);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .preset-chip:active {
+            transform: scale(0.96);
+        }
+    </style>
+</head>
+<body>
+{% macro update_query(page=none) %}
+    {% set params = request.args.to_dict() %}
+    {% if page %}
+        {% set _ = params.update({'page': page}) %}
+    {% endif %}
+    {{ url_for('admin', **params) }}
+{% endmacro %}
+
+<!-- TOP BAR -->
+<nav class="topbar">
+    <div class="topbar-brand">
+        <div class="dot"></div>
+        Pashynska Photography
+        <span style="color:#4b5563; font-weight:400;">/ Admin</span>
+    </div>
+    <div class="topbar-right">
+        <a href="/admin/clients" class="topbar-link" style="font-size:13px;">👥 Clients</a>
+        <span class="topbar-badge">Admin</span>
+        <a href="/" class="topbar-link" target="_blank">↗ Booking site</a>
+    </div>
+</nav>
+
+<div class="page">
+
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+        <div class="page-title">
+            <h1>Today's Operations</h1>
+            <p>What's happening across your bookings & next session.</p>
+        </div>
+        <div class="page-actions">
+            <a href="#events-section" class="btn-outline" style="text-decoration:none;">✦ Manage events</a>
+            <button class="btn-outline" onclick="location.reload()">↻ Refresh</button>
+        </div>
+    </div>
+
+    {# ─ figure out the next upcoming session ─ #}
+    {% set _today = (now.strftime('%Y-%m-%d') if now is defined and now else '') %}
+    {% set _ev_sorted = (events|sort(attribute='date')) if events else [] %}
+    {% set upcoming = none %}
+    {% if _ev_sorted %}
+        {% if _today %}
+            {% for ev in _ev_sorted if ev.date >= _today and (upcoming is none) %}{% set upcoming = ev %}{% endfor %}
+        {% endif %}
+        {% if upcoming is none %}{% set upcoming = _ev_sorted[0] %}{% endif %}
+    {% endif %}
+
+    <!-- OPERATIONAL DASHBOARD HERO -->
+    <div class="ops-dash">
+        {# LEFT — needs action OR all clear #}
+        {% if filtered_stats.pending and filtered_stats.pending > 0 %}
+        <div class="ops-card action">
+            <div class="head"><span>⚡ Needs your attention</span><span class="ico">⏳</span></div>
+            <div class="big">{{ filtered_stats.pending }} pending {{ 'payment' if filtered_stats.pending == 1 else 'payments' }}</div>
+            <div class="sub">Auto-verifier checks Gmail every minute. If a client paid early or in cash, confirm manually.</div>
+            <a href="#tbody" class="pill-cta" onclick="setStatusFilter('pending')">Review pending →</a>
+        </div>
+        {% else %}
+        <div class="ops-card calm">
+            <div class="head"><span>✓ All clear</span><span class="ico">🌿</span></div>
+            <div class="big">No pending payments</div>
+            <div class="sub">Every reserved slot has been confirmed. You're caught up — new bookings will surface here.</div>
+        </div>
+        {% endif %}
+
+        {# RIGHT — next upcoming session spotlight #}
+        <div class="ops-spotlight">
+            {% if upcoming %}
+            <span class="eyebrow">Next session</span>
+            <h3>{{ upcoming.title }}</h3>
+            <div class="meta-row">
+                <span>📅 <strong>{{ upcoming.date }}</strong>{% if upcoming.start_time %} · {{ upcoming.start_time }}{% endif %}</span>
+                {% if upcoming.location %}<span>📍 {{ upcoming.location.split(',')[0] }}</span>{% endif %}
+                {% if upcoming.session_type %}<span>🏷️ {{ upcoming.session_type }}</span>{% endif %}
+            </div>
+            {% if upcoming.total_spots %}
+            {% set _booked = upcoming.total_spots - (upcoming.spots_left if upcoming.spots_left is defined else upcoming.total_spots) %}
+            {% set _pct = (100 * _booked / upcoming.total_spots) | round(0, 'floor') %}
+            <div class="progress-wrap">
+                <div class="progress-bar"><span style="width: {{ _pct }}%"></span></div>
+                <div class="progress-num"><strong>{{ _booked }}</strong> / {{ upcoming.total_spots }} booked</div>
+            </div>
+            {% endif %}
+            {% else %}
+            <span class="eyebrow">Next session</span>
+            <h3>No upcoming sessions scheduled</h3>
+            <div class="spotlight-empty">Create one below to start taking bookings.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- KEY METRICS ROW -->
+    <div class="ops-row">
+        <div class="ops-card">
+            <div class="head"><span>Confirmed</span><span class="ico">✓</span></div>
+            <div class="big" style="color:var(--green-text)">{{ filtered_stats.confirmed }}</div>
+            <div class="sub">{% if filtered_stats.total %}{{ ((100 * filtered_stats.confirmed / filtered_stats.total) | round(0, 'floor')) }}% of {{ filtered_stats.total }} filtered{% else %}—{% endif %}</div>
+        </div>
+        <div class="ops-card">
+            <div class="head"><span>Pending</span><span class="ico">⏳</span></div>
+            <div class="big" style="color:var(--accent)">{{ filtered_stats.pending }}</div>
+            <div class="sub">Awaiting payment verification</div>
+        </div>
+        <div class="ops-card">
+            <div class="head"><span>Expected revenue</span><span class="ico">$</span></div>
+            <div class="big" style="color:var(--blue-text)">${{ "%.0f"|format(filtered_stats.total_expected) }}</div>
+            <div class="sub">CAD · deposits + balances on confirmed</div>
+        </div>
+        <div class="ops-card">
+            <div class="head"><span>Cancelled / Expired</span><span class="ico">✕</span></div>
+            <div class="big" style="color:var(--text-2)">{{ filtered_stats.cancelled + filtered_stats.expired }}</div>
+            <div class="sub">{{ filtered_stats.cancelled }} cancelled · {{ filtered_stats.expired }} expired</div>
+        </div>
+    </div>
+
+    <!-- BOOKINGS HEADER -->
+    <div class="page-header" style="margin-top:8px; margin-bottom:14px;">
+        <div class="page-title">
+            <h1 style="font-size:18px;">Bookings</h1>
+            <p>Showing {{ filtered_stats.total }} of {{ overall_stats.total }} total bookings</p>
+        </div>
+    </div>
+
+    <!-- NOTICE -->
+    <div class="notice">
+        <span class="notice-icon">💡</span>
+        <span>
+            <strong>Confirmation options:</strong>
+            Payments are verified automatically via email every minute when e-Transfer arrives from <code>notify@payments.interac.ca</code>.
+            Use the <strong>Confirm</strong> button below for manual confirmation (cash, early e-Transfer, etc).
+        </span>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="card" style="margin-bottom:20px; padding:20px;">
+        <form id="filter-form" method="get" action="/admin">
+            <input type="hidden" id="page" name="page" value="{{ filters.page }}">
+            <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; align-items:end;">
+                <div class="form-group">
+                    <label for="date_from">Date from</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ filters.date_from }}">
+                </div>
+                <div class="form-group">
+                    <label for="date_to">Date to</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ filters.date_to }}">
+                </div>
+                <div class="form-group">
+                    <label for="session_type">Session type</label>
+                    <select id="session_type" name="session_type">
+                        <option value="">All types</option>
+                        {% for st in session_types %}
+                        <option value="{{ st }}" {% if filters.session_type == st %}selected{% endif %}>{{ st }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select id="status" name="status">
+                        <option value="">All statuses</option>
+                        <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All</option>
+                        <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>⏳ Pending</option>
+                        <option value="confirmed" {% if filters.status == 'confirmed' %}selected{% endif %}>✅ Confirmed</option>
+                        <option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>❌ Cancelled</option>
+                        <option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expired</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="search">Search</label>
+                    <input type="text" id="search" name="search" placeholder="Name, email, phone, Instagram…" value="{{ filters.search }}">
+                </div>
+                <div class="form-group">
+                    <label for="limit">Rows per page</label>
+                    <select id="limit" name="limit">
+                        <option value="10" {% if filters.limit == 10 %}selected{% endif %}>10</option>
+                        <option value="25" {% if filters.limit == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if filters.limit == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if filters.limit == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn-save" style="padding:8px 16px; font-size:14px;">Apply filters</button>
+                    <a href="/admin" class="btn-outline" style="margin-left:8px; padding:8px 16px; font-size:14px; text-decoration:none;">Reset</a>
+                    <a href="/admin/export?{{ request.query_string.decode() }}" class="btn-outline" style="margin-left:8px; padding:8px 16px; font-size:14px; text-decoration:none;">📥 Export CSV</a>
+                </div>
+            </div>
+        </form>
+        {% if filters.date_from or filters.date_to or filters.session_type or filters.status or filters.search %}
+        <div style="margin-top:16px; padding:12px 16px; background:var(--surface-2); border-radius:var(--radius); border:1px solid var(--border); font-size:13px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span style="font-weight:600;">Active filters:</span>
+                <a href="/admin" style="margin-left:auto; font-size:12px; color:var(--accent); text-decoration:none;">Clear all</a>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                {% if filters.date_from %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    📅 From: {{ filters.date_from }}
+                </span>
+                {% endif %}
+                {% if filters.date_to %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    📅 To: {{ filters.date_to }}
+                </span>
+                {% endif %}
+                {% if filters.session_type %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    🏷️ Type: {{ filters.session_type }}
+                </span>
+                {% endif %}
+                {% if filters.status and filters.status != 'all' %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    📊 Status: {{ filters.status }}
+                </span>
+                {% endif %}
+                {% if filters.search %}
+                <span style="background:white; border:1px solid var(--border); border-radius:12px; padding:4px 10px; font-size:12px;">
+                    🔍 Search: "{{ filters.search }}"
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- QUICK STATUS FILTERS -->
+    <div class="toolbar">
+        <button class="filter-btn {% if not filters.status %}active{% endif %}" onclick="setStatusFilter('')">All</button>
+        <button class="filter-btn {% if filters.status == 'pending' %}active{% endif %}" onclick="setStatusFilter('pending')">⏳ Pending</button>
+        <button class="filter-btn {% if filters.status == 'confirmed' %}active{% endif %}" onclick="setStatusFilter('confirmed')">✅ Confirmed</button>
+        <button class="filter-btn {% if filters.status == 'cancelled' %}active{% endif %}" onclick="setStatusFilter('cancelled')">❌ Cancelled</button>
+        <button class="filter-btn {% if filters.status == 'expired' %}active{% endif %}" onclick="setStatusFilter('expired')">Expired</button>
+        <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" type="text" id="search" placeholder="Search by name, email, Instagram…" oninput="doSearch(this.value)">
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Date &amp; Time</th>
+                    <th>Client</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Instagram</th>
+                    <th>Status</th>
+                    <th>Deposit paid</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tbody">
+                {% for b in bookings %}
+                <tr class="brow row-{{ b.status }}"
+                    data-status="{{ b.status }}"
+                    data-search="{{ (b.name or '') | lower }} {{ (b.email or '') | lower }} {{ (b.instagram or '') | lower }} {{ (b.phone or '') | lower }}">
+
+                    <td class="cell-id">#{{ b.id }}</td>
+
+                    <td>
+                        <div class="cell-time">{{ b.time }}</div>
+                        <div style="color:var(--text-3);font-size:12px;">{{ b.date }}</div>
+                    </td>
+
+                    <td class="cell-name">{{ b.name or '—' }}</td>
+
+                    <td class="cell-email">
+                        {% if b.email %}<a href="mailto:{{ b.email }}">{{ b.email }}</a>{% else %}—{% endif %}
+                    </td>
+
+                    <td style="color:var(--text-2);">{{ b.phone or '—' }}</td>
+
+                    <td class="cell-ig">
+                        {% if b.instagram %}
+                        <a href="https://instagram.com/{{ b.instagram.lstrip('@') }}" target="_blank">@{{ b.instagram.lstrip('@') }}</a>
+                        {% else %}—{% endif %}
+                    </td>
+
+                    <td>
+                        <span class="badge b-{{ b.status }}">
+                            <span class="badge-dot"></span>
+                            {% if b.status == 'reserved' %}Reserved
+                            {% elif b.status == 'pending_payment' %}Pending payment
+                            {% elif b.status == 'confirmed' %}Confirmed
+                            {% elif b.status == 'cancelled' %}Cancelled
+                            {% elif b.status == 'expired' %}Expired
+                            {% else %}{{ b.status }}{% endif %}
+                        </span>
+                    </td>
+
+                    <td>
+                        {% if b.paid_amount %}
+                        <span class="cell-amount">${{ "%.2f"|format(b.paid_amount) }} CAD</span>
+                        {% else %}
+                        <span class="cell-amount none">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="actions">
+                        {% if b.status in ('reserved', 'pending_payment') %}
+                            <button class="btn-confirm" onclick='confirmBooking({{ b.id }}, {{ (b.name or "") | tojson }})'>✓ Confirm</button>
+                            <button class="btn-reschedule" onclick='openRescheduleModal({{ b.id }}, {{ (b.name or "") | tojson }}, {{ (b.date or "") | tojson }}, {{ (b.time or "") | tojson }}, {{ (b.event_id or "") | tojson }})'>📅 Reschedule</button>
+                            <button class="btn-cancel" onclick='cancelBooking({{ b.id }}, {{ (b.name or "") | tojson }})'>✕ Cancel</button>
+                            <button class="btn-delete" onclick='deleteBooking({{ b.id }}, {{ (b.name or "") | tojson }})'>🗑️ Delete</button>
+                        {% elif b.status == 'confirmed' %}
+                            <button class="btn-done" disabled>✓ Done</button>
+                            <button class="btn-balance" onclick='requestBalance({{ b.id }}, {{ (b.name or "") | tojson }})'>💸 Request Balance</button>
+                            <button class="btn-reschedule" onclick='openRescheduleModal({{ b.id }}, {{ (b.name or "") | tojson }}, {{ (b.date or "") | tojson }}, {{ (b.time or "") | tojson }}, {{ (b.event_id or "") | tojson }})'>📅 Reschedule</button>
+                            <button class="btn-delete" onclick='deleteBooking({{ b.id }}, {{ (b.name or "") | tojson }})'>🗑️ Delete</button>
+                        {% else %}
+                            <button class="btn-delete" onclick='deleteBooking({{ b.id }}, {{ (b.name or "") | tojson }})'>🗑️ Delete</button>
+                        {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9">
+                    <div class="empty">
+                        <div class="empty-icon">📋</div>
+                        <p>No bookings yet.</p>
+                    </div>
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- PAGINATION -->
+    {% if filters.total_pages > 1 %}
+    <div class="pagination" style="margin-top:20px; display:flex; justify-content:center; align-items:center; gap:8px;">
+        {% if filters.page > 1 %}
+        <a href="{{ update_query(page=1) }}" class="btn-outline" style="text-decoration:none; padding:6px 12px;">&laquo; First</a>
+        <a href="{{ update_query(page=filters.page-1) }}" class="btn-outline" style="text-decoration:none; padding:6px 12px;">&lsaquo; Prev</a>
+        {% endif %}
+        <span style="color:var(--text-2); font-size:13px;">Page {{ filters.page }} of {{ filters.total_pages }}</span>
+        {% if filters.page < filters.total_pages %}
+        <a href="{{ update_query(page=filters.page+1) }}" class="btn-outline" style="text-decoration:none; padding:6px 12px;">Next &rsaquo;</a>
+        <a href="{{ update_query(page=filters.total_pages) }}" class="btn-outline" style="text-decoration:none; padding:6px 12px;">Last &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- EVENT MANAGEMENT -->
+    <div style="margin-top:36px;" id="events-section">
+        <div class="page-header" style="margin-bottom:16px;">
+            <div class="page-title">
+                <h1>Events</h1>
+                <p>Create, edit and manage shooting events — slots are computed automatically</p>
+            </div>
+            <div class="page-actions">
+                <button class="btn-save" onclick="openCreateModal()" style="display:inline-flex;align-items:center;gap:6px;">
+                    ✦ New event
+                </button>
+            </div>
+        </div>
+
+        {% for ev in events %}
+        <div class="event-settings-card" id="ev-card-{{ ev.id }}">
+
+            <!-- ── CARD HEADER ── -->
+            <div class="event-settings-header">
+                <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <span style="font-weight:700; font-size:15px;" id="ev-title-display-{{ ev.id }}">{{ ev.title }}</span>
+                        {% if ev.featured %}<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;border:1px solid #fde68a;">⭐ Featured</span>{% endif %}
+                        <span class="badge {% if ev.status == 'active' %}b-confirmed{% elif ev.status == 'upcoming' %}b-reserved{% else %}b-expired{% endif %}" style="font-size:11px;">
+                            <span class="badge-dot"></span>{{ ev.status }}
+                        </span>
+                    </div>
+                    <div style="color:var(--text-3); font-size:12px; margin-top:4px;">
+                        {{ ev.id }} · 📅 {{ ev.date }}
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;">
+                    <button class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick='duplicateEvent({{ ev.id | tojson }}, {{ (ev.title or "") | tojson }})'>
+                        ⊕ Duplicate
+                    </button>
+                    <button class="btn-delete" style="font-size:12px; padding:6px 12px;" onclick='deleteEvent({{ ev.id | tojson }}, {{ (ev.title or "") | tojson }})'>
+                        🗑 Delete
+                    </button>
+                    <button class="btn-save" onclick="saveAllEventSettings('{{ ev.id }}')" id="save-btn-{{ ev.id }}">
+                        💾 Save changes
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── TAB BAR ── -->
+            <div style="display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:20px;">
+                <button class="ev-tab active" data-ev="{{ ev.id }}" data-tab="schedule" onclick="switchTab('{{ ev.id }}','schedule')">📅 Schedule</button>
+                <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="info" onclick="switchTab('{{ ev.id }}','info')">✏️ Info</button>
+                <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="included" onclick="switchTab('{{ ev.id }}','included')">✅ What's included</button>
+                <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="photos" onclick="switchTab('{{ ev.id }}','photos')">📸 Photos <span id="photos-count-{{ ev.id }}" style="background:var(--accent-light);color:var(--accent);border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px;">{{ (ev.photos or [])|length }}</span></button>
+            </div>
+
+            <!-- ── TAB: SCHEDULE ── -->
+            <div id="tab-schedule-{{ ev.id }}" class="ev-tab-panel">
+                <div class="event-settings-grid">
+                    <div class="form-group">
+                        <label>Start time</label>
+                        <input type="time" id="start-{{ ev.id }}" value="{{ ev.start_time }}"
+                               oninput="updateSlotsPreview('{{ ev.id }}')">
+                    </div>
+                    <div class="form-group">
+                        <label>End time</label>
+                        <input type="time" id="end-{{ ev.id }}" value="{{ ev.end_time }}"
+                               oninput="updateSlotsPreview('{{ ev.id }}')">
+                    </div>
+                    <div class="form-group">
+                        <label>Session length (min)</label>
+                        <input type="number" id="session-{{ ev.id }}" value="{{ ev.session_length }}"
+                               min="5" max="120" oninput="updateSlotsPreview('{{ ev.id }}')">
+                    </div>
+                    <div class="form-group">
+                        <label>Break between sessions (min)</label>
+                        <input type="number" id="break-{{ ev.id }}" value="{{ ev.break_length }}"
+                               min="0" max="60" oninput="updateSlotsPreview('{{ ev.id }}')">
+                    </div>
+                    <div class="form-group">
+                        <label>Deposit (CAD)</label>
+                        <input type="number" id="deposit-{{ ev.id }}" value="{{ ev.deposit }}"
+                               min="0" step="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Full price (CAD)</label>
+                        <input type="number" id="fullprice-{{ ev.id }}" value="{{ ev.full_price }}"
+                               min="0" step="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="evstatus-{{ ev.id }}">
+                            <option value="active" {% if ev.status == 'active' %}selected{% endif %}>Active (bookable)</option>
+                            <option value="upcoming" {% if ev.status == 'upcoming' %}selected{% endif %}>Upcoming (visible, no booking yet)</option>
+                            <option value="completed" {% if ev.status == 'completed' %}selected{% endif %}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label>Location</label>
+                        <input type="text" id="location-{{ ev.id }}" value="{{ ev.location|default('') }}"
+                               placeholder="e.g. Riley Park, Calgary — near Central Memorial Park">
+                    </div>
+                    <div class="form-group">
+                        <label>Booking flow</label>
+                        <select id="booking-type-{{ ev.id }}" onchange="toggleBookingTypeFields('{{ ev.id }}')">
+                            <option value="fixed_slots" {% if (ev.booking_type or 'fixed_slots') == 'fixed_slots' %}selected{% endif %}%>Fixed slots (mini session)</option>
+                            <option value="rolling_availability" {% if ev.booking_type == 'rolling_availability' %}selected{% endif %}%>Rolling availability (individual)</option>
+                            <option value="inquiry_only" {% if ev.booking_type == 'inquiry_only' %}selected{% endif %}%>Inquiry only (wedding/custom)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Session type label</label>
+                        <select id="session-type-{{ ev.id }}">
+                            <option value="mini" {% if (ev.session_type or 'mini') == 'mini' %}selected{% endif %}%>Mini</option>
+                            <option value="individual" {% if ev.session_type == 'individual' %}selected{% endif %}%>Individual</option>
+                            <option value="wedding" {% if ev.session_type == 'wedding' %}selected{% endif %}%>Wedding</option>
+                            <option value="custom" {% if ev.session_type == 'custom' %}selected{% endif %}%>Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="horizon-group-{{ ev.id }}" style="{% if ev.booking_type != 'rolling_availability' %}display:none{% endif %}">
+                        <label>Availability horizon (days)</label>
+                        <input type="number" id="horizon-{{ ev.id }}" value="{{ ev.availability_horizon_days|default(90) }}" min="7" max="365">
+                    </div>
+                    <div class="form-group" id="blackout-group-{{ ev.id }}" style="{% if ev.booking_type != 'rolling_availability' %}display:none{% endif %}">
+                        <label>Blackout dates</label>
+                        <input type="text" id="blackout-{{ ev.id }}" value="{{ (ev.blackout_dates or [])|join(', ') }}" placeholder="e.g. 2026-07-01, 2026-07-02">
+                    </div>
+                </div>
+                <!-- Live slot preview -->
+                <div id="preview-{{ ev.id }}" class="slots-preview" style="margin-top:16px;">
+                    📅 <span id="preview-count-{{ ev.id }}">{{ ev.start_time }} → {{ ev.end_time }}</span>
+                    <span style="font-weight:400; color:var(--text-2);">·</span>
+                    <span id="preview-slots-{{ ev.id }}" style="color:var(--text-2); font-weight:400;"></span>
+                </div>
+                <div class="slots-list" id="slots-chips-{{ ev.id }}"></div>
+            </div>
+
+            <!-- ── TAB: INFO ── -->
+            <div id="tab-info-{{ ev.id }}" class="ev-tab-panel" style="display:none;">
+                <div class="event-settings-grid" style="grid-template-columns:1fr 1fr;">
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label>Event title</label>
+                        <input type="text" id="ev-title-{{ ev.id }}" value="{{ ev.title | e }}"
+                               placeholder="e.g. 🌸 Spring Mini Sessions" maxlength="120">
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label>Subtitle / tagline</label>
+                        <input type="text" id="ev-subtitle-{{ ev.id }}" value="{{ ev.subtitle | default('') | e }}"
+                               placeholder="e.g. Soft spring moments you'll want to keep forever" maxlength="200">
+                    </div>
+                    <div class="form-group">
+                        <label>Event date</label>
+                        <input type="date" id="ev-date-{{ ev.id }}" value="{{ ev.date }}">
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:center; gap:12px; padding-top:22px;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500; margin-bottom:0;">
+                            <input type="checkbox" id="ev-featured-{{ ev.id }}" {% if ev.featured %}checked{% endif %}
+                                   style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);">
+                            ⭐ Mark as featured (shown prominently on booking page)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TAB: INCLUDED ── -->
+            <div id="tab-included-{{ ev.id }}" class="ev-tab-panel" style="display:none;">
+                <p style="font-size:13px; color:var(--text-2); margin-bottom:14px;">
+                    What clients get — shown as bullet points on the booking page.
+                </p>
+                <!-- Preset quick-add chips for existing events -->
+                <div style="margin-bottom:12px;">
+                    <p style="font-size:12px; color:var(--text-2); margin:0 0 8px;">Quick add presets — click to add:</p>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                        <button onclick="addPresetIncluded('{{ ev.id }}','⏱ 20-minute photo session')" class="preset-chip">⏱ 20-min session</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','🖼 15 professionally edited photos')" class="preset-chip">🖼 15 edited photos</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','📸 All original photos included')" class="preset-chip">📸 All originals</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','🎨 Beautiful boho-style setup & decorations')" class="preset-chip">🎨 Boho setup</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','✨ Assistance with posing')" class="preset-chip">✨ Posing help</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','🌿 Cozy natural atmosphere')" class="preset-chip">🌿 Natural vibe</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','👗 Outfit change included')" class="preset-chip">👗 Outfit change</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','🖥 Private online gallery')" class="preset-chip">🖥 Online gallery</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','⚡ Quick turnaround (within 48 hours)')" class="preset-chip">⚡ 48h delivery</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','🖨 Print release included')" class="preset-chip">🖨 Print release</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','🎞 High-resolution digital files')" class="preset-chip">🎞 High-res files</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','📍 Location scouting included')" class="preset-chip">📍 Location scout</button>
+                    </div>
+                </div>
+                <div id="included-list-{{ ev.id }}">
+                    {% for item in (ev.included or []) %}
+                    <div class="included-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                        <input type="text" class="included-input" value="{{ item | e }}"
+                               placeholder="e.g. 15 professionally edited photos"
+                               style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+                        <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;flex-shrink:0;">✕</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button onclick="addIncludedRow('{{ ev.id }}')"
+                        style="margin-top:8px; display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border:1px dashed var(--accent); border-radius:var(--radius); background:var(--accent-light); color:var(--accent); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">
+                    + Add custom item
+                </button>
+            </div>
+
+            <!-- ── TAB: PHOTOS ── -->
+            <div id="tab-photos-{{ ev.id }}" class="ev-tab-panel" style="display:none;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <p style="font-size:13px; color:var(--text-2);">
+                        Preview photos shown on the booking page. First photo is the main card image.
+                    </p>
+                    <label class="btn-outline" style="cursor:pointer; color:var(--accent); border-color:var(--accent); display:inline-flex; align-items:center; gap:6px;">
+                        + Add photo
+                        <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
+                            onchange="uploadPhoto('{{ ev.id }}', null, this)">
+                    </label>
+                </div>
+
+                <div id="photo-grid-{{ ev.id }}" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px;">
+                    {% set photos = ev.photos or [] %}
+                    {% if photos %}
+                        {% for photo in photos %}
+                        <div class="photo-slot" data-index="{{ loop.index0 }}" style="position:relative; border-radius:10px; overflow:hidden; background:var(--surface-2); border:1px solid var(--border); aspect-ratio:4/3;">
+                            {% if loop.index0 == 0 %}
+                            <div style="position:absolute;top:6px;left:6px;z-index:3;background:var(--accent);color:white;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;">Main</div>
+                            {% endif %}
+                            <img src="{{ photo }}" style="width:100%; height:100%; object-fit:cover; display:block;">
+                            <div style="position:absolute; inset:0; background:rgba(0,0,0,0); transition:background 0.2s;"
+                                 onmouseover="this.style.background='rgba(0,0,0,0.35)'; this.nextElementSibling.style.opacity='1'"
+                                 onmouseout="this.style.background='rgba(0,0,0,0)'; this.nextElementSibling.style.opacity='0'">
+                            </div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; opacity:0; transition:opacity 0.2s; pointer-events:none;" class="photo-actions">
+                                <label style="background:white; color:#111; border:none; border-radius:7px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; pointer-events:all;">
+                                    ↑ Replace
+                                    <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
+                                        onchange="uploadPhoto('{{ ev.id }}', {{ loop.index0 }}, this)">
+                                </label>
+                                <button onclick="deletePhoto('{{ ev.id }}', {{ loop.index0 }})"
+                                    style="background:var(--red); color:white; border:none; border-radius:7px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; pointer-events:all;">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div id="photo-empty-{{ ev.id }}" style="grid-column:1/-1; padding:40px; text-align:center; color:var(--text-3); border:2px dashed var(--border); border-radius:10px;">
+                            No photos yet — click <strong>+ Add photo</strong> to upload
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+
+        {% if not events %}
+        <div style="text-align:center; padding:60px 20px; color:var(--text-3); border:2px dashed var(--border); border-radius:var(--radius);">
+            <div style="font-size:40px; margin-bottom:12px;">📅</div>
+            <div style="font-size:16px; font-weight:600; margin-bottom:6px;">No events yet</div>
+            <div style="font-size:13px; margin-bottom:20px;">Create your first shooting event to start accepting bookings.</div>
+            <button class="btn-save" onclick="openCreateModal()">✦ Create first event</button>
+        </div>
+        {% endif %}
+    </div>
+
+
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     CREATE EVENT MODAL
+═════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="create-modal" onclick="closeCreateModalOutside(event)">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-title" id="modal-title">✦ Create new event</div>
+        <div class="modal-subtitle">Fill in the details — you can edit everything later from the admin panel.</div>
+
+        <div class="modal-grid">
+            <!-- Basic info -->
+            <div class="modal-section-label" style="border-top:none; padding-top:0;">📋 Basic info</div>
+
+            <div class="form-group" style="grid-column:1/-1">
+                <label>Event title *</label>
+                <input type="text" id="new-title" placeholder="e.g. 🌸 Spring Mini Sessions" maxlength="120">
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+                <label>Subtitle / tagline</label>
+                <input type="text" id="new-subtitle" placeholder="e.g. Soft spring moments you'll want to keep forever" maxlength="200">
+            </div>
+            <div class="form-group">
+                <label>Event date *</label>
+                <input type="date" id="new-date">
+            </div>
+            <div class="form-group" style="display:flex; align-items:center; gap:8px; padding-top:22px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500; margin-bottom:0;">
+                    <input type="checkbox" id="new-featured" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);">
+                    ⭐ Featured event
+                </label>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+                <label>Location</label>
+                <input type="text" id="new-location" placeholder="e.g. Riley Park, Calgary — exact spot sent after booking">
+            </div>
+
+            <!-- Schedule -->
+            <div class="modal-section-label">⏱️ Schedule</div>
+
+            <div class="form-group">
+                <label>Start time</label>
+                <input type="time" id="new-start" value="10:00">
+            </div>
+            <div class="form-group">
+                <label>End time</label>
+                <input type="time" id="new-end" value="17:00">
+            </div>
+            <div class="form-group">
+                <label>Session length (min)</label>
+                <input type="number" id="new-session" value="20" min="5" max="120">
+            </div>
+            <div class="form-group">
+                <label>Break between sessions (min)</label>
+                <input type="number" id="new-break" value="10" min="0" max="60">
+            </div>
+
+            <!-- Pricing -->
+            <div class="modal-section-label">💰 Pricing</div>
+
+            <div class="form-group">
+                <label>Deposit (CAD)</label>
+                <input type="number" id="new-deposit" value="100" min="0" step="5">
+            </div>
+            <div class="form-group">
+                <label>Full price (CAD)</label>
+                <input type="number" id="new-fullprice" value="300" min="0" step="5">
+            </div>
+            <div class="form-group">
+                <label>Initial status</label>
+                <select id="new-status">
+                    <option value="upcoming">Upcoming (visible, no booking yet)</option>
+                    <option value="active">Active (bookable now)</option>
+                </select>
+            </div>
+
+            <!-- Booking type -->
+            <div class="modal-section-label">📋 Booking type</div>
+
+            <div class="form-group">
+                <label>Booking flow</label>
+                <select id="new-booking-type" onchange="toggleCreateBookingTypeFields()">
+                    <option value="fixed_slots" selected>Fixed slots (mini session)</option>
+                    <option value="rolling_availability">Rolling availability (individual)</option>
+                    <option value="inquiry_only">Inquiry only (wedding/custom)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Session type label</label>
+                <select id="new-session-type">
+                    <option value="mini" selected>Mini</option>
+                    <option value="individual">Individual</option>
+                    <option value="wedding">Wedding</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div class="form-group" id="new-horizon-group">
+                <label>Availability horizon (days)</label>
+                <input type="number" id="new-horizon" value="90" min="7" max="365">
+            </div>
+            <div class="form-group" id="new-blackout-group">
+                <label>Blackout dates</label>
+                <input type="text" id="new-blackout" placeholder="e.g. 2026-07-01, 2026-07-02, 2026-07-15">
+            </div>
+
+            <!-- What's included -->
+            <div class="modal-section-label">✅ What's included <span style="font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></div>
+
+            <!-- Preset quick-add buttons -->
+            <div style="grid-column:1/-1; margin-bottom:8px;">
+                <p style="font-size:12px; color:var(--text-2); margin:0 0 8px;">Quick add presets — click to add:</p>
+                <div id="new-included-presets" style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button onclick="addPresetIncluded('new','⏱ 20-minute photo session')" class="preset-chip">⏱ 20-min session</button>
+                    <button onclick="addPresetIncluded('new','🖼 15 professionally edited photos')" class="preset-chip">🖼 15 edited photos</button>
+                    <button onclick="addPresetIncluded('new','📸 All original photos included')" class="preset-chip">📸 All originals</button>
+                    <button onclick="addPresetIncluded('new','🎨 Beautiful boho-style setup & decorations')" class="preset-chip">🎨 Boho setup</button>
+                    <button onclick="addPresetIncluded('new','✨ Assistance with posing')" class="preset-chip">✨ Posing help</button>
+                    <button onclick="addPresetIncluded('new','🌿 Cozy natural atmosphere')" class="preset-chip">🌿 Natural vibe</button>
+                    <button onclick="addPresetIncluded('new','👗 Outfit change included')" class="preset-chip">👗 Outfit change</button>
+                    <button onclick="addPresetIncluded('new','🖥 Private online gallery')" class="preset-chip">🖥 Online gallery</button>
+                    <button onclick="addPresetIncluded('new','⚡ Quick turnaround (within 48 hours)')" class="preset-chip">⚡ 48h delivery</button>
+                    <button onclick="addPresetIncluded('new','🖨 Print release included')" class="preset-chip">🖨 Print release</button>
+                    <button onclick="addPresetIncluded('new','🎞 High-resolution digital files')" class="preset-chip">🎞 High-res files</button>
+                    <button onclick="addPresetIncluded('new','📍 Location scouting included')" class="preset-chip">📍 Location scout</button>
+                </div>
+            </div>
+
+            <div style="grid-column:1/-1;" id="new-included-list">
+                <!-- Default items pre-filled -->
+                <div class="included-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="text" class="included-input" value="🖼 15 professionally edited photos"
+                           style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+                    <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
+                </div>
+                <div class="included-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="text" class="included-input" value="📸 All original photos included"
+                           style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+                    <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
+                </div>
+                <div class="included-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="text" class="included-input" value="🎨 Beautiful boho-style setup & decorations"
+                           style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+                    <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
+                </div>
+                <div class="included-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="text" class="included-input" value="✨ Assistance with posing"
+                           style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+                    <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
+                </div>
+                <div class="included-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="text" class="included-input" value="🌿 Cozy natural atmosphere"
+                           style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+                    <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
+                </div>
+            </div>
+            <div style="grid-column:1/-1; margin-top:-4px;">
+                <button onclick="addNewIncludedRow()"
+                        style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border:1px dashed var(--accent); border-radius:var(--radius); background:var(--accent-light); color:var(--accent); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">
+                    + Add custom item
+                </button>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn-outline" onclick="closeCreateModal()">Cancel</button>
+            <button class="btn-save" id="create-submit-btn" onclick="submitCreateEvent()">✦ Create event</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    /* ── toast ── */
+    function toast(msg, type) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'show ' + (type || '');
+        setTimeout(() => el.className = '', 3500);
+    }
+
+    /* ── delete ── */
+    async function deleteBooking(id, name) {
+        if (!confirm(`Delete booking #${id} for ${name}?\n\nThis is permanent and cannot be undone.`)) return;
+        try {
+            const res = await fetch('/admin/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ booking_id: id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('Booking deleted', 'error');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+    }
+
+    /* ── confirm ── */
+    async function confirmBooking(id, name) {
+        if (!confirm(`Confirm booking #${id} for ${name}?\n\nThis will mark the deposit as paid and send a confirmation email to the client.`)) return;
+        try {
+            const res = await fetch('/admin/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ booking_id: id, paid_amount: 95 })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('✅ Booking confirmed!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+    }
+
+    /* ── Request Balance: send remaining balance payment request ── */
+    async function requestBalance(id, name) {
+        if (!confirm(`Send remaining balance payment request to ${name}?\n\nThe email will include Interac e-Transfer instructions plus a Stripe card / Apple Pay / Google Pay link when available.`)) return;
+        try {
+            const res = await fetch('/admin/request-balance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ booking_id: id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                const amount = Number(data.balance_due || 0).toFixed(2);
+                toast(`💸 Balance request sent — $${amount} CAD`, 'success');
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+    }
+
+    /* ── cancel ── */
+    async function cancelBooking(id, name) {
+        if (!confirm(`Cancel booking #${id} for ${name}?\n\nThe slot will be freed for other clients.`)) return;
+        try {
+            const res = await fetch('/admin/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ booking_id: id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('Booking cancelled', 'error');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       RESCHEDULE — move a booking to another event / date / time
+    ══════════════════════════════════════════════════════════ */
+    let _reschedState = {
+        bookingId: null,
+        clientName: '',
+        oldDate: '',
+        oldTime: '',
+        currentEventId: '',
+        selectedSlot: '',
+        eventsCache: null,
+    };
+
+    async function _loadEventsList() {
+        if (_reschedState.eventsCache) return _reschedState.eventsCache;
+        try {
+            const r = await fetch('/events');
+            const j = await r.json();
+            _reschedState.eventsCache = j.events || [];
+            return _reschedState.eventsCache;
+        } catch (e) {
+            console.error('events load failed', e);
+            return [];
+        }
+    }
+
+    async function openRescheduleModal(bookingId, clientName, oldDate, oldTime, currentEventId) {
+        _reschedState.bookingId = bookingId;
+        _reschedState.clientName = clientName || '';
+        _reschedState.oldDate = oldDate || '';
+        _reschedState.oldTime = oldTime || '';
+        _reschedState.currentEventId = currentEventId || '';
+        _reschedState.selectedSlot = '';
+
+        document.getElementById('resched-old').innerHTML =
+            `<b>${escapeHtml(clientName) || 'Client'}</b> · #${bookingId}<br>` +
+            `Currently: ${escapeHtml(oldDate)} at ${escapeHtml(oldTime)}`;
+
+        // Populate event dropdown
+        const events = await _loadEventsList();
+        const sel = document.getElementById('resched-event');
+        sel.innerHTML = events.map(e =>
+            `<option value="${escapeAttr(e.id)}" ${e.id === currentEventId ? 'selected' : ''}>
+                ${escapeHtml(e.title || e.id)} ${e.date ? '· ' + escapeHtml(e.date) : ''}
+            </option>`
+        ).join('');
+
+        // Default date: keep old date if rolling, else event date
+        const cur = events.find(e => e.id === sel.value);
+        const dateInput = document.getElementById('resched-date');
+        if (cur && cur.booking_type === 'rolling_availability') {
+            dateInput.value = oldDate || cur.date || '';
+            dateInput.disabled = false;
+        } else if (cur) {
+            dateInput.value = cur.date || '';
+            dateInput.disabled = true;
+        }
+
+        await _loadReschedSlots();
+        document.getElementById('resched-submit').disabled = true;
+        document.getElementById('resched-modal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeRescheduleModal() {
+        document.getElementById('resched-modal').classList.remove('open');
+        document.body.style.overflow = '';
+        _reschedState.bookingId = null;
+    }
+
+    async function _onReschedEventChange() {
+        const sel = document.getElementById('resched-event');
+        const events = await _loadEventsList();
+        const cur = events.find(e => e.id === sel.value);
+        const dateInput = document.getElementById('resched-date');
+        if (cur && cur.booking_type === 'rolling_availability') {
+            dateInput.disabled = false;
+            if (!dateInput.value) dateInput.value = cur.date || '';
+        } else if (cur) {
+            dateInput.value = cur.date || '';
+            dateInput.disabled = true;
+        }
+        _reschedState.selectedSlot = '';
+        await _loadReschedSlots();
+        document.getElementById('resched-submit').disabled = true;
+    }
+
+    async function _loadReschedSlots() {
+        const sel = document.getElementById('resched-event');
+        const dateInput = document.getElementById('resched-date');
+        const slotsBox = document.getElementById('resched-slots');
+        const eventId = sel.value;
+        const date = dateInput.value;
+        if (!eventId || !date) {
+            slotsBox.innerHTML = '<div class="resched-empty">Pick a date to see slots.</div>';
+            return;
+        }
+        slotsBox.innerHTML = '<div class="resched-empty">Loading…</div>';
+        try {
+            const r = await fetch(`/slots/${encodeURIComponent(date)}?event_id=${encodeURIComponent(eventId)}`);
+            const j = await r.json();
+            // /slots returns ONLY free slots (booked ones are removed server-side).
+            // Add the current client's own slot back as "current" so admin can see
+            // they're already on it — selecting it is a no-op (caught by submit).
+            const freeSlots = (j.slots || []).map(s => ({time: s.time, label: s.label, kind: 'free'}));
+            const isSameEventDate = (date === _reschedState.oldDate && eventId === _reschedState.currentEventId);
+            if (isSameEventDate && _reschedState.oldTime && !freeSlots.find(s => s.time === _reschedState.oldTime)) {
+                freeSlots.push({time: _reschedState.oldTime, label: _reschedState.oldTime, kind: 'current'});
+                freeSlots.sort((a, b) => a.time.localeCompare(b.time));
+            }
+
+            if (!freeSlots.length) {
+                slotsBox.innerHTML = '<div class="resched-empty">No slots available on this date.</div>';
+                return;
+            }
+
+            slotsBox.innerHTML = freeSlots.map(s => {
+                const isCurrent = s.kind === 'current';
+                const cls = isCurrent ? 'resched-slot taken' : 'resched-slot';
+                const dis = isCurrent ? 'data-taken="1" title="Currently selected slot"' : '';
+                const label = isCurrent ? `${escapeHtml(s.time)} •` : escapeHtml(s.time);
+                return `<button type="button" class="${cls}" data-time="${escapeAttr(s.time)}" ${dis} onclick="_pickReschedSlot(this)">${label}</button>`;
+            }).join('');
+        } catch (e) {
+            console.error('slot load failed', e);
+            slotsBox.innerHTML = '<div class="resched-empty">Failed to load.</div>';
+        }
+    }
+
+    function _pickReschedSlot(btn) {
+        if (btn.dataset.taken === '1') return;
+        document.querySelectorAll('.resched-slot.sel').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+        _reschedState.selectedSlot = btn.dataset.time;
+        document.getElementById('resched-submit').disabled = false;
+    }
+
+    async function submitReschedule() {
+        const eventId = document.getElementById('resched-event').value;
+        const date = document.getElementById('resched-date').value;
+        const time = _reschedState.selectedSlot;
+        const bookingId = _reschedState.bookingId;
+        if (!bookingId || !eventId || !date || !time) {
+            toast('Please pick event, date, and time', 'error');
+            return;
+        }
+        const same = (date === _reschedState.oldDate && time === _reschedState.oldTime && eventId === _reschedState.currentEventId);
+        if (same) {
+            toast('Same slot — nothing to change', 'error');
+            return;
+        }
+        if (!confirm(`Move booking #${bookingId} to ${date} at ${time}?\n\nAn email will be sent to the client.`)) return;
+
+        const btn = document.getElementById('resched-submit');
+        btn.disabled = true;
+        btn.textContent = '⏳ Moving…';
+        try {
+            const r = await fetch('/admin/reschedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    booking_id: bookingId,
+                    new_event_id: eventId,
+                    new_date: date,
+                    new_time: time,
+                })
+            });
+            const j = await r.json();
+            if (r.ok && j.success) {
+                toast('📅 Booking rescheduled — client notified', 'success');
+                closeRescheduleModal();
+                setTimeout(() => location.reload(), 800);
+            } else {
+                toast('Error: ' + (j.error || 'Unknown'), 'error');
+                btn.disabled = false;
+                btn.textContent = 'Move booking';
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = 'Move booking';
+        }
+    }
+
+    // Small HTML escape helpers (defensive against bookings with quotes/<>)
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[c]));
+    }
+    function escapeAttr(s) { return escapeHtml(s); }
+
+    /* ── server-side filtering ── */
+    function setStatusFilter(status) {
+        const form = document.getElementById('filter-form');
+        const statusInput = document.getElementById('status');
+        if (statusInput) {
+            statusInput.value = status;
+        }
+        form.submit();
+    }
+
+    function applyFilters() {
+        const form = document.getElementById('filter-form');
+        // Reset page to 1 when changing filters
+        const pageInput = document.getElementById('page');
+        if (pageInput) {
+            pageInput.value = 1;
+        }
+        form.submit();
+    }
+
+    // Debounced search to avoid too many requests
+    let searchTimeout = null;
+    function doSearch(value) {
+        const form = document.getElementById('filter-form');
+        const searchInput = document.getElementById('search');
+        if (searchInput) {
+            searchInput.value = value;
+        }
+        // Reset page to 1 when searching
+        const pageInput = document.getElementById('page');
+        if (pageInput) {
+            pageInput.value = 1;
+        }
+        // Debounce submit
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            form.submit();
+        }, 500);
+    }
+
+    // Auto-submit filter form on change (except search which uses debounce)
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('filter-form');
+        if (form) {
+            form.querySelectorAll('select, input[type="date"]').forEach(el => {
+                el.addEventListener('change', () => {
+                    applyFilters();
+                });
+            });
+            // Search input already has oninput handler
+        }
+    });
+
+    /* ── photos ── */
+    async function uploadPhoto(eventId, slotIndex, input) {
+        const file = input.files[0];
+        if (!file) return;
+        const label = input.closest('label');
+        const origText = label ? label.childNodes[0].textContent.trim() : '';
+        if (label) label.childNodes[0].textContent = ' Uploading…';
+        toast('Uploading…');
+
+        const fd = new FormData();
+        fd.append('photo', file);
+        if (slotIndex !== null) fd.append('slot_index', slotIndex);
+
+        try {
+            const res = await fetch(`/admin/photos/${eventId}/upload`, {
+                method: 'POST',
+                body: fd
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('✅ Photo saved!', 'success');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+                if (label) label.childNodes[0].textContent = origText;
+            }
+        } catch (err) {
+            toast('Upload failed: ' + err.message, 'error');
+            if (label) label.childNodes[0].textContent = origText;
+        }
+        input.value = '';
+    }
+
+    async function deletePhoto(eventId, slotIndex) {
+        if (!confirm('Remove this photo from the event?')) return;
+        try {
+            const res = await fetch(`/admin/photos/${eventId}/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slot_index: slotIndex })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('Photo removed', 'error');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Error: ' + err.message, 'error');
+        }
+    }
+
+    /* ── event settings: live slot preview ── */
+    function computeSlots(startTime, endTime, sessionLen, breakLen) {
+        const slots = [];
+        const [sh, sm] = startTime.split(':').map(Number);
+        const [eh, em] = endTime.split(':').map(Number);
+        let cur = sh * 60 + sm;
+        const end = eh * 60 + em;
+        const interval = sessionLen + breakLen;
+        if (interval <= 0 || cur >= end) return slots;
+        while (cur < end) {
+            const h = String(Math.floor(cur / 60)).padStart(2, '0');
+            const m = String(cur % 60).padStart(2, '0');
+            const cur2 = cur + sessionLen;
+            const h2 = String(Math.floor(cur2 / 60)).padStart(2, '0');
+            const m2 = String(cur2 % 60).padStart(2, '0');
+            slots.push(`${h}:${m}–${h2}:${m2}`);
+            cur += interval;
+        }
+        return slots;
+    }
+
+    function updateSlotsPreview(eventId) {
+        const start  = document.getElementById(`start-${eventId}`)?.value || '';
+        const end    = document.getElementById(`end-${eventId}`)?.value || '';
+        const session = parseInt(document.getElementById(`session-${eventId}`)?.value) || 20;
+        const brk     = parseInt(document.getElementById(`break-${eventId}`)?.value) || 0;
+
+        const slots = (start && end) ? computeSlots(start, end, session, brk) : [];
+        const interval = session + brk;
+
+        const previewCount = document.getElementById(`preview-count-${eventId}`);
+        const previewSlots = document.getElementById(`preview-slots-${eventId}`);
+        const chipsEl      = document.getElementById(`slots-chips-${eventId}`);
+
+        if (previewCount) previewCount.textContent = `${start || '?'} → ${end || '?'}  ·  ${slots.length} slot${slots.length !== 1 ? 's' : ''}`;
+        if (previewSlots) previewSlots.textContent = `${session} min session + ${brk} min break = every ${interval} min`;
+        if (chipsEl) {
+            chipsEl.innerHTML = slots.map(s => `<span class="slot-chip">${s}</span>`).join('');
+        }
+    }
+
+    /* ── init previews on load ── */
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[id^="start-"]').forEach(el => {
+            const eventId = el.id.replace('start-', '');
+            updateSlotsPreview(eventId);
+        });
+    });
+
+    /* ══════════════════════════════════════════════════════════
+       SAVE ALL — schedule + meta + included in one click
+    ══════════════════════════════════════════════════════════ */
+    async function saveAllEventSettings(eventId) {
+        const btn = document.getElementById(`save-btn-${eventId}`);
+        btn.disabled = true;
+        btn.textContent = '⏳ Saving…';
+
+        // --- SCHEDULE payload (existing route) ---
+        const schedPayload = {
+            start_time:     document.getElementById(`start-${eventId}`)?.value,
+            end_time:       document.getElementById(`end-${eventId}`)?.value,
+            session_length: parseInt(document.getElementById(`session-${eventId}`)?.value),
+            break_length:   parseInt(document.getElementById(`break-${eventId}`)?.value),
+            deposit:        parseFloat(document.getElementById(`deposit-${eventId}`)?.value),
+            full_price:     parseFloat(document.getElementById(`fullprice-${eventId}`)?.value),
+            status:         document.getElementById(`evstatus-${eventId}`)?.value,
+            location:       document.getElementById(`location-${eventId}`)?.value,
+            booking_type:   document.getElementById(`booking-type-${eventId}`)?.value,
+            session_type:   document.getElementById(`session-type-${eventId}`)?.value,
+            availability_horizon_days: parseInt(document.getElementById(`horizon-${eventId}`)?.value) || 90,
+            blackout_dates: (document.getElementById(`blackout-${eventId}`)?.value || '').split(',').map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)),
+        };
+
+        // --- META payload (new route) ---
+        const metaPayload = {
+            title:    document.getElementById(`ev-title-${eventId}`)?.value,
+            subtitle: document.getElementById(`ev-subtitle-${eventId}`)?.value,
+            date:     document.getElementById(`ev-date-${eventId}`)?.value,
+            featured: document.getElementById(`ev-featured-${eventId}`)?.checked,
+        };
+
+        // --- INCLUDED payload ---
+        const includedInputs = document.querySelectorAll(`#tab-included-${eventId} .included-input`);
+        const includedItems = Array.from(includedInputs).map(i => i.value.trim()).filter(Boolean);
+
+        try {
+            // Fire all three in parallel
+            const [schedRes, metaRes] = await Promise.all([
+                fetch(`/admin/events/${eventId}/update`, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(schedPayload)
+                }),
+                fetch(`/admin/events/${eventId}/update-meta`, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ ...metaPayload, included: includedItems })
+                }),
+            ]);
+
+            const [schedData, metaData] = await Promise.all([schedRes.json(), metaRes.json()]);
+            const errors = [schedData, metaData].filter(d => d.error).map(d => d.error);
+
+            if (errors.length) {
+                toast('Error: ' + errors.join(' | '), 'error');
+            } else {
+                toast(`✅ Saved — ${schedData.slots_count} slots`, 'success');
+                updateSlotsPreview(eventId);
+
+                // Update displayed title in card header
+                if (metaPayload.title) {
+                    const disp = document.getElementById(`ev-title-display-${eventId}`);
+                    if (disp) disp.textContent = metaPayload.title;
+                }
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+
+        btn.disabled = false;
+        btn.textContent = '💾 Save changes';
+    }
+
+    function toggleBookingTypeFields(eventId) {
+        const bt = document.getElementById(`booking-type-${eventId}`).value;
+        const hg = document.getElementById(`horizon-group-${eventId}`);
+        const bg = document.getElementById(`blackout-group-${eventId}`);
+        if (bt === 'rolling_availability') {
+            if (hg) hg.style.display = '';
+            if (bg) bg.style.display = '';
+        } else {
+            if (hg) hg.style.display = 'none';
+            if (bg) bg.style.display = 'none';
+        }
+    }
+    function switchTab(eventId, tab) {
+        // Hide all panels for this event
+        ['schedule','info','included','photos'].forEach(t => {
+            const panel = document.getElementById(`tab-${t}-${eventId}`);
+            if (panel) panel.style.display = t === tab ? '' : 'none';
+        });
+        // Update tab button styles
+        document.querySelectorAll(`.ev-tab[data-ev="${eventId}"]`).forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       INCLUDED ITEMS — edit mode (existing events)
+    ══════════════════════════════════════════════════════════ */
+    function addIncludedRow(eventId) {
+        const list = document.getElementById(`included-list-${eventId}`);
+        const row = document.createElement('div');
+        row.className = 'included-row';
+        row.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
+        row.innerHTML = `
+            <input type="text" class="included-input" placeholder="e.g. All original photos included"
+                   style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+            <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;flex-shrink:0;">✕</button>
+        `;
+        list.appendChild(row);
+        row.querySelector('input').focus();
+    }
+
+    function removeIncludedRow(btn) {
+        btn.closest('.included-row').remove();
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       CREATE EVENT MODAL
+    ══════════════════════════════════════════════════════════ */
+    function openCreateModal() {
+        document.getElementById('create-modal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+        // Set default date to next week
+        const d = new Date(); d.setDate(d.getDate() + 7);
+        const iso = d.toISOString().split('T')[0];
+        document.getElementById('new-date').value = iso;
+        toggleCreateBookingTypeFields();
+        setTimeout(() => document.getElementById('new-title').focus(), 100);
+    }
+
+    function toggleCreateBookingTypeFields() {
+        const bt = document.getElementById('new-booking-type').value;
+        const hg = document.getElementById('new-horizon-group');
+        const bg = document.getElementById('new-blackout-group');
+        if (bt === 'rolling_availability') {
+            if (hg) hg.style.display = '';
+            if (bg) bg.style.display = '';
+        } else {
+            if (hg) hg.style.display = 'none';
+            if (bg) bg.style.display = 'none';
+        }
+    }
+
+    function closeCreateModal() {
+        document.getElementById('create-modal').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    function closeCreateModalOutside(e) {
+        if (e.target === document.getElementById('create-modal')) closeCreateModal();
+    }
+
+    // Close with Escape
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeCreateModal();
+    });
+
+    function addNewIncludedRow() {
+        const list = document.getElementById('new-included-list');
+        const row = document.createElement('div');
+        row.className = 'included-row';
+        row.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
+        row.innerHTML = `
+            <input type="text" class="included-input" placeholder="e.g. Quick turnaround (within 48 hours)"
+                   style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+            <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
+        `;
+        list.appendChild(row);
+        row.querySelector('input').focus();
+    }
+
+    /* Add a preset included item (quick chip click) */
+    function addPresetIncluded(eventId, text) {
+        let list;
+        if (eventId === 'new') {
+            list = document.getElementById('new-included-list');
+        } else {
+            list = document.getElementById(`included-list-${eventId}`);
+        }
+        if (!list) return;
+
+        const row = document.createElement('div');
+        row.className = 'included-row';
+        row.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
+        row.innerHTML = `
+            <input type="text" class="included-input" value="${text.replace(/"/g, '&quot;')}"
+                   style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
+            <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;flex-shrink:0;">✕</button>
+        `;
+        list.appendChild(row);
+        row.querySelector('input').focus();
+    }
+
+    async function submitCreateEvent() {
+        const title = document.getElementById('new-title').value.trim();
+        const date  = document.getElementById('new-date').value;
+
+        if (!title) { toast('Event title is required', 'error'); document.getElementById('new-title').focus(); return; }
+        if (!date)  { toast('Event date is required', 'error');  document.getElementById('new-date').focus(); return; }
+
+        const includedInputs = document.querySelectorAll('#new-included-list .included-input');
+        const included = Array.from(includedInputs).map(i => i.value.trim()).filter(Boolean);
+
+        const bookingType = document.getElementById('new-booking-type').value;
+        const sessionType = document.getElementById('new-session-type').value;
+        const horizon = parseInt(document.getElementById('new-horizon').value) || 90;
+        const blackoutRaw = document.getElementById('new-blackout').value.trim();
+        const blackoutDates = blackoutRaw
+            ? blackoutRaw.split(',').map(s => s.trim()).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s))
+            : [];
+
+        const payload = {
+            title,
+            subtitle:       document.getElementById('new-subtitle').value.trim(),
+            date,
+            start_time:     document.getElementById('new-start').value,
+            end_time:       document.getElementById('new-end').value,
+            session_length: parseInt(document.getElementById('new-session').value),
+            break_length:   parseInt(document.getElementById('new-break').value),
+            deposit:        parseFloat(document.getElementById('new-deposit').value),
+            full_price:     parseFloat(document.getElementById('new-fullprice').value),
+            status:         document.getElementById('new-status').value,
+            location:       document.getElementById('new-location').value.trim(),
+            featured:       document.getElementById('new-featured').checked,
+            included,
+            booking_type:   bookingType,
+            session_type:   sessionType,
+            availability_horizon_days: bookingType === 'rolling_availability' ? horizon : undefined,
+            blackout_dates: bookingType === 'rolling_availability' ? blackoutDates : undefined,
+        };
+
+        const btn = document.getElementById('create-submit-btn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Creating…';
+
+        try {
+            const res  = await fetch('/admin/events/create', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('✅ Event created! Opening Photos tab…', 'success');
+                closeCreateModal();
+                sessionStorage.setItem('scrollTo', 'events-section');
+                sessionStorage.setItem('openPhotosTab', data.event_id || '');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+                btn.disabled = false;
+                btn.textContent = '✦ Create event';
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = '✦ Create event';
+        }
+    }
+
+    // Restore scroll position + auto-open Photos tab after event creation
+    window.addEventListener('DOMContentLoaded', () => {
+        const target = sessionStorage.getItem('scrollTo');
+        if (target) {
+            sessionStorage.removeItem('scrollTo');
+            const el = document.getElementById(target);
+            if (el) setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'start'}), 200);
+        }
+        const openPhotosFor = sessionStorage.getItem('openPhotosTab');
+        if (openPhotosFor) {
+            sessionStorage.removeItem('openPhotosTab');
+            setTimeout(() => {
+                const card = document.getElementById(`ev-card-${openPhotosFor}`);
+                if (card) {
+                    switchTab(openPhotosFor, 'photos');
+                    card.scrollIntoView({behavior:'smooth', block:'start'});
+                    // Highlight the Photos tab briefly
+                    const tab = card.querySelector(`.ev-tab[data-tab="photos"]`);
+                    if (tab) { tab.style.background='var(--accent-light)'; setTimeout(()=>tab.style.background='',1400); }
+                }
+            }, 350);
+        }
+    });
+
+    /* ══════════════════════════════════════════════════════════
+       DELETE EVENT
+    ══════════════════════════════════════════════════════════ */
+    async function deleteEvent(eventId, title) {
+        const confirmed = confirm(
+            `Delete event "${title}"?\n\n` +
+            `This will permanently remove the event from your system.\n` +
+            `⚠️ Active bookings for this event will NOT be deleted from the database,\n` +
+            `but the event will no longer be accessible.\n\nProceed?`
+        );
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`/admin/events/${eventId}/delete`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                toast('Event deleted', 'error');
+                const card = document.getElementById(`ev-card-${eventId}`);
+                if (card) {
+                    card.style.transition = 'opacity 0.4s, transform 0.4s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.97)';
+                    setTimeout(() => card.remove(), 400);
+                }
+            } else if (data.active_bookings) {
+                // Has active bookings — ask to force
+                const force = confirm(
+                    `⚠️ This event has ${data.active_bookings} active booking(s).\n\n` +
+                    `Are you sure you want to delete the event anyway?\n` +
+                    `(Existing bookings will remain in the database but the event will be gone.)`
+                );
+                if (!force) return;
+
+                const res2 = await fetch(`/admin/events/${eventId}/delete`, {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ force: true })
+                });
+                const data2 = await res2.json();
+                if (data2.success) {
+                    toast('Event force-deleted', 'error');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    toast('Error: ' + (data2.error || 'Unknown'), 'error');
+                }
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       DUPLICATE EVENT
+    ══════════════════════════════════════════════════════════ */
+    async function duplicateEvent(eventId, title) {
+        if (!confirm(`Duplicate "${title}"?\n\nA copy will be created with status "upcoming" and no photos.`)) return;
+
+        try {
+            const res = await fetch(`/admin/events/${eventId}/duplicate`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast(`✅ Duplicated as "${data.new_event_id}". Reloading…`, 'success');
+                sessionStorage.setItem('scrollTo', 'events-section');
+                setTimeout(() => location.reload(), 900);
+            } else {
+                toast('Error: ' + (data.error || 'Unknown'), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        }
+    }
+</script>
+
+<!-- ── RESCHEDULE MODAL ─────────────────────────────────────────────────── -->
+<div class="resched-modal" id="resched-modal" onclick="if(event.target===this)closeRescheduleModal()">
+    <div class="resched-box">
+        <h3>📅 Reschedule booking</h3>
+        <p class="sub">Move the client to a new event, date, or time. Deposit and confirmed status are preserved.</p>
+
+        <div class="resched-old" id="resched-old">—</div>
+
+        <div class="resched-field">
+            <label for="resched-event">Event</label>
+            <select id="resched-event" onchange="_onReschedEventChange()"></select>
+        </div>
+
+        <div class="resched-field">
+            <label for="resched-date">Date</label>
+            <input type="date" id="resched-date" onchange="_loadReschedSlots(); _reschedState.selectedSlot=''; document.getElementById('resched-submit').disabled=true;">
+        </div>
+
+        <div class="resched-field">
+            <label>Time slot</label>
+            <div class="resched-slots" id="resched-slots">
+                <div class="resched-empty">Pick a date to see slots.</div>
+            </div>
+        </div>
+
+        <div class="resched-actions">
+            <button type="button" class="cancel" onclick="closeRescheduleModal()">Cancel</button>
+            <button type="button" class="submit" id="resched-submit" onclick="submitReschedule()" disabled>Move booking</button>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

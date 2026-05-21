@@ -1,0 +1,53 @@
+{
+  "project": "Pashynska Booking (iryna-booking)",
+  "timestamp": "2026-05-12-1502",
+  "status": "PASSED",
+  "layers": {
+    "layer1_business_logic": {
+      "status": "PASSED",
+      "passed": 9,
+      "failed": 0,
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer1_business_logic/test_layer1.py -q --tb=short",
+      "output_summary": "9 passed in 9.00s"
+    },
+    "layer2_api_database": {
+      "status": "PASSED",
+      "passed": 10,
+      "failed": 0,
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer2_api_database/test_layer2.py -q --tb=short",
+      "output_summary": "10 passed in 0.08s"
+    },
+    "layer3_ui_e2e": {
+      "status": "PASSED",
+      "passed": 9,
+      "failed": 0,
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer3_ui_e2e/test_layer3.py -q --tb=short",
+      "output_summary": "9 passed in 8.04s"
+    },
+    "layer4_visual": {
+      "status": "PASSED",
+      "passed": 2,
+      "failed": 0,
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer4_visual/test_layer4.py -q --tb=short",
+      "output_summary": "2 passed in 3.29s"
+    }
+  },
+  "full_e2e": {
+    "status": "PASSED",
+    "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 qa/nightly/tests/full_e2e_demo.py",
+    "report": "/Users/andrzej/business/iryna/iryna-booking/qa/nightly/reports/full_e2e_20260512_150152.json",
+    "email": "qa-e2e-150144@example.com"
+  },
+  "cleanup": {
+    "status": "PASSED",
+    "db_path": "/Users/andrzej/.pashynska-data/bookings.db",
+    "deleted": 1,
+    "remaining_qa_bookings": 0,
+    "patterns": [
+      "qa-%",
+      "qa-test%",
+      "%@example.com"
+    ]
+  },
+  "summary": "Autonomous QA Complete: Layer1 9/9, Layer2 10/10, Layer3 9/9, Layer4 2/2, E2E PASSED"
+}

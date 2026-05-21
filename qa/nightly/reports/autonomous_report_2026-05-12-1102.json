@@ -1,0 +1,44 @@
+{
+  "project": "Pashynska Booking (iryna-booking)",
+  "timestamp": "2026-05-12-1102",
+  "status": "passed",
+  "layers": {
+    "layer1_business_logic": {
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer1_business_logic/test_layer1.py -q --tb=short"
+    },
+    "layer2_api_database": {
+      "status": "passed",
+      "passed": 10,
+      "failed": 0,
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer2_api_database/test_layer2.py -q --tb=short"
+    },
+    "layer3_ui_e2e": {
+      "status": "passed",
+      "passed": 9,
+      "failed": 0,
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer3_ui_e2e/test_layer3.py -q --tb=short"
+    },
+    "layer4_visual": {
+      "status": "passed",
+      "passed": 2,
+      "failed": 0,
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer4_visual/test_layer4.py -q --tb=short"
+    }
+  },
+  "full_e2e": {
+    "status": "passed",
+    "report": "qa/nightly/reports/full_e2e_20260512_110157.json",
+    "booking_id": 155,
+    "email": "qa-e2e-110149@example.com"
+  },
+  "cleanup": {
+    "status": "passed",
+    "db_path": "/Users/andrzej/.pashynska-data/bookings.db",
+    "deleted_qa_bookings": 1,
+    "remaining_qa_bookings": 0
+  },
+  "summary": "✅ Autonomous QA Complete: Layer1 9/9, Layer2 10/10, Layer3 9/9, Layer4 2/2, E2E PASSED"
+}

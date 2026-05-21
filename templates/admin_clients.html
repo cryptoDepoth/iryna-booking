@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Client Database · Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Palette mirrors templates/admin.html so the two pages feel like one app. */
+  :root {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface2: #f7f8fa;
+    --border: #e4e7ec;
+    --border-strong: #d1d5db;
+    --text: #111827;
+    --text-2: #6b7280;
+    --muted: #9ca3af;
+    --accent: #f97316;
+    --accent-light: #fff7ed;
+    --accent-strong: #ea580c;
+    --topbar-bg: #111827;
+    --topbar-link: #9ca3af;
+    --success: #16a34a;
+    --success-bg: #dcfce7;
+    --warn: #d97706;
+    --warn-bg: #fef3c7;
+    --danger: #dc2626;
+    --danger-bg: #fee2e2;
+    --tag-vip: #c2410c;
+    --tag-vip-bg: #ffedd5;
+    --tag-family: #1d4ed8;
+    --tag-family-bg: #dbeafe;
+    --tag-couple: #be185d;
+    --tag-couple-bg: #fce7f3;
+    --tag-returning: #15803d;
+    --tag-returning-bg: #dcfce7;
+    --tag-new: #6d28d9;
+    --tag-new-bg: #ede9fe;
+    --tag-corporate: #a16207;
+    --tag-corporate-bg: #fef9c3;
+    --radius: 10px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  /* ── TOP BAR (matches admin.html) ── */
+  .topbar {
+    background: var(--topbar-bg);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-brand {
+    display: flex; align-items: center; gap: 10px;
+    color: #fff; font-weight: 600; font-size: 15px; white-space: nowrap;
+  }
+  .topbar-brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .topbar-nav { display: flex; gap: 4px; }
+  .topbar-nav a {
+    color: var(--topbar-link); font-size: 13px; text-decoration: none;
+    padding: 6px 12px; border-radius: var(--radius-sm);
+    transition: color .15s, background .15s;
+  }
+  .topbar-nav a:hover { color: #fff; background: rgba(255,255,255,.06); }
+  .topbar-nav a.active { color: var(--accent); background: rgba(249,115,22,.15); }
+  .topbar-spacer { flex: 1; }
+  .backup-btn {
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+    color: #e5e7eb; font-size: 12px; font-weight: 500; padding: 6px 14px;
+    border-radius: var(--radius-sm); cursor: pointer; transition: all .15s;
+  }
+  .backup-btn:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.25); color: #fff; }
+  .export-btn {
+    background: var(--accent); color: #fff; font-size: 12px; font-weight: 600;
+    padding: 7px 16px; border: none; border-radius: var(--radius-sm); cursor: pointer;
+    text-decoration: none; transition: background .15s;
+  }
+  .export-btn:hover { background: var(--accent-strong); }
+
+  /* ── LAYOUT ── */
+  .layout { display: grid; grid-template-columns: 1fr 420px; gap: 0; height: calc(100vh - 56px); }
+  .list-panel { overflow-y: auto; border-right: 1px solid var(--border); background: var(--bg); }
+  .detail-panel { overflow-y: auto; background: var(--surface); }
+
+  /* ── SEARCH / FILTER BAR ── */
+  .search-bar {
+    padding: 14px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .search-input-wrap { position: relative; flex: 1; min-width: 180px; }
+  .search-input-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; stroke: var(--muted); }
+  .search-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-size: 13px; padding: 8px 12px 8px 34px;
+    border-radius: var(--radius-sm); outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,.12); }
+  .search-input::placeholder { color: var(--muted); }
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag-filter {
+    font-size: 11px; font-weight: 600; padding: 4px 10px;
+    border-radius: 20px; border: 1px solid var(--border); background: var(--surface);
+    cursor: pointer; transition: all .15s; user-select: none;
+    color: var(--text-2);
+  }
+  .tag-filter:hover { background: var(--surface2); }
+  .tag-filter.all.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .sort-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-2); font-size: 12px; padding: 7px 10px;
+    border-radius: var(--radius-sm); cursor: pointer; outline: none;
+  }
+  .sort-select:focus { border-color: var(--accent); }
+  .client-count { color: var(--text-2); font-size: 12px; white-space: nowrap; }
+
+  /* ── CLIENT CARD (list) ── */
+  .client-list { padding: 12px; }
+  .client-card {
+    padding: 14px 16px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all .15s;
+    display: flex; gap: 12px; align-items: flex-start;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow);
+  }
+  .client-card:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+  .client-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,.15); }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #fb923c, var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; color: #fff; flex-shrink: 0;
+  }
+  .card-body { flex: 1; min-width: 0; }
+  .card-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-email { font-size: 12px; color: var(--text-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-meta { display: flex; gap: 10px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+  .card-stat { font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .card-stat b { color: var(--text); font-weight: 600; }
+  .card-last { font-size: 11px; color: var(--muted); }
+  .tag-chip {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+    letter-spacing: .03em;
+  }
+  .tag-VIP        { background: var(--tag-vip-bg);        color: var(--tag-vip); }
+  .tag-FAMILY     { background: var(--tag-family-bg);     color: var(--tag-family); }
+  .tag-COUPLE     { background: var(--tag-couple-bg);     color: var(--tag-couple); }
+  .tag-RETURNING  { background: var(--tag-returning-bg);  color: var(--tag-returning); }
+  .tag-NEW        { background: var(--tag-new-bg);        color: var(--tag-new); }
+  .tag-CORPORATE  { background: var(--tag-corporate-bg);  color: var(--tag-corporate); }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-2); }
+  .empty-state svg { margin-bottom: 14px; opacity: .4; stroke: var(--muted); }
+  .empty-state p { font-size: 14px; }
+
+  /* ── DETAIL PANEL ── */
+  .detail-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; color: var(--text-2); gap: 12px; padding: 40px;
+  }
+  .detail-empty svg { opacity: .35; stroke: var(--muted); }
+  .detail-empty p { font-size: 14px; text-align: center; }
+  .detail-content { padding: 24px; display: none; }
+  .detail-content.show { display: block; }
+
+  /* Profile header */
+  .profile-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 20px; }
+  .profile-avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, #fb923c, var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 20px; color: #fff; flex-shrink: 0;
+  }
+  .profile-info { flex: 1; min-width: 0; }
+  .profile-name { font-size: 18px; font-weight: 700; color: var(--text); }
+  .profile-email { font-size: 13px; color: var(--text-2); margin-top: 2px; word-break: break-all; }
+  .profile-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+  /* Stats row */
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .stat-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px;
+    text-align: center;
+  }
+  .stat-box .num { font-size: 22px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+  .stat-box .lbl { font-size: 11px; color: var(--text-2); margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
+
+  /* Info rows */
+  .info-section { margin-bottom: 22px; }
+  .section-title {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-2); margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .info-row { display: flex; gap: 12px; margin-bottom: 8px; align-items: center; }
+  .info-label { font-size: 12px; color: var(--text-2); width: 100px; flex-shrink: 0; }
+  .info-val { font-size: 13px; color: var(--text); flex: 1; min-width: 0; word-break: break-all; }
+  .info-val a { color: var(--accent); text-decoration: none; }
+  .info-val a:hover { text-decoration: underline; }
+  .edit-field {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 13px; padding: 6px 10px;
+    border-radius: 6px; outline: none; width: 100%;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .edit-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,.12); }
+  .save-edit-btn {
+    font-size: 12px; font-weight: 600; background: var(--accent); color: #fff;
+    border: none; border-radius: 6px; padding: 7px 14px; cursor: pointer;
+    transition: background .15s;
+  }
+  .save-edit-btn:hover { background: var(--accent-strong); }
+
+  /* Tags editor */
+  .tags-editor { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag-toggle {
+    font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 20px;
+    cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-2); transition: all .15s; user-select: none;
+  }
+  .tag-toggle:hover { border-color: var(--border-strong); }
+  .tag-toggle[data-tag="VIP"].on        { background: var(--tag-vip-bg);       color: var(--tag-vip);       border-color: var(--tag-vip-bg); }
+  .tag-toggle[data-tag="FAMILY"].on     { background: var(--tag-family-bg);    color: var(--tag-family);    border-color: var(--tag-family-bg); }
+  .tag-toggle[data-tag="COUPLE"].on     { background: var(--tag-couple-bg);    color: var(--tag-couple);    border-color: var(--tag-couple-bg); }
+  .tag-toggle[data-tag="RETURNING"].on  { background: var(--tag-returning-bg); color: var(--tag-returning); border-color: var(--tag-returning-bg); }
+  .tag-toggle[data-tag="NEW"].on        { background: var(--tag-new-bg);       color: var(--tag-new);       border-color: var(--tag-new-bg); }
+  .tag-toggle[data-tag="CORPORATE"].on  { background: var(--tag-corporate-bg); color: var(--tag-corporate); border-color: var(--tag-corporate-bg); }
+
+  /* Bookings */
+  .booking-row {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 10px 14px; margin-bottom: 8px;
+    display: flex; gap: 12px; align-items: center;
+    text-decoration: none; color: inherit;
+    transition: border-color .15s, box-shadow .15s;
+    cursor: pointer;
+  }
+  .booking-row:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,.10); }
+  .booking-date { font-size: 13px; font-weight: 600; color: var(--text); min-width: 90px; font-variant-numeric: tabular-nums; }
+  .booking-time { font-size: 12px; color: var(--text-2); min-width: 60px; font-variant-numeric: tabular-nums; }
+  .booking-type { font-size: 12px; color: var(--text); flex: 1; }
+  .booking-row .chev { color: var(--muted); font-size: 14px; }
+  .status-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; letter-spacing: .03em;
+  }
+  .status-confirmed { background: var(--success-bg); color: var(--success); }
+  .status-reserved, .status-pending_payment { background: var(--warn-bg); color: var(--warn); }
+  .status-cancelled, .status-expired { background: var(--danger-bg); color: var(--danger); }
+
+  /* Notes */
+  .note-item {
+    background: var(--surface2); border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 10px 14px; margin-bottom: 8px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .note-text { flex: 1; font-size: 13px; color: var(--text); line-height: 1.5; }
+  .note-date { font-size: 11px; color: var(--text-2); white-space: nowrap; }
+  .note-del {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 2px 4px; transition: color .15s;
+  }
+  .note-del:hover { color: var(--danger); }
+  .note-add-row { display: flex; gap: 8px; margin-top: 6px; }
+  .note-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 13px; padding: 8px 12px; border-radius: var(--radius-sm);
+    outline: none; resize: none; font-family: inherit;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .note-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,.12); }
+  .note-input::placeholder { color: var(--muted); }
+  .note-add-btn {
+    background: var(--accent); color: #fff; border: none; font-size: 12px;
+    font-weight: 700; padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer;
+    transition: background .15s; align-self: flex-start;
+  }
+  .note-add-btn:hover { background: var(--accent-strong); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 13px; padding: 12px 18px;
+    border-radius: var(--radius-sm); box-shadow: 0 8px 32px rgba(0,0,0,.12);
+    opacity: 0; transform: translateY(8px); transition: all .25s;
+    pointer-events: none; z-index: 9999;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.ok { border-left: 3px solid var(--success); }
+  .toast.err { border-left: 3px solid var(--danger); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* Loading skeleton */
+  .skeleton { background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    .detail-panel { display: none; }
+    .detail-panel.mobile-show { display: block; }
+    .layout.detail-open .list-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <span class="topbar-brand">📸 Pashynska Studio</span>
+  <nav class="topbar-nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/clients" class="active">👥 Clients</a>
+  </nav>
+  <span class="topbar-spacer"></span>
+  <button class="backup-btn" onclick="triggerBackup()">💾 Backup Now</button>
+  <a class="export-btn" href="/admin/api/clients/export">⬇ Export CSV</a>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div class="layout" id="layout">
+
+  <!-- LIST PANEL -->
+  <div class="list-panel">
+    <div class="search-bar">
+      <div class="search-input-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a8590" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-input" id="searchInput" placeholder="Search name, email, phone…" oninput="debounceSearch()" />
+      </div>
+      <select class="sort-select" id="sortSelect" onchange="loadClients()">
+        <option value="last_booking_at">Last booking</option>
+        <option value="total_bookings">Most bookings</option>
+        <option value="total_paid">Highest spend</option>
+        <option value="name">Name A–Z</option>
+        <option value="created_at">Newest client</option>
+      </select>
+      <span class="client-count" id="clientCount"></span>
+    </div>
+
+    <!-- Tag filter row -->
+    <div class="search-bar" style="padding-top:8px;padding-bottom:8px;border-top:none;">
+      <div class="filter-row" id="tagFilters">
+        <span class="tag-filter all active" data-tag="" onclick="setTagFilter(this)">All</span>
+        <span class="tag-filter" data-tag="VIP" onclick="setTagFilter(this)" style="background:rgba(200,169,126,.1);color:var(--tag-vip);border-color:rgba(200,169,126,.3)">VIP</span>
+        <span class="tag-filter" data-tag="FAMILY" onclick="setTagFilter(this)" style="background:rgba(126,184,224,.1);color:var(--tag-family);border-color:rgba(126,184,224,.3)">Family</span>
+        <span class="tag-filter" data-tag="COUPLE" onclick="setTagFilter(this)" style="background:rgba(224,126,176,.1);color:var(--tag-couple);border-color:rgba(224,126,176,.3)">Couple</span>
+        <span class="tag-filter" data-tag="RETURNING" onclick="setTagFilter(this)" style="background:rgba(126,224,176,.1);color:var(--tag-returning);border-color:rgba(126,224,176,.3)">Returning</span>
+        <span class="tag-filter" data-tag="NEW" onclick="setTagFilter(this)" style="background:rgba(160,126,224,.1);color:var(--tag-new);border-color:rgba(160,126,224,.3)">New</span>
+        <span class="tag-filter" data-tag="CORPORATE" onclick="setTagFilter(this)" style="background:rgba(224,200,74,.1);color:var(--tag-corporate);border-color:rgba(224,200,74,.3)">Corporate</span>
+      </div>
+    </div>
+
+    <div class="client-list" id="clientList">
+      <!-- Skeleton -->
+      <div style="padding:8px;">
+        <div class="skeleton" style="height:68px;border-radius:12px;margin-bottom:4px;"></div>
+        <div class="skeleton" style="height:68px;border-radius:12px;margin-bottom:4px;"></div>
+        <div class="skeleton" style="height:68px;border-radius:12px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL PANEL -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-empty" id="detailEmpty">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+      <p>Select a client<br>to view their profile</p>
+    </div>
+    <div class="detail-content" id="detailContent"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let clients = [];
+let activeTag = "";
+let searchTimer = null;
+let selectedId = null;
+let currentClient = null;
+
+const TAGS = ["VIP","FAMILY","COUPLE","RETURNING","NEW","CORPORATE"];
+
+// ── Init ──
+loadClients();
+
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadClients, 280);
+}
+
+function setTagFilter(el) {
+  document.querySelectorAll(".tag-filter").forEach(e => e.classList.remove("active"));
+  el.classList.add("active");
+  activeTag = el.dataset.tag;
+  loadClients();
+}
+
+async function loadClients() {
+  const q = document.getElementById("searchInput").value.trim();
+  const sort = document.getElementById("sortSelect").value;
+  const params = new URLSearchParams({ q, sort });
+  if (activeTag) params.set("tag", activeTag);
+
+  try {
+    const res = await fetch(`/admin/api/clients?${params}`);
+    // Session expired — bounce to login with a return path so the operator
+    // lands back here, not at /admin.
+    if (res.status === 401 || res.status === 403) {
+      const next = encodeURIComponent(location.pathname + location.search);
+      location.href = "/admin/login?next=" + next;
+      return;
+    }
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const body = await res.json();
+    // Defensive: API contract is an array. If it ever drifts (auth redirect,
+    // 500 with HTML body), keep the page usable instead of a stuck skeleton.
+    clients = Array.isArray(body) ? body : [];
+    renderList();
+  } catch(e) {
+    clients = [];
+    renderListError(e && e.message ? e.message : "Network error");
+    showToast("Failed to load clients — " + (e && e.message ? e.message : "network error"), "err");
+  }
+}
+
+function renderListError(detail) {
+  const el = document.getElementById("clientList");
+  el.innerHTML = `<div class="empty-state" role="alert">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <p>Couldn't load clients<br><span style="font-size:12px;color:var(--text-2);">${esc(detail || "")}</span></p>
+    <button class="save-edit-btn" style="margin-top:10px;" onclick="loadClients()">Try again</button>
+  </div>`;
+  document.getElementById("clientCount").textContent = "—";
+}
+
+function renderList() {
+  const el = document.getElementById("clientList");
+  document.getElementById("clientCount").textContent = `${clients.length} client${clients.length !== 1 ? "s" : ""}`;
+
+  if (!clients.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <p>No clients found</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = clients.map(c => {
+    const initials = (c.name || "?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+    const tags = parseTags(c.tags);
+    const tagChips = tags.map(t => `<span class="tag-chip tag-${t}">${esc(t)}</span>`).join("");
+    const paid = c.total_paid ? `$${parseFloat(c.total_paid).toFixed(0)}` : "$0";
+    const lastBk = c.last_booking_at ? `· last ${fmtDate(c.last_booking_at)}` : "";
+    return `<div class="client-card ${c.id === selectedId ? 'selected' : ''}" onclick="openClient(${c.id})">
+      <div class="avatar">${initials}</div>
+      <div class="card-body">
+        <div class="card-name">${esc(c.name || "Unknown")}</div>
+        <div class="card-email">${esc(c.email || "")}</div>
+        <div class="card-meta">
+          <span class="card-stat"><b>${c.total_bookings || 0}</b> sessions</span>
+          <span class="card-stat"><b>${paid}</b> spent</span>
+          <span class="card-last">${lastBk}</span>
+          ${tagChips}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// Defensive: the legacy schema stored tags as DEFAULT '[]' (JSON-ish) while
+// the rest of the code uses CSV. Strip the "[]" artifact and accept any
+// known tag from the TAGS whitelist; ignore garbage so we never render
+// `tag-[]` (which broke the old design).
+function parseTags(raw) {
+  if (!raw || raw === "[]") return [];
+  const parts = String(raw).split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+  return parts.filter(t => TAGS.includes(t));
+}
+
+async function openClient(id) {
+  selectedId = id;
+  renderList(); // refresh selection highlight
+
+  document.getElementById("detailEmpty").style.display = "none";
+  document.getElementById("detailContent").classList.remove("show");
+  document.getElementById("detailContent").innerHTML = `<div style="padding:60px;text-align:center;color:var(--muted)">Loading…</div>`;
+  document.getElementById("detailContent").classList.add("show");
+
+  try {
+    const res = await fetch(`/admin/api/clients/${id}`);
+    if (!res.ok) {
+      document.getElementById("detailContent").innerHTML = `<div style="padding:60px;text-align:center;color:var(--danger)"><b>Error ${res.status}</b><br>Could not load client details.</div>`;
+      return;
+    }
+    const data = await res.json();
+    if (data.error) {
+      document.getElementById("detailContent").innerHTML = `<div style="padding:60px;text-align:center;color:var(--danger)">${esc(data.error)}</div>`;
+      return;
+    }
+    currentClient = data.client;
+    renderDetail(data);
+  } catch(e) {
+    document.getElementById("detailContent").innerHTML = `<div style="padding:60px;text-align:center;color:var(--danger)">Failed to load client:<br>${esc(e.message || e)}</div>`;
+  }
+}
+
+function renderDetail({ client, bookings, notes }) {
+  const initials = (client.name || "?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+  const tags = parseTags(client.tags);
+  const tagChips = tags.map(t => `<span class="tag-chip tag-${t}">${esc(t)}</span>`).join(" ");
+
+  const sinceDate = client.first_booking_at ? fmtDate(client.first_booking_at) : "—";
+  const lastDate = client.last_booking_at ? fmtDate(client.last_booking_at) : "—";
+
+  const tagToggles = TAGS.map(t => {
+    const on = tags.includes(t);
+    return `<span class="tag-toggle ${on ? 'on' : ''}" data-tag="${t}" onclick="toggleTag(${client.id}, '${t}', this)">${t}</span>`;
+  }).join("");
+
+  const bookingRows = bookings.length ? bookings.map(b => {
+    const sc = `status-${b.status}`;
+    return `<div class="booking-row">
+      <span class="booking-date">${b.date || "—"}</span>
+      <span class="booking-time">${b.time || "—"}</span>
+      <span class="booking-type">${esc(b.session_type || "Session")}</span>
+      <span class="status-badge ${sc}">${b.status}</span>
+    </div>`;
+  }).join("") : `<p style="color:var(--muted);font-size:13px;">No bookings yet.</p>`;
+
+  const noteItems = notes.map(n => `<div class="note-item" data-note-id="${n.id}">
+    <span class="note-text">${esc(n.text)}</span>
+    <span class="note-date">${fmtDate(n.created_at)}</span>
+    <button class="note-del" onclick="deleteNote(${client.id}, ${n.id})" title="Delete note">✕</button>
+  </div>`).join("");
+
+  const html = `
+    <div class="profile-head">
+      <div class="profile-avatar">${initials}</div>
+      <div class="profile-info">
+        <div class="profile-name">${esc(client.name || "Unknown")}</div>
+        <div class="profile-email">${esc(client.email || "")}</div>
+        <div class="profile-tags">${tagChips || '<span style="color:var(--muted);font-size:12px;">No tags</span>'}</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="num">${client.total_bookings || 0}</div><div class="lbl">Total Sessions</div></div>
+      <div class="stat-box"><div class="num">${client.total_confirmed || 0}</div><div class="lbl">Confirmed</div></div>
+      <div class="stat-box"><div class="num">$${parseFloat(client.total_paid || 0).toFixed(0)}</div><div class="lbl">Total Paid</div></div>
+    </div>
+
+    <div class="info-section">
+      <div class="section-title">Contact Info</div>
+      <div class="info-row">
+        <span class="info-label">Phone</span>
+        <span class="info-val">
+          <input class="edit-field" id="edit-phone" value="${esc(client.phone || "")}" placeholder="—" />
+        </span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Instagram</span>
+        <span class="info-val">
+          <input class="edit-field" id="edit-instagram" value="${esc(client.instagram || "")}" placeholder="—" />
+        </span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Client Since</span>
+        <span class="info-val">${sinceDate}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Last Booking</span>
+        <span class="info-val">${lastDate}</span>
+      </div>
+      <div style="margin-top:8px;">
+        <button class="save-edit-btn" onclick="saveClientEdit(${client.id})">Save Changes</button>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <div class="section-title">Tags</div>
+      <div class="tags-editor">${tagToggles}</div>
+    </div>
+
+    <div class="info-section">
+      <div class="section-title">Booking History (${bookings.length})</div>
+      ${bookingRows}
+    </div>
+
+    <div class="info-section">
+      <div class="section-title">Notes (${notes.length})</div>
+      <div id="notesList">${noteItems}</div>
+      <div class="note-add-row">
+        <textarea class="note-input" id="noteInput" rows="2" placeholder="Add a note…"></textarea>
+        <button class="note-add-btn" onclick="addNote(${client.id})">Add</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("detailContent").innerHTML = html;
+}
+
+async function toggleTag(clientId, tag, el) {
+  const isOn = el.classList.contains("on");
+  const action = isOn ? "remove" : "add";
+  try {
+    const res = await fetch(`/admin/api/clients/${clientId}/tag`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag, action })
+    });
+    const data = await res.json();
+    if (data.success) {
+      el.classList.toggle("on");
+      // Update client in list
+      const ci = clients.findIndex(c => c.id === clientId);
+      if (ci !== -1) clients[ci].tags = data.tags;
+      renderList();
+      showToast(isOn ? `Tag ${tag} removed` : `Tag ${tag} added`, "ok");
+    }
+  } catch(e) { showToast("Failed to update tag", "err"); }
+}
+
+async function saveClientEdit(clientId) {
+  const phone = document.getElementById("edit-phone").value.trim();
+  const instagram = document.getElementById("edit-instagram").value.trim();
+  try {
+    const res = await fetch(`/admin/api/clients/${clientId}/edit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, instagram })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast("Client updated", "ok");
+      // Refresh list
+      loadClients();
+    }
+  } catch(e) { showToast("Failed to save", "err"); }
+}
+
+async function addNote(clientId) {
+  const input = document.getElementById("noteInput");
+  const text = input.value.trim();
+  if (!text) return;
+  try {
+    const res = await fetch(`/admin/api/clients/${clientId}/note`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.success) {
+      input.value = "";
+      const n = data.note;
+      const notesList = document.getElementById("notesList");
+      const div = document.createElement("div");
+      div.className = "note-item";
+      div.dataset.noteId = n.id;
+      div.innerHTML = `<span class="note-text">${esc(n.text)}</span>
+        <span class="note-date">${fmtDate(n.created_at)}</span>
+        <button class="note-del" onclick="deleteNote(${clientId}, ${n.id})" title="Delete note">✕</button>`;
+      notesList.prepend(div);
+      showToast("Note added", "ok");
+    }
+  } catch(e) { showToast("Failed to add note", "err"); }
+}
+
+async function deleteNote(clientId, noteId) {
+  try {
+    const res = await fetch(`/admin/api/clients/${clientId}/note/${noteId}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.success) {
+      const el = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
+      if (el) el.remove();
+      showToast("Note deleted", "ok");
+    }
+  } catch(e) { showToast("Failed to delete note", "err"); }
+}
+
+async function triggerBackup() {
+  try {
+    const res = await fetch("/admin/backup", { method: "POST" });
+    const data = await res.json();
+    if (data.success) showToast("✅ Backup created successfully", "ok");
+    else showToast("Backup failed: " + data.error, "err");
+  } catch(e) { showToast("Backup failed", "err"); }
+}
+
+// ── Helpers ──
+function esc(str) {
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function fmtDate(iso) {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-CA", { year:"numeric", month:"short", day:"numeric" });
+  } catch { return iso; }
+}
+let toastTimer;
+function showToast(msg, type="ok") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 3000);
+}
+</script>
+</body>
+</html>

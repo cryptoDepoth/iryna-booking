@@ -1,0 +1,57 @@
+events:
+- id: lilac-jun7
+  title: 🪻 Lilac Mini Sessions
+  subtitle: Soft spring moments you'll want to keep forever
+  date: '2026-06-07'
+  start_time: '15:00'
+  end_time: '19:00'
+  session_length: 20
+  break_length: 10
+  slot_interval: 30
+  deposit: 250.0
+  full_price: 500.0
+  location: Calgary — exact spot sent after booking
+  session_type: mini
+  featured: true
+  included:
+  - 20 minutes among blooming lilacs
+  - 15 professionally edited photos
+  - All original JPEGs included
+  - Quick turnaround within 48 hours
+  photos:
+  - /images/lilac-jun7_fc0f222e.jpg
+  - /images/lilac-jun7_ee3244d9.jpeg
+  status: active
+- id: blossom-may3
+  title: 🪻 Blossom Mini Sessions
+  subtitle: Capture your family's most beautiful season
+  date: '2026-05-03'
+  start_time: '10:00'
+  end_time: '16:00'
+  session_length: 20
+  break_length: 10
+  slot_interval: 30
+  deposit: 200.0
+  full_price: 400.0
+  location: Calgary — exact spot sent after booking
+  session_type: mini
+  featured: false
+  included:
+  - 20 minutes among blooming lilacs
+  - 15 professionally edited photos
+  - All original photos included
+  - Quick turnaround (within 48 hours)
+  photos:
+  - /images/blossom-may3_e3ec0cdd.jpeg
+  - /images/blossom-may3_646dd709.png
+  status: completed
+  hidden: true
+settings:
+  photographer_email: iryna.pashynska@gmail.com
+  photographer_name: Iryna
+  photographer_instagram: '@pashynska.photo'
+  photographer_instagram_url: https://instagram.com/pashynska.photo
+  reservation_minutes: 15
+  currency: CAD
+  tax_label: +GST
+  timezone: America/Edmonton

@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#faf7f5">
+<title>Pashynska — 21st.dev preview (mockup, не продакшн)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Tenor+Sans&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   21st.dev × Pashynska — design preview
+   Сохраняем бренд (тёплая палитра, серифные заголовки), добавляем 21st-паттерны:
+   aurora-glow фон, glass-карточки, узкие радиусы, sharper focus rings,
+   tabular nums, min-44px touch targets, плотный hover, edge-to-edge mobile.
+   Это standalone-файл с моковыми данными — открой в браузере. Никакой связи с
+   живым app.py.
+   ═══════════════════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  /* Бренд (без изменений) */
+  --nude:#f5ede8; --blush:#e8c8c0; --rose:#c4857a; --rose-deep:#a3685e;
+  --rose-glow:rgba(196,133,122,.18);
+  --ink:#1c1917; --ink-2:#44403c; --ink-3:#78716c; --ink-4:#a8a29e; --ink-5:#e7e5e4;
+  --page-bg:#faf7f5; --surface:#fff;
+  --green:#3d6b4f; --green-bg:#edf5f0;
+  --amber:#92722a; --amber-bg:#fdf5e4;
+  --red:#8b3535; --red-bg:#fdf0f0;
+
+  --font-d:'Cormorant Garamond',Georgia,serif;
+  --font-h:'Tenor Sans','Cormorant Garamond',Georgia,serif;
+  --font-b:'Inter',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+
+  /* 21st-style токены */
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --shadow-sm: 0 1px 2px rgba(28,25,23,.06);
+  --shadow:    0 4px 14px rgba(28,25,23,.08);
+  --shadow-lg: 0 16px 48px rgba(28,25,23,.12);
+  --shadow-glow: 0 0 0 1px rgba(196,133,122,.18), 0 12px 32px rgba(196,133,122,.18);
+
+  --ring: 0 0 0 3px rgba(196,133,122,.32);
+  --ring-ink: 0 0 0 3px rgba(28,25,23,.18);
+
+  --ease: cubic-bezier(.22,.61,.36,1);
+  --ease-out-back: cubic-bezier(.34,1.4,.64,1);
+
+  /* Edge-safe insets для iPhone notch / nav bar */
+  --edge: max(16px, env(safe-area-inset-left));
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001s !important;transition-duration:.001s !important}
+}
+
+html,body{overflow-x:hidden;max-width:100vw}
+body{
+  font-family:var(--font-b);
+  font-feature-settings:"cv11","ss01";
+  color:var(--ink);
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  min-height:100vh;
+  background: var(--page-bg);
+  position:relative;
+  isolation:isolate;
+}
+
+/* ── 21st aurora-glow background (CSS-only, без WebGL) ───────────────────── */
+body::before{
+  content:"";
+  position:fixed;inset:0;z-index:-2;
+  background:
+    radial-gradient(60vw 60vw at 12% -8%, rgba(232,200,192,.45), transparent 60%),
+    radial-gradient(50vw 50vw at 92% 14%, rgba(196,133,122,.28), transparent 65%),
+    radial-gradient(45vw 45vw at 50% 110%, rgba(245,237,232,.7), transparent 70%);
+  filter:saturate(1.05);
+  pointer-events:none;
+}
+/* ── Subtle dot grid overlay (21st pattern) ──────────────────────────────── */
+body::after{
+  content:"";
+  position:fixed;inset:0;z-index:-1;
+  background-image: radial-gradient(rgba(28,25,23,.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: 0 0;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.15) 60%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.15) 60%, transparent);
+  pointer-events:none;
+}
+
+img{max-width:100%;height:auto;display:block}
+
+/* ── NAV — glass, не плоская плёнка ──────────────────────────────────────── */
+.nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px var(--edge);
+  background:rgba(250,247,245,.72);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom:1px solid rgba(28,25,23,.06);
+  position:sticky;top:0;z-index:30;gap:10px;
+}
+.nav .brand{
+  font-family:var(--font-h);
+  font-size:1.15rem;font-weight:400;
+  letter-spacing:.18em;text-transform:uppercase;
+}
+.nav .brand small{
+  display:block;font-size:.55rem;font-weight:400;
+  letter-spacing:.32em;text-transform:uppercase;
+  color:var(--ink-3);margin-top:3px;
+}
+.lang-pill{
+  display:inline-flex;background:rgba(255,255,255,.7);
+  border:1px solid rgba(28,25,23,.06);
+  border-radius:999px;padding:3px;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+.lang-pill button{
+  min-height:32px; min-width:36px;     /* touch target */
+  padding:6px 10px;border-radius:999px;border:0;
+  background:transparent;color:var(--ink-3);
+  font:600 11px var(--font-b);cursor:pointer;
+  transition:all .18s var(--ease);
+}
+.lang-pill button.on{
+  background:var(--ink);color:#fff;
+  box-shadow: 0 1px 4px rgba(28,25,23,.18);
+}
+.lang-pill button:focus-visible{outline:0;box-shadow:var(--ring)}
+@media(min-width:680px){.nav{padding:18px 28px} .nav .brand{font-size:1.4rem}}
+
+/* ── HERO — split: photo + info card ─────────────────────────────────────── */
+.hero{
+  max-width:1280px;margin:0 auto;
+  padding:18px var(--edge) 0;
+}
+.hero-grid{
+  display:grid;grid-template-columns:1fr;gap:16px;align-items:stretch;
+}
+@media(min-width:900px){
+  .hero-grid{grid-template-columns:minmax(0,1.4fr) minmax(360px,1fr);gap:24px}
+}
+
+.hero-stage{
+  position:relative;border-radius:var(--radius-lg);overflow:hidden;
+  background:linear-gradient(135deg,#dbcfca,#b89c95);
+  box-shadow: var(--shadow-lg);
+  aspect-ratio:4/5;width:100%;
+}
+@media(min-width:680px){.hero-stage{aspect-ratio:3/2}}
+@media(min-width:900px){.hero-stage{aspect-ratio:auto;height:100%;min-height:560px;border-radius:var(--radius-xl)}}
+.hero-stage::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(to bottom,rgba(28,25,23,.18) 0%,transparent 30%,transparent 60%,rgba(28,25,23,.6) 100%);
+  pointer-events:none;
+}
+
+/* Demo photo: gradient + svg silhouette so превью смотрится без реальных файлов */
+.hero-stage .demo{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(80% 60% at 30% 40%, rgba(255,255,255,.4), transparent 60%),
+    linear-gradient(160deg,#e9c5b9 0%,#c4857a 55%,#8e5a52 100%);
+}
+.hero-stage .demo::before{
+  content:"🪻";position:absolute;font-size:120px;left:50%;top:46%;
+  transform:translate(-50%,-50%);filter:drop-shadow(0 6px 18px rgba(0,0,0,.25));
+  opacity:.7;
+}
+
+.hero-pill-row{
+  position:absolute;top:16px;left:16px;right:16px;
+  display:flex;gap:8px;flex-wrap:wrap;z-index:3;pointer-events:none;
+}
+.hero-pill{
+  background:rgba(255,255,255,.92);color:var(--ink);
+  padding:7px 13px;border-radius:30px;
+  font:600 .68rem var(--font-b);
+  text-transform:uppercase;letter-spacing:.1em;
+  display:inline-flex;align-items:center;gap:7px;
+  box-shadow:0 4px 14px rgba(0,0,0,.10);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+.hero-pill.dark{background:rgba(28,25,23,.82);color:#fff}
+.hero-pill.rose{background:var(--rose);color:#fff;box-shadow:0 4px 14px rgba(196,133,122,.4)}
+.hero-pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:dot-pulse 1.6s var(--ease) infinite}
+@keyframes dot-pulse{0%,100%{opacity:.55;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+
+.hero-stage-cap{
+  position:absolute;left:20px;right:20px;bottom:18px;z-index:3;color:#fff;
+  display:flex;flex-direction:column;gap:4px;pointer-events:none;
+}
+.hero-stage-cap .t{
+  font-family:var(--font-d);font-weight:300;font-size:1.7rem;line-height:1.08;
+  text-shadow:0 2px 14px rgba(0,0,0,.4);letter-spacing:-.01em;
+}
+.hero-stage-cap .s{font-size:.85rem;opacity:.92;text-shadow:0 1px 8px rgba(0,0,0,.4)}
+@media(min-width:900px){.hero-stage-cap{display:none}}
+
+/* Info-карточка справа: glass + чёткие линии */
+.hero-card{
+  background:rgba(255,255,255,.86);
+  -webkit-backdrop-filter:saturate(1.4) blur(14px);
+  backdrop-filter:saturate(1.4) blur(14px);
+  border:1px solid rgba(28,25,23,.06);
+  border-radius:var(--radius-lg);
+  padding:22px 22px 20px;
+  display:flex;flex-direction:column;gap:14px;
+  box-shadow:var(--shadow);
+}
+@media(min-width:900px){.hero-card{padding:32px 32px 28px;border-radius:var(--radius-xl);justify-content:center}}
+
+.hero-kicker{
+  font:400 .7rem var(--font-h);
+  letter-spacing:.32em;text-transform:uppercase;color:var(--rose);
+  display:inline-flex;align-items:center;gap:10px;
+}
+.hero-kicker::before{content:"";width:18px;height:1px;background:var(--rose)}
+
+.hero-title{
+  font-family:var(--font-d);font-weight:300;
+  font-size:clamp(2.1rem,4.6vw,3.2rem);
+  line-height:1.04;letter-spacing:-.012em;color:var(--ink);
+}
+.hero-title em{font-style:italic;font-weight:300;color:var(--rose)}
+
+.hero-sub{
+  font-family:var(--font-d);font-style:italic;font-weight:400;
+  font-size:1.06rem;color:var(--ink-2);line-height:1.45;
+}
+
+.hero-facts{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:0;
+  border-top:1px solid var(--ink-5);border-bottom:1px solid var(--ink-5);
+  font-variant-numeric:tabular-nums;
+}
+.hero-facts .f{padding:12px 0;display:flex;flex-direction:column;gap:3px;min-width:0;border-right:1px solid var(--ink-5)}
+.hero-facts .f:nth-child(2n){border-right:0}
+.hero-facts .f:nth-child(-n+2){border-bottom:1px solid var(--ink-5)}
+.hero-facts .f:nth-child(odd){padding-right:14px}
+.hero-facts .f:nth-child(even){padding-left:14px}
+.hero-facts .f .k{font:400 .58rem var(--font-h);letter-spacing:.24em;text-transform:uppercase;color:var(--ink-3)}
+.hero-facts .f .v{font-family:var(--font-d);font-weight:400;font-size:1.45rem;line-height:1.05;color:var(--ink)}
+.hero-facts .f .v small{font-family:var(--font-b);font-size:.66rem;font-weight:400;color:var(--ink-3);display:block;margin-top:4px;letter-spacing:.02em;text-transform:none}
+
+.hero-cta-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+
+/* PRIMARY CTA — high-contrast + subtle shimmer (21st pattern) */
+.cta{
+  min-height:48px;                                          /* touch target */
+  flex:1 1 200px;
+  position:relative;overflow:hidden;
+  background:var(--ink);color:#fff;
+  padding:14px 22px;border:0;border-radius:var(--radius);
+  font:600 .82rem var(--font-b);letter-spacing:.06em;text-transform:uppercase;
+  cursor:pointer;text-align:center;
+  transition: transform .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+  isolation:isolate;
+}
+.cta::after{
+  /* edge-to-edge shimmer на hover */
+  content:"";position:absolute;inset:0;z-index:-1;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.16) 50%, transparent 70%);
+  transform: translateX(-100%);transition:transform .55s var(--ease);
+}
+.cta:hover{transform:translateY(-1px);background:#000;box-shadow:0 14px 28px rgba(0,0,0,.22)}
+.cta:hover::after{transform:translateX(100%)}
+.cta:focus-visible{outline:0;box-shadow:var(--ring-ink), 0 14px 28px rgba(0,0,0,.22)}
+.cta:active{transform:translateY(0);box-shadow:0 4px 12px rgba(0,0,0,.18)}
+
+.cta-outline{
+  min-height:48px;
+  background:transparent;color:var(--ink);
+  border:1px solid var(--ink-5);
+  padding:14px 22px;border-radius:var(--radius);
+  font:600 .82rem var(--font-b);letter-spacing:.06em;text-transform:uppercase;
+  cursor:pointer;text-align:center;
+  transition: border-color .18s var(--ease), background .18s var(--ease);
+}
+.cta-outline:hover{border-color:var(--ink);background:rgba(28,25,23,.04)}
+.cta-outline:focus-visible{outline:0;box-shadow:var(--ring-ink)}
+
+/* ── SOCIAL PROOF ────────────────────────────────────────────────────────── */
+.proof{
+  display:flex;justify-content:center;gap:18px;flex-wrap:wrap;
+  padding:24px var(--edge) 0;font-size:.82rem;color:var(--ink-3);
+  max-width:980px;margin:0 auto;font-variant-numeric:tabular-nums;
+}
+.proof strong{color:var(--ink);font-weight:600}
+.proof .sep{color:var(--ink-5)}
+
+/* ── HOW IT WORKS — 21st-style stepper ───────────────────────────────────── */
+.how-head{max-width:1200px;margin:48px auto 14px;padding:0 var(--edge);display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.how-head h3{font-family:var(--font-d);font-size:1.6rem;font-weight:300;letter-spacing:-.005em}
+.how-head .sub{font-size:.82rem;color:var(--ink-3)}
+
+.how{max-width:1200px;margin:0 auto;padding:0 var(--edge);display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:720px){.how{grid-template-columns:1fr}}
+
+.step{
+  background:rgba(255,255,255,.78);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border:1px solid rgba(28,25,23,.06);
+  border-radius:var(--radius-lg);
+  padding:18px 20px;display:flex;gap:14px;align-items:flex-start;
+  transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s var(--ease);
+}
+.step:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:rgba(196,133,122,.35)}
+.step .num{
+  flex-shrink:0;width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,var(--rose),var(--rose-deep));color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-d);font-weight:600;font-size:1rem;
+  box-shadow:0 4px 12px rgba(196,133,122,.35);
+}
+.step h4{font-family:var(--font-h);font-size:.8rem;font-weight:400;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px}
+.step p{font-size:.84rem;color:var(--ink-3);line-height:1.5}
+
+/* ── SECTION HEAD ────────────────────────────────────────────────────────── */
+.sec-head{max-width:1200px;margin:48px auto 14px;padding:0 var(--edge);display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.sec-head h2{font-family:var(--font-d);font-size:clamp(1.7rem,3.4vw,2.4rem);font-weight:300;letter-spacing:-.01em}
+.sec-head .sub{font-size:.85rem;color:var(--ink-3)}
+
+/* ── FILTERS — 21st pill row ─────────────────────────────────────────────── */
+.filters{
+  max-width:1200px;margin:0 auto 16px;
+  padding:2px var(--edge);
+  display:flex;gap:8px;align-items:center;overflow-x:auto;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.filters::-webkit-scrollbar{display:none}
+.chip{
+  flex-shrink:0;min-height:38px;
+  padding:9px 16px;border:1px solid var(--ink-5);
+  border-radius:999px;background:rgba(255,255,255,.72);
+  font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;
+  white-space:nowrap;transition:all .15s var(--ease);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+}
+.chip:hover{border-color:var(--rose);color:var(--rose);background:#fff}
+.chip:focus-visible{outline:0;box-shadow:var(--ring)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 4px 12px rgba(28,25,23,.18)}
+
+/* ── EVENT GRID ──────────────────────────────────────────────────────────── */
+.events-wrap{max-width:1200px;margin:0 auto 28px;padding:0 var(--edge)}
+.events{display:grid;grid-template-columns:1fr;gap:18px}
+@media(min-width:560px){.events{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}}
+
+.event-card{
+  background:rgba(255,255,255,.86);
+  -webkit-backdrop-filter:saturate(1.4) blur(14px);
+  backdrop-filter:saturate(1.4) blur(14px);
+  border:1px solid rgba(28,25,23,.06);
+  border-radius:var(--radius-lg);
+  overflow:hidden;
+  box-shadow:var(--shadow-sm);
+  display:flex;flex-direction:column;
+  cursor:pointer;position:relative;
+  transition: transform .25s var(--ease), box-shadow .25s var(--ease), border-color .25s var(--ease);
+}
+.event-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:rgba(196,133,122,.25)}
+.event-card:focus-within{box-shadow:var(--shadow-glow)}
+.event-card .photo{aspect-ratio:4/3;position:relative;overflow:hidden}
+.event-card .photo .photo-bg{
+  position:absolute;inset:0;
+  background:linear-gradient(135deg,#e9c5b9,#c4857a);
+  transition:transform .6s var(--ease);
+}
+.event-card:hover .photo .photo-bg{transform:scale(1.04)}
+.event-card .photo .demo-mark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:64px;opacity:.45;filter:drop-shadow(0 4px 12px rgba(0,0,0,.2))}
+
+.event-card .status{
+  position:absolute;top:12px;left:12px;
+  background:rgba(255,255,255,.94);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  padding:6px 12px;border-radius:999px;
+  font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  box-shadow:0 2px 8px rgba(0,0,0,.06);
+}
+.event-card .status.open{color:var(--green)}
+.event-card .status.low{color:var(--amber)}
+.event-card .status.sold{color:var(--red)}
+.event-card .status .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
+
+.event-card .countdown{
+  position:absolute;top:12px;right:12px;
+  background:rgba(28,25,23,.82);color:#fff;
+  padding:6px 12px;border-radius:999px;
+  font:600 .7rem var(--font-b);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  font-variant-numeric:tabular-nums;
+}
+
+.event-card .featured-mark{
+  position:absolute;bottom:12px;left:12px;
+  background:linear-gradient(135deg,var(--rose),var(--rose-deep));color:#fff;
+  padding:5px 11px;border-radius:6px;
+  font:600 .66rem var(--font-b);text-transform:uppercase;letter-spacing:.08em;
+  box-shadow:0 4px 12px rgba(196,133,122,.35);
+}
+
+.event-card .body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
+.event-card .type-tag{font:400 .65rem var(--font-h);letter-spacing:.24em;text-transform:uppercase;color:var(--rose)}
+.event-card h3{font-family:var(--font-d);font-size:1.5rem;font-weight:400;line-height:1.18;letter-spacing:-.005em;color:var(--ink)}
+.event-card .subtitle{font-family:var(--font-d);font-size:.95rem;color:var(--ink-2);font-style:italic}
+.event-card .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:.78rem;color:var(--ink-3)}
+
+.event-card .price-bar{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  margin-top:auto;padding-top:14px;border-top:1px solid var(--ink-5);
+  font-variant-numeric:tabular-nums;
+}
+.event-card .price-bar .price{font-family:var(--font-d);font-size:1.7rem;font-weight:500;color:var(--rose);line-height:1}
+.event-card .price-bar .price small{font-family:var(--font-b);font-size:.7rem;color:var(--ink-3);font-weight:500;display:block;margin-top:4px;letter-spacing:.04em;text-transform:uppercase}
+
+.event-card .btn-sm{
+  min-height:40px;
+  background:var(--ink);color:#fff;border:0;
+  padding:10px 16px;border-radius:var(--radius);
+  font:600 13px var(--font-b);cursor:pointer;letter-spacing:.02em;
+  transition: background .18s var(--ease), transform .18s var(--ease);
+}
+.event-card .btn-sm:hover{background:#000;transform:translateY(-1px)}
+.event-card .btn-sm:focus-visible{outline:0;box-shadow:var(--ring-ink)}
+.event-card.sold .btn-sm{background:var(--ink-5);color:var(--ink-2);cursor:default;transform:none}
+
+/* ── ИТОГ: 21st-style footer banner с CTA ────────────────────────────────── */
+.banner{
+  max-width:1200px;margin:40px auto;padding:32px var(--edge);
+  border-radius:var(--radius-xl);
+  background:
+    radial-gradient(80% 100% at 50% 0%, rgba(196,133,122,.18), transparent 70%),
+    linear-gradient(180deg, #fff, #fdf7f6);
+  border:1px solid rgba(196,133,122,.2);
+  text-align:center;
+  position:relative;overflow:hidden;
+}
+.banner::before{
+  content:"";position:absolute;inset:0;
+  background-image: radial-gradient(rgba(196,133,122,.18) 1px, transparent 1px);
+  background-size: 18px 18px;
+  opacity:.4;pointer-events:none;
+  mask-image: radial-gradient(circle at 50% 50%, rgba(0,0,0,.6), transparent 70%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, rgba(0,0,0,.6), transparent 70%);
+}
+.banner h3{font-family:var(--font-d);font-weight:400;font-size:clamp(1.6rem,3vw,2.2rem);line-height:1.1;margin-bottom:8px;letter-spacing:-.01em}
+.banner p{color:var(--ink-3);font-size:.95rem;max-width:520px;margin:0 auto 18px}
+.banner .cta{flex:0 1 240px}
+
+/* ── FOOTER ──────────────────────────────────────────────────────────────── */
+footer{
+  max-width:1200px;margin:0 auto;padding:24px var(--edge);
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.78rem;color:var(--ink-3);
+  border-top:1px solid rgba(28,25,23,.06);
+}
+footer a{color:var(--rose);text-decoration:none}
+footer a:hover{text-decoration:underline}
+
+/* ── DEMO HELPER — баннер сверху ─────────────────────────────────────────── */
+.demo-banner{
+  background:linear-gradient(90deg,#fff7ea,#fdf0f0);
+  border-bottom:1px solid rgba(146,114,42,.18);
+  padding:10px var(--edge);
+  font-size:.78rem;color:#7a5a18;text-align:center;
+}
+.demo-banner b{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  <b>21st.dev preview</b> · mockup data, нет связи с live сайтом · открой через iPhone DevTools чтобы проверить mobile
+</div>
+
+<nav class="nav">
+  <div class="brand">PASHYNSKA<small>Photography · Calgary</small></div>
+  <div class="lang-pill" role="tablist" aria-label="Language">
+    <button class="on" aria-pressed="true">EN</button>
+    <button>РУ</button>
+    <button>हिं</button>
+    <button>УК</button>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-grid">
+    <div class="hero-stage">
+      <div class="demo"></div>
+      <div class="hero-pill-row">
+        <span class="hero-pill rose">★ Featured</span>
+        <span class="hero-pill dark"><span class="dot"></span>In 17 days</span>
+      </div>
+      <div class="hero-stage-cap">
+        <div class="t">Blossom Mini Sessions</div>
+        <div class="s">Calgary · May 30, 2026</div>
+      </div>
+    </div>
+
+    <div class="hero-card">
+      <div class="hero-kicker">Featured session</div>
+      <h1 class="hero-title">Blossom <em>mini</em> sessions</h1>
+      <p class="hero-sub">Twenty minutes among Calgary blossoms. Warm light, real photos, no posing pressure.</p>
+
+      <div class="hero-facts">
+        <div class="f"><span class="k">Date</span><span class="v">May 30 <small>Saturday</small></span></div>
+        <div class="f"><span class="k">Spots left</span><span class="v">3<small>of 16 slots</small></span></div>
+        <div class="f"><span class="k">Deposit</span><span class="v">$95<small>$199.50 total</small></span></div>
+        <div class="f"><span class="k">Length</span><span class="v">20 min<small>per session</small></span></div>
+      </div>
+
+      <div class="hero-cta-row">
+        <button class="cta">Reserve a slot</button>
+        <button class="cta-outline">See all dates</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="proof">
+  <span>★ <strong>5.0</strong> Google reviews</span>
+  <span class="sep">·</span>
+  <span><strong>1,700+</strong> sessions delivered</span>
+  <span class="sep">·</span>
+  <span><strong>Local</strong> · Calgary, AB</span>
+</div>
+
+<div class="how-head">
+  <h3>How it works</h3>
+  <span class="sub">3 minutes, then enjoy the photos</span>
+</div>
+<div class="how">
+  <div class="step">
+    <div class="num">1</div>
+    <div>
+      <h4>Pick a slot</h4>
+      <p>Browse upcoming sessions, choose a time that works. 20-min slots, no overlap.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num">2</div>
+    <div>
+      <h4>Reserve & pay deposit</h4>
+      <p>Lock the slot for 15 min, send $95 by Interac e-Transfer or card. Auto-confirmed.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num">3</div>
+    <div>
+      <h4>Show up</h4>
+      <p>Bring whoever matters. We send a prep guide 48h before. Photos in your inbox in 48h.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sec-head">
+  <h2>Upcoming sessions</h2>
+  <span class="sub">3 events</span>
+</div>
+
+<div class="filters">
+  <button class="chip on">All</button>
+  <button class="chip">This month</button>
+  <button class="chip">Mini</button>
+  <button class="chip">Family</button>
+  <button class="chip">Maternity</button>
+  <button class="chip">Wedding</button>
+</div>
+
+<div class="events-wrap">
+  <div class="events">
+    <article class="event-card">
+      <div class="photo">
+        <div class="photo-bg" style="background:linear-gradient(135deg,#ead4cc,#c4857a)"></div>
+        <div class="demo-mark">🌸</div>
+        <div class="status open"><span class="dot"></span>Open</div>
+        <div class="countdown">In 17 days</div>
+        <div class="featured-mark">★ Featured</div>
+      </div>
+      <div class="body">
+        <div class="type-tag">Mini</div>
+        <h3>Blossom Mini Sessions</h3>
+        <div class="subtitle">Soft, sunlit moments among Calgary blooms</div>
+        <div class="meta"><span>📅 May 30</span><span>📍 Calgary</span></div>
+        <div class="price-bar">
+          <div class="price">$95<small>$199.50 total · deposit</small></div>
+          <button class="btn-sm">View dates</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="event-card">
+      <div class="photo">
+        <div class="photo-bg" style="background:linear-gradient(135deg,#cdb6e0,#7a609a)"></div>
+        <div class="demo-mark">🪻</div>
+        <div class="status low"><span class="dot"></span>Almost full</div>
+        <div class="countdown">In 32 days</div>
+      </div>
+      <div class="body">
+        <div class="type-tag">Lilac</div>
+        <h3>Lilac Mini Sessions</h3>
+        <div class="subtitle">Two weeks only — lilacs in full bloom</div>
+        <div class="meta"><span>📅 Jun 14</span><span>📍 Calgary</span></div>
+        <div class="price-bar">
+          <div class="price">$110<small>$220 total · deposit</small></div>
+          <button class="btn-sm">View dates</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="event-card sold">
+      <div class="photo">
+        <div class="photo-bg" style="background:linear-gradient(135deg,#e5d3b3,#a08658)"></div>
+        <div class="demo-mark">🌾</div>
+        <div class="status sold"><span class="dot"></span>Sold out</div>
+        <div class="countdown">Past</div>
+      </div>
+      <div class="body">
+        <div class="type-tag">Family</div>
+        <h3>Golden Hour Families</h3>
+        <div class="subtitle">Last year's autumn series</div>
+        <div class="meta"><span>📅 Oct 12, 2025</span><span>📍 Calgary</span></div>
+        <div class="price-bar">
+          <div class="price">$130<small>$260 total · deposit</small></div>
+          <button class="btn-sm">Join waitlist</button>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>
+
+<section class="banner">
+  <h3>Custom session?</h3>
+  <p>For weddings, maternity, or family editorial — DM Iryna directly on Instagram. Custom-pricing, custom locations.</p>
+  <button class="cta">DM on Instagram</button>
+</section>
+
+<footer>
+  <span>© 2026 Iryna Pashynska Photography · <a href="#">Privacy</a></span>
+  <span>v · 21st preview</span>
+</footer>
+
+<script>
+// minimal demo wiring — chip toggle, lang toggle (без сетевых вызовов)
+document.querySelectorAll('.chip').forEach(c =>
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+  })
+);
+document.querySelectorAll('.lang-pill button').forEach(b =>
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.lang-pill button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+  })
+);
+</script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+{% extends "base_landing.html" %}
+{% block title %}Calgary Wedding Photographer — Pashynska Photography{% endblock %}
+{% block meta_desc %}Professional wedding photography in Calgary. Intimate ceremonies, engagement sessions & elopements. Natural light, candid moments, timeless editing. Book your wedding photographer online.{% endblock %}
+{% block canonical %}https://book.pashynskaphoto.com/wedding{% endblock %}
+{% block og_title %}Calgary Wedding Photographer — Pashynska Photography{% endblock %}
+{% block og_desc %}Professional wedding photography in Calgary. Intimate ceremonies, engagement sessions & elopements. Natural light, candid moments.{% endblock %}
+{% block og_url %}https://book.pashynskaphoto.com/wedding{% endblock %}
+
+{% block schema %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://book.pashynskaphoto.com/wedding",
+      "url": "https://book.pashynskaphoto.com/wedding",
+      "name": "Calgary Wedding Photographer — Pashynska Photography",
+      "description": "Professional wedding photography in Calgary. Intimate ceremonies, engagement sessions & elopements.",
+      "inLanguage": ["en", "ru", "uk"],
+      "isPartOf": {"@id": "https://book.pashynskaphoto.com/#website"}
+    },
+    {
+      "@type": "Service",
+      "@id": "https://book.pashynskaphoto.com/wedding#service",
+      "name": "Calgary Wedding Photography",
+      "provider": {"@id": "https://book.pashynskaphoto.com/#organization"},
+      "areaServed": {"@type": "City", "name": "Calgary"},
+      "serviceType": "Wedding Photography",
+      "description": "Intimate wedding ceremonies, engagement sessions and elopements in Calgary. Natural light photography with candid moments and timeless editing.",
+      "offers": {
+        "@type": "AggregateOffer",
+        "lowPrice": "580",
+        "highPrice": "1160",
+        "priceCurrency": "CAD",
+        "availability": "https://schema.org/InStock"
+      },
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Wedding Photography Packages",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Intimate Wedding Ceremony",
+              "description": "1.5 hours, 50 retouched photos + all originals, 2 locations, online gallery"
+            },
+            "price": "580",
+            "priceCurrency": "CAD"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Full Wedding Day",
+              "description": "4 hours coverage, 150+ retouched photos + all originals, multiple locations, online gallery, preview within 48h"
+            },
+            "price": "1160",
+            "priceCurrency": "CAD"
+          }
+        ]
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much does a wedding photographer cost in Calgary?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Wedding photography in Calgary starts at $580 + GST for intimate ceremonies (1.5 hours, 50 edited photos + all originals). Full-day coverage is $1160. Engagement sessions can be added for $290."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do you travel outside Calgary for weddings?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, I cover weddings in Canmore, Banff, and the Bow Valley area. Travel fees apply for destinations beyond 50km from Calgary — contact me for a custom quote."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How many photos do we get from a Calgary wedding?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "An intimate wedding (1.5h) includes 50 professionally edited photos plus all original unedited images. Full-day coverage (4h+) includes 150+ edited photos. Every meaningful moment is included — no artificial limits."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "When do we receive our wedding photos?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You receive a preview gallery within 48 hours. The full gallery is ready within 2 weeks. All photos are delivered via a private online gallery with download access and print rights."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can we meet before booking our Calgary wedding photographer?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Absolutely. I offer a free 15-minute video call to discuss your vision, preferred locations, and timeline. This helps us connect and ensures I understand exactly what you're looking for."
+      }
+    }
+  ]
+}
+</script>
+{% endblock %}
+
+{% block hero_kicker %}Wedding Photography{% endblock %}
+{% block hero_title %}Say <em>Yes</em> to Moments That Last Forever{% endblock %}
+{% block hero_sub %}Intimate weddings, engagement sessions & elopements in Calgary. Natural light, candid emotion, and the kind of photos you'll cry happy tears over for decades.{% endblock %}
+{% block hero_image_alt %}Calgary wedding photographer capturing an intimate ceremony in golden light{% endblock %}
+{% block hero_facts %}
+<div class="f"><span class="k">Starting at</span><span class="v">$580<span class="unit">CAD</span></span></div>
+<div class="f"><span class="k">Coverage</span><span class="v">1.5–4<span class="unit">hours</span></span></div>
+<div class="f"><span class="k">Photos</span><span class="v">50–150+<span class="unit">edited</span></span></div>
+<div class="f"><span class="k">Delivery</span><span class="v">2<span class="unit">weeks</span></span></div>
+{% endblock %}
+{% block cta_primary %}Book Your Wedding Date{% endblock %}
+{% block cta_primary_url %}/book?type=wedding{% endblock %}
+{% block cta_secondary %}View Portfolio ↗{% endblock %}
+{% block cta_secondary_url %}{{ PORTFOLIO_URL }}{% endblock %}
+
+{% block content %}
+<!-- Trust badges -->
+<div class="trust-row">
+  <div class="trust-item">
+    <div class="trust-num">50+</div>
+    <div class="trust-label">Weddings captured in Calgary</div>
+  </div>
+  <div class="trust-item">
+    <div class="trust-num">4.9★</div>
+    <div class="trust-label">Average review rating</div>
+  </div>
+  <div class="trust-item">
+    <div class="trust-num">48h</div>
+    <div class="trust-label">Preview gallery delivery</div>
+  </div>
+</div>
+
+<!-- Services -->
+<div class="section">
+  <h2 class="section-title">Wedding Packages</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-top">
+        <div class="card-badge">Most Popular</div>
+        <h3 class="card-name">Intimate Wedding</h3>
+        <div class="card-price">$580<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>1.5 hours of coverage</li>
+        <li>50 professionally edited photos</li>
+        <li>All original unedited images</li>
+        <li>2 locations (ceremony + portraits)</li>
+        <li>Private online gallery</li>
+        <li>Print rights included</li>
+      </ul>
+      <a class="card-btn" href="/book?type=wedding">Check Availability</a>
+    </div>
+    <div class="card">
+      <div class="card-top">
+        <h3 class="card-name">Engagement Session</h3>
+        <div class="card-price">$290<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>1 hour of photography</li>
+        <li>25 edited photos + all originals</li>
+        <li>1-2 locations in Calgary</li>
+        <li>Outfit change welcome</li>
+        <li>Perfect for save-the-dates</li>
+      </ul>
+      <a class="card-btn" href="/book?type=individual">Check Availability</a>
+    </div>
+    <div class="card">
+      <div class="card-top">
+        <h3 class="card-name">Full Wedding Day</h3>
+        <div class="card-price">$1,160<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>4+ hours of coverage</li>
+        <li>150+ edited photos</li>
+        <li>All original unedited images</li>
+        <li>Multiple locations</li>
+        <li>Preview within 48 hours</li>
+        <li>Rush delivery option</li>
+      </ul>
+      <a class="card-btn" href="/book?type=wedding">Contact for Details</a>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="section section-faq">
+  <h2 class="section-title">Wedding Photography Questions</h2>
+  <div class="faq-list">
+    <details class="faq-item">
+      <summary class="faq-q">How much does a wedding photographer cost in Calgary?</summary>
+      <div class="faq-a">Wedding photography in Calgary starts at $580 + GST for intimate ceremonies (1.5 hours, 50 edited photos + all originals). Full-day coverage is $1160.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Do you travel outside Calgary for weddings?</summary>
+      <div class="faq-a">Yes, I cover weddings in Canmore, Banff, and the Bow Valley area. Travel fees apply for destinations beyond 50km from Calgary — contact me for a custom quote.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">How many photos do we get from a Calgary wedding?</summary>
+      <div class="faq-a">An intimate wedding (1.5h) includes 50 professionally edited photos plus all original unedited images. Full-day coverage (4h+) includes 150+ edited photos.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">When do we receive our wedding photos?</summary>
+      <div class="faq-a">You receive a preview gallery within 48 hours. The full gallery is ready within 2 weeks. All photos delivered via private online gallery with download access.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Can we meet before booking?</summary>
+      <div class="faq-a">Absolutely. I offer a free 15-minute video call to discuss your vision, preferred locations, and timeline.</div>
+    </details>
+  </div>
+</div>
+
+<!-- Related services -->
+<div class="section">
+  <h2 class="section-title">Explore Other Sessions</h2>
+  <div class="link-cards">
+    <a class="link-card" href="/family">
+      <span class="link-card-icon">👨‍👩‍👧‍👦</span>
+      <span class="link-card-text">Family Photography</span>
+      <span class="link-card-arrow">→</span>
+    </a>
+    <a class="link-card" href="/maternity">
+      <span class="link-card-icon">🤰</span>
+      <span class="link-card-text">Maternity Photography</span>
+      <span class="link-card-arrow">→</span>
+    </a>
+  </div>
+</div>
+
+<!-- Bottom CTA -->
+<div class="bottom-cta">
+  <div class="bottom-cta-inner">
+    <h3 class="bottom-cta-title">Ready to book your Calgary wedding photographer?</h3>
+    <p class="bottom-cta-desc">Dates fill up fast during summer wedding season. Reserve your date with a small deposit — the remaining balance is due on the session day.</p>
+    <a class="bottom-cta-btn" href="/book?type=wedding">View Available Dates</a>
+  </div>
+</div>
+{% endblock %}

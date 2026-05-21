@@ -1,0 +1,79 @@
+{
+  "result": {
+    "status": "failed",
+    "reason": "db_not_found",
+    "email": "qa-e2e-002609@example.com",
+    "requests": [
+      {
+        "url": "http://127.0.0.1:5001/events",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "https://fonts.gstatic.com/s/tenorsans/v21/bx6ANxqUneKx06UkIXISn3V4Ck-L2qM.woff2",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa0ZL7W0Q5n-wU.woff2",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "http://127.0.0.1:5001/images/lilac-jun7_fc0f222e.jpg",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "http://127.0.0.1:5001/images/lilac-jun7_ee3244d9.jpeg",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3ZmX5slCNuHLi8bLeY9MK7whWMhyjYrEtImSqn7B6D.woff2",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "http://127.0.0.1:5001/slots/2026-06-07?event_id=lilac-jun7",
+        "method": "GET",
+        "post_data": null
+      },
+      {
+        "url": "http://127.0.0.1:5001/slots/2026-06-07?event_id=lilac-jun7",
+        "status": 200,
+        "method": "GET"
+      }
+    ]
+  },
+  "log": [
+    "[00:26:09] \ud83d\ude80 STARTING FULL E2E TEST",
+    "[00:26:10] Step 1: Opening landing page...",
+    "[00:26:12] \u2705 Landing page loaded",
+    "[00:26:12] Step 2: Clicking event card...",
+    "[00:26:12] \u2705 Clicked event card (article[onclick])",
+    "[00:26:13] \u2705 Drawer opened",
+    "[00:26:13] Step 2.5: Selecting available slot...",
+    "[00:26:13] \u2705 Selected slot (8 available)",
+    "[00:26:13] \u2705 Slot selection confirmed",
+    "[00:26:14] Step 3: Waiting for form to render...",
+    "[00:26:14] Step 3: Filling reserve form...",
+    "[00:26:14] \u2705 Form filled",
+    "[00:26:14] \u2705 Form submitted",
+    "[00:26:17] \u2705 Booking submitted",
+    "[00:26:17] Step 4: Verifying database...",
+    "[00:26:18] \u274c Booking NOT found in database",
+    "[00:26:18] Step 9: Cleanup...",
+    "[00:26:18] \u2705 Cleaned 0 test booking(s)"
+  ]
+}

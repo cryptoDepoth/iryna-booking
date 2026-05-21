@@ -1,0 +1,20 @@
+{
+  "result": {
+    "status": "failed",
+    "error": "Page.fill: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"input[name='name'], input#name\")\n",
+    "email": "qa-e2e-235004@example.com"
+  },
+  "log": [
+    "[23:50:04] \ud83d\ude80 STARTING FULL E2E TEST",
+    "[23:50:05] Step 1: Opening landing page...",
+    "[23:50:07] \u2705 Landing page loaded",
+    "[23:50:07] Step 2: Clicking event card...",
+    "[23:50:07] \u2705 Clicked event card (article[onclick])",
+    "[23:50:09] \u2705 Drawer opened",
+    "[23:50:09] Step 3: Filling reserve form...",
+    "[23:50:39] \u274c ERROR: TimeoutError: Page.fill: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"input[name='name'], input#name\")\n",
+    "[23:50:39] Step 9: Cleanup...",
+    "[23:50:39] \u2705 Cleaned 0 test booking(s)",
+    "[23:50:39] \ud83c\udfc1 E2E TEST COMPLETE"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-05-12-0505",
+  "project": "Pashynska Booking / iryna-booking",
+  "status": "passed",
+  "summary": "Autonomous QA complete: all layers green and full E2E passed.",
+  "layers": {
+    "layer1_business_logic": {
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer1_business_logic/test_layer1.py -q --tb=short",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "layer2_api_database": {
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer2_api_database/test_layer2.py -q --tb=short",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "layer3_ui_e2e": {
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer3_ui_e2e/test_layer3.py -q --tb=short",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "layer4_visual": {
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest qa/nightly/tests/layer4_visual/test_layer4.py -q --tb=short",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "status": "passed"
+    },
+    "full_e2e_demo": {
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 qa/nightly/tests/full_e2e_demo.py",
+      "status": "passed",
+      "latest_report": "qa/nightly/reports/full_e2e_20260512_050457.json"
+    }
+  },
+  "cleanup": {
+    "db": "/Users/andrzej/.pashynska-data/bookings.db",
+    "deleted_qa_bookings": 0,
+    "remaining_qa_bookings": 0,
+    "status": "complete"
+  },
+  "fixes_applied": [
+    "Layer 1 API helper now sends synthetic X-Forwarded-For headers for /reserve requests, keeping production rate limiting enabled while preventing autonomous local QA from producing rate-limit skips.",
+    "full_e2e_demo.py now routes only /reserve through a per-run synthetic X-Forwarded-For header, avoiding both rate-limit skips and global CORS preflight noise."
+  ]
+}

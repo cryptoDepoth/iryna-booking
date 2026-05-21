@@ -1,0 +1,38 @@
+{
+  "project": "Pashynska Booking (iryna-booking)",
+  "timestamp": "2026-05-12T13:03:00",
+  "layers": {
+    "layer1": {
+      "passed": 9,
+      "failed": 0,
+      "status": "PASSED"
+    },
+    "layer2": {
+      "passed": 10,
+      "failed": 0,
+      "status": "PASSED"
+    },
+    "layer3": {
+      "passed": 9,
+      "failed": 0,
+      "status": "PASSED"
+    },
+    "layer4": {
+      "passed": 2,
+      "failed": 0,
+      "status": "PASSED"
+    }
+  },
+  "full_e2e": {
+    "status": "PASSED",
+    "report": "qa/nightly/reports/full_e2e_20260512_130214.json",
+    "email": null
+  },
+  "cleanup": {
+    "db_path": "/Users/andrzej/.pashynska-data/bookings.db",
+    "deleted_qa_bookings": 1,
+    "remaining_qa_bookings": 0,
+    "status": "PASSED"
+  },
+  "summary": "✅ Autonomous QA Complete: Layer1 9/9, Layer2 10/10, Layer3 9/9, Layer4 2/2, E2E PASSED"
+}

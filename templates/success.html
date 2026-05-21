@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="page_title">Booking Status | Pashynska Photography</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --nude:      #f5ede8;
+      --rose:      #c4857a;
+      --rose-deep: #a3685e;
+      --ink:       #1c1917;
+      --ink-2:     #44403c;
+      --ink-3:     #78716c;
+      --ink-4:     #a8a29e;
+      --ink-5:     #e7e5e4;
+      --page-bg:   #faf7f5;
+      --surface:   #ffffff;
+      --green:     #3d6b4f;
+      --green-bg:  #edf5f0;
+      --amber:     #92722a;
+      --amber-bg:  #fdf5e4;
+      --red:       #8b3535;
+      --red-bg:    #fdf0f0;
+      --font-d:    'Cormorant Garamond', Georgia, serif;
+      --font-b:    'DM Sans', system-ui, sans-serif;
+    }
+
+    html { font-size: 16px; }
+    body {
+      font-family: var(--font-b);
+      background: var(--page-bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      transition: background 0.8s ease;
+    }
+    body.confirmed-bg { background: linear-gradient(160deg, #f0f8f3 0%, #faf7f5 60%); }
+
+    /* ── TOP BAR ── */
+    .top-bar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,247,245,0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--ink-5);
+      padding: 14px 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .top-bar-title { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
+    .progress-dots { margin-left: auto; display: flex; gap: 5px; align-items: center; }
+    .pdot { height: 6px; border-radius: 3px; background: var(--rose); }
+
+    /* ── LANGUAGE SWITCHER ── */
+    .lang-switcher {
+      display: flex; gap: 3px;
+      background: rgba(0,0,0,0.05);
+      border-radius: 20px; padding: 3px;
+      margin-left: 10px;
+    }
+    .lang-btn {
+      padding: 4px 9px; border-radius: 16px; border: none;
+      font-family: var(--font-b); font-size: 11px; font-weight: 600;
+      cursor: pointer; background: transparent; color: var(--ink-3);
+      transition: all 0.2s; line-height: 1;
+    }
+    .lang-btn:hover { color: var(--rose); }
+    .lang-btn.active {
+      background: white; color: var(--rose);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+
+    /* ── PETAL CANVAS ── */
+    #petal-canvas {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 999;
+      overflow: hidden; display: none;
+    }
+    .petal {
+      position: absolute;
+      font-size: 18px; line-height: 1;
+      animation: petal-fall linear forwards;
+      pointer-events: none; user-select: none;
+    }
+    @keyframes petal-fall {
+      0%   { transform: translateY(-30px) rotate(0deg) scale(1);   opacity: 1; }
+      80%  { opacity: 1; }
+      100% { transform: translateY(110vh) rotate(900deg) scale(0.6); opacity: 0; }
+    }
+    .spark {
+      position: absolute;
+      width: 6px; height: 6px; border-radius: 50%;
+      animation: spark-burst ease-out forwards;
+    }
+    @keyframes spark-burst {
+      0%   { transform: translate(0,0) scale(1); opacity: 1; }
+      100% { transform: var(--tx, 80px) var(--ty, -80px) scale(0); opacity: 0; }
+    }
+
+    /* ── CAMERA FLASH ── */
+    #camera-flash {
+      position: fixed; inset: 0;
+      background: #fff;
+      z-index: 10000;
+      pointer-events: none;
+      opacity: 0;
+    }
+    #camera-flash.active {
+      animation: flash-bang 0.55s ease-out forwards;
+    }
+    @keyframes flash-bang {
+      0%   { opacity: 0.85; }
+      100% { opacity: 0; }
+    }
+
+    /* ── FILM STRIP ── */
+    .film-strip {
+      display: flex; gap: 10px; justify-content: center;
+      margin: 20px auto 8px; max-width: 320px;
+      opacity: 0; transform: translateY(10px);
+    }
+    .film-strip.show {
+      animation: film-in 0.5s ease 0.6s forwards;
+    }
+    @keyframes film-in {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .film-frame {
+      width: 56px; height: 44px;
+      border: 2px solid var(--ink-5);
+      border-radius: 5px;
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    }
+
+    /* ── CALENDAR CTA ── */
+    .calendar-panel {
+      display: none;
+      margin: 20px 0 18px;
+      padding: 18px;
+      border: 1px solid rgba(61,107,79,0.24);
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(196,133,122,0.20), transparent 32%),
+        linear-gradient(135deg, #ffffff 0%, #f0f8f3 100%);
+      box-shadow: 0 18px 44px rgba(61,107,79,0.16);
+      position: relative;
+      overflow: hidden;
+    }
+    .calendar-panel.show {
+      display: block;
+      animation: calendar-pop 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .calendar-panel::before {
+      content: '✨';
+      position: absolute;
+      right: 18px; top: 14px;
+      font-size: 1.35rem;
+      animation: twinkle 1.8s ease-in-out infinite;
+    }
+    @keyframes calendar-pop {
+      0% { opacity: 0; transform: translateY(18px) scale(0.96); }
+      70% { opacity: 1; transform: translateY(-2px) scale(1.01); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes twinkle { 0%,100% { transform: scale(1) rotate(0deg); opacity: .65; } 50% { transform: scale(1.22) rotate(12deg); opacity: 1; } }
+    .calendar-kicker {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 6px;
+    }
+    .calendar-title {
+      font-family: var(--font-d);
+      font-size: 1.45rem;
+      line-height: 1.1;
+      color: var(--ink);
+      margin-bottom: 5px;
+    }
+    .calendar-subtitle {
+      color: var(--ink-3);
+      font-size: 0.88rem;
+      margin-bottom: 14px;
+      max-width: 390px;
+    }
+    .calendar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .calendar-btn {
+      min-height: 58px;
+      border-radius: 16px;
+      padding: 12px 14px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      position: relative;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      isolation: isolate;
+    }
+    .calendar-btn::after {
+      content: ''; position: absolute; inset: -3px; border-radius: 19px; z-index: -1;
+      opacity: 0; transition: opacity 0.18s ease;
+      background: linear-gradient(120deg, rgba(196,133,122,0.55), rgba(61,107,79,0.45));
+    }
+    .calendar-btn:hover { transform: translateY(-2px); }
+    .calendar-btn:hover::after { opacity: 1; }
+    .calendar-btn.google {
+      background: #fff; color: #1f2937; border: 1px solid rgba(66,133,244,0.35);
+      box-shadow: 0 10px 24px rgba(66,133,244,0.14);
+      animation: cta-pulse 2.6s ease-in-out infinite;
+    }
+    .calendar-btn.apple {
+      background: var(--ink); color: #fff; border: 1px solid var(--ink);
+      box-shadow: 0 10px 24px rgba(28,25,23,0.16);
+      animation: cta-pulse 2.6s ease-in-out 0.35s infinite;
+    }
+    .calendar-icon { font-size: 1.35rem; line-height: 1; }
+    @keyframes cta-pulse {
+      0%, 100% { box-shadow: 0 10px 24px rgba(61,107,79,0.12); }
+      50% { box-shadow: 0 14px 34px rgba(196,133,122,0.28); }
+    }
+    @media (max-width: 430px) {
+      .calendar-actions { grid-template-columns: 1fr; }
+      .calendar-btn { min-height: 56px; }
+    }
+
+    /* ── CONTAINER ── */
+    .container { max-width: 520px; margin: 0 auto; padding: 36px 20px 64px; }
+
+    /* ── STATUS HERO ── */
+    .status-hero {
+      text-align: center; margin-bottom: 32px;
+      animation: fade-up 0.5s ease both;
+    }
+    @keyframes fade-up { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:none; } }
+
+    /* Animated pending ring */
+    .icon-wrap {
+      width: 96px; height: 96px;
+      margin: 0 auto 20px;
+      position: relative;
+    }
+    .icon-ring {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      border: 2.5px solid transparent;
+    }
+    .icon-ring.pending {
+      border-color: var(--amber);
+      border-right-color: transparent;
+      animation: spin-ring 1.4s linear infinite;
+    }
+    .icon-ring.confirmed {
+      border-color: var(--green);
+      animation: ring-appear 0.6s cubic-bezier(0.4,0,0.2,1) both;
+    }
+    @keyframes spin-ring {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes ring-appear {
+      0%  { transform: scale(0.4); opacity: 0; border-color: var(--green); }
+      60% { transform: scale(1.12); }
+      100%{ transform: scale(1); opacity: 1; }
+    }
+    .icon-inner {
+      position: absolute; inset: 6px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.4rem; transition: all 0.5s cubic-bezier(0.4,0,0.2,1);
+    }
+    .icon-inner.pending   { background: var(--amber-bg); }
+    .icon-inner.confirmed { background: var(--green-bg); animation: icon-pop 0.5s cubic-bezier(0.4,0,0.2,1) both; }
+    .icon-inner.cancelled { background: var(--red-bg); }
+    @keyframes icon-pop {
+      0%   { transform: scale(0.5) rotate(-20deg); }
+      60%  { transform: scale(1.15) rotate(5deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+
+    /* SVG checkmark */
+    .check-svg { width: 40px; height: 40px; display: none; }
+    .check-svg.show { display: block; }
+    .check-path {
+      fill: none; stroke: var(--green); stroke-width: 3.5;
+      stroke-linecap: round; stroke-linejoin: round;
+      stroke-dasharray: 50; stroke-dashoffset: 50;
+      animation: draw-check 0.5s ease 0.15s forwards;
+    }
+    @keyframes draw-check { to { stroke-dashoffset: 0; } }
+
+    .status-title {
+      font-family: var(--font-d);
+      font-size: 2.1rem; font-weight: 400;
+      color: var(--ink); margin-bottom: 8px;
+      transition: all 0.4s ease;
+    }
+    .status-sub {
+      font-size: 0.9rem; color: var(--ink-3);
+      max-width: 340px; margin: 0 auto;
+      transition: all 0.4s ease;
+    }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 16px; border-radius: 20px;
+      font-size: 0.82rem; font-weight: 600;
+      margin-top: 16px; transition: all 0.4s ease;
+    }
+    .status-badge.pending  { background: var(--amber-bg); color: var(--amber); }
+    .status-badge.confirmed{ background: var(--green-bg); color: var(--green); }
+    .status-badge.cancelled{ background: var(--red-bg); color: var(--red); }
+    .badge-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+    }
+    .status-badge.pending .badge-dot { animation: blink 1.5s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+      padding: 22px 20px; margin-bottom: 16px;
+      transition: transform 0.4s ease, box-shadow 0.4s ease;
+    }
+    .card.animate-in {
+      animation: card-slide-in 0.5s cubic-bezier(0.4,0,0.2,1) both;
+    }
+    @keyframes card-slide-in {
+      from { opacity:0; transform:translateY(16px); }
+      to   { opacity:1; transform:none; }
+    }
+    .card-title {
+      font-family: var(--font-d);
+      font-size: 1.3rem; font-weight: 500;
+      color: var(--ink); margin-bottom: 16px;
+    }
+
+    /* ── DETAIL ROWS ── */
+    .detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 11px 0; border-bottom: 1px solid var(--ink-5);
+      font-size: 0.9rem;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row .key { color: var(--ink-3); }
+    .detail-row .val { font-weight: 500; }
+
+    /* ── MESSAGES ── */
+    .msg {
+      border-radius: 0 12px 12px 0;
+      padding: 14px 18px; margin-bottom: 14px;
+      font-size: 0.875rem; line-height: 1.6;
+      border-left: 3px solid;
+      transition: all 0.4s ease;
+    }
+    .msg.info    { background: #eef4fb; border-color: #5b9bd5; color: #1e3a5f; }
+    .msg.warning { background: var(--amber-bg); border-color: var(--amber); color: #5c4516; }
+    .msg.success { background: var(--green-bg); border-color: var(--green); color: #1e3d2a; animation: msg-pop 0.4s ease; }
+    @keyframes msg-pop {
+      0%  { transform: scale(0.97); opacity: 0; }
+      100%{ transform: scale(1);    opacity: 1; }
+    }
+
+    /* ── PREP CARD ── */
+    .prep-card {
+      background: var(--nude);
+      border-radius: 18px; padding: 22px 20px; margin-bottom: 16px;
+    }
+    .prep-title {
+      font-family: var(--font-d);
+      font-size: 1.4rem; font-weight: 400;
+      text-align: center; margin-bottom: 18px;
+    }
+    .prep-item {
+      display: flex; gap: 14px;
+      padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.07);
+      animation: fade-up 0.4s ease both;
+    }
+    .prep-item:last-child { border-bottom: none; }
+    .prep-emoji { font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }
+    .prep-text strong { display: block; font-size: 0.88rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .prep-text span   { font-size: 0.82rem; color: var(--ink-3); line-height: 1.5; }
+
+    /* ── CONFIRMED BANNER ── */
+    .confirmed-banner {
+      display: none;
+      background: linear-gradient(135deg, #edf5f0 0%, #d4edde 100%);
+      border: 1px solid rgba(61,107,79,0.2);
+      border-radius: 18px; padding: 28px 22px; margin-bottom: 16px;
+      text-align: center;
+      animation: banner-in 0.6s cubic-bezier(0.4,0,0.2,1) both;
+    }
+    @keyframes banner-in {
+      0%  { opacity:0; transform: scale(0.94) translateY(12px); }
+      100%{ opacity:1; transform: none; }
+    }
+    .confirmed-banner.show { display: block; }
+    .banner-emoji { font-size: 3rem; margin-bottom: 10px; animation: bounce-in 0.6s ease 0.3s both; }
+    @keyframes bounce-in {
+      0%  { transform: scale(0) rotate(-30deg); opacity:0; }
+      60% { transform: scale(1.2) rotate(10deg); }
+      100%{ transform: scale(1) rotate(0deg); opacity:1; }
+    }
+    .banner-title {
+      font-family: var(--font-d);
+      font-size: 2.2rem; font-weight: 500;
+      color: var(--green); margin-bottom: 6px;
+    }
+    .banner-sub { font-size: 0.9rem; color: var(--ink-2); }
+
+    /* ── IG CTA ── */
+    .ig-cta {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: var(--surface);
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 14px; padding: 16px;
+      text-decoration: none; color: var(--ink);
+      font-size: 0.9rem; font-weight: 500;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      margin-bottom: 16px;
+    }
+    .ig-cta:hover { border-color: var(--rose); box-shadow: 0 2px 12px rgba(196,133,122,0.15); }
+    .ig-cta span { color: var(--rose); }
+
+    footer {
+      text-align: center; padding: 20px 24px 32px;
+      font-size: 0.82rem; color: var(--ink-4);
+    }
+    footer a { color: var(--rose); text-decoration: none; font-weight: 500; }
+  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
+</head>
+<body{% if booking and booking.confirmed %} class="confirmed-bg"{% endif %}>
+
+  <!-- Camera flash overlay -->
+  <div id="camera-flash"></div>
+
+  <!-- Petal / confetti layer -->
+  <div id="petal-canvas"></div>
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div class="top-bar-title" data-i18n="booking_status">Booking Status</div>
+    <div class="progress-dots">
+      <div class="pdot" style="width:6px;opacity:0.4"></div>
+      <div class="pdot" style="width:6px;opacity:0.4"></div>
+      <div class="pdot" style="width:18px"></div>
+    </div>
+    <!-- Language switcher -->
+    <div class="lang-switcher" role="group" aria-label="Language">
+      <button class="lang-btn active" onclick="setLang('en')" data-lang="en">EN</button>
+      <button class="lang-btn" onclick="setLang('ru')" data-lang="ru">РУ</button>
+      <button class="lang-btn" onclick="setLang('hi')" data-lang="hi">हिं</button>
+      <button class="lang-btn" onclick="setLang('uk')" data-lang="uk">УК</button>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Status hero -->
+    <div class="status-hero">
+      <div class="icon-wrap" id="icon-wrap">
+        <div class="icon-ring {% if booking and booking.confirmed %}confirmed{% else %}pending{% endif %}" id="icon-ring"></div>
+        <div class="icon-inner {% if booking and booking.confirmed %}confirmed{% else %}pending{% endif %}" id="icon-inner">
+          <span id="icon-emoji"{% if booking and booking.confirmed %} style="display:none"{% endif %}>⏳</span>
+          <svg class="check-svg{% if booking and booking.confirmed %} show{% endif %}" id="check-svg" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path class="check-path" d="M8 20 L17 29 L33 13"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="status-title" id="main-title" data-i18n="{% if booking and booking.confirmed %}confirmed_title{% else %}verifying{% endif %}">{% if booking and booking.confirmed %}You're Confirmed! 🌸{% else %}Verifying Payment…{% endif %}</div>
+      <p class="status-sub" id="subtitle" data-i18n="{% if booking and booking.confirmed %}confirmed_sub{% else %}verifying_sub{% endif %}">{% if booking and booking.confirmed %}Payment received. See you at the session!{% else %}Your e-Transfer is being verified. This usually takes under a minute.{% endif %}</p>
+      <span class="status-badge {% if booking and booking.confirmed %}confirmed{% else %}pending{% endif %}" id="status-badge">
+        <span class="badge-dot"></span>
+        <span id="status-text" data-i18n="{% if booking and booking.confirmed %}confirmed_status{% else %}checking{% endif %}">{% if booking and booking.confirmed %}Confirmed ✓{% else %}Checking payment…{% endif %}</span>
+      </span>
+    </div>
+
+    <!-- Confirmed calendar CTA (hidden until confirmed) -->
+    <div id="calendar-buttons" class="calendar-panel{% if booking and booking.confirmed %} show{% endif %}">
+      <div class="calendar-kicker"><span>📅</span><span data-i18n="calendar_kicker">Don't miss it</span></div>
+      <div class="calendar-title" data-i18n="calendar_title">Add your session to your calendar</div>
+      <div class="calendar-subtitle" data-i18n="calendar_subtitle">One tap now means no forgotten time, no scrolling through messages later.</div>
+      <div class="calendar-actions">
+        <a id="google-cal-link" href="#" target="_blank" rel="noopener" class="calendar-btn google" aria-label="Add booking to Google Calendar">
+          <span class="calendar-icon">🌈</span>
+          <span data-i18n="add_google">Add to Google</span>
+        </a>
+        <a id="apple-cal-link" href="#" class="calendar-btn apple" aria-label="Download Apple Calendar invite">
+          <span class="calendar-icon"></span>
+          <span data-i18n="add_apple">Add to Apple</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Confirmed banner -->
+    <div class="confirmed-banner{% if booking and booking.confirmed %} show{% endif %}" id="confirmed-banner">
+      <div class="banner-emoji">🌸</div>
+      <div class="banner-title" data-i18n="confirmed_title">You're Confirmed!</div>
+      <div class="banner-sub" data-i18n="confirmed_sub">Payment received. See you at the session!</div>
+    </div>
+
+    <!-- Film strip -->
+    <div class="film-strip{% if booking and booking.confirmed %} show{% endif %}" id="film-strip">
+      <div class="film-frame">📸</div>
+      <div class="film-frame">📷</div>
+      <div class="film-frame">✨</div>
+      <div class="film-frame">📸</div>
+      <div class="film-frame">🪻</div>
+    </div>
+
+    <!-- Booking details -->
+    <div class="card">
+      {% if booking %}
+      <div class="detail-row">
+        <span class="key" data-i18n="booking_id">Booking ID</span>
+        <span class="val">#{{ booking.id }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="key" data-i18n="name_label">Name</span>
+        <span class="val">{{ booking.name }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="key" data-i18n="time_label">Time</span>
+        <span class="val">{{ booking.time }}</span>
+      </div>
+      {% if booking.instagram %}
+      <div class="detail-row">
+        <span class="key" data-i18n="instagram_label">Instagram</span>
+        <span class="val">@{{ booking.instagram }}</span>
+      </div>
+      {% endif %}
+      {% endif %}
+      <div class="detail-row">
+        <span class="key" data-i18n="date_label">Date</span>
+        <span class="val">{{ date }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="key" data-i18n="payment_label">Payment</span>
+        <span class="val" data-i18n="payment_method">Interac e-Transfer</span>
+      </div>
+      <div class="detail-row">
+        <span class="key" data-i18n="amount_label">Amount</span>
+        <span class="val">${{ "%.2f"|format(price) }} CAD</span>
+      </div>
+      <div class="detail-row">
+        <span class="key" data-i18n="status_label">Status</span>
+        <span class="val" id="detail-status" data-i18n="{% if booking and booking.confirmed %}confirmed_status{% else %}pending_verify{% endif %}">{% if booking and booking.confirmed %}Confirmed ✓{% else %}Pending verification{% endif %}</span>
+      </div>
+    </div>
+
+    <!-- Pending message -->
+    <div class="msg info" id="msg-pending"{% if booking and booking.confirmed %} style="display:none"{% endif %}>
+      📧 <strong data-i18n="what_next_title">What happens next?</strong><br><br>
+      <span data-i18n="what_next_body">Our system checks for your e-Transfer automatically. Once confirmed, this page updates instantly.</span><br><br>
+      <strong data-i18n="no_resend">Please do not resend the payment.</strong>
+    </div>
+
+    <!-- Confirmed message (hidden) -->
+    <div class="msg success" id="msg-confirmed" style="display:{% if booking and booking.confirmed %}block{% else %}none{% endif %}">
+      🎉 <strong data-i18n="booking_confirmed_msg">Your booking is confirmed!</strong><br><br>
+      <span data-i18n="booking_confirmed_body">Payment received. A confirmation has been noted. See you at the session!</span>
+    </div>
+
+    <!-- Warning -->
+    <div class="msg warning" id="msg-warning"{% if booking and booking.confirmed %} style="display:none"{% endif %}>
+      ⚠️ <strong data-i18n="slot_reserved_msg">Your slot is reserved</strong>
+      <span data-i18n="slot_reserved_body"> while payment verifies. Questions?</span>
+      <a href="https://instagram.com/pashynska.photo" style="color:var(--rose);text-decoration:none;font-weight:600" target="_blank"> DM @pashynska.photo</a>
+    </div>
+
+    <!-- IG CTA -->
+    <a class="ig-cta" href="https://instagram.com/pashynska.photo" target="_blank">
+      <span>@pashynska.photo</span>
+      <span style="color:var(--ink-3)" data-i18n="ig_cta">· Questions or changes? DM me</span>
+    </a>
+
+    <!-- Prep guide -->
+    <div class="prep-card">
+      <div class="prep-title" data-i18n="prep_title">How to Prepare</div>
+      <div class="prep-item" style="animation-delay:0.05s">
+        <span class="prep-emoji">👗</span>
+        <div class="prep-text">
+          <strong data-i18n="prep_wardrobe">Wardrobe</strong>
+          <span data-i18n="prep_wardrobe_desc">Soft, coordinating tones — lilac, cream, pastels, or white. Avoid busy patterns and neon.</span>
+        </div>
+      </div>
+      <div class="prep-item" style="animation-delay:0.1s">
+        <span class="prep-emoji">💇‍♀️</span>
+        <div class="prep-text">
+          <strong data-i18n="prep_hair">Hair &amp; Makeup</strong>
+          <span data-i18n="prep_hair_desc">Natural, dewy makeup photographs best. Stick with your usual hairstyle.</span>
+        </div>
+      </div>
+      <div class="prep-item" style="animation-delay:0.15s">
+        <span class="prep-emoji">👟</span>
+        <div class="prep-text">
+          <strong data-i18n="prep_shoes">Footwear</strong>
+          <span data-i18n="prep_shoes_desc">Grass may be damp. Bring a spare pair and be ready to go barefoot for some shots.</span>
+        </div>
+      </div>
+      <div class="prep-item" style="animation-delay:0.2s">
+        <span class="prep-emoji">🧒</span>
+        <div class="prep-text">
+          <strong data-i18n="prep_kids">Kids &amp; Family</strong>
+          <span data-i18n="prep_kids_desc">Feed children before the session. Bring snacks, water, and a comfort toy.</span>
+        </div>
+      </div>
+      <div class="prep-item" style="animation-delay:0.25s">
+        <span class="prep-emoji">⏰</span>
+        <div class="prep-text">
+          <strong data-i18n="prep_arrive">Arrive 5 min early</strong>
+          <span data-i18n="prep_arrive_desc">Your slot is exactly 20 minutes. Location details sent via DM closer to the date.</span>
+        </div>
+      </div>
+      <div class="prep-item" style="animation-delay:0.3s">
+        <span class="prep-emoji">🌸</span>
+        <div class="prep-text">
+          <strong data-i18n="prep_tip">Bonus tip</strong>
+          <span data-i18n="prep_tip_desc">The lilac backdrop attracts bees — stay calm, we can always work around them.</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <p data-i18n="studio_footer">Pashynska Photography — Calgary, AB</p>
+    <p style="margin-top:6px">
+      <span data-i18n="questions">Questions?</span>
+      <a href="https://instagram.com/pashynska.photo" target="_blank" data-i18n="dm_link"> DM @pashynska.photo on Instagram</a>
+    </p>
+    <p style="margin-top:6px"><a href="/privacy" data-i18n="privacy_link">Privacy & browser storage</a></p>
+  </footer>
+
+  <script>
+  /* ════════════════════════════════════════════════════
+     i18n — 4 languages
+  ════════════════════════════════════════════════════ */
+  const TRANSLATIONS = {
+    en: {
+      page_title:         'Booking Status | Pashynska Photography',
+      booking_status:     'Booking Status',
+      verifying:          'Verifying Payment…',
+      verifying_sub:      'Your e-Transfer is being verified. This usually takes under a minute.',
+      checking:           'Checking payment…',
+      confirmed_title:    "You're All Set! 🎞️",
+      confirmed_sub:      'Payment received. See you at the session!',
+      booking_id:         'Booking ID',
+      name_label:         'Name',
+      time_label:         'Time',
+      date_label:         'Date',
+      payment_label:      'Payment',
+      amount_label:       'Amount',
+      status_label:       'Status',
+      pending_verify:     'Pending verification',
+      confirmed_status:   'Confirmed ✓',
+      what_next_title:    'What happens next?',
+      what_next_body:     'Our system checks for your e-Transfer automatically. Once confirmed, this page updates instantly.',
+      no_resend:          'Please do not resend the payment.',
+      booking_confirmed_msg:  'Your booking is confirmed!',
+      booking_confirmed_body: 'Payment received. A confirmation has been noted. See you at the session!',
+      calendar_kicker:     "Don't miss it",
+      calendar_title:      'Add your session to your calendar',
+      calendar_subtitle:   'One tap now means no forgotten time, no scrolling through messages later.',
+      add_google:          'Add to Google',
+      add_apple:           'Add to Apple',
+      slot_reserved_msg:  'Your slot is reserved',
+      slot_reserved_body: ' while payment verifies. Questions?',
+      ig_cta:             '· Questions or changes? DM me',
+      prep_title:         'How to Prepare',
+      prep_wardrobe:      'Wardrobe',
+      prep_wardrobe_desc: 'Soft, coordinating tones — lilac, cream, pastels, or white. Avoid busy patterns and neon.',
+      prep_hair:          'Hair & Makeup',
+      prep_hair_desc:     'Natural, dewy makeup photographs best. Stick with your usual hairstyle.',
+      prep_shoes:         'Footwear',
+      prep_shoes_desc:    'Grass may be damp. Bring a spare pair and be ready to go barefoot for some shots.',
+      prep_kids:          'Kids & Family',
+      prep_kids_desc:     'Feed children before the session. Bring snacks, water, and a comfort toy.',
+      prep_arrive:        'Arrive 5 min early',
+      prep_arrive_desc:   'Your slot is exactly 20 minutes. Location details sent via DM closer to the date.',
+      prep_tip:           'Bonus tip',
+      prep_tip_desc:      'The lilac backdrop attracts bees — stay calm, we can always work around them.',
+      questions:          'Questions?',
+      dm_link:            ' DM @pashynska.photo on Instagram',
+      instagram_label:    'Instagram',
+      payment_method:     'Interac e-Transfer',
+      studio_footer:      'Pashynska Photography — Calgary, AB',
+      privacy_link:       'Privacy & browser storage',
+      cancelled_title:    'Booking Cancelled',
+      cancelled_sub:      'This booking has been cancelled.',
+    },
+    ru: {
+      page_title:         'Статус бронирования | Pashynska Photography',
+      booking_status:     'Статус бронирования',
+      verifying:          'Проверка оплаты…',
+      verifying_sub:      'Ваш e-Transfer проверяется. Обычно это занимает меньше минуты.',
+      checking:           'Проверяем оплату…',
+      confirmed_title:    'Подтверждено! 🎞️',
+      confirmed_sub:      'Оплата получена. До встречи на фотосессии!',
+      booking_id:         'Номер брони',
+      name_label:         'Имя',
+      time_label:         'Время',
+      date_label:         'Дата',
+      payment_label:      'Оплата',
+      amount_label:       'Сумма',
+      status_label:       'Статус',
+      pending_verify:     'Ожидает подтверждения',
+      confirmed_status:   'Подтверждено ✓',
+      what_next_title:    'Что будет дальше?',
+      what_next_body:     'Наша система автоматически проверяет ваш e-Transfer. После подтверждения страница обновится мгновенно.',
+      no_resend:          'Пожалуйста, не отправляйте оплату повторно.',
+      booking_confirmed_msg:  'Ваше бронирование подтверждено!',
+      booking_confirmed_body: 'Оплата получена. До встречи на фотосессии!',
+      calendar_kicker:     'Не пропустите',
+      calendar_title:      'Добавьте съёмку в календарь',
+      calendar_subtitle:   'Один клик сейчас — и время не потеряется в переписке.',
+      add_google:          'В Google',
+      add_apple:           'В Apple',
+      slot_reserved_msg:  'Ваш слот забронирован',
+      slot_reserved_body: ' пока идёт проверка. Есть вопросы?',
+      ig_cta:             '· Вопросы? Напишите мне в Direct',
+      prep_title:         'Как подготовиться',
+      prep_wardrobe:      'Одежда',
+      prep_wardrobe_desc: 'Мягкие, сочетающиеся тона — сиреневый, кремовый, пастель или белый. Избегайте ярких принтов и неона.',
+      prep_hair:          'Причёска и макияж',
+      prep_hair_desc:     'Натуральный, лёгкий макияж смотрится лучше всего на фото. Оставьте привычную укладку.',
+      prep_shoes:         'Обувь',
+      prep_shoes_desc:    'Трава может быть влажной. Возьмите запасную пару и будьте готовы к съёмке босиком.',
+      prep_kids:          'Дети и семья',
+      prep_kids_desc:     'Покормите детей перед сессией. Возьмите перекус, воду и любимую игрушку.',
+      prep_arrive:        'Приходите за 5 мин до начала',
+      prep_arrive_desc:   'Ваш слот — ровно 20 минут. Детали по локации пришлю в Direct ближе к дате.',
+      prep_tip:           'Полезный совет',
+      prep_tip_desc:      'Кусты сирени привлекают пчёл — сохраняйте спокойствие, мы всегда найдём решение.',
+      questions:          'Вопросы?',
+      dm_link:            ' Написать @pashynska.photo в Instagram',
+      instagram_label:    'Instagram',
+      payment_method:     'Interac e-Transfer',
+      studio_footer:      'Pashynska Photography — Калгари, AB',
+      privacy_link:       'Privacy и хранение в браузере',
+      cancelled_title:    'Бронирование отменено',
+      cancelled_sub:      'Это бронирование было отменено.',
+    },
+    hi: {
+      page_title:         'बुकिंग स्थिति | Pashynska Photography',
+      booking_status:     'बुकिंग स्थिति',
+      verifying:          'भुगतान की जाँच हो रही है…',
+      verifying_sub:      'आपके e-Transfer की जाँच हो रही है। इसमें आमतौर पर एक मिनट से कम समय लगता है।',
+      checking:           'भुगतान जाँचा जा रहा है…',
+      confirmed_title:    'बुकिंग पक्की हो गई! 🎞️',
+      confirmed_sub:      'भुगतान प्राप्त हुआ। सेशन पर मिलते हैं!',
+      booking_id:         'बुकिंग ID',
+      name_label:         'नाम',
+      time_label:         'समय',
+      date_label:         'तारीख',
+      payment_label:      'भुगतान',
+      amount_label:       'राशि',
+      status_label:       'स्थिति',
+      pending_verify:     'जाँच बाकी है',
+      confirmed_status:   'पुष्टि हो गई ✓',
+      what_next_title:    'आगे क्या होगा?',
+      what_next_body:     'हमारा सिस्टम अपने आप e-Transfer की जाँच करता है। पुष्टि होने पर यह पेज तुरंत अपडेट हो जाएगा।',
+      no_resend:          'कृपया दोबारा भुगतान न करें।',
+      booking_confirmed_msg:  'आपकी बुकिंग पक्की हो गई!',
+      booking_confirmed_body: 'भुगतान प्राप्त हुआ। सेशन पर मिलते हैं!',
+      calendar_kicker:     'इसे न भूलें',
+      calendar_title:      'सेशन को कैलेंडर में जोड़ें',
+      calendar_subtitle:   'अभी एक टैप करें — बाद में समय ढूँढना नहीं पड़ेगा।',
+      add_google:          'Google में जोड़ें',
+      add_apple:           'Apple में जोड़ें',
+      slot_reserved_msg:  'आपका स्लॉट रिज़र्व है',
+      slot_reserved_body: ' जाँच होने तक। कोई सवाल?',
+      ig_cta:             '· सवाल? DM करें',
+      prep_title:         'तैयारी कैसे करें',
+      prep_wardrobe:      'कपड़े',
+      prep_wardrobe_desc: 'हल्के और मेलते रंग चुनें — बैंगनी, क्रीम, पेस्टल या सफेद। चमकीले रंग और बड़े प्रिंट से बचें।',
+      prep_hair:          'बाल और मेकअप',
+      prep_hair_desc:     'प्राकृतिक और हल्का मेकअप फोटो में बेहतर दिखता है। अपनी सामान्य हेयरस्टाइल रखें।',
+      prep_shoes:         'जूते',
+      prep_shoes_desc:    'घास गीली हो सकती है। एक अतिरिक्त जोड़ी लाएं और नंगे पैर के लिए तैयार रहें।',
+      prep_kids:          'बच्चे और परिवार',
+      prep_kids_desc:     'सेशन से पहले बच्चों को खाना खिलाएं। स्नैक्स, पानी और एक पसंदीदा खिलौना लाएं।',
+      prep_arrive:        '5 मिनट पहले पहुंचें',
+      prep_arrive_desc:   'आपका स्लॉट ठीक 20 मिनट का है। लोकेशन की जानकारी DM से भेजी जाएगी।',
+      prep_tip:           'बोनस टिप',
+      prep_tip_desc:      'लाइलक के फूल मधुमक्खियों को आकर्षित करते हैं — शांत रहें, हम साथ मिलकर संभाल लेंगे।',
+      questions:          'कोई सवाल?',
+      dm_link:            ' Instagram पर DM करें @pashynska.photo',
+      instagram_label:    'Instagram',
+      payment_method:     'Interac e-Transfer',
+      studio_footer:      'Pashynska Photography — कैलगरी, AB',
+      privacy_link:       'Privacy और browser storage',
+      cancelled_title:    'बुकिंग रद्द हो गई',
+      cancelled_sub:      'यह बुकिंग रद्द कर दी गई है।',
+    },
+    uk: {
+      page_title:         'Статус бронювання | Pashynska Photography',
+      booking_status:     'Статус бронювання',
+      verifying:          'Перевірка оплати…',
+      verifying_sub:      'Ваш e-Transfer перевіряється. Зазвичай це займає менше хвилини.',
+      checking:           'Перевіряємо оплату…',
+      confirmed_title:    'Підтверджено! 🎞️',
+      confirmed_sub:      'Оплату отримано. До зустрічі на сесії!',
+      booking_id:         'Номер бронювання',
+      name_label:         'Ім\'я',
+      time_label:         'Час',
+      date_label:         'Дата',
+      payment_label:      'Оплата',
+      amount_label:       'Сума',
+      status_label:       'Статус',
+      pending_verify:     'Очікує підтвердження',
+      confirmed_status:   'Підтверджено ✓',
+      what_next_title:    'Що буде далі?',
+      what_next_body:     'Наша система автоматично перевіряє ваш e-Transfer. Після підтвердження сторінка оновиться миттєво.',
+      no_resend:          'Будь ласка, не надсилайте оплату повторно.',
+      booking_confirmed_msg:  'Ваше бронювання підтверджено!',
+      booking_confirmed_body: 'Оплату отримано. До зустрічі на сесії!',
+      calendar_kicker:     'Не пропустіть',
+      calendar_title:      'Додайте сесію в календар',
+      calendar_subtitle:   'Один дотик зараз — і час не загубиться у повідомленнях.',
+      add_google:          'У Google',
+      add_apple:           'В Apple',
+      slot_reserved_msg:  'Ваш слот заброньовано',
+      slot_reserved_body: ' поки оплата перевіряється. Є питання?',
+      ig_cta:             '· Питання? Напишіть мені в Instagram',
+      prep_title:         'Як підготуватись',
+      prep_wardrobe:      'Одяг',
+      prep_wardrobe_desc: 'М\'які, пасуючі відтінки — бузковий, кремовий, пастелі або білий. Уникайте яскравих візерунків.',
+      prep_hair:          'Зачіска та макіяж',
+      prep_hair_desc:     'Природний, легкий макіяж виглядає найкраще на фото. Залиште свою звичну зачіску.',
+      prep_shoes:         'Взуття',
+      prep_shoes_desc:    'Трава може бути вологою. Візьміть запасну пару і будьте готові знятись босоніж.',
+      prep_kids:          'Діти та родина',
+      prep_kids_desc:     'Нагодуйте дітей перед сесією. Візьміть снеки, воду та улюблену іграшку.',
+      prep_arrive:        'Приходьте на 5 хв раніше',
+      prep_arrive_desc:   'Ваш слот — рівно 20 хвилин. Деталі щодо місця надішлю у DM ближче до дати.',
+      prep_tip:           'Корисна порада',
+      prep_tip_desc:      'Кущі бузку приваблюють бджіл — зберігайте спокій, ми завжди знайдемо рішення.',
+      questions:          'Питання?',
+      dm_link:            ' Написати @pashynska.photo в Instagram',
+      instagram_label:    'Instagram',
+      payment_method:     'Interac e-Transfer',
+      studio_footer:      'Pashynska Photography — Калгарі, AB',
+      privacy_link:       'Privacy і зберігання в браузері',
+      cancelled_title:    'Бронювання скасовано',
+      cancelled_sub:      'Це бронювання було скасовано.',
+    }
+  };
+
+  let currentLang = localStorage.getItem('lang') || 'en';
+  let isConfirmed = {{ 'true' if booking and booking.confirmed else 'false' }};
+
+  function setLang(lang) {
+    if (!TRANSLATIONS[lang]) return;
+    currentLang = lang;
+    localStorage.setItem('lang', lang);
+    applyTranslations();
+    document.querySelectorAll('.lang-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.lang === lang);
+    });
+    // Update page title
+    document.title = t('page_title');
+    // Update dynamic confirmed state if already confirmed
+    if (isConfirmed) applyConfirmedTranslations();
+  }
+
+  function t(key) {
+    return TRANSLATIONS[currentLang]?.[key] || TRANSLATIONS.en[key] || key;
+  }
+
+  function applyTranslations() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.dataset.i18n;
+      el.innerHTML = t(key);
+    });
+  }
+
+  /* ════════════════════════════════════════════════════
+     ANIMATIONS
+  ════════════════════════════════════════════════════ */
+  const PETALS = ['🌸','🌺','🌷','🪻','✿','❀','🌼','💜','🩷'];
+  const SPARKS = ['#c4857a','#3d6b4f','#ffc107','#7c3aed','#60a5fa','#f97316'];
+
+  function launchPetals() {
+    const canvas = document.getElementById('petal-canvas');
+    canvas.style.display = 'block';
+
+    // Wave 1 — immediate burst. Keep this light on mobile: enough to feel
+    // celebratory without making the confirmation page sluggish.
+    for (let i = 0; i < 28; i++) {
+      const p = document.createElement('div');
+      p.className = 'petal';
+      p.textContent = PETALS[Math.floor(Math.random() * PETALS.length)];
+      p.style.left   = (Math.random() * 110 - 5) + '%';
+      p.style.top    = '-30px';
+      p.style.fontSize = (14 + Math.random() * 16) + 'px';
+      p.style.animationDuration = (2.5 + Math.random() * 3.5) + 's';
+      p.style.animationDelay   = (Math.random() * 1.2) + 's';
+      canvas.appendChild(p);
+    }
+
+    // Wave 2 — delayed second burst
+    setTimeout(() => {
+      for (let i = 0; i < 14; i++) {
+        const p = document.createElement('div');
+        p.className = 'petal';
+        p.textContent = PETALS[Math.floor(Math.random() * PETALS.length)];
+        p.style.left   = (Math.random() * 110 - 5) + '%';
+        p.style.top    = '-30px';
+        p.style.fontSize = (12 + Math.random() * 14) + 'px';
+        p.style.animationDuration = (3 + Math.random() * 3) + 's';
+        p.style.animationDelay   = (Math.random() * 0.8) + 's';
+        canvas.appendChild(p);
+      }
+    }, 1400);
+
+    // Spark burst around checkmark
+    const iconRect = document.getElementById('icon-wrap').getBoundingClientRect();
+    const cx = iconRect.left + iconRect.width / 2;
+    const cy = iconRect.top + iconRect.height / 2;
+    for (let i = 0; i < 18; i++) {
+      const spark = document.createElement('div');
+      spark.className = 'spark';
+      const angle = (i / 18) * Math.PI * 2;
+      const dist  = 60 + Math.random() * 60;
+      spark.style.cssText = `
+        left:${cx}px; top:${cy}px; position:fixed;
+        background:${SPARKS[Math.floor(Math.random() * SPARKS.length)]};
+        width:${5 + Math.random() * 5}px; height:${5 + Math.random() * 5}px;
+        border-radius:50%;
+        --tx:${Math.cos(angle) * dist}px;
+        --ty:${Math.sin(angle) * dist}px;
+        animation:spark-burst 0.7s ease-out ${Math.random() * 0.2}s forwards;
+        z-index:9999;
+      `;
+      document.body.appendChild(spark);
+      setTimeout(() => spark.remove(), 1000);
+    }
+
+    // Auto-remove petals
+    setTimeout(() => {
+      canvas.style.display = 'none';
+      canvas.innerHTML = '';
+    }, 8000);
+  }
+
+  /* ════════════════════════════════════════════════════
+     STATUS POLLING
+  ════════════════════════════════════════════════════ */
+  (function () {
+    const bookingId = '{{ booking.id if booking else "" }}';
+    if (!bookingId) return;
+
+    const confirmationToken = '{{ confirmation_token }}';
+
+    let pollTimer;
+
+    window.isConfirmed = isConfirmed;
+
+    function applyConfirmedTranslations() {
+      document.getElementById('main-title').textContent  = t('confirmed_title');
+      document.getElementById('subtitle').textContent    = t('confirmed_sub');
+      document.getElementById('status-text').textContent = t('confirmed_status');
+      document.getElementById('detail-status').textContent = t('confirmed_status');
+    }
+    window.applyConfirmedTranslations = applyConfirmedTranslations;
+
+    const CALENDAR_DATA = {
+      date: {{ date|tojson }},
+      time: {{ time|tojson }},
+      title: {{ event_title|tojson }},
+      location: {{ location|tojson }},
+      sessionLength: {{ session_length|tojson }},
+      timezone: {{ timezone|tojson }},
+      bookingId: {{ (booking.id if booking else '')|tojson }},
+      token: {{ confirmation_token|tojson }}
+    };
+
+    function googleDateStamp(date, time) {
+      return String(date || '').replace(/-/g, '') + 'T' + String(time || '00:00').replace(':', '') + '00';
+    }
+
+    function addMinutes(time, minutes) {
+      const [rawH, rawM] = String(time || '00:00').split(':').map(Number);
+      const total = ((rawH || 0) * 60) + (rawM || 0) + (Number(minutes) || 20);
+      const h = Math.floor(total / 60) % 24;
+      const m = total % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    }
+
+    function setupCalendarLinks() {
+      const panel = document.getElementById('calendar-buttons');
+      const google = document.getElementById('google-cal-link');
+      const apple = document.getElementById('apple-cal-link');
+      if (!panel || !google || !apple || !CALENDAR_DATA.bookingId || !CALENDAR_DATA.token) return;
+
+      const endTime = addMinutes(CALENDAR_DATA.time, CALENDAR_DATA.sessionLength);
+      const startIso = googleDateStamp(CALENDAR_DATA.date, CALENDAR_DATA.time);
+      const endIso = googleDateStamp(CALENDAR_DATA.date, endTime);
+      const details = 'Booking #' + CALENDAR_DATA.bookingId + ' with Pashynska Photography';
+
+      google.href = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+        '&text=' + encodeURIComponent(CALENDAR_DATA.title) +
+        '&dates=' + encodeURIComponent(startIso + '/' + endIso) +
+        '&ctz=' + encodeURIComponent(CALENDAR_DATA.timezone || 'America/Edmonton') +
+        '&location=' + encodeURIComponent(CALENDAR_DATA.location) +
+        '&details=' + encodeURIComponent(details);
+
+      apple.href = '/calendar-ics/' + encodeURIComponent(CALENDAR_DATA.bookingId) +
+        '?token=' + encodeURIComponent(CALENDAR_DATA.token);
+
+      panel.classList.add('show');
+    }
+
+    function updateUI(data) {
+      if (data.confirmed && !isConfirmed) {
+        isConfirmed = true;
+        window.isConfirmed = true;
+
+        // Background
+        document.body.classList.add('confirmed-bg');
+
+        // Icon ring → confirmed
+        const ring  = document.getElementById('icon-ring');
+        const inner = document.getElementById('icon-inner');
+        const emoji = document.getElementById('icon-emoji');
+        const svg   = document.getElementById('check-svg');
+
+        ring.className  = 'icon-ring confirmed';
+        inner.className = 'icon-inner confirmed';
+        emoji.style.display = 'none';
+        svg.classList.add('show');
+
+        // Texts
+        applyConfirmedTranslations();
+
+        // Badge
+        const badge = document.getElementById('status-badge');
+        badge.className = 'status-badge confirmed';
+
+        // Detail status
+        document.getElementById('detail-status').textContent = t('confirmed_status');
+
+        // Messages
+        document.getElementById('msg-pending').style.display   = 'none';
+        document.getElementById('msg-confirmed').style.display = 'block';
+        document.getElementById('msg-warning').style.display   = 'none';
+
+        // Confirmed banner
+        document.getElementById('confirmed-banner').classList.add('show');
+
+        // Page title
+        document.title = '✅ ' + t('confirmed_title') + ' | Pashynska Photography';
+
+        // Camera flash
+        const flash = document.getElementById('camera-flash');
+        if (flash) { flash.classList.add('active'); setTimeout(() => flash.classList.remove('active'), 600); }
+
+        // Animations
+        launchPetals();
+
+        // Film strip
+        setTimeout(() => {
+          const strip = document.getElementById('film-strip');
+          if (strip) strip.classList.add('show');
+        }, 800);
+
+        // Calendar links + animated CTA
+        setupCalendarLinks();
+
+        stopPolling();
+
+        // Card entrance animations
+        document.querySelectorAll('.card, .prep-card').forEach((el, i) => {
+          el.style.animationDelay = (i * 0.08) + 's';
+          el.classList.add('animate-in');
+        });
+
+      } else if (data.status === 'cancelled' && !isConfirmed) {
+        const ring  = document.getElementById('icon-ring');
+        const inner = document.getElementById('icon-inner');
+        ring.className  = 'icon-ring';
+        ring.style.border = '2.5px solid var(--red)';
+        inner.className = 'icon-inner cancelled';
+        document.getElementById('icon-emoji').textContent = '❌';
+
+        document.getElementById('main-title').textContent  = t('cancelled_title');
+        document.getElementById('subtitle').textContent    = t('cancelled_sub');
+        const badge = document.getElementById('status-badge');
+        badge.className = 'status-badge cancelled';
+        document.getElementById('status-text').textContent = t('cancelled_title');
+        document.getElementById('msg-pending').style.display = 'none';
+        document.getElementById('msg-warning').style.display = 'none';
+        stopPolling();
+      }
+    }
+
+    function poll() {
+      fetch('/booking-status?booking_id=' + bookingId + '&token=' + confirmationToken)
+        .then(r => r.json())
+        .then(data => {
+          if (data.confirmed || data.status === 'confirmed' || data.status === 'cancelled') {
+            updateUI(data);
+          }
+        })
+        .catch(() => {});
+    }
+
+    function stopPolling() { if (pollTimer) clearInterval(pollTimer); }
+
+    if (isConfirmed) {
+      // ── Already confirmed: launch everything immediately ──
+      document.title = '✅ ' + t('confirmed_title') + ' | Pashynska Photography';
+
+      // Camera flash
+      const flash = document.getElementById('camera-flash');
+      flash.classList.add('active');
+      setTimeout(() => flash.classList.remove('active'), 600);
+
+      // Petals + sparks
+      launchPetals();
+
+      // Film strip
+      setTimeout(() => {
+        const strip = document.getElementById('film-strip');
+        if (strip) strip.classList.add('show');
+      }, 800);
+
+      // Card entrance
+      document.querySelectorAll('.card, .prep-card').forEach((el, i) => {
+        el.style.animationDelay = (i * 0.08) + 's';
+        el.classList.add('animate-in');
+      });
+
+      // Calendar links + animated CTA
+      setupCalendarLinks();
+
+      stopPolling();
+    } else {
+      pollTimer = setInterval(poll, 3000);
+      poll();
+    }
+  })();
+
+  /* ════════════════════════════════════════════════════
+     INIT
+  ════════════════════════════════════════════════════ */
+  document.addEventListener('DOMContentLoaded', () => {
+    setLang(currentLang);
+  });
+  </script>
+</body>
+</html>

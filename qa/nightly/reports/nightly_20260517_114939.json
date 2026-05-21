@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-05-17T17:49:39Z",
+  "pass": 2,
+  "fail": 0,
+  "warn": 2,
+  "log_path": "/Users/andrzej/Iryna-Master/01-Booking-System/qa/nightly/logs/nightly_20260517_114939.log",
+  "target": "http://127.0.0.1:5051",
+  "layers": {
+    "1_business": "pass",
+    "2_api": "pass",
+    "3_ui": "pass",
+    "4_visual": "pass"
+  }
+}

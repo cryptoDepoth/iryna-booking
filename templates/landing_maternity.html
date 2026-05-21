@@ -1,0 +1,226 @@
+{% extends "base_landing.html" %}
+{% block title %}Calgary Maternity Photographer — Pashynska Photography{% endblock %}
+{% block meta_desc %}Professional maternity photography in Calgary. Celebrate your pregnancy journey with soft, elegant portraits. Studio or outdoor sessions. Book online in 2 minutes.{% endblock %}
+{% block canonical %}https://book.pashynskaphoto.com/maternity{% endblock %}
+{% block og_title %}Calgary Maternity Photographer — Pashynska Photography{% endblock %}
+{% block og_desc %}Professional maternity photography in Calgary. Celebrate your pregnancy journey with soft, elegant portraits.{% endblock %}
+{% block og_url %}https://book.pashynskaphoto.com/maternity{% endblock %}
+
+{% block schema %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://book.pashynskaphoto.com/maternity",
+      "url": "https://book.pashynskaphoto.com/maternity",
+      "name": "Calgary Maternity Photographer — Pashynska Photography",
+      "description": "Professional maternity photography in Calgary. Celebrate your pregnancy journey with soft, elegant portraits.",
+      "inLanguage": ["en", "ru", "uk"],
+      "isPartOf": {"@id": "https://book.pashynskaphoto.com/#website"}
+    },
+    {
+      "@type": "Service",
+      "@id": "https://book.pashynskaphoto.com/maternity#service",
+      "name": "Calgary Maternity Photography",
+      "provider": {"@id": "https://book.pashynskaphoto.com/#organization"},
+      "areaServed": {"@type": "City", "name": "Calgary"},
+      "serviceType": "Maternity Photography",
+      "description": "Elegant maternity photo sessions in Calgary. Studio or outdoor options to celebrate your pregnancy journey with soft, timeless portraits.",
+      "offers": {
+        "@type": "Offer",
+        "price": "290",
+        "priceCurrency": "CAD",
+        "description": "1 hour of photography, 25 professionally retouched photos and all original photos"
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "When is the best time for maternity photos in Calgary?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The ideal time is between 28-34 weeks of pregnancy. Your belly is beautifully round and you still have the energy to enjoy the session. Outdoor or studio options available year-round in Calgary."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much does maternity photography cost in Calgary?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Maternity sessions in Calgary start at $290 + GST for 1 hour with 25 edited photos and all original images. Mini maternity sessions (20 minutes, 5 photos) start at $180."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What should I wear for maternity photos?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Flowing dresses, form-fitting outfits that highlight your bump, and soft neutral tones work beautifully. I provide a detailed styling guide after booking with Calgary-specific recommendations for each season."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can my partner and other children join the maternity session?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Absolutely. Including your partner and children creates meaningful family portraits during this special time. The session naturally flows between solo maternity shots and family groupings."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do you offer studio maternity sessions in Calgary?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, I offer both studio and outdoor maternity sessions. Studio sessions are perfect year-round regardless of Calgary weather. Outdoor sessions capture the golden light and natural beauty of Alberta landscapes."
+      }
+    }
+  ]
+}
+</script>
+{% endblock %}
+
+{% block hero_kicker %}Maternity Photography{% endblock %}
+{% block hero_title %}Celebrate This <em>Beautiful</em> Chapter{% endblock %}
+{% block hero_sub %}Elegant maternity portraits in Calgary. Soft light, flowing fabrics, and the radiant glow that only this season of life brings. Studio or outdoor — your comfort comes first.{% endblock %}
+{% block hero_image_alt %}Calgary maternity photographer capturing an elegant pregnancy portrait in soft light{% endblock %}
+{% block hero_facts %}
+<div class="f"><span class="k">Starting at</span><span class="v">$290<span class="unit">CAD</span></span></div>
+<div class="f"><span class="k">Best at</span><span class="v">28-34<span class="unit">weeks</span></span></div>
+<div class="f"><span class="k">Photos</span><span class="v">25+<span class="unit">edited</span></span></div>
+<div class="f"><span class="k">Location</span><span class="v">Studio<span class="unit">or outdoor</span></span></div>
+{% endblock %}
+{% block cta_primary %}Book Maternity Session{% endblock %}
+{% block cta_primary_url %}/book?type=maternity{% endblock %}
+{% block cta_secondary %}View Portfolio ↗{% endblock %}
+{% block cta_secondary_url %}{{ PORTFOLIO_URL }}{% endblock %}
+
+{% block content %}
+<!-- Trust badges -->
+<div class="trust-row">
+  <div class="trust-item">
+    <div class="trust-num">80+</div>
+    <div class="trust-label">Maternity sessions captured</div>
+  </div>
+  <div class="trust-item">
+    <div class="trust-num">4.9★</div>
+    <div class="trust-label">Average review rating</div>
+  </div>
+  <div class="trust-item">
+    <div class="trust-num">All</div>
+    <div class="trust-label">Original photos included</div>
+  </div>
+</div>
+
+<!-- Services -->
+<div class="section">
+  <h2 class="section-title">Maternity Session Packages</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-top">
+        <div class="card-badge">Most Popular</div>
+        <h3 class="card-name">Maternity Session</h3>
+        <div class="card-price">$290<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>1 hour of photography</li>
+        <li>25 professionally edited photos</li>
+        <li>All original unedited images</li>
+        <li>Studio or outdoor in Calgary</li>
+        <li>Partner & children welcome</li>
+        <li>Private online gallery</li>
+      </ul>
+      <a class="card-btn" href="/book?type=maternity">Check Availability</a>
+    </div>
+    <div class="card">
+      <div class="card-top">
+        <h3 class="card-name">Mini Maternity</h3>
+        <div class="card-price">$180<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>20 minutes of photography</li>
+        <li>5 edited photos + all originals</li>
+        <li>Studio or 1 outdoor location</li>
+        <li>Solo or with partner</li>
+        <li>Quick turnaround</li>
+      </ul>
+      <a class="card-btn" href="/book?type=mini">Check Availability</a>
+    </div>
+    <div class="card">
+      <div class="card-top">
+        <h3 class="card-name">Bump to Baby</h3>
+        <div class="card-price">$500<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>Maternity + Newborn sessions</li>
+        <li>25 edited photos each session</li>
+        <li>All original images</li>
+        <li>Save $80 vs booking separately</li>
+        <li>Flexible scheduling</li>
+      </ul>
+      <a class="card-btn" href="/book?type=maternity">Contact for Details</a>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="section section-faq">
+  <h2 class="section-title">Maternity Photography Questions</h2>
+  <div class="faq-list">
+    <details class="faq-item">
+      <summary class="faq-q">When is the best time for maternity photos?</summary>
+      <div class="faq-a">The ideal time is between 28-34 weeks of pregnancy. Your belly is beautifully round and you still have the energy to enjoy the session.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">How much does maternity photography cost?</summary>
+      <div class="faq-a">Maternity sessions start at $290 + GST for 1 hour with 25 edited photos and all original images included.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">What should I wear?</summary>
+      <div class="faq-a">Flowing dresses, form-fitting outfits that highlight your bump, and soft neutral tones work beautifully. I provide a detailed styling guide after booking.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Can my partner join?</summary>
+      <div class="faq-a">Absolutely. Including your partner and children creates meaningful family portraits during this special time.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Studio or outdoor?</summary>
+      <div class="faq-a">Both! Studio sessions are perfect year-round. Outdoor sessions capture golden light and Alberta landscapes. Choose what feels right for you.</div>
+    </details>
+  </div>
+</div>
+
+<!-- Related services -->
+<div class="section">
+  <h2 class="section-title">Explore Other Sessions</h2>
+  <div class="link-cards">
+    <a class="link-card" href="/wedding">
+      <span class="link-card-icon">💍</span>
+      <span class="link-card-text">Wedding Photography</span>
+      <span class="link-card-arrow">→</span>
+    </a>
+    <a class="link-card" href="/family">
+      <span class="link-card-icon">👨‍👩‍👧‍👦</span>
+      <span class="link-card-text">Family Photography</span>
+      <span class="link-card-arrow">→</span>
+    </a>
+  </div>
+</div>
+
+<!-- Bottom CTA -->
+<div class="bottom-cta">
+  <div class="bottom-cta-inner">
+    <h3 class="bottom-cta-title">Ready to celebrate your pregnancy journey?</h3>
+    <p class="bottom-cta-desc">The best time is 28-34 weeks. Book now to secure your preferred date — maternity sessions are limited each month.</p>
+    <a class="bottom-cta-btn" href="/book?type=maternity">View Available Dates</a>
+  </div>
+</div>
+{% endblock %}

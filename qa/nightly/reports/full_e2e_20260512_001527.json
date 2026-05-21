@@ -1,0 +1,26 @@
+{
+  "result": {
+    "status": "failed",
+    "reason": "db_not_found",
+    "email": "qa-e2e-001518@example.com"
+  },
+  "log": [
+    "[00:15:18] \ud83d\ude80 STARTING FULL E2E TEST",
+    "[00:15:19] Step 1: Opening landing page...",
+    "[00:15:20] \u2705 Landing page loaded",
+    "[00:15:20] Step 2: Clicking event card...",
+    "[00:15:20] \u2705 Clicked event card (article[onclick])",
+    "[00:15:22] \u2705 Drawer opened",
+    "[00:15:22] Step 2.5: Selecting available slot...",
+    "[00:15:22] \u2705 Selected slot (8 available)",
+    "[00:15:23] Step 3: Waiting for form to render...",
+    "[00:15:23] Step 3: Filling reserve form...",
+    "[00:15:23] \u2705 Form filled",
+    "[00:15:23] \u2705 Form submitted",
+    "[00:15:26] \u2705 Booking submitted",
+    "[00:15:26] Step 4: Verifying database...",
+    "[00:15:27] \u274c Booking NOT found in database",
+    "[00:15:27] Step 9: Cleanup...",
+    "[00:15:27] \u2705 Cleaned 0 test booking(s)"
+  ]
+}

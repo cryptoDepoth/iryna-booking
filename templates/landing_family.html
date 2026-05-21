@@ -1,0 +1,226 @@
+{% extends "base_landing.html" %}
+{% block title %}Calgary Family Photographer — Pashynska Photography{% endblock %}
+{% block meta_desc %}Professional family photography in Calgary. Outdoor sessions for families of all sizes. Natural light, genuine smiles, all original photos included. Book online in 2 minutes.{% endblock %}
+{% block canonical %}https://book.pashynskaphoto.com/family{% endblock %}
+{% block og_title %}Calgary Family Photographer — Pashynska Photography{% endblock %}
+{% block og_desc %}Professional family photography in Calgary. Outdoor sessions for families of all sizes. Natural light, genuine smiles.{% endblock %}
+{% block og_url %}https://book.pashynskaphoto.com/family{% endblock %}
+
+{% block schema %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://book.pashynskaphoto.com/family",
+      "url": "https://book.pashynskaphoto.com/family",
+      "name": "Calgary Family Photographer — Pashynska Photography",
+      "description": "Professional family photography in Calgary. Outdoor sessions for families of all sizes.",
+      "inLanguage": ["en", "ru", "uk"],
+      "isPartOf": {"@id": "https://book.pashynskaphoto.com/#website"}
+    },
+    {
+      "@type": "Service",
+      "@id": "https://book.pashynskaphoto.com/family#service",
+      "name": "Calgary Family Photography",
+      "provider": {"@id": "https://book.pashynskaphoto.com/#organization"},
+      "areaServed": {"@type": "City", "name": "Calgary"},
+      "serviceType": "Family Photography",
+      "description": "Outdoor family photo sessions in Calgary for families of all sizes. Natural light photography with genuine smiles and all original photos included.",
+      "offers": {
+        "@type": "Offer",
+        "price": "290",
+        "priceCurrency": "CAD",
+        "description": "1 hour of photography, 25 professionally retouched photos and all original photos"
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much does family photography cost in Calgary?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Family sessions in Calgary start at $290 + GST for 1 hour with 25 edited photos and all original images included. Mini family sessions (20 minutes, 5 photos) start at $180."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What should we wear for family photos in Calgary?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Soft tones, layered textures, and clothes without big logos work best. I send a complete styling guide after booking with color palette suggestions and what to avoid. Coordinating (not matching) outfits look best on camera."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can we bring our dog to the family photo session?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Absolutely! Just mention it when booking so I can plan the location accordingly. Many Calgary parks are dog-friendly and make wonderful backdrops. Pets add so much personality to family photos."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where are the best places for family photos in Calgary?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Riley Park, Confederation Park, Prince's Island Park, and the Bow River pathways are favourites. I also know hidden spots with great light and fewer crowds. We can also shoot at your home or a location meaningful to your family."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How long does a family photo session take?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A full family session is 1 hour — enough time for group shots, individual portraits of kids, and candid moments. Mini sessions are 20 minutes, perfect for quick updates or holiday cards."
+      }
+    }
+  ]
+}
+</script>
+{% endblock %}
+
+{% block hero_kicker %}Family Photography{% endblock %}
+{% block hero_title %}Real Smiles, Real <em>Connection</em>{% endblock %}
+{% block hero_sub %}Outdoor family sessions in Calgary for families of all sizes. No forced poses — just genuine laughter, warm light, and the kind of photos you'll treasure for generations.{% endblock %}
+{% block hero_image_alt %}Calgary family photographer capturing genuine smiles in a park setting{% endblock %}
+{% block hero_facts %}
+<div class="f"><span class="k">Starting at</span><span class="v">$290<span class="unit">CAD</span></span></div>
+<div class="f"><span class="k">Duration</span><span class="v">1<span class="unit">hour</span></span></div>
+<div class="f"><span class="k">Photos</span><span class="v">25+<span class="unit">edited</span></span></div>
+<div class="f"><span class="k">Delivery</span><span class="v">2<span class="unit">weeks</span></span></div>
+{% endblock %}
+{% block cta_primary %}Book Family Session{% endblock %}
+{% block cta_primary_url %}/book?type=family{% endblock %}
+{% block cta_secondary %}View Portfolio ↗{% endblock %}
+{% block cta_secondary_url %}{{ PORTFOLIO_URL }}{% endblock %}
+
+{% block content %}
+<!-- Trust badges -->
+<div class="trust-row">
+  <div class="trust-item">
+    <div class="trust-num">120+</div>
+    <div class="trust-label">Family sessions delivered</div>
+  </div>
+  <div class="trust-item">
+    <div class="trust-num">4.9★</div>
+    <div class="trust-label">Average review rating</div>
+  </div>
+  <div class="trust-item">
+    <div class="trust-num">All</div>
+    <div class="trust-label">Original photos included</div>
+  </div>
+</div>
+
+<!-- Services -->
+<div class="section">
+  <h2 class="section-title">Family Session Packages</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-top">
+        <div class="card-badge">Most Popular</div>
+        <h3 class="card-name">Family Session</h3>
+        <div class="card-price">$290<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>1 hour of photography</li>
+        <li>25 professionally edited photos</li>
+        <li>All original unedited images</li>
+        <li>1-2 outdoor locations in Calgary</li>
+        <li>Private online gallery</li>
+        <li>Print rights included</li>
+      </ul>
+      <a class="card-btn" href="/book?type=family">Check Availability</a>
+    </div>
+    <div class="card">
+      <div class="card-top">
+        <h3 class="card-name">Mini Family Session</h3>
+        <div class="card-price">$180<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>20 minutes of photography</li>
+        <li>5 edited photos + all originals</li>
+        <li>1 location in Calgary</li>
+        <li>Perfect for holiday cards</li>
+        <li>Seasonal mini session events</li>
+      </ul>
+      <a class="card-btn" href="/book?type=mini">Check Availability</a>
+    </div>
+    <div class="card">
+      <div class="card-top">
+        <h3 class="card-name">Extended Family</h3>
+        <div class="card-price">$450<span class="card-unit">CAD + GST</span></div>
+      </div>
+      <ul class="card-list">
+        <li>1.5 hours of photography</li>
+        <li>40 edited photos + all originals</li>
+        <li>Multiple group combinations</li>
+        <li>Grandparents, cousins, everyone</li>
+        <li>2-3 locations</li>
+      </ul>
+      <a class="card-btn" href="/book?type=family">Contact for Details</a>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="section section-faq">
+  <h2 class="section-title">Family Photography Questions</h2>
+  <div class="faq-list">
+    <details class="faq-item">
+      <summary class="faq-q">How much does family photography cost in Calgary?</summary>
+      <div class="faq-a">Family sessions in Calgary start at $290 + GST for 1 hour with 25 edited photos and all original images included. Mini family sessions start at $180.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">What should we wear for family photos?</summary>
+      <div class="faq-a">Soft tones, layered textures, and clothes without big logos work best. I send a complete styling guide after booking with color palette suggestions.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Can we bring our dog?</summary>
+      <div class="faq-a">Absolutely! Just mention it when booking. Many Calgary parks are dog-friendly and make wonderful backdrops.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">Where are the best places for family photos?</summary>
+      <div class="faq-a">Riley Park, Confederation Park, Prince's Island Park, and Bow River pathways are favourites. I also know hidden spots with great light.</div>
+    </details>
+    <details class="faq-item">
+      <summary class="faq-q">How long does a family session take?</summary>
+      <div class="faq-a">A full family session is 1 hour — enough for group shots, individual portraits, and candid moments. Mini sessions are 20 minutes.</div>
+    </details>
+  </div>
+</div>
+
+<!-- Related services -->
+<div class="section">
+  <h2 class="section-title">Explore Other Sessions</h2>
+  <div class="link-cards">
+    <a class="link-card" href="/wedding">
+      <span class="link-card-icon">💍</span>
+      <span class="link-card-text">Wedding Photography</span>
+      <span class="link-card-arrow">→</span>
+    </a>
+    <a class="link-card" href="/maternity">
+      <span class="link-card-icon">🤰</span>
+      <span class="link-card-text">Maternity Photography</span>
+      <span class="link-card-arrow">→</span>
+    </a>
+  </div>
+</div>
+
+<!-- Bottom CTA -->
+<div class="bottom-cta">
+  <div class="bottom-cta-inner">
+    <h3 class="bottom-cta-title">Ready to capture your family's story?</h3>
+    <p class="bottom-cta-desc">Seasonal mini sessions and full family shoots available. Book online in 2 minutes — your kids will actually enjoy it.</p>
+    <a class="bottom-cta-btn" href="/book?type=family">View Available Dates</a>
+  </div>
+</div>
+{% endblock %}
