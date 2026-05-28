@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{{ event.title|e }} · Admin Event</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Same palette as admin.html / admin_clients.html / booking_detail.html
+     so the four admin pages feel like one coherent product. */
+  :root {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface2: #f7f8fa;
+    --border: #e4e7ec;
+    --border-strong: #d1d5db;
+    --text: #111827;
+    --text-2: #6b7280;
+    --muted: #9ca3af;
+    --accent: #f97316;
+    --accent-strong: #ea580c;
+    --topbar-bg: #111827;
+    --topbar-link: #9ca3af;
+    --success: #16a34a;
+    --success-bg: #dcfce7;
+    --warn: #d97706;
+    --warn-bg: #fef3c7;
+    --danger: #dc2626;
+    --danger-bg: #fee2e2;
+    --blue: #2563eb;
+    --blue-bg: #dbeafe;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+  a { color: inherit; text-decoration: none; }
+
+  .topbar {
+    background: var(--topbar-bg); padding: 0 24px; height: 56px;
+    display: flex; align-items: center; gap: 20px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 600; font-size: 15px; white-space: nowrap; }
+  .topbar-brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .topbar-nav { display: flex; gap: 4px; }
+  .topbar-nav a { color: var(--topbar-link); font-size: 13px; padding: 6px 12px; border-radius: var(--radius-sm); transition: color .15s, background .15s; }
+  .topbar-nav a:hover { color: #fff; background: rgba(255,255,255,.06); }
+  .topbar-spacer { flex: 1; }
+
+  .page { max-width: 1120px; margin: 0 auto; padding: 28px 20px 60px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 13px; font-weight: 500; margin-bottom: 16px; }
+  .back-link:hover { color: var(--text); }
+
+  .event-hero {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 22px 26px;
+    margin-bottom: 22px;
+  }
+  .event-hero h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .event-hero .meta { color: var(--text-2); font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .event-hero .meta span { white-space: nowrap; }
+
+  /* Legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-2); margin-bottom: 16px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); }
+  .legend-swatch.free { background: var(--surface); }
+  .legend-swatch.pending { background: var(--warn-bg); border-color: var(--warn-bg); }
+  .legend-swatch.confirmed { background: var(--success-bg); border-color: var(--success-bg); }
+
+  /* Slot grid */
+  .slot-grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+  .slot {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    transition: border-color .15s, box-shadow .15s;
+    cursor: pointer;
+  }
+  .slot.free:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,.10); }
+  .slot.pending { background: var(--warn-bg); border-color: var(--warn-bg); cursor: default; }
+  .slot.confirmed { background: var(--success-bg); border-color: var(--success-bg); cursor: default; }
+  .slot-time { font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+  .slot-label { font-size: 11px; color: var(--text-2); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .slot-status { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-top: 6px; display: inline-block; }
+  .slot.free .slot-status { color: var(--accent); }
+  .slot.pending .slot-status { color: var(--warn); }
+  .slot.confirmed .slot-status { color: var(--success); }
+  .slot-client {
+    font-size: 12px; color: var(--text); margin-top: 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .slot-link {
+    display: inline-block; font-size: 11px; color: var(--text-2);
+    margin-top: 4px; text-decoration: underline; text-underline-offset: 2px;
+  }
+  .slot-link:hover { color: var(--accent); }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(17,24,39,.5); backdrop-filter: blur(2px);
+    display: none; align-items: center; justify-content: center; z-index: 1000;
+    padding: 16px;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius); padding: 28px 30px;
+    width: 100%; max-width: 460px; box-shadow: 0 24px 64px rgba(0,0,0,.18);
+  }
+  .modal h2 { font-size: 18px; margin-bottom: 6px; }
+  .modal .sub { font-size: 13px; color: var(--text-2); margin-bottom: 18px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); margin-bottom: 6px; display: block; }
+  .field input[type=text], .field input[type=email], .field input[type=tel] {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 14px; padding: 9px 12px; border-radius: 6px;
+    outline: none; font-family: inherit;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,.12); }
+  .field .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface2); border-radius: 6px; }
+  .field .checkbox-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .field .checkbox-row label { margin: 0; letter-spacing: 0; text-transform: none; font-size: 13px; color: var(--text); font-weight: 500; }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+  .btn {
+    font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: var(--radius-sm);
+    border: 1px solid transparent; cursor: pointer; font-family: inherit;
+    transition: all .15s;
+  }
+  .btn-outline { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+  .btn-outline:hover { background: var(--surface2); }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-accent:hover { background: var(--accent-strong); }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 13px; padding: 12px 18px;
+    border-radius: var(--radius-sm); box-shadow: 0 8px 32px rgba(0,0,0,.12);
+    opacity: 0; transform: translateY(8px); transition: all .25s;
+    pointer-events: none; z-index: 9999;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.ok  { border-left: 3px solid var(--success); }
+  .toast.err { border-left: 3px solid var(--danger); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="topbar-brand"><span class="dot"></span>📸 Pashynska Studio</span>
+  <nav class="topbar-nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/clients">👥 Clients</a>
+  </nav>
+  <span class="topbar-spacer"></span>
+</header>
+
+<main class="page">
+  <a class="back-link" href="/admin">← Back to dashboard</a>
+
+  <section class="event-hero">
+    <h1>{{ event.title|e }}</h1>
+    <div class="meta">
+      <span>📅 {{ event.date or '—' }}</span>
+      <span>⏱ {{ event.start_time or '—' }} – {{ event.end_time or '—' }}</span>
+      {% if event.location %}<span>📍 {{ event.location|e }}</span>{% endif %}
+      {% if event.deposit %}<span>💰 Deposit ${{ "%.2f"|format(event.deposit|float) }}</span>{% endif %}
+      {% if event.full_price %}<span>Total ${{ "%.2f"|format(event.full_price|float) }}</span>{% endif %}
+    </div>
+  </section>
+
+  <div class="legend">
+    <span class="legend-item"><span class="legend-swatch free"></span>Free — click to block</span>
+    <span class="legend-item"><span class="legend-swatch pending"></span>Reserved (awaiting payment)</span>
+    <span class="legend-item"><span class="legend-swatch confirmed"></span>Confirmed / paid</span>
+  </div>
+
+  <div id="slotGrid" class="slot-grid" aria-live="polite">
+    <div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-2);">Loading slots…</div>
+  </div>
+</main>
+
+<!-- Modal: Block slot manually -->
+<div id="modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <form class="modal" id="bookForm" onsubmit="submitBooking(event)">
+    <h2 id="modalTitle">Block slot</h2>
+    <p class="sub" id="modalSub">Pick this slot for a walk-in client — they won't appear on the public calendar.</p>
+
+    <div class="field">
+      <label for="bName">Client name *</label>
+      <input id="bName" name="name" type="text" required minlength="2" maxlength="80" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="bEmail">Email (optional)</label>
+      <input id="bEmail" name="email" type="email" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="bPhone">Phone (optional)</label>
+      <input id="bPhone" name="phone" type="tel" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="bInsta">Instagram (optional)</label>
+      <input id="bInsta" name="instagram" type="text" autocomplete="off" placeholder="@handle or handle" />
+    </div>
+    <div class="field">
+      <div class="checkbox-row">
+        <input id="bPaid" name="mark_paid" type="checkbox" checked />
+        <label for="bPaid">Mark as paid (status = confirmed, paid_amount = full price)</label>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" type="button" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-accent" type="submit">Block slot</button>
+    </div>
+  </form>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+  const eventId = {{ event.id|tojson }};
+  const toastEl = document.getElementById('toast');
+  const modalEl = document.getElementById('modal');
+  const gridEl  = document.getElementById('slotGrid');
+  let pendingSlot = null;
+  let toastTimer;
+
+  function showToast(msg, type) {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast show ' + (type === 'err' ? 'err' : 'ok');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3500);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  async function loadSlots() {
+    gridEl.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-2);">Loading slots…</div>';
+    let res;
+    try {
+      res = await fetch('/admin/api/event/' + encodeURIComponent(eventId) + '/slots');
+    } catch (e) {
+      gridEl.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--danger);">Network error — could not load slots</div>';
+      return;
+    }
+    if (res.status === 401 || res.status === 403) {
+      const next = encodeURIComponent(location.pathname);
+      location.href = '/admin/login?next=' + next;
+      return;
+    }
+    if (!res.ok) {
+      gridEl.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--danger);">HTTP ' + res.status + '</div>';
+      return;
+    }
+    const data = await res.json();
+    renderGrid(data.slots || []);
+  }
+
+  function renderGrid(slots) {
+    if (!slots.length) {
+      gridEl.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-2);">No slots configured for this event.</div>';
+      return;
+    }
+    gridEl.innerHTML = slots.map(s => {
+      const state = s.state;
+      const clientLine = s.client ? `<div class="slot-client">${esc(s.client)}</div>` : '';
+      const openLink = s.booking_id
+        ? `<a class="slot-link" href="/admin/booking/${s.booking_id}" onclick="event.stopPropagation();">Open #${s.booking_id} →</a>`
+        : '';
+      const onclick = (state === 'free') ? `onclick="openModal('${esc(s.time)}','${esc(s.label)}')"` : '';
+      const statusLabel = state === 'free' ? 'Free' : (state === 'confirmed' ? 'Confirmed' : 'Reserved');
+      return `
+        <div class="slot ${state}" ${onclick}>
+          <div class="slot-time">${esc(s.time)}</div>
+          <div class="slot-label">${esc(s.label)}</div>
+          <div class="slot-status">${statusLabel}</div>
+          ${clientLine}
+          ${openLink}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function openModal(time, label) {
+    pendingSlot = time;
+    document.getElementById('modalSub').textContent = 'Slot: ' + label + ' — pick this slot for a walk-in client. They won\'t appear on the public calendar.';
+    document.getElementById('bookForm').reset();
+    document.getElementById('bPaid').checked = true;
+    modalEl.classList.add('show');
+    setTimeout(() => document.getElementById('bName').focus(), 50);
+  }
+  function closeModal() {
+    pendingSlot = null;
+    modalEl.classList.remove('show');
+  }
+  modalEl.addEventListener('click', (e) => { if (e.target === modalEl) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+  async function submitBooking(ev) {
+    ev.preventDefault();
+    if (!pendingSlot) return;
+    const body = {
+      time: pendingSlot,
+      name: document.getElementById('bName').value.trim(),
+      email: document.getElementById('bEmail').value.trim(),
+      phone: document.getElementById('bPhone').value.trim(),
+      instagram: document.getElementById('bInsta').value.trim(),
+      mark_paid: document.getElementById('bPaid').checked,
+    };
+    showToast('Blocking slot…');
+    let res;
+    try {
+      res = await fetch('/admin/api/event/' + encodeURIComponent(eventId) + '/manual-book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) { showToast('Network error', 'err'); return; }
+    if (res.status === 401 || res.status === 403) {
+      const next = encodeURIComponent(location.pathname);
+      location.href = '/admin/login?next=' + next;
+      return;
+    }
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (res.ok && data && data.success) {
+      showToast('Slot blocked ✓ (#' + data.booking_id + ')', 'ok');
+      closeModal();
+      loadSlots();
+    } else {
+      showToast((data && data.error) || ('HTTP ' + res.status), 'err');
+    }
+  }
+
+  loadSlots();
+</script>
+
+</body>
+</html>

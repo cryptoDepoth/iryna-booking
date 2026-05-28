@@ -235,9 +235,9 @@ body::after{
       <img src="{{ hero_photo_url or '/static/og-image.jpg' }}"
            alt="{% block hero_image_alt %}{% endblock %}" loading="eager">
       <div class="hero-caption" aria-hidden="true">
-        <!-- Decorative duplicate of the title for visual punch on the photo card.
-             It's aria-hidden because the real <h1> lives in .hero-card below;
-             a page must have exactly one h1 for SEO + accessibility. -->
+        {# Decorative duplicate of the title for visual punch on the photo card.
+           It is aria-hidden because the real heading lives in .hero-card below;
+           a page must have exactly one top-level heading for SEO + a11y. #}
         <div class="tag">{{ self.hero_kicker() }}</div>
         <div class="hero-caption-title">{{ self.hero_title() }}</div>
       </div>

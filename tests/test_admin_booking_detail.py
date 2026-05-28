@@ -11,6 +11,7 @@ Features tested:
 - Invalid booking id = 404
 """
 import os
+import re
 import subprocess
 import sqlite3
 import tempfile
@@ -121,6 +122,53 @@ def test_admin_invoice_generate_returns_pdf(admin_client, monkeypatch):
     assert resp.data[:4] == b"%PDF"
 
 
+def test_admin_invoice_pdf_stays_one_page_with_verbose_booking(admin_client, monkeypatch):
+    """A verbose booking with Cyrillic client data should still render as one PDF page."""
+    monkeypatch.setattr(booking_app, "_send_email_raw", lambda *a, **k: True, raising=False)
+    booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
+    conn = sqlite3.connect(booking_app.DB_PATH)
+    conn.execute(
+        """UPDATE bookings
+           SET name=?, phone=?, session_type=?, full_price=?, paid_amount=?, deposit_amount=?
+           WHERE id=?""",
+        (
+            "Олександра Довгопрізвище-Перевірка",
+            "+1 368 997 7903 ext. 12345",
+            "Дуже довга сімейна фотосесія з розширеним описом",
+            875.0,
+            250.0,
+            250.0,
+            booking_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(
+        booking_app,
+        "get_event_by_id",
+        lambda _event_id: {
+            "title": "Дуже довга сімейна фотосесія з розширеним описом пакету",
+            "location": "Fish Creek Provincial Park, Calgary — точка зустрічі біля головного входу",
+            "full_price": 875.0,
+            "included": [
+                "Pre-session planning and styling guidance with location recommendations",
+                "Up to 60 minutes of relaxed guided photography for the whole family",
+                "Private online gallery with professionally edited high-resolution images",
+                "Print release for personal use and simple sharing with relatives",
+                "Delivery within five to seven business days after the session",
+                "Optional short preview selection before final gallery delivery",
+            ],
+        },
+        raising=False,
+    )
+
+    resp = admin_client.post(f"/admin/booking/{booking_id}/invoice", json={})
+    assert resp.status_code == 200
+    assert resp.data[:4] == b"%PDF"
+    page_count = len(re.findall(rb"/Type\s*/Page\b", resp.data))
+    assert page_count == 1
+
+
 # 5. Invoice email sends with PDF attachment
 def test_admin_invoice_send_email(admin_client, monkeypatch):
     """RED: POST /admin/booking/<id>/send-invoice should trigger email."""
@@ -183,3 +231,76 @@ def test_admin_review_email(admin_client, monkeypatch):
     data = resp.get_json()
     assert data.get("success") is True
     assert captured.get("called") is True
+
+
+# 8. Detail page exposes one-page invoice/balance generator fields
+def test_admin_booking_detail_has_inline_invoice_generator(admin_client, monkeypatch):
+    """RED: detail page should let admin edit total/paid and request balance from one page."""
+    booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
+    conn = sqlite3.connect(booking_app.DB_PATH)
+    conn.execute("UPDATE bookings SET full_price=?, paid_amount=?, deposit_amount=? WHERE id=?", (500.0, 200.0, 200.0, booking_id))
+    conn.commit()
+    conn.close()
+
+    resp = admin_client.get(f"/admin/booking/{booking_id}")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Invoice generator" in html
+    assert "invoiceFullPrice" in html
+    assert "invoicePaidAmount" in html
+    assert "invoiceBalanceDue" in html
+    assert "Request balance" in html
+    assert "300.00" in html
+
+
+# 9. Admin can edit invoice amounts from detail page without prompts
+def test_admin_invoice_patch_updates_amounts(admin_client, monkeypatch):
+    """RED: PATCH /admin/booking/<id>/invoice should persist full/paid/deposit values."""
+    booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
+
+    resp = admin_client.patch(
+        f"/admin/booking/{booking_id}/invoice",
+        json={"full_price": 640.0, "paid_amount": 250.0, "deposit_amount": 250.0},
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["full_price"] == 640.0
+    assert data["paid_amount"] == 250.0
+    assert data["balance_due"] == 390.0
+
+    conn = sqlite3.connect(booking_app.DB_PATH)
+    row = conn.execute("SELECT full_price, paid_amount, deposit_amount FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    conn.close()
+    assert row == (640.0, 250.0, 250.0)
+
+
+# 10. Balance request uses booking.full_price and returns copyable link if email succeeds
+def test_admin_request_balance_uses_booking_full_price_and_returns_link(admin_client, monkeypatch):
+    """RED: remaining balance = booking.full_price - paid_amount, not stale event defaults."""
+    booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
+    conn = sqlite3.connect(booking_app.DB_PATH)
+    conn.execute("UPDATE bookings SET full_price=?, paid_amount=?, deposit_amount=? WHERE id=?", (700.0, 250.0, 250.0, booking_id))
+    conn.commit()
+    conn.close()
+
+    captured = {}
+    def fake_balance_email(**kwargs):
+        captured.update(kwargs)
+        return True
+    monkeypatch.setattr(booking_app, "_send_balance_request_email", fake_balance_email, raising=False)
+    monkeypatch.setattr(booking_app, "_create_balance_checkout_url", lambda booking, event, balance_due: "https://buy.stripe.com/test_balance", raising=False)
+    monkeypatch.setattr(booking_app, "_notify_admin", lambda *a, **k: True, raising=False)
+    monkeypatch.setattr(booking_app, "_emit_n8n_event", lambda *a, **k: True, raising=False)
+
+    resp = admin_client.post("/admin/request-balance", json={"booking_id": booking_id})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["total_price"] == 700.0
+    assert data["paid_amount"] == 250.0
+    assert data["balance_due"] == 450.0
+    assert data["stripe_url"] == "https://buy.stripe.com/test_balance"
+    assert captured["total_price"] == 700.0
+    assert captured["paid_amount"] == 250.0
+    assert captured["balance_due"] == 450.0

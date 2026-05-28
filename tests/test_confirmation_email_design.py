@@ -44,7 +44,11 @@ def test_confirmation_email_has_next_steps_timeline(monkeypatch):
     assert "Confederation Park, Calgary" in email
     assert "remaining balance" in email.lower()
     assert "after the photo session" in email
-    assert "within one week" in email
+    # Step 4 used to be "edited gallery within one week"; per Iryna's brand
+    # update the deliverable is now described as the unedited original
+    # photos (see Step 4 in _send_client_email plain + HTML branches).
+    assert "original photos" in email.lower()
+    assert "unedited" in email.lower()
     assert "Wfolio" in email
     assert "download" in email.lower()
     assert "1–2 months" in email or "1-2 months" in email

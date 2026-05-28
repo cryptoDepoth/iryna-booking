@@ -302,6 +302,15 @@
   .toast.ok { border-left: 3px solid var(--success); }
   .toast.err { border-left: 3px solid var(--danger); }
 
+  /* Booking action buttons */
+  .booking-actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn-sm { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-family: inherit; }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-outline { background: transparent; color: var(--accent); border-color: var(--accent); }
+  .btn-gallery { background: #6b8e23; color: #fff; text-decoration: none; display: inline-block; }
+  .btn-review { background: #ffd700; color: #333; }
+  .booking-amount { font-weight: 600; color: var(--accent); }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -540,11 +549,27 @@ function renderDetail({ client, bookings, notes }) {
 
   const bookingRows = bookings.length ? bookings.map(b => {
     const sc = `status-${b.status}`;
-    return `<div class="booking-row">
+    // Build action buttons based on booking status
+    const actions = [];
+    if (b.status === 'confirmed') {
+      actions.push(`<button class="btn-sm btn-primary" onclick="sendInvoice(${b.id})" title="Send invoice to client">📧 Send Invoice</button>`);
+      actions.push(`<button class="btn-sm btn-outline" onclick="downloadInvoice(${b.id})" title="Download invoice PDF">📄 Invoice PDF</button>`);
+      actions.push(`<button class="btn-sm btn-outline" onclick="editInvoiceAmounts(${b.id}, ${b.full_price||0}, ${b.deposit_amount||0}, '${parseFloat(b.paid_amount||0).toFixed(2)}')" title="Edit amounts">✏️ Edit</button>`);
+    }
+    if (b.status === 'confirmed' || b.status === 'completed') {
+      if (b.wfolio_url) {
+        actions.push(`<a href="${esc(b.wfolio_url)}" target="_blank" class="btn-sm btn-gallery" title="Open gallery">🖼️ Gallery</a>`);
+      }
+      actions.push(`<button class="btn-sm btn-review" onclick="openReviewDialog(${b.id})" title="Send review request">⭐ Review</button>`);
+    }
+    const actionBar = actions.length ? `<div class="booking-actions">${actions.join(' ')}</div>` : '';
+    return `<div class="booking-row" data-booking-id="${b.id}">
       <span class="booking-date">${b.date || "—"}</span>
       <span class="booking-time">${b.time || "—"}</span>
       <span class="booking-type">${esc(b.session_type || "Session")}</span>
       <span class="status-badge ${sc}">${b.status}</span>
+      <span class="booking-amount">$${parseFloat(b.paid_amount || 0).toFixed(2)}</span>
+      ${actionBar}
     </div>`;
   }).join("") : `<p style="color:var(--muted);font-size:13px;">No bookings yet.</p>`;
 
@@ -707,9 +732,59 @@ async function triggerBackup() {
   } catch(e) { showToast("Backup failed", "err"); }
 }
 
+async function sendInvoice(bookingId) {
+  try {
+    const res = await fetch(`/admin/booking/${bookingId}/send-invoice`, { method: "POST" });
+    const data = await res.json();
+    if (data.success) showToast(`Invoice sent to client for #${bookingId}`, "ok");
+    else showToast(`Failed to send invoice: ${data.error || 'Unknown error'}`, "err");
+  } catch(e) { showToast("Failed to send invoice", "err"); }
+}
+
+async function downloadInvoice(bookingId) {
+  try {
+    const res = await fetch(`/admin/booking/${bookingId}/invoice`, { method: "POST" });
+    if (!res.ok) { showToast(`Invoice error: ${res.status}`, "err"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `invoice-${bookingId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) { showToast("Failed to download invoice", "err"); }
+}
+
+async function openReviewDialog(bookingId) {
+  if (!confirm(`Send review request email for booking #${bookingId}?`)) return;
+  try {
+    const res = await fetch(`/admin/booking/${bookingId}/send-review`, { method: "POST" });
+    const data = await res.json();
+    if (data.success) showToast(`Review request sent for #${bookingId}`, "ok");
+    else showToast(`Failed: ${data.error || 'Unknown error'}`, "err");
+  } catch(e) { showToast("Failed to send review request", "err"); }
+}
+
 // ── Helpers ──
 function esc(str) {
   return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function editInvoiceAmounts(bookingId, fullPrice, depositAmount, paidAmount) {
+  const fp = prompt("Full price (CAD):", fullPrice > 0 ? fullPrice : "");
+  if (fp === null) return;
+  const dep = prompt("Deposit amount (CAD):", depositAmount > 0 ? depositAmount : "");
+  const data = {full_price: parseFloat(fp) || 0, deposit_amount: parseFloat(dep) || 0};
+  fetch(`/admin/booking/${bookingId}/invoice`, {
+    method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(r => {
+    if (r.success) { showToast(`Booking #${bookingId} updated`, "ok"); location.reload(); }
+    else { showToast(`Failed: ${r.error||'Error'}`, "err"); }
+  })
+  .catch(e => showToast("Failed to update amounts", "err"));
 }
 function fmtDate(iso) {
   if (!iso) return "—";

@@ -898,7 +898,10 @@
         <span style="color:#4b5563; font-weight:400;">/ Admin</span>
     </div>
     <div class="topbar-right">
+        <a href="#bookings-section" class="topbar-link" style="font-size:13px;">Bookings</a>
+        <a href="#events-section" class="topbar-link" style="font-size:13px;">Events & slots</a>
         <a href="/admin/clients" class="topbar-link" style="font-size:13px;">👥 Clients</a>
+        <a href="/admin/health" class="topbar-link" style="font-size:13px;">Health</a>
         <span class="topbar-badge">Admin</span>
         <a href="/" class="topbar-link" target="_blank">↗ Booking site</a>
     </div>
@@ -998,7 +1001,7 @@
     </div>
 
     <!-- BOOKINGS HEADER -->
-    <div class="page-header" style="margin-top:8px; margin-bottom:14px;">
+    <div class="page-header" id="bookings-section" style="margin-top:8px; margin-bottom:14px;">
         <div class="page-title">
             <h1 style="font-size:18px;">Bookings</h1>
             <p>Showing {{ filtered_stats.total }} of {{ overall_stats.total }} total bookings</p>
@@ -1259,6 +1262,9 @@
                     </div>
                 </div>
                 <div style="display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;">
+                    <a class="btn-outline" style="font-size:12px; padding:6px 12px; text-decoration:none; display:inline-block;" href="/admin/event/{{ ev.id }}" title="Open the slot grid for this event and manually block walk-in clients">
+                        🗓 Manage slots
+                    </a>
                     <button class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick='duplicateEvent({{ ev.id | tojson }}, {{ (ev.title or "") | tojson }})'>
                         ⊕ Duplicate
                     </button>

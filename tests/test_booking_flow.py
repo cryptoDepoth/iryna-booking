@@ -128,12 +128,34 @@ def test_public_pages_link_to_privacy_without_cookie_consent_friction(client):
     assert "Accept cookies" not in payment_html
     assert "Reject cookies" not in payment_html
 
-    success = c.get(f"/success?booking_id={booking_id}")
+    success = c.get(f"/success?booking_id={booking_id}&token={token}")
     assert success.status_code == 200
     success_html = success.get_data(as_text=True)
     assert 'href="/privacy"' in success_html
     assert "Accept cookies" not in success_html
     assert "Reject cookies" not in success_html
+
+
+def test_success_page_requires_confirmation_token(client):
+    """Booking details must not be visible from booking_id alone."""
+    c, client_db = client
+    slot_time, date, event_id = _first_slot((c, client_db))
+    reserve = _reserve(c, slot_time, event_id, email="success-token@test.com")
+    booking_id = reserve.get_json()["booking_id"]
+    token = reserve.get_json()["confirmation_token"]
+
+    missing = c.get(f"/success?booking_id={booking_id}")
+    assert missing.status_code == 302
+    assert missing.headers["Location"].endswith("/")
+
+    wrong = c.get(f"/success?booking_id={booking_id}&token=wrong")
+    assert wrong.status_code == 302
+    assert wrong.headers["Location"].endswith("/")
+
+    ok = c.get(f"/success?booking_id={booking_id}&token={token}")
+    assert ok.status_code == 200
+    assert "success-token@test.com" not in ok.get_data(as_text=True)
+    assert 'href="/privacy"' in ok.get_data(as_text=True)
 
 
 def test_reserve_and_confirm_flow(client):
@@ -266,6 +288,11 @@ def test_admin_confirm_sends_telegram_confirmation_notification(client, monkeypa
     slot_time, date, event_id = _first_slot(client_tuple)
     sent_messages = []
     monkeypatch.setattr(booking_app, "_notify_admin", lambda message, reply_markup=None: sent_messages.append(message), raising=False)
+    # /admin/confirm calls _send_client_email (not send_confirmation_email),
+    # which shells out to the himalaya CLI. In CI / local sandboxes himalaya
+    # isn't on PATH and the call fails, flipping the Telegram message to the
+    # error branch. Stub a success so the assertion targets the right line.
+    monkeypatch.setattr(booking_app, "_send_client_email", lambda **kw: True, raising=False)
 
     resp = _reserve(c, slot_time, event_id, name="Telegram Test", email="telegram-confirm@test.com")
     booking_id = resp.get_json()["booking_id"]
@@ -288,6 +315,40 @@ def test_admin_confirm_sends_telegram_confirmation_notification(client, monkeypa
     assert "Email confirmation sent to client" in message
 
 
+def test_admin_confirm_is_idempotent(client, monkeypatch):
+    """Double-clicking Confirm should not resend email or duplicate side effects."""
+    c, db_path = client_tuple = client
+    slot_time, date, event_id = _first_slot(client_tuple)
+    calls = {"email": 0, "calendar": 0, "notion": 0, "telegram": 0}
+
+    monkeypatch.setattr(booking_app, "_send_client_email", lambda **kw: calls.__setitem__("email", calls["email"] + 1) or True, raising=False)
+    monkeypatch.setattr(booking_app, "create_calendar_event_for_booking", lambda booking_id: calls.__setitem__("calendar", calls["calendar"] + 1) or "https://calendar.example/event", raising=False)
+    monkeypatch.setattr(booking_app, "sync_to_notion", lambda booking_id: calls.__setitem__("notion", calls["notion"] + 1), raising=False)
+    monkeypatch.setattr(booking_app, "_notify_admin", lambda message, reply_markup=None: calls.__setitem__("telegram", calls["telegram"] + 1), raising=False)
+    monkeypatch.setattr(booking_app, "_emit_n8n_event", lambda *args, **kwargs: None, raising=False)
+
+    resp = _reserve(c, slot_time, event_id, name="Double Click", email="double-confirm@test.com")
+    booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
+    c.post("/confirm", json={"booking_id": booking_id, "confirmation_token": token})
+    for key in calls:
+        calls[key] = 0
+
+    first = c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"}, json={
+        "booking_id": booking_id,
+        "paid_amount": 250.00,
+    })
+    second = c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"}, json={
+        "booking_id": booking_id,
+        "paid_amount": 250.00,
+    })
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.get_json()["already_confirmed"] is True
+    assert calls == {"email": 1, "calendar": 1, "notion": 1, "telegram": 1}
+
+
 def test_success_page_initially_renders_confirmed_state_for_confirmed_booking(client):
     """A confirmed e-Transfer booking should not show stale pending copy on page load."""
     c, db_path = client_tuple = client
@@ -300,7 +361,7 @@ def test_success_page_initially_renders_confirmed_state_for_confirmed_booking(cl
     c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"},
            json={"booking_id": booking_id, "paid_amount": 100.0})
 
-    page = c.get(f"/success?booking_id={booking_id}")
+    page = c.get(f"/success?booking_id={booking_id}&token={token}")
     assert page.status_code == 200
     html = page.data.decode()
     assert 'id="main-title" data-i18n="confirmed_title"' in html
@@ -647,7 +708,7 @@ def test_success_page_confirmed_has_animated_calendar_cta(client):
     c.post("/admin/confirm", headers={"X-Admin-Key": "test-admin-key"},
            json={"booking_id": booking_id, "paid_amount": 100.0})
 
-    page = c.get(f"/success?booking_id={booking_id}")
+    page = c.get(f"/success?booking_id={booking_id}&token={token}")
     assert page.status_code == 200
     html = page.data.decode()
 
@@ -668,8 +729,9 @@ def test_success_page_calendar_cta_hidden_until_confirmation(client):
 
     resp = _reserve(c, slot_time, event_id, email="calendar-pending@test.com")
     booking_id = resp.get_json()["booking_id"]
+    token = resp.get_json()["confirmation_token"]
 
-    page = c.get(f"/success?booking_id={booking_id}")
+    page = c.get(f"/success?booking_id={booking_id}&token={token}")
     assert page.status_code == 200
     html = page.data.decode()
 
@@ -695,7 +757,7 @@ def test_public_booking_pages_include_premium_design_layer(client):
     assert payment.status_code == 200
     assert stylesheet in payment.data.decode()
 
-    success = c.get(f'/success?booking_id={booking_id}')
+    success = c.get(f'/success?booking_id={booking_id}&token={token}')
     assert success.status_code == 200
     assert stylesheet in success.data.decode()
 

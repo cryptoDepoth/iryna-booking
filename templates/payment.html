@@ -376,7 +376,7 @@
         <li data-i18n="how_step1">Open your banking app (RBC, TD, Scotiabank, etc.)</li>
         <li data-i18n="how_step2">Choose "Send Interac e-Transfer"</li>
         <li data-i18n="how_step3">Tap the email above to copy, paste as recipient</li>
-        <li data-i18n="how_step4">Enter amount: <strong>${{ price }}.00</strong></li>
+        <li data-i18n="how_step4">Enter amount: <strong>${{ price }} CAD</strong></li>
         <li data-i18n="how_step5">Add message: "{{ event_title }} — {{ date }} {{ booking.time }}"</li>
         <li data-i18n="how_step6">Send the transfer</li>
       </ol>
@@ -389,7 +389,7 @@
     <!-- Confirm form -->
     <div class="card">
       <div class="card-title" data-i18n="ive_sent_title">I've Sent the Payment</div>
-      <p style="font-size:0.875rem;color:var(--ink-3);margin-bottom:20px" data-i18n="ive_sent_sub">Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.</p>
+      <p style="font-size:0.875rem;color:var(--ink-3);margin-bottom:20px" data-i18n="ive_sent_sub">Once you've sent the e-Transfer, tap below. It usually confirms automatically within a few minutes; if not, Iryna will confirm it manually.</p>
 
       <form id="confirm-form">
         <input type="hidden" id="time"         value="{{ booking.time }}">
@@ -622,7 +622,7 @@
       auto_deposit:     'Auto-deposit enabled · no password needed',
       how_to_title:     'How to send Interac e-Transfer',
       ive_sent_title:   "I've Sent the Payment",
-      ive_sent_sub:     "Once you've sent the e-Transfer, tap below. I'll confirm your booking within a few minutes.",
+      ive_sent_sub:     "Once you've sent the e-Transfer, tap below. It usually confirms automatically within a few minutes; if not, Iryna will confirm it manually.",
       confirm_btn:      "✓ Yes, I've Sent ${{ price }} — Confirm Booking",
       back_btn:         '← Back to Change Time',
       no_pwd:           '💡 <strong>No password needed!</strong> This is an auto-deposit enabled email. The money arrives instantly.',
@@ -641,7 +641,7 @@
       how_step1:         'Open your banking app (RBC, TD, Scotiabank, etc.)',
       how_step2:         'Choose "Send Interac e-Transfer"',
       how_step3:         'Tap the email above to copy, paste as recipient',
-      how_step4:         'Enter amount: <strong>${{ price }}.00</strong>',
+      how_step4:         'Enter amount: <strong>${{ price }} CAD</strong>',
       how_step5:         'Add message: "{{ event_title }} — {{ date }} {{ booking.time }}"',
       how_step6:         'Send the transfer',
       footer_questions:  'Questions?',
@@ -670,7 +670,7 @@
       auto_deposit:     'Автодепозит включён · пароль не нужен',
       how_to_title:     'Как отправить Interac e-Transfer',
       ive_sent_title:   'Я отправил(а) оплату',
-      ive_sent_sub:     'После отправки e-Transfer нажмите ниже. Я подтвержу ваше бронирование в течение нескольких минут.',
+      ive_sent_sub:     'После отправки e-Transfer нажмите ниже. Обычно подтверждение проходит автоматически за несколько минут; если нет, Ирина подтвердит вручную.',
       confirm_btn:      '✓ Да, я отправил(а) ${{ price }} — Подтвердить',
       back_btn:         '← Назад, изменить время',
       no_pwd:           '💡 <strong>Пароль не нужен!</strong> Это email с автоматическим зачислением. Деньги поступают мгновенно.',
@@ -689,7 +689,7 @@
       how_step1:         'Откройте приложение банка (RBC, TD, Scotiabank и т.д.)',
       how_step2:         'Выберите "Send Interac e-Transfer"',
       how_step3:         'Скопируйте email выше и вставьте его как получателя',
-      how_step4:         'Введите сумму: <strong>${{ price }}.00</strong>',
+      how_step4:         'Введите сумму: <strong>${{ price }} CAD</strong>',
       how_step5:         'Добавьте сообщение: "{{ event_title }} — {{ date }} {{ booking.time }}"',
       how_step6:         'Отправьте перевод',
       footer_questions:  'Вопросы?',
@@ -718,7 +718,7 @@
       auto_deposit:     'ऑटो-डिपॉज़िट चालू है · पासवर्ड की ज़रूरत नहीं',
       how_to_title:     'Interac e-Transfer कैसे भेजें',
       ive_sent_title:   'मैंने भुगतान भेज दिया',
-      ive_sent_sub:     'e-Transfer भेजने के बाद नीचे दबाएं। मैं कुछ ही मिनटों में आपकी बुकिंग की पुष्टि कर दूंगी।',
+      ive_sent_sub:     'e-Transfer भेजने के बाद नीचे दबाएं। आम तौर पर कुछ मिनटों में अपने आप पुष्टि हो जाती है; अगर नहीं, तो Iryna manually confirm करेंगी।',
       confirm_btn:      '✓ हाँ, मैंने ${{ price }} भेजे — बुकिंग पक्की करें',
       back_btn:         '← वापस जाएं और समय बदलें',
       no_pwd:           '💡 <strong>पासवर्ड की ज़रूरत नहीं!</strong> यह ऑटो-डिपॉज़िट ईमेल है। पैसे तुरंत पहुंच जाते हैं।',
@@ -737,7 +737,7 @@
       how_step1:         'अपना बैंकिंग ऐप खोलें (RBC, TD, Scotiabank, आदि)',
       how_step2:         '"Send Interac e-Transfer" चुनें',
       how_step3:         'ऊपर दिया email कॉपी करें और प्राप्तकर्ता में पेस्ट करें',
-      how_step4:         'राशि दर्ज करें: <strong>${{ price }}.00</strong>',
+      how_step4:         'राशि दर्ज करें: <strong>${{ price }} CAD</strong>',
       how_step5:         'संदेश जोड़ें: "{{ event_title }} — {{ date }} {{ booking.time }}"',
       how_step6:         'ट्रांसफ़र भेजें',
       footer_questions:  'सवाल?',
@@ -766,7 +766,7 @@
       auto_deposit:     'Автодепозит увімкнено · пароль не потрібен',
       how_to_title:     'Як надіслати Interac e-Transfer',
       ive_sent_title:   'Я надіслав(ла) оплату',
-      ive_sent_sub:     'Після відправки e-Transfer натисніть нижче. Я підтверджу ваше бронювання протягом кількох хвилин.',
+      ive_sent_sub:     'Після відправки e-Transfer натисніть нижче. Зазвичай підтвердження проходить автоматично за кілька хвилин; якщо ні, Ірина підтвердить вручну.',
       confirm_btn:      '✓ Так, я надіслав(ла) ${{ price }} — Підтвердити',
       back_btn:         '← Назад, змінити час',
       no_pwd:           '💡 <strong>Пароль не потрібен!</strong> Це email із автоматичним зарахуванням. Гроші надходять миттєво.',
@@ -785,7 +785,7 @@
       how_step1:         'Відкрийте додаток банку (RBC, TD, Scotiabank тощо)',
       how_step2:         'Оберіть "Send Interac e-Transfer"',
       how_step3:         'Скопіюйте email вище та вставте як отримувача',
-      how_step4:         'Введіть суму: <strong>${{ price }}.00</strong>',
+      how_step4:         'Введіть суму: <strong>${{ price }} CAD</strong>',
       how_step5:         'Додайте повідомлення: "{{ event_title }} — {{ date }} {{ booking.time }}"',
       how_step6:         'Надішліть переказ',
       footer_questions:  'Питання?',

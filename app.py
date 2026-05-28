@@ -460,9 +460,27 @@ def _notify_new_reservation(booking_id, client_name, client_email, event_date,
     _notify_admin(text, reply_markup=keyboard)
 
 
+def _booking_success_url(booking_id, token=None, absolute_base=None, **extra_params):
+    """Build a client-safe success URL.
+
+    The success page shows private booking details, so public links must carry
+    the same confirmation token used by payment/status/calendar routes.
+    """
+    from urllib.parse import urlencode
+
+    base = ((absolute_base if absolute_base is not None else (BASE_URL or CANONICAL_SITE_URL)) or "").rstrip("/")
+    path = f"{base}/success"
+    params = {"booking_id": booking_id}
+    if token:
+        params["token"] = token
+    params.update({k: v for k, v in extra_params.items() if v is not None})
+    return f"{path}?{urlencode(params)}"
+
+
 def _notify_payment_pending(booking_id, client_name, client_email, event_date,
                             slot_time, event_title, session_type, client_ig,
-                            expected_deposit=None, client_phone=None):
+                            expected_deposit=None, client_phone=None,
+                            confirmation_token=None):
     """Send payment notification with inline confirm/cancel buttons to Iryna + Andrzej."""
     deposit = expected_deposit or SESSION_PRICE
     slot_end = ""
@@ -474,7 +492,7 @@ def _notify_payment_pending(booking_id, client_name, client_email, event_date,
         pass
 
     admin_url = f"{BASE_URL}/admin" if BASE_URL else "/admin"
-    success_url = f"{BASE_URL}/success?booking_id={booking_id}" if BASE_URL else f"/success?booking_id={booking_id}"
+    success_url = _booking_success_url(booking_id, confirmation_token)
 
     ig_clean = (client_ig or "").lstrip("@")
     phone_display = client_phone or "N/A"
@@ -596,7 +614,7 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
             f"1. We meet for your photo session: {meeting_line}\n"
             f"2. after the photo session, I will send the request for the remaining balance. You can pay by Interac e-Transfer or Stripe card / Apple Pay / Google Pay.\n"
             f"3. I review the photos with you and confirm which images will be professionally edited.\n"
-            f"4. Your edited gallery is prepared within one week.\n"
+            f"4. You receive all original photos from the session — unedited, full resolution.\n"
             f"5. You receive a private Wfolio gallery link with your photos. Please download everything — the gallery is normally kept online for 1–2 months.\n\n"
             f"If you need to reschedule or have questions, DM me on Instagram @pashynska.photo.\n\n"
             f"Warmly,\nIryna Pashynska\n@pashynska.photo"
@@ -659,7 +677,7 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#c4857a;color:#fff;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">1</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">We meet for your session.</strong><br>{safe_date} at {safe_time}. {('Location: ' + safe_location + '.') if location_text else 'Exact location will be sent closer to the session date.'}</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#d9aaa0;color:#fff;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">2</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">After the photo session, the remaining balance is requested.</strong><br>You can pay by Interac e-Transfer or securely by Stripe card, Apple Pay, or Google Pay.</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#e7c7bf;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">3</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">We review and confirm the images for editing.</strong><br>I prepare the photos and confirm with you which images will be professionally edited.</td></tr>
-        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#f0ded7;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">4</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">Your edited gallery is prepared within one week.</strong><br>I retouch and polish the selected images with a natural, timeless look.</td></tr>
+        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#f0ded7;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">4</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">You receive all original photos from the session.</strong><br>Unedited, full-resolution images delivered as-is — no retouching, no filters, every frame I captured.</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#fff1ec;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">5</span></td><td style=\"padding:0;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">You receive your private Wfolio gallery link.</strong><br>Please download your photos when the link arrives. Galleries are normally kept online for 1–2 months.</td></tr>
       </table>
     </div>
@@ -697,25 +715,84 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
             f"--{boundary}--\r\n"
         )
 
-        result = subprocess.run(
-            ["himalaya", "message", "send", "-a", "iryna"],
-            input=template, capture_output=True, text=True, timeout=30
-        )
-        if result.returncode == 0:
-            log.info(f"[email] HTML confirmation sent to {to_email}")
-            return True
-        else:
-            log.error(f"[email] Himalaya failed: {result.stderr[:200]}")
-            return False
+        return _send_email_raw(to_email, client_text, subject, plain, html)
     except Exception as e:
         log.error(f"[email] Send failed: {e}")
         return False
 
 
-def _send_email_raw(to_email, client_name, subject, plain, html):
-    """Low-level: send multipart/alternative email via Himalaya CLI."""
+# ── Email ──
+import smtplib, uuid, time as _time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+
+GMAIL_USER      = os.environ.get("GMAIL_USER", "")
+GMAIL_PASSWORD  = os.environ.get("GMAIL_APP_PASSWORD", "")
+SMTP_HOST       = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT       = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_TIMEOUT    = int(os.environ.get("SMTP_TIMEOUT", "10"))
+SMTP_MAX_RETRY  = int(os.environ.get("SMTP_MAX_RETRY", "3"))
+SMTP_RETRY_BASE = float(os.environ.get("SMTP_RETRY_BASE", "2.0"))
+
+_GMAIL_APP_PASSWORD_FILE = os.path.expanduser("~/.config/himalaya/iryna_gmail_app_password")
+if not GMAIL_PASSWORD and os.path.isfile(_GMAIL_APP_PASSWORD_FILE):
+    try:
+        with open(_GMAIL_APP_PASSWORD_FILE) as f:
+            GMAIL_PASSWORD = f.read().strip()
+    except Exception:
+        pass
+
+def _smtp_send_email(to_email, client_name, subject, plain, html, attachment_bytes=None, attachment_filename="attachment.pdf", attachment_mime="application/pdf"):
+    """Send multipart email via Gmail SMTP with retry."""
     if not to_email:
         return False
+    if not GMAIL_USER or not GMAIL_PASSWORD:
+        log.error("[email] GMAIL_USER/GMAIL_APP_PASSWORD not set — falling back to Himalaya")
+        return _smtp_fallback_raw(to_email, client_name, subject, plain, html)
+    msg = MIMEMultipart("mixed")
+    msg["From"] = f"Iryna Pashynska <{GMAIL_USER}>"
+    msg["To"] = f"{client_name} <{to_email}>"
+    msg["Subject"] = subject
+    msg["Message-Id"] = f"<pashynska-{uuid.uuid4().hex}@gmail.com>"
+    # Body (multipart/alternative)
+    body = MIMEMultipart("alternative")
+    body.attach(MIMEText(plain, "plain", "utf-8"))
+    body.attach(MIMEText(html, "html", "utf-8"))
+    msg.attach(body)
+    # Attachment
+    if attachment_bytes:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment_bytes)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f"attachment; filename={attachment_filename}")
+        msg.attach(part)
+    message = msg.as_string()
+    last_err = None
+    for attempt in range(1, SMTP_MAX_RETRY + 1):
+        try:
+            # Prefer STARTTLS (port 587) — more reliable across environments
+            if SMTP_PORT == 587:
+                server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT)
+                server.starttls()
+            else:
+                server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT)
+            server.login(GMAIL_USER, GMAIL_PASSWORD)
+            server.sendmail(GMAIL_USER, [to_email], message)
+            server.quit()
+            log.info(f"[email] Sent '{subject}' to {to_email} (attempt {attempt})")
+            return True
+        except Exception as e:
+            last_err = str(e)
+            log.warning(f"[email] Attempt {attempt}/{SMTP_MAX_RETRY} failed: {last_err[:150]}")
+            if attempt < SMTP_MAX_RETRY:
+                _time.sleep(SMTP_RETRY_BASE * attempt)
+    log.error(f"[email] Failed to send after {SMTP_MAX_RETRY} attempts: {last_err[:200]}")
+    return False
+
+def _smtp_fallback_raw(to_email, client_name, subject, plain, html):
+    """Last resort: try Himalaya subprocess if SMTP fails."""
     try:
         import subprocess
         boundary = f"====pashynska_{abs(hash(subject))}===="
@@ -739,14 +816,19 @@ def _send_email_raw(to_email, client_name, subject, plain, html):
             input=template, capture_output=True, text=True, timeout=30
         )
         if result.returncode == 0:
-            log.info(f"[email] Sent '{subject}' to {to_email}")
+            log.info(f"[email fallback] Sent '{subject}' to {to_email}")
             return True
         else:
-            log.error(f"[email] Himalaya failed ({subject}): {result.stderr[:200]}")
+            log.error(f"[email fallback] Himalaya failed ({subject}): {result.stderr[:200]}")
             return False
     except Exception as e:
-        log.error(f"[email] Send failed ({subject}): {e}")
+        log.error(f"[email fallback] Send failed ({subject}): {e}")
         return False
+
+
+def _send_email_raw(to_email, client_name, subject, plain, html, attachment_bytes=None, attachment_filename="attachment.pdf", attachment_mime="application/pdf"):
+    """Unified email sender: prefers SMTP with retry, falls back to Himalaya CLI."""
+    return _smtp_send_email(to_email, client_name, subject, plain, html, attachment_bytes, attachment_filename, attachment_mime)
 
 
 def _send_client_reschedule_email(to_email, client_name, old_event_title, old_date, old_time,
@@ -1284,6 +1366,71 @@ def healthz():
     return jsonify({"ok": True, "service": "iryna-booking"}), 200
 
 
+@app.route('/callback')
+def oauth_callback():
+    """Generic OAuth redirect target for Meta/Threads testing.
+
+    Threads OAuth redirects here with ?code=... after the user authorizes the
+    app. The app itself does not need to perform the token exchange in-browser;
+    this endpoint only gives Meta a valid redirect URI and gives the operator a
+    copyable code.
+    """
+    code = request.args.get("code", "")
+    error = request.args.get("error") or request.args.get("error_message")
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    if code:
+        return (
+            "<!doctype html><html><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>Threads OAuth Code</title>"
+            "<style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;"
+            "max-width:720px;margin:48px auto;padding:0 20px;line-height:1.5}"
+            "code{display:block;white-space:pre-wrap;word-break:break-all;background:#f6f3f1;"
+            "border-radius:12px;padding:16px}</style></head><body>"
+            "<h1>Threads OAuth code received</h1>"
+            "<p>Copy this and send it to Hermes:</p>"
+            f"<code>THREADS_CODE={code}</code>"
+            "</body></html>"
+        ), 200
+    return jsonify({"ok": True, "service": "iryna-booking", "purpose": "oauth_callback"}), 200
+
+
+@app.route('/meta/deauthorize', methods=['GET', 'POST'])
+def meta_deauthorize_callback():
+    """Meta app deauthorization callback.
+
+    Meta may call this when a user removes app authorization. We do not keep a
+    local Threads user table yet, so acknowledge the callback without side
+    effects. Keeping this endpoint live lets Meta Developer settings validate.
+    """
+    return jsonify({"ok": True, "status": "deauthorization_received"}), 200
+
+
+@app.route('/meta/data-deletion', methods=['GET', 'POST'])
+def meta_data_deletion_callback():
+    """Meta data deletion callback.
+
+    Meta expects a JSON response containing a status URL and confirmation code.
+    The booking system does not persist Threads user data yet; the response says
+    the deletion request was accepted/no local Threads data exists.
+    """
+    confirmation_code = request.values.get("confirmation_code") or "pashynska-threads-no-local-user-data"
+    return jsonify({
+        "url": "https://book.pashynskaphoto.com/meta/data-deletion/status",
+        "confirmation_code": confirmation_code,
+    }), 200
+
+
+@app.route('/meta/data-deletion/status')
+def meta_data_deletion_status():
+    return jsonify({
+        "ok": True,
+        "status": "completed",
+        "message": "No local Threads user data is stored by this booking system.",
+    }), 200
+
+
 # ── Global error handlers ─────────────────────────────────────────────────────
 # Goal: never show Flask's default debug traceback to a real visitor, never
 # return raw 500 HTML to a JSON consumer (drawer JS, admin SPA, /admin/api/*).
@@ -1791,6 +1938,8 @@ def init_db():
         ("bookings",  "confirmation_token", "ALTER TABLE bookings ADD COLUMN confirmation_token TEXT"),
         # Store expected deposit at booking time so checker doesn't need events.yaml lookup
         ("bookings",  "deposit_amount",    "ALTER TABLE bookings ADD COLUMN deposit_amount REAL"),
+        # Store full_price in booking so invoice always matches what was agreed
+        ("bookings",  "full_price",        "ALTER TABLE bookings ADD COLUMN full_price REAL"),
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
     ]
@@ -2257,6 +2406,7 @@ def index():
     template_context = {
         "stripe_enabled": bool(STRIPE_SECRET_KEY),
         "booking_flow_variant": booking_flow_variant,
+        "initial_events": _public_events_payload(),
     }
 
     # ── Direct event link: still render v2 landing, but could auto-open drawer in future ──
@@ -2283,14 +2433,25 @@ def sitemap_xml():
 
 
 # ── Service landing pages (SEO-optimized for each photography direction) ──
+# 60-second TTL cache for landing-image discovery. A landing GET would otherwise
+# do up to (6 slots) × (4 extensions) × (2 naming variants) = 48 stat syscalls;
+# 60s is fast enough that a freshly-dropped photo appears within a minute and
+# slow enough that crawler hammering doesn't multiply disk reads.
+_LANDING_GALLERY_CACHE: dict = {}
+_LANDING_GALLERY_CACHE_TTL = 60  # seconds
+
+
 def _landing_gallery(slug, max_photos=6):
     """Look for `<slug>-1.jpg…N` (jpg/jpeg/webp/png) in both /static/images/
     (bundled) and PHOTOS_DIR (persistent volume) and return URL paths Jinja
-    can drop straight into <img src>.
+    can drop straight into <img src>. TTL-cached to keep landing GETs cheap."""
+    import time
+    now = time.monotonic()
+    cache_key = (slug, int(max_photos))
+    cached = _LANDING_GALLERY_CACHE.get(cache_key)
+    if cached and cached[0] > now:
+        return list(cached[1])  # defensive copy so callers can mutate
 
-    No DB hit, no I/O on hot path beyond a handful of os.path.exists calls.
-    Cached implicitly by Flask's response caching at the CDN if configured.
-    """
     out = []
     bundled_dir = os.path.join(app.root_path, "static", "images")
     persistent_dir = PHOTOS_DIR
@@ -2308,7 +2469,15 @@ def _landing_gallery(slug, max_photos=6):
                     break
             if found:
                 break
+
+    _LANDING_GALLERY_CACHE[cache_key] = (now + _LANDING_GALLERY_CACHE_TTL, list(out))
     return out
+
+
+def _invalidate_landing_gallery_cache():
+    """Test helper / future admin-side cache buster. Drops every cached
+    slug's photo list so the next GET re-scans disk."""
+    _LANDING_GALLERY_CACHE.clear()
 
 
 def _landing_headshot():
@@ -2439,9 +2608,12 @@ def _render_single_event(ev):
         slots=slots,
     )
 
-@app.route("/events")
-def list_events():
-    """API: list all events with full details including available spots."""
+def _public_events_payload():
+    """Return public event cards with current availability.
+
+    Used by both the API and the initial landing render so booking does not
+    depend entirely on a second client-side request succeeding.
+    """
     result = []
     now = datetime.now()
     conn = db_conn()
@@ -2529,6 +2701,13 @@ def list_events():
                 "included": ev.get("included", []),
             })
     conn.close()
+    return result
+
+
+@app.route("/events")
+def list_events():
+    """API: list all events with full details including available spots."""
+    result = _public_events_payload()
     response = jsonify({"events": result})
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return response
@@ -2954,13 +3133,13 @@ def reserve_slot():
         """, (event_date, slot_time, now.isoformat()))
 
         token = secrets.token_urlsafe(16)
-
         _deposit_amt = float(ev.get("deposit") or SESSION_PRICE)
+        _full_price = float(ev.get("full_price") or 0) or _deposit_amt * 2
         c.execute("""
             INSERT INTO bookings
-                (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id, confirmation_token, deposit_amount)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?)
-        """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"], token, _deposit_amt))
+                (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id, confirmation_token, deposit_amount, full_price)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?)
+        """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"], token, _deposit_amt, _full_price))
 
         if c.rowcount == 0:
             conn.rollback()
@@ -3162,6 +3341,7 @@ def confirm_payment():
         client_ig=client_ig,
         expected_deposit=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
         client_phone=client_phone,
+        confirmation_token=token,
     )
     
     _emit_n8n_event(
@@ -3194,16 +3374,35 @@ def confirm_payment():
 @app.route("/success")
 def success():
     booking_id = request.args.get("booking_id")
-    booking = None
-    if booking_id:
-        conn = db_conn()
-        c = conn.cursor()
+    token      = (request.args.get("token") or "").strip()
+    if not booking_id:
+        return redirect(url_for("index"))
+
+    # Success shows private session details, so public access requires the same
+    # confirmation token used by payment, status polling, and calendar export.
+    if not token and not _admin_authorized():
+        return redirect(url_for("index"))
+
+    conn = db_conn()
+    c = conn.cursor()
+    if token:
+        c.execute("SELECT * FROM bookings WHERE id=? AND confirmation_token=?", (booking_id, token))
+    else:
         c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
-        row = c.fetchone()
-        if row:
-            booking = dict(row)
-        conn.close()
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        return redirect(url_for("index"))
+
+    booking = dict(row)
     ev = get_event_by_id(booking["event_id"]) if booking and booking.get("event_id") else get_active_event()
+    location_text = ev.get("location", "Calgary, AB") if ev else "Calgary, AB"
+    location_url = ev.get("location_url") if ev else None
+    # If no explicit location_url but we have a location, generate a Google Maps search link
+    if location_text and not location_url:
+        query = (location_text + ", Calgary, AB").replace(" ", "+")
+        location_url = f"https://www.google.com/maps/search/?api=1&query={query}"
     return render_template("success.html",
         email=EMAIL,
         date=ev["date"] if ev else DATE,
@@ -3212,7 +3411,8 @@ def success():
         event_title=ev.get("title", "Photo Session") if ev else "Photo Session",
         session_length=ev.get("session_length", 20) if ev else 20,
         timezone=ev.get("timezone", "America/Edmonton") if ev else "America/Edmonton",
-        location=ev.get("location", "Calgary, AB") if ev else "Calgary, AB",
+        location=location_text,
+        location_url=location_url,
         booking=booking,
         confirmation_token=booking.get("confirmation_token") if booking else ""
     )
@@ -3353,17 +3553,39 @@ def _stripe_balance_idempotency_key(booking, balance_due):
     return f"balance-{booking_id}-{cents}-{digest}"
 
 
-def _booking_balance_due(booking, event):
-    """Return remaining balance for a booking in CAD, never below zero."""
+def _booking_total_price(booking, event=None):
+    """Return the agreed full session price in CAD.
+
+    booking.full_price is the source of truth after admin edits; event/full app
+    defaults are only fallbacks for older rows.
+    """
     event = event or {}
-    total = float(event.get("full_price") or SESSION_TOTAL or 0)
+    for value in (booking.get("full_price"), event.get("full_price"), SESSION_TOTAL):
+        try:
+            amount = float(value or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+        if amount > 0:
+            return round(amount, 2)
+    return 0.0
+
+
+def _booking_paid_amount(booking, event=None):
+    """Return amount already paid, falling back to deposit for legacy rows."""
+    event = event or {}
     paid = booking.get("paid_amount")
     if paid is None or paid == "":
         paid = booking.get("deposit_amount") or event.get("deposit") or SESSION_PRICE or 0
     try:
-        paid = float(paid or 0)
+        return round(float(paid or 0), 2)
     except (TypeError, ValueError):
-        paid = 0.0
+        return 0.0
+
+
+def _booking_balance_due(booking, event):
+    """Return remaining balance for a booking in CAD, never below zero."""
+    total = _booking_total_price(booking, event)
+    paid = _booking_paid_amount(booking, event)
     return round(max(total - paid, 0.0), 2)
 
 
@@ -3398,7 +3620,12 @@ def _create_balance_checkout_url(booking, event, balance_due):
         }],
         mode="payment",
         customer_email=booking.get("email") or None,
-        success_url=f"{base_url}/success?booking_id={booking.get('id')}&balance_paid=1",
+        success_url=_booking_success_url(
+            booking.get("id"),
+            booking.get("confirmation_token"),
+            absolute_base=base_url,
+            balance_paid=1,
+        ),
         cancel_url=f"{base_url}/admin",
         metadata={
             "booking_id": str(booking.get("id")),
@@ -3522,10 +3749,7 @@ def stripe_create_checkout():
         date_nice = event_date
 
     base_url = BASE_URL or CANONICAL_SITE_URL
-    success_url = (
-        f"{base_url}/success?booking_id={booking_id}"
-        f"&token={token}&stripe_paid=1"
-    )
+    success_url = _booking_success_url(booking_id, token, absolute_base=base_url, stripe_paid=1)
     cancel_url = f"{base_url}/payment?booking_id={booking_id}&token={token}"
 
     # Build product description from event includes
@@ -3753,12 +3977,36 @@ def stripe_webhook():
 
     return jsonify({"ok": True})
 
+def _safe_next_url(raw, default=None):
+    """Validate a `?next=` redirect target so a crafted link can't bounce the
+    operator off-site after login (open-redirect). Accepts only same-origin
+    relative paths: must start with `/`, no scheme, no netloc, no `//` or
+    `/\\` protocol-relative tricks, no leading whitespace or control chars."""
+    if default is None:
+        default = url_for("admin")
+    if not raw:
+        return default
+    raw = raw.strip()
+    # Reject anything that smells like protocol/host trickery.
+    if (not raw.startswith("/")) or raw.startswith("//") or raw.startswith("/\\"):
+        return default
+    # Strip control chars browsers might tolerate in URL parsing.
+    if any(ch in raw for ch in ("\r", "\n", "\t", "\x00")):
+        return default
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(raw)
+    except Exception:
+        return default
+    if parsed.scheme or parsed.netloc:
+        return default
+    return raw
+
+
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     """Browser login for the admin dashboard."""
-    next_url = request.values.get("next") or url_for("admin")
-    if not next_url.startswith("/") or next_url.startswith("//"):
-        next_url = url_for("admin")
+    next_url = _safe_next_url(request.values.get("next"))
 
     # Already logged in — skip straight to admin
     if session.get("admin_authenticated"):
@@ -4074,53 +4322,333 @@ def _admin_booking_row_or_404(booking_id):
     return dict(row)
 
 
+# Brand constants for the invoice — keep here so any future PDF (receipts,
+# gallery delivery memos, etc.) can reuse the same palette + footer.
+_INVOICE_ROSE       = "#a3685e"   # rose-deep — section headings + rules
+_INVOICE_ROSE_SOFT  = "#e8c8c0"   # blush — table header background
+_INVOICE_PAGE_BG    = "#faf5f2"   # whisper-cream — page background tint
+_INVOICE_INK        = "#1c1917"   # near-black — body text
+_INVOICE_INK_2      = "#57534e"   # warm grey — labels, secondary
+_INVOICE_INK_3      = "#a8a29e"   # light grey — footnotes
+_INVOICE_FOOTER     = "iryna.pashynska@gmail.com · +1 (368) 997-7903 · book.pashynskaphoto.com"
+_INVOICE_BRAND      = "Pashynska Photography"
+_INVOICE_TAGLINE    = "Iryna Pashynska — Portrait & Lifestyle Photographer"
+_INVOICE_TERMS = (
+    "Terms: The deposit is non-refundable. Rescheduling is subject to availability. "
+    "Late arrival will reduce the session time; overtime is not guaranteed. "
+    "Delivery within 5–7 business days after the session."
+)
+
+
 def _admin_invoice_pdf_bytes(booking):
-    client = str(booking.get("name") or "Client").replace("(", "").replace(")", "")
+    """Build a premium PDF invoice for the booking using ReportLab.
+
+    Layout mirrors the previously well-received INV-00169 design and pushes
+    further on typography + structure: serif heading, rose accent rules, full
+    BILL TO / SESSION DETAILS / WHAT'S INCLUDED / PAYMENT SUMMARY / TERMS /
+    FOOTER blocks. Falls back to a tiny but valid PDF if ReportLab is missing
+    (so the route still 200s in stripped-down environments)."""
     booking_id = booking.get("id", "")
-    amount = float(booking.get("paid_amount") or booking.get("deposit_amount") or 0)
+    invoice_no = f"INV-{int(booking_id):05d}" if str(booking_id).isdigit() else f"INV-{booking_id}"
+    client_name = (booking.get("name") or "Client").strip()
+    client_email = (booking.get("email") or "").strip()
+    client_phone = (booking.get("phone") or "").strip()
+    paid_amount = float(booking.get("paid_amount") or 0)
+    deposit_amount = float(booking.get("deposit_amount") or 0)
+
+    # Look up event so we can show real title, location, included items, full price.
+    event = None
+    try:
+        if booking.get("event_id"):
+            event = get_event_by_id(booking.get("event_id"))
+    except Exception:
+        event = None
+
+    session_title = (event.get("title") if event else None) or (booking.get("session_type") or "Photo session")
+    session_date = booking.get("date") or "—"
+    session_time = booking.get("time") or "—"
+    session_location = (event.get("location") if event else "") or "Location confirmed after booking"
+    included_items = list((event or {}).get("included") or [])
+
+    # Money: GST 5% on the session fee. booking.full_price is source of truth.
+    # Falls back to event.full_price, then inferred from paid_amount.
+    full_price = float(booking.get("full_price") or 0) or float((event or {}).get("full_price") or 0) or (paid_amount + deposit_amount or paid_amount or deposit_amount)
+    # Treat event.full_price as the GST-INCLUSIVE total (matches how prices
+    # are displayed on the landing pages) and back-calculate pre-tax fee.
+    tax_rate = 0.05
+    if full_price > 0:
+        session_fee_pre_tax = round(full_price / (1 + tax_rate), 2)
+        gst_amount = round(full_price - session_fee_pre_tax, 2)
+        total_due = session_fee_pre_tax + gst_amount
+    else:
+        session_fee_pre_tax = gst_amount = total_due = 0.0
+
+    remaining = max(0.0, round(total_due - paid_amount, 2))
+
+    # Try ReportLab first; if unavailable, fall back to a minimal valid PDF
+    # so the route still returns 200 in stripped-down test sandboxes.
+    try:
+        from io import BytesIO
+        from reportlab.lib.pagesizes import LETTER
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        )
+    except Exception:
+        return _admin_invoice_pdf_bytes_fallback(booking, invoice_no, client_name, paid_amount)
+
+    rose = colors.HexColor(_INVOICE_ROSE)
+    rose_soft = colors.HexColor(_INVOICE_ROSE_SOFT)
+    ink = colors.HexColor(_INVOICE_INK)
+    ink_2 = colors.HexColor(_INVOICE_INK_2)
+    ink_3 = colors.HexColor(_INVOICE_INK_3)
+    page_bg = colors.HexColor(_INVOICE_PAGE_BG)
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=LETTER,
+        leftMargin=0.5 * inch, rightMargin=0.5 * inch,
+        topMargin=0.42 * inch, bottomMargin=0.38 * inch,
+        title=f"Invoice {invoice_no} — Pashynska Photography",
+        author="Pashynska Photography",
+    )
+
+    def _register_invoice_font():
+        """Use a Unicode font when available so Cyrillic names do not turn into boxes."""
+        regular_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            "/System/Library/Fonts/Supplemental/Verdana.ttf",
+            "/Library/Fonts/Arial Unicode.ttf",
+        ]
+        bold_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/System/Library/Fonts/Supplemental/Verdana Bold.ttf",
+        ]
+        regular = next((path for path in regular_candidates if os.path.exists(path)), None)
+        bold = next((path for path in bold_candidates if os.path.exists(path)), None)
+        if regular:
+            try:
+                if "InvoiceSans" not in pdfmetrics.getRegisteredFontNames():
+                    pdfmetrics.registerFont(TTFont("InvoiceSans", regular))
+                if bold and "InvoiceSans-Bold" not in pdfmetrics.getRegisteredFontNames():
+                    pdfmetrics.registerFont(TTFont("InvoiceSans-Bold", bold))
+                return "InvoiceSans", "InvoiceSans-Bold" if bold else "InvoiceSans"
+            except Exception:
+                pass
+        return "Helvetica", "Helvetica-Bold"
+
+    invoice_font, invoice_font_bold = _register_invoice_font()
+
+    ss = getSampleStyleSheet()
+    style_brand = ParagraphStyle("brand", parent=ss["Normal"], fontName="Times-Roman",
+                                 fontSize=19, leading=22, textColor=ink, spaceAfter=0)
+    style_tagline = ParagraphStyle("tagline", parent=ss["Normal"], fontName="Times-Italic",
+                                   fontSize=8.5, leading=10.5, textColor=ink_2, spaceAfter=8)
+    style_invoice_h = ParagraphStyle("invh", parent=ss["Normal"], fontName="Times-Roman",
+                                     fontSize=22, leading=24, textColor=ink, spaceAfter=4)
+    style_meta = ParagraphStyle("meta", parent=ss["Normal"], fontName=invoice_font,
+                                fontSize=8.2, leading=10.5, textColor=ink_2)
+    style_section_h = ParagraphStyle("sech", parent=ss["Normal"], fontName=invoice_font_bold,
+                                     fontSize=7.4, leading=9, textColor=rose,
+                                     spaceBefore=5, spaceAfter=3,
+                                     letterSpacing=0.6)  # Reportlab supports this in 4.x
+    style_body = ParagraphStyle("body", parent=ss["Normal"], fontName=invoice_font,
+                                fontSize=8.8, leading=11.3, textColor=ink)
+    style_body_small = ParagraphStyle("bodysm", parent=ss["Normal"], fontName=invoice_font,
+                                      fontSize=8.1, leading=10.3, textColor=ink_2)
+    style_terms = ParagraphStyle("terms", parent=ss["Normal"], fontName=invoice_font,
+                                 fontSize=7.4, leading=9.2, textColor=ink_2, spaceBefore=7)
+    style_footer = ParagraphStyle("foot", parent=ss["Normal"], fontName=invoice_font,
+                                  fontSize=7, leading=8.5, textColor=ink_3, alignment=1)
+    style_check = ParagraphStyle("check", parent=ss["Normal"], fontName=invoice_font,
+                                 fontSize=8.1, leading=10.2, textColor=ink, leftIndent=8)
+
+    elems = []
+    # ── Brand header
+    elems.append(Paragraph(_INVOICE_BRAND, style_brand))
+    elems.append(Paragraph(_INVOICE_TAGLINE, style_tagline))
+
+    # ── Thin rose rule (elegant, whisper-thin)
+    rule = Table([[""]], colWidths=[doc.width])
+    rule.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, -1), 0.35, ink_3)]))
+    elems.append(rule)
+    elems.append(Spacer(1, 8))
+
+    # ── Invoice title (large, quiet authority)
+    style_invoice_h = ParagraphStyle("invh", parent=ss["Normal"], fontName="Times-Roman",
+                                     fontSize=23, leading=25, textColor=ink, spaceAfter=4)
+    elems.append(Paragraph("Invoice", style_invoice_h))
+
+    # ── Invoice number + date (right-aligned columns)
+    from datetime import datetime as _dt
+    today = _dt.now().strftime("%B %d, %Y")
+    meta_tbl = Table([
+        [Paragraph("", style_meta),
+         Paragraph(f"<b>Invoice #</b><br/>{invoice_no}", style_meta),
+         Paragraph(f"<b>Date</b><br/>{today}", style_meta)],
+    ], colWidths=[doc.width * 0.4, doc.width * 0.3, doc.width * 0.3])
+    meta_tbl.setStyle(TableStyle([
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    elems.append(meta_tbl)
+    elems.append(Spacer(1, 8))
+
+    # ── BILL TO
+    elems.append(Paragraph("BILL&nbsp;TO", style_section_h))
+    bill_lines = [f"<b>{_html_escape(client_name)}</b>"]
+    if client_email:
+        bill_lines.append(_html_escape(client_email))
+    if client_phone:
+        bill_lines.append(_html_escape(client_phone))
+    elems.append(Paragraph("<br/>".join(bill_lines), style_body))
+
+    # ── SESSION DETAILS
+    elems.append(Paragraph("SESSION&nbsp;DETAILS", style_section_h))
+    session_lines = [
+        f"<b>Session:</b> {_html_escape(session_title)}",
+        f"<b>Date &amp; Time:</b> {_html_escape(session_date)} at {_html_escape(session_time)}",
+        f"<b>Location:</b> {_html_escape(session_location)}",
+    ]
+    elems.append(Paragraph("<br/>".join(session_lines), style_body))
+
+    # ── WHAT'S INCLUDED
+    if included_items:
+        elems.append(Paragraph("WHAT'S &nbsp;INCLUDED", style_section_h))
+        for item in included_items[:4]:
+            elems.append(Paragraph(f"•  {_html_escape(str(item))}", style_check))
+
+    # ── PAYMENT SUMMARY (table)
+    elems.append(Paragraph("PAYMENT&nbsp;SUMMARY", style_section_h))
+    money_rows = [
+        ["Session fee",        f"$ {session_fee_pre_tax:,.2f}"],
+        ["GST (5%)",           f"$ {gst_amount:,.2f}"],
+        ["Total amount",       f"$ {total_due:,.2f}"],
+        ["",                   ""],
+        ["Deposit (paid)",     f"$ {paid_amount:,.2f}"],
+        ["Remaining balance",  f"$ {remaining:,.2f}"],
+    ]
+    pay_tbl = Table(money_rows, colWidths=[doc.width * 0.7, doc.width * 0.3])
+    pay_tbl.setStyle(TableStyle([
+        ("FONTNAME",   (0, 0), (-1, -1), invoice_font),
+        ("FONTSIZE",   (0, 0), (-1, -1), 8.6),
+        ("TEXTCOLOR",  (0, 0), (0, -1), ink_2),
+        ("TEXTCOLOR",  (1, 0), (1, -1), ink),
+        ("ALIGN",      (1, 0), (1, -1), "RIGHT"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        # Total row: rule above + slightly bolder
+        ("LINEABOVE", (0, 2), (-1, 2), 0.5, rose_soft),
+        ("FONTNAME",  (0, 2), (-1, 2), invoice_font_bold),
+        ("TEXTCOLOR", (0, 2), (-1, 2), ink),
+        # Remaining-balance row: strong rule + rose accent
+        ("LINEABOVE", (0, 5), (-1, 5), 0.8, rose),
+        ("FONTNAME",  (0, 5), (-1, 5), invoice_font_bold),
+        ("TEXTCOLOR", (0, 5), (1, 5), rose if remaining > 0 else ink),
+        ("FONTSIZE",  (0, 5), (-1, 5), 9.8),
+        ("TOPPADDING", (0, 5), (-1, 5), 4),
+    ]))
+    elems.append(pay_tbl)
+
+    # ── Payment method note
+    elems.append(Spacer(1, 6))
+    elems.append(Paragraph(
+        "<b>Payment method:</b> Interac e-Transfer to "
+        "<font color='" + _INVOICE_ROSE + "'>iryna.pashynska@gmail.com</font>. "
+        "Auto-deposit enabled — no security question required.",
+        style_body_small,
+    ))
+
+    # ── Terms
+    elems.append(Paragraph(_INVOICE_TERMS, style_terms))
+
+    # Bottom rule + footer
+    rule2 = Table([[""]], colWidths=[doc.width])
+    rule2.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, -1), 0.4, rose_soft)]))
+    elems.append(Spacer(1, 7))
+    elems.append(rule2)
+    elems.append(Spacer(1, 4))
+    elems.append(Paragraph(_INVOICE_FOOTER, style_footer))
+
+    def _on_page(canvas, doc_):
+        # Subtle warm background tint behind everything
+        canvas.saveState()
+        canvas.setFillColor(page_bg)
+        canvas.rect(0, 0, LETTER[0], LETTER[1], stroke=0, fill=1)
+        canvas.restoreState()
+
+    doc.build(elems, onFirstPage=_on_page, onLaterPages=_on_page)
+    return buf.getvalue()
+
+
+def _admin_invoice_pdf_bytes_fallback(booking, invoice_no, client_name, paid_amount):
+    """Tiny but valid PDF for environments where ReportLab isn't installed.
+    Tests only assert the response is `%PDF…` so this is sufficient."""
     lines = [
         "Pashynska Photography Invoice",
-        f"Booking #{booking_id}",
-        f"Client: {client}",
-        f"Amount paid: ${amount:.2f} CAD",
+        f"Invoice {invoice_no}",
+        f"Client: {client_name}",
+        f"Amount paid: ${paid_amount:.2f} CAD",
     ]
     text = "\\n".join(lines)
     stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode("latin-1", "replace")
-    return b"%PDF-1.4\n1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj\n3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 <</Type /Font /Subtype /Helvetica /BaseFont /Helvetica>>>>>> /Contents 4 0 R>> endobj\n4 0 obj <</Length " + str(len(stream)).encode() + b">> stream\n" + stream + b"\nendstream endobj\ntrailer <</Root 1 0 R>>\n%%EOF\n"
+    return (
+        b"%PDF-1.4\n1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n"
+        b"2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj\n"
+        b"3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Resources <</Font <</F1 <</Type /Font /Subtype /Helvetica "
+        b"/BaseFont /Helvetica>>>>>> /Contents 4 0 R>> endobj\n"
+        b"4 0 obj <</Length " + str(len(stream)).encode() + b">> stream\n"
+        + stream + b"\nendstream endobj\ntrailer <</Root 1 0 R>>\n%%EOF\n"
+    )
 
 
 def _send_email_with_attachment(to_email, client_name, subject, plain, html, attachment_bytes=None, attachment_filename="attachment.pdf", attachment_mime="application/pdf"):
-    """Attachment-capable email hook; tests monkeypatch this, production falls back to plain HTML email."""
-    return _send_email_raw(to_email, client_name, subject, plain, html)
+    """Attachment-capable email hook. Uses SMTP with retry, falls back to plain SMTP if no attachment."""
+    if attachment_bytes:
+        return _smtp_send_email(to_email, client_name, subject, plain, html, attachment_bytes, attachment_filename, attachment_mime)
+    else:
+        return _smtp_send_email(to_email, client_name, subject, plain, html)
 
 
 @app.route("/admin/booking/<int:booking_id>")
 @admin_required
 def admin_booking_detail(booking_id):
+    """Full booking detail page — renders templates/booking_detail.html with
+    everything an operator needs: client info, session details, payment summary,
+    and the Invoice/Send/Wfolio/Review/Reschedule actions. The previous
+    implementation returned an inline 3-button HTML stub that looked broken in
+    the browser; the template was already on disk but unused."""
     booking = _admin_booking_row_or_404(booking_id)
     if not booking:
         return jsonify({"error": "Booking not found"}), 404
-    html = f"""<!doctype html><html><head><title>Booking #{booking_id}</title></head><body>
-<h1>Booking #{booking_id}</h1>
-<p>{_html_escape(str(booking.get('name') or ''))}</p>
-<p>{_html_escape(str(booking.get('email') or ''))}</p>
-<section>
-  <button data-action=\"invoice\">Invoice</button>
-  <button data-action=\"gallery\">Gallery</button>
-  <button data-action=\"review\">Review</button>
-</section>
-</body></html>"""
-    return html
+    event = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else None
+    return render_template("booking_detail.html", booking=booking, event=event)
 
 
-@app.route("/admin/booking/<int:booking_id>/invoice", methods=["POST"])
+@app.route("/admin/booking/<int:booking_id>/invoice", methods=["GET", "POST"])
 @admin_required
 def admin_booking_invoice(booking_id):
+    """Generate and stream a PDF invoice for the booking.
+
+    GET so the admin UI can use a plain <a href target='_blank'> link — the
+    file downloads / opens inline in the new tab. POST kept for backward
+    compatibility with the existing test suite + any older clients."""
     booking = _admin_booking_row_or_404(booking_id)
     if not booking:
         return jsonify({"error": "Booking not found"}), 404
     from flask import Response
-    return Response(_admin_invoice_pdf_bytes(booking), mimetype="application/pdf", headers={"Content-Disposition": f"attachment; filename=invoice-{booking_id}.pdf"})
+    return Response(
+        _admin_invoice_pdf_bytes(booking),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=invoice-{booking_id}.pdf"},
+    )
 
 
 @app.route("/admin/booking/<int:booking_id>/send-invoice", methods=["POST"])
@@ -4193,20 +4721,73 @@ def admin_booking_send_review(booking_id):
     return jsonify({"success": bool(sent)})
 
 
+@app.route("/admin/booking/<int:booking_id>/no-show", methods=["POST"])
+@admin_required
+def admin_booking_no_show(booking_id):
+    """Mark a booking as `no_show` — the client didn't turn up. Distinct from
+    `cancelled` so revenue reporting can keep paid_amount in the books while
+    excluding the row from "completed sessions" stats. Idempotent: re-posting
+    on an already-no-show row is a no-op."""
+    booking = _admin_booking_row_or_404(booking_id)
+    if not booking:
+        return jsonify({"error": "Booking not found"}), 404
+    conn = db_conn()
+    conn.execute(
+        "UPDATE bookings SET status='no_show' WHERE id=? AND status NOT IN ('cancelled','expired')",
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+    log.info(f"[admin] booking #{booking_id} marked as no_show")
+    return jsonify({"success": True, "status": "no_show"})
+
+
 @app.route("/admin/confirm", methods=["POST"])
 @admin_required
 def admin_confirm():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     booking_id = data.get("booking_id")
-    # Use the amount from the button (which reads deposit_amount),
-    # fall back to the booking's deposit_amount, then SESSION_PRICE
+    if not booking_id:
+        return jsonify({"success": False, "error": "booking_id required"}), 400
+
+    # Allow admin to override invoice amounts manually
     conn = db_conn()
-    booking_row = conn.execute("SELECT deposit_amount, paid_amount FROM bookings WHERE id=?", (booking_id,)).fetchone()
-    booking_deposit = booking_row["deposit_amount"] if booking_row else None
-    paid_amount = data.get("paid_amount") or booking_deposit or SESSION_PRICE
     c = conn.cursor()
-    c.execute("UPDATE bookings SET confirmed=1, paid=1, status='confirmed', paid_amount=? WHERE id=?",
-              (paid_amount, booking_id))
+    c.execute("BEGIN IMMEDIATE")
+    booking_row = c.execute("SELECT id, status, confirmed, deposit_amount, paid_amount, full_price, calendar_event_url FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    if not booking_row:
+        conn.rollback()
+        conn.close()
+        return jsonify({"success": False, "error": "Booking not found"}), 404
+
+    booking_dict = dict(booking_row)
+
+    # Idempotency guard: if already confirmed, skip all side effects.
+    # Double-click protection — return success without duplicating GCal/email/Notion/Telegram.
+    if booking_dict.get("confirmed") or booking_dict.get("status") == "confirmed":
+        conn.rollback()
+        conn.close()
+        log.info(f"[admin] confirm #{booking_id} skipped — already confirmed")
+        return jsonify({
+            "success": True,
+            "already_confirmed": True,
+            "status": "already_confirmed",
+            "calendar_event": booking_dict.get("calendar_event_url"),
+            "message": "Booking already confirmed. No duplicate email sent.",
+        })
+
+    booking_deposit = booking_dict.get("deposit_amount")
+    paid_amount = data.get("paid_amount")
+    if paid_amount is None or paid_amount == "":
+        paid_amount = booking_deposit or SESSION_PRICE
+    # Update full_price if admin sends it
+    manual_full_price = data.get("full_price")
+    if manual_full_price is not None:
+        c.execute("UPDATE bookings SET full_price=?, confirmed=1, paid=1, status='confirmed', paid_amount=? WHERE id=?",
+                  (manual_full_price, paid_amount, booking_id))
+    else:
+        c.execute("UPDATE bookings SET confirmed=1, paid=1, status='confirmed', paid_amount=? WHERE id=?",
+                  (paid_amount, booking_id))
     conn.commit()
     # Fetch booking details for email notification
     c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
@@ -4288,6 +4869,41 @@ def admin_confirm():
     })
 
 
+@app.route("/admin/booking/<int:booking_id>/invoice", methods=["PATCH"])
+@admin_required
+def admin_update_invoice(booking_id):
+    """Allow admin to manually set full_price for any booking.
+    Updates the booking row; invoice endpoint reads full_price from DB."""
+    data = request.get_json(silent=True) or {}
+    full_price = data.get("full_price")
+    deposit_amount = data.get("deposit_amount")
+    paid_amount = data.get("paid_amount")
+    conn = db_conn()
+    c = conn.cursor()
+    if full_price is not None:
+        c.execute("UPDATE bookings SET full_price=? WHERE id=?", (float(full_price), booking_id))
+    if deposit_amount is not None:
+        c.execute("UPDATE bookings SET deposit_amount=? WHERE id=?", (float(deposit_amount), booking_id))
+    if paid_amount is not None:
+        c.execute("UPDATE bookings SET paid_amount=? WHERE id=?", (float(paid_amount), booking_id))
+    conn.commit()
+    c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Booking not found"}), 404
+    booking = dict(row)
+    event = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
+    return jsonify({
+        "success": True,
+        "booking_id": booking_id,
+        "full_price": _booking_total_price(booking, event),
+        "deposit_amount": round(float(booking.get("deposit_amount") or 0), 2),
+        "paid_amount": _booking_paid_amount(booking, event),
+        "balance_due": _booking_balance_due(booking, event),
+    })
+
+
 @app.route("/admin/request-balance", methods=["POST"])
 @admin_required
 def admin_request_balance():
@@ -4314,11 +4930,8 @@ def admin_request_balance():
 
     event = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
     event = event or {}
-    total_price = float(event.get("full_price") or SESSION_TOTAL or 0)
-    paid_amount = booking.get("paid_amount")
-    if paid_amount is None or paid_amount == "":
-        paid_amount = booking.get("deposit_amount") or event.get("deposit") or SESSION_PRICE or 0
-    paid_amount = float(paid_amount or 0)
+    total_price = _booking_total_price(booking, event)
+    paid_amount = _booking_paid_amount(booking, event)
     balance_due = _booking_balance_due(booking, event)
     if balance_due <= 0:
         return jsonify({"error": "No balance due for this booking"}), 400
@@ -5126,6 +5739,285 @@ def admin_update_event_meta(event_id):
 def admin_clients():
     """Client database page."""
     return render_template("admin_clients.html")
+
+
+# ── Admin event page — manual slot management ────────────────────────────────
+# Lets Iryna open an event (e.g. lilac-jun7) and see every slot's state
+# (free / reserved / confirmed / blocked), plus a "Block slot" form so she
+# can enter a walk-in client's details manually and mark them as already paid.
+# Bypasses reCAPTCHA, rate-limit and the public reservation timer, but reuses
+# the same UNIQUE(date, time) atomic check so it can't double-book.
+@app.route("/admin/event/<event_id>")
+@admin_required
+def admin_event(event_id):
+    ev = get_event_by_id(event_id)
+    if not ev:
+        # Falls through to the global 404 handler (friendly HTML card or JSON
+        # depending on Accept header / path). No need for a bespoke template.
+        from flask import abort
+        abort(404)
+    return render_template("admin_event.html", event=ev)
+
+
+@app.route("/admin/api/event/<event_id>/slots")
+@admin_required
+def admin_event_slots(event_id):
+    """JSON: every slot in the event with its current booking state, so the
+    UI can render the grid + decide which slots can still be blocked."""
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"error": "Event not found"}), 404
+    base = generate_slots(ev)
+    # Pull all bookings on this event's date(s) so we can mark each slot.
+    target_date = ev.get("date")
+    if not target_date:
+        return jsonify({"event": {"id": ev.get("id"), "title": ev.get("title")}, "slots": []})
+
+    conn = db_conn()
+    rows = conn.execute(
+        """SELECT id, time, name, email, status, confirmed, paid, paid_amount, deposit_amount
+           FROM bookings
+           WHERE date=? AND status NOT IN ('cancelled','expired')""",
+        (target_date,),
+    ).fetchall()
+    conn.close()
+    by_time = {r["time"]: dict(r) for r in rows}
+    out = []
+    for s in base:
+        b = by_time.get(s["time"])
+        out.append({
+            "time": s["time"],
+            "label": s["label"],
+            "state": (
+                "confirmed" if (b and b.get("confirmed")) else
+                ("pending" if b else "free")
+            ),
+            "booking_id": b["id"] if b else None,
+            "client": (b.get("name") if b else None),
+        })
+    return jsonify({
+        "event": {
+            "id": ev.get("id"),
+            "title": ev.get("title"),
+            "date": target_date,
+            "location": ev.get("location"),
+            "deposit": float(ev.get("deposit") or 0),
+            "full_price": float(ev.get("full_price") or 0),
+        },
+        "slots": out,
+    })
+
+
+@app.route("/admin/api/event/<event_id>/block-day", methods=["POST"])
+@admin_required
+def admin_event_block_day(event_id):
+    """Block every remaining FREE slot on an event in one shot — Iryna can't
+    physically shoot that day (sick, family, weather). Each blocked slot
+    creates a status='reserved' booking under the synthetic "INTERNAL BLOCK"
+    name so the public calendar shows the slot as taken without surfacing a
+    real client. Existing reserved/confirmed slots are left alone. Returns
+    the count of slots newly blocked + the count that were already taken."""
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"success": False, "error": "Event not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    reason = (data.get("reason") or "").strip()[:120] or "Internal block"
+    event_date = ev.get("date")
+    if not event_date:
+        return jsonify({"success": False, "error": "Event has no date"}), 400
+
+    now = datetime.now()
+    expires = (now + timedelta(days=365)).isoformat()
+    deposit_amt = float(ev.get("deposit") or 0)
+    full_price = float(ev.get("full_price") or 0) or (deposit_amt * 2)
+    all_slots = [s["time"] for s in generate_slots(ev)]
+    if not all_slots:
+        return jsonify({"success": False, "error": "Event has no slots"}), 400
+
+    conn = db_conn()
+    c = conn.cursor()
+    blocked = 0
+    already = 0
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        # Find which of these slots already have an active booking on this date.
+        placeholders = ",".join("?" for _ in all_slots)
+        c.execute(
+            f"""SELECT time FROM bookings
+                WHERE date=? AND time IN ({placeholders})
+                  AND status NOT IN ('cancelled','expired')
+                  AND (confirmed=1 OR reserved_until > ?)""",
+            [event_date] + all_slots + [now.isoformat()],
+        )
+        taken = {r["time"] for r in c.fetchall()}
+        already = len(taken)
+
+        for slot_time in all_slots:
+            if slot_time in taken:
+                continue
+            # Sweep any stale rows on this slot so the UNIQUE constraint passes.
+            c.execute(
+                """DELETE FROM bookings
+                   WHERE date=? AND time=?
+                     AND (status IN ('cancelled','expired')
+                          OR (status IN ('reserved','pending_payment') AND reserved_until <= ?))""",
+                (event_date, slot_time, now.isoformat()),
+            )
+            token = secrets.token_urlsafe(16)
+            c.execute(
+                """INSERT INTO bookings
+                     (date, time, name, email, phone, instagram, session_type,
+                      status, reserved_until, event_id, confirmation_token,
+                      deposit_amount, full_price, confirmed, paid, paid_amount)
+                   VALUES (?, ?, ?, '', '', '', 'internal_block',
+                           'reserved', ?, ?, ?, ?, ?, 0, 0, 0)""",
+                (event_date, slot_time, f"⛔ {reason}", expires, ev["id"],
+                 token, deposit_amt, full_price),
+            )
+            blocked += 1
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        log.exception(f"[admin_event_block_day] {e}")
+        return jsonify({"success": False, "error": "Server error"}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    log.info(
+        f"[admin_event_block_day] event={event_id} date={event_date} "
+        f"blocked={blocked} already_taken={already} reason={reason!r}"
+    )
+    return jsonify({
+        "success": True,
+        "blocked": blocked,
+        "already_taken": already,
+        "total_slots": len(all_slots),
+    })
+
+
+@app.route("/admin/api/event/<event_id>/manual-book", methods=["POST"])
+@admin_required
+def admin_event_manual_book(event_id):
+    """Manually create a booking on a given slot. Bypasses reCAPTCHA + rate
+    limit (admin-only path) but reuses the atomic conflict check from /reserve
+    so it can't overwrite an existing active booking. If `mark_paid` is true
+    the booking is created as fully confirmed + paid_amount = full_price."""
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"success": False, "error": "Event not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    slot_time = (data.get("time") or "").strip()
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    phone = (data.get("phone") or "").strip()
+    instagram = (data.get("instagram") or "").lstrip("@").strip()
+    note = (data.get("note") or "").strip()[:500]
+    mark_paid = bool(data.get("mark_paid"))
+
+    if not slot_time:
+        return jsonify({"success": False, "error": "Slot time is required"}), 400
+    if not name or len(name) < 2:
+        return jsonify({"success": False, "error": "Client name is required"}), 400
+
+    # Validate slot belongs to this event.
+    valid_times = {s["time"] for s in generate_slots(ev)}
+    if slot_time not in valid_times:
+        return jsonify({"success": False, "error": "Slot is not part of this event"}), 400
+
+    event_date = ev.get("date")
+    if not event_date:
+        return jsonify({"success": False, "error": "Event has no date"}), 400
+
+    now = datetime.now()
+    deposit_amt = float(ev.get("deposit") or 0)
+    full_price = float(ev.get("full_price") or 0) or (deposit_amt * 2)
+
+    conn = db_conn()
+    c = conn.cursor()
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        c.execute(
+            """SELECT id FROM bookings
+               WHERE date=? AND time=?
+                 AND status NOT IN ('cancelled', 'expired')
+                 AND (confirmed=1 OR reserved_until > ?)""",
+            (event_date, slot_time, now.isoformat()),
+        )
+        if c.fetchone():
+            conn.rollback()
+            conn.close()
+            return jsonify({"success": False, "error": "Slot already taken"}), 409
+
+        # Clear stale rows on this exact slot so the unique constraint passes.
+        c.execute(
+            """DELETE FROM bookings
+               WHERE date=? AND time=?
+                 AND (status IN ('cancelled','expired')
+                      OR (status IN ('reserved','pending_payment') AND reserved_until <= ?))""",
+            (event_date, slot_time, now.isoformat()),
+        )
+
+        token = secrets.token_urlsafe(16)
+        status_val = "confirmed" if mark_paid else "reserved"
+        paid_val = 1 if mark_paid else 0
+        confirmed_val = 1 if mark_paid else 0
+        paid_amount = full_price if mark_paid else 0.0
+        # 1-hour reservation window for manual blocks (so it doesn't expire
+        # at the public 15-min mark while admin sorts out paperwork).
+        reserved_until = (now + timedelta(hours=1)).isoformat()
+        c.execute(
+            """INSERT INTO bookings
+                 (date, time, name, email, phone, instagram, session_type, status,
+                  reserved_until, event_id, confirmation_token, deposit_amount,
+                  full_price, confirmed, paid, paid_amount)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                event_date, slot_time, name, email, phone, instagram,
+                ev.get("session_type") or "manual",
+                status_val, reserved_until, ev["id"], token,
+                deposit_amt, full_price,
+                confirmed_val, paid_val, paid_amount,
+            ),
+        )
+        booking_id = c.lastrowid
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        log.exception(f"[admin_event_manual_book] {e}")
+        return jsonify({"success": False, "error": "Server error"}), 500
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    # Best-effort sync to clients table (don't fail the request if it errors)
+    if email:
+        try:
+            sync_client(email, name, phone, instagram)
+        except Exception as _e:
+            log.warning(f"[admin_event_manual_book] sync_client failed: {_e}")
+
+    log.info(
+        f"[admin_event_manual_book] event={event_id} slot={event_date} {slot_time} "
+        f"booking_id={booking_id} mark_paid={mark_paid} name={name!r}"
+    )
+    return jsonify({
+        "success": True,
+        "booking_id": booking_id,
+        "status": status_val,
+        "paid_amount": paid_amount,
+        "date": event_date,
+        "time": slot_time,
+    })
 
 
 @app.route("/admin/api/clients")

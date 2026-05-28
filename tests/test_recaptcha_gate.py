@@ -140,3 +140,24 @@ def test_healthz_returns_ok(client):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["ok"] is True
+
+
+def test_meta_threads_oauth_and_compliance_callbacks_are_valid(client):
+    """Meta Developer settings validate these URLs before accepting Threads OAuth config."""
+    callback = client.get("/callback?code=test_code_123")
+    assert callback.status_code == 200
+    assert b"THREADS_CODE=test_code_123" in callback.data
+
+    deauth = client.post("/meta/deauthorize", data={"signed_request": "dummy"})
+    assert deauth.status_code == 200
+    assert deauth.get_json()["ok"] is True
+
+    deletion = client.post("/meta/data-deletion", data={"signed_request": "dummy"})
+    assert deletion.status_code == 200
+    deletion_body = deletion.get_json()
+    assert deletion_body["url"] == "https://book.pashynskaphoto.com/meta/data-deletion/status"
+    assert deletion_body["confirmation_code"]
+
+    status = client.get("/meta/data-deletion/status")
+    assert status.status_code == 200
+    assert status.get_json()["status"] == "completed"
