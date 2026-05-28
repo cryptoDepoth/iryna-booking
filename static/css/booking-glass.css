@@ -1,0 +1,293 @@
+/* ────────────────────────────────────────────────
+   Glass Edition — Pashynska Photography
+   Premium glassmorphism overlay for index_v2.html
+   Palettes: blush / rose / cream / ivory
+   Preserves all functional booking logic
+   ──────────────────────────────────────────────── */
+
+/* ====== CSS RESET OVERRIDES ====== */
+:root {
+  /* Glass palette — light, airy, premium */
+  --nude: #F9F0EE;
+  --blush: #F3E1DD;
+  --blush-deep: #E8C5BD;
+  --rose: #c28e8e;
+  --rose-deep: #a3707a;
+  --rose-glow: rgba(194, 142, 142, .18);
+
+  --ink: #3A3230;
+  --ink-2: #5C5451;
+  --ink-3: #887E7B;
+  --ink-4: #B0A8A5;
+  --ink-5: #E5E1DF;
+
+  --page-bg: #FFFAF5;
+  --surface: rgba(255, 255, 255, 0.55);
+
+  --green: #5A8A6A;
+  --green-bg: #EDF5F0;
+  --amber: #A0822A;
+  --amber-bg: #FDF5E4;
+  --red: #A34545;
+  --red-bg: #FDF0F0;
+
+  --font-d: 'Playfair Display', Georgia, serif;
+  --font-h: 'Playfair Display', Georgia, serif;
+  --font-b: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --glass-white: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.45);
+  --glass-shadow: 0 8px 32px 0 rgba(78, 56, 52, 0.08);
+}
+
+/* ====== AMBIENT BACKGROUND BLOBS ====== */
+body.glass-loaded::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 10% 0%, var(--blush-deep), transparent 45%),
+    radial-gradient(circle at 90% 100%, #EED2CC, transparent 45%),
+    radial-gradient(circle at 60% 40%, #DBC7C1, transparent 35%);
+  opacity: 0.35;
+  filter: blur(80px);
+}
+
+/* ====== NAVIGATION — glass sticky bar ====== */
+.nav {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 16px rgba(78, 56, 52, 0.04);
+}
+
+/* ====== HERO CARD — glass panel ====== */
+.hero-card {
+  background: var(--glass-white);
+  backdrop-filter: blur(30px) saturate(130%);
+  -webkit-backdrop-filter: blur(30px) saturate(130%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), 0 0 80px rgba(255, 255, 255, 0.25) inset;
+  border-radius: 2.5rem;
+}
+
+/* ====== HERO KICKER — refined rose accent ====== */
+.hero-kicker {
+  color: var(--rose-deep);
+}
+.hero-kicker::before {
+  background: var(--rose-deep);
+}
+
+/* ====== EVENT CARDS — glass elevation ====== */
+.event-card {
+  background: var(--glass-white);
+  backdrop-filter: blur(24px) saturate(130%);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 2rem;
+  transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+}
+.event-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 16px 48px rgba(78, 56, 52, 0.1);
+}
+
+/* ====== DRAWER — glass modal ====== */
+.drawer {
+  background: rgba(255, 250, 245, 0.92);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  border-radius: 2.5rem;
+}
+
+.drawer .dphoto {
+  border-radius: 2.5rem 2.5rem 0 0;
+}
+
+/* ====== FILTER CHIPS — glass pills ====== */
+.filters .chip {
+  background: var(--glass-white);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 999px;
+  padding: 8px 18px;
+  transition: background .2s, border-color .2s, color .2s;
+}
+.filters .chip:hover {
+  border-color: var(--rose);
+  color: var(--rose);
+  background: rgba(255, 255, 255, 0.75);
+}
+.filters .chip.on {
+  background: rgba(58, 50, 48, 0.92);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ====== STEP CARDS — glass ====== */
+.how .step {
+  background: var(--glass-white);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.6rem;
+  box-shadow: var(--glass-shadow);
+}
+
+/* ====== FAQ — glass panels ====== */
+.faq details {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.4rem;
+}
+
+/* ====== DRAWER PAYMENT ELEMENTS — glass styling ====== */
+.transfer-box {
+  background: linear-gradient(135deg, rgba(249, 240, 238, 0.85), rgba(243, 225, 221, 0.7));
+  border: 1px solid rgba(194, 142, 142, 0.25);
+  backdrop-filter: blur(12px);
+}
+
+.how-to {
+  background: rgba(249, 240, 238, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+/* ====== ASSISTANT WIDGET — glass bubble ====== */
+.assistant-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.assistant-head {
+  background: rgba(255, 250, 245, 0.7);
+  backdrop-filter: blur(12px);
+}
+.assistant-messages {
+  background: rgba(253, 250, 248, 0.5);
+}
+
+/* ====== FOOTER — glass bar ====== */
+footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* ====== BUTTONS — refined ====== */
+.hero-cta {
+  border-radius: 999px;
+  padding: 14px 28px;
+  background: rgba(58, 50, 48, 0.92);
+  transition: opacity .2s, transform .2s;
+}
+.hero-cta:hover {
+  opacity: .88;
+  transform: translateY(-1px);
+  background: rgba(58, 50, 48, 0.92);
+}
+.hero-cta.outline {
+  background: var(--glass-white);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  color: var(--ink);
+}
+.hero-cta.outline:hover {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: var(--ink);
+}
+
+.event-card .price-bar .cta {
+  border-radius: 999px;
+  background: rgba(58, 50, 48, 0.92);
+  padding: 11px 24px;
+  transition: opacity .2s, transform .2s;
+}
+.event-card .price-bar .cta:hover {
+  opacity: .88;
+  transform: translateY(-1px);
+}
+
+.drawer .btn {
+  border-radius: 999px;
+  background: rgba(58, 50, 48, 0.92);
+  transition: opacity .2s, transform .2s;
+}
+.drawer .btn:hover {
+  opacity: .88;
+}
+
+/* ====== INPUT FIELDS — glass touch ====== */
+.drawer input {
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  border-radius: 1rem;
+}
+.drawer input:focus {
+  border-color: var(--rose);
+  box-shadow: 0 0 0 3px rgba(194, 142, 142, 0.12);
+}
+
+/* ====== SLOTS — glass pills ====== */
+.drawer .slot {
+  border-radius: 999px;
+  border: 1.5px solid var(--glass-border);
+  background: var(--glass-white);
+  backdrop-filter: blur(8px);
+}
+.drawer .slot:hover {
+  border-color: var(--rose);
+  color: var(--rose);
+}
+.drawer .slot.sel {
+  background: var(--rose);
+  border-color: var(--rose);
+}
+
+/* ====== SUCCESS — glass panel ====== */
+.success-state {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 2rem;
+  backdrop-filter: blur(12px);
+}
+
+/* ====== MOBILE BOTTOM SHEET — glass ====== */
+@media (max-width: 640px) {
+  .drawer {
+    border-radius: 2.4rem 2.4rem 0 0;
+  }
+}
+
+/* ====== TYPOGRAPHY REFINEMENTS ====== */
+.hero-title {
+  font-family: var(--font-d);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  line-height: 1.12;
+}
+.hero-title em {
+  color: #9B7E78;
+}
+
+/* ====== SOCIAL PROOF — refined ====== */
+.proof {
+  color: var(--ink-3);
+}
+.proof span strong {
+  color: var(--ink);
+}
