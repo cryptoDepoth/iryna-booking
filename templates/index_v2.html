@@ -400,8 +400,12 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .skel-line{height:13px;border-radius:7px;margin:12px 16px 0}
 .skel-img,.skel-line{background:linear-gradient(100deg,#ece3df 30%,#f8f2ef 50%,#ece3df 70%);background-size:200% 100%;animation:skel-move 1.5s ease-in-out infinite}
 @keyframes skel-move{to{background-position:-200% 0}}
+.js-anim .event-card.card-reveal{opacity:0}
+.js-anim .event-card.card-reveal.in{animation:card-rise .62s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes card-rise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
 @media (prefers-reduced-motion: reduce){
   .js-anim .reveal{opacity:1!important;transform:none!important;transition:none!important}
+  .js-anim .event-card.card-reveal{opacity:1!important;animation:none!important}
   .hero-cta:not(.outline)::after,.event-card .price-bar .cta::after,.cta-shimmer::after{display:none!important}
   .skel-img,.skel-line{animation:none!important}
   .drawer .slot.sel{animation:none!important}
@@ -660,7 +664,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   <div class="featured-wrap" id="featuredWrap"></div>
 
   <!-- SECTION HEAD -->
-  <div class="sec-head">
+  <div class="sec-head reveal">
     <h2 data-i18n="sessions_heading">Upcoming sessions</h2>
     <span class="sub" data-i18n="sessions_subhead">Pick one — booking takes about 2 minutes</span>
   </div>
@@ -694,36 +698,36 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   </div>
 
   <!-- HOW IT WORKS (moved below grid, compact) -->
-  <div class="how-head">
+  <div class="how-head reveal">
     <h3 data-i18n="how_heading">How it works</h3>
     <span class="sub" data-i18n="how_subhead">Three quick steps</span>
   </div>
   <div class="how">
-    <div class="step"><div class="num">1</div><div><h4 data-i18n="how_step1_title">Pick a session</h4><p data-i18n="how_step1_desc">Browse upcoming dates and choose what fits — dress code & location come with confirmation.</p></div></div>
-    <div class="step"><div class="num">2</div><div><h4 data-i18n="how_step2_title">Reserve in 2 min</h4><p data-i18n="how_step2_desc">Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
-    <div class="step"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit. It usually auto-confirms in a few minutes; Iryna confirms manually if needed. Final balance is paid on session day.</p></div></div>
+    <div class="step reveal"><div class="num">1</div><div><h4 data-i18n="how_step1_title">Pick a session</h4><p data-i18n="how_step1_desc">Browse upcoming dates and choose what fits — dress code & location come with confirmation.</p></div></div>
+    <div class="step reveal"><div class="num">2</div><div><h4 data-i18n="how_step2_title">Reserve in 2 min</h4><p data-i18n="how_step2_desc">Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
+    <div class="step reveal"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit. It usually auto-confirms in a few minutes; Iryna confirms manually if needed. Final balance is paid on session day.</p></div></div>
   </div>
 
   <!-- TESTIMONIALS (real client quotes) -->
   <div class="tmt">
-    <div class="tmt-head">
+    <div class="tmt-head reveal">
       <h3 data-i18n="tmt_heading">What Calgary clients say</h3>
       <span class="sub" data-i18n="tmt_subhead">Real words from recent sessions</span>
     </div>
     <div class="tmt-grid">
-      <article class="tmt-card">
+      <article class="tmt-card reveal">
         <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
         <p class="tmt-quote">“The session felt calm and easy, and the photos look like us — warm, real, and beautiful.”</p>
         <div class="tmt-name">Anastasia M.</div>
         <div class="tmt-context">Family session · Calgary</div>
       </article>
-      <article class="tmt-card">
+      <article class="tmt-card reveal">
         <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
         <p class="tmt-quote">“Iryna guided every pose without making it feel staged. We got so many favourites.”</p>
         <div class="tmt-name">Sarah K.</div>
         <div class="tmt-context">Maternity session · Calgary</div>
       </article>
-      <article class="tmt-card">
+      <article class="tmt-card reveal">
         <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
         <p class="tmt-quote">“Fast, organized, and very gentle with our kids. The gallery was better than we hoped.”</p>
         <div class="tmt-name">Olena P.</div>
@@ -733,7 +737,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   </div>
 
   <!-- FAQ -->
-  <div class="faq">
+  <div class="faq reveal">
     <h2 data-i18n="faq_title">Quick answers</h2>
     <details><summary data-i18n="faq_q1">What should we wear?</summary><div class="a" data-i18n="faq_a1">I send a styling guide after booking — soft tones, layered textures, nothing with big logos.</div></details>
     <details><summary data-i18n="faq_q2">What if it rains?</summary><div class="a" data-i18n="faq_a2">We reschedule for free, no questions asked. I check the forecast 24h before and reach out.</div></details>
@@ -744,7 +748,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
   <!-- PAST SESSIONS ARCHIVE (rendered by renderPast; hidden when empty) -->
   <div class="past-wrap" id="pastWrap" style="display:none">
-    <div class="past-head">
+    <div class="past-head reveal">
       <h3 data-i18n="past_heading">Past sessions</h3>
       <span class="sub" data-i18n="past_subhead">A look at recent shoots — these dates have wrapped</span>
     </div>
@@ -1060,14 +1064,15 @@ function renderGrid() {
 
   grid.style.display = '';
   empty.style.display = 'none';
-  grid.innerHTML = list.map(e => {
+  grid.innerHTML = list.map((e, i) => {
     const b = statusBadge(e.spots_left, e.total_spots, e.status);
     const cd = countdownText(e.date, true);
     const isSold = e.spots_left === 0;
     const photo = e.photo_url || e.photo || '/static/images/placeholder.jpg';
     const totalPrice = e.full_price || e.price || 0;
+    const revDelay = Math.min(i * 65, 390);
     return `
-    <article class="event-card ${isSold ? 'sold' : ''}" onclick="openDrawer('${e.id}')">
+    <article class="event-card card-reveal ${isSold ? 'sold' : ''}" style="animation-delay:${revDelay}ms" onclick="openDrawer('${e.id}')">
       <div class="photo">
         <div class="photo-bg" style="background-image:url('${photo}')"></div>
         <div class="status ${b.cls}"><span class="dot"></span>${b.txt}</div>
@@ -1089,6 +1094,7 @@ function renderGrid() {
       </div>
     </article>`;
   }).join('');
+  if (window.__wowScan) window.__wowScan();
 }
 
 function setGridEmptyCopy(titleKey, descKey) {
@@ -1881,12 +1887,13 @@ function renderPast() {
   if (!wrap || !strip) return;
   const list = Array.isArray(pastEventsData) ? pastEventsData : [];
   if (!list.length) { wrap.style.display = 'none'; return; }
-  strip.innerHTML = list.map(e => {
+  strip.innerHTML = list.map((e, i) => {
     const photo = e.photo_url || (e.photos && e.photos[0]) || '/static/images/placeholder.jpg';
     const loc = (e.location || 'Calgary').split(',')[0];
     const safeTitle = String(e.title || '').replace(/"/g, '&quot;');
+    const revDelay = Math.min(i * 55, 360);
     return `
-      <figure class="past-card" title="${safeTitle}">
+      <figure class="past-card reveal" style="transition-delay:${revDelay}ms" title="${safeTitle}">
         <div class="pimg" style="background-image:url('${photo}')"></div>
         <div class="pshade"></div>
         <span class="pbadge">${T('past_badge')}</span>
@@ -1897,6 +1904,7 @@ function renderPast() {
       </figure>`;
   }).join('');
   wrap.style.display = '';
+  if (window.__wowScan) window.__wowScan();
 }
 
 function renderAll() {
@@ -1943,6 +1951,8 @@ const SITE_I18N = {
     stripe_redirecting: 'Redirecting to Stripe…',
     privacy_link: 'Privacy & browser storage',
     proof_reviews: '<strong>★ 4.9</strong> · 80+ reviews',
+    proof_reviews_label: 'reviews',
+    proof_sessions_label: 'sessions delivered',
     proof_sessions: '<strong>120+</strong> sessions delivered',
     proof_award: '<strong>Calgary</strong> local pick 2024 & 2025',
     /* how it works */
@@ -2117,6 +2127,8 @@ const SITE_I18N = {
     stripe_redirecting: 'Переходим к безопасной оплате…',
     privacy_link: 'Privacy и хранение в браузере',
     proof_reviews: '<strong>★ 4.9</strong> · 80+ отзывов',
+    proof_reviews_label: 'отзывов',
+    proof_sessions_label: 'съёмок проведено',
     proof_sessions: '<strong>120+</strong> съёмок проведено',
     proof_award: '<strong>Калгари</strong> · локальный выбор 2024 и 2025',
     how_step1_title: 'Выберите сессию',
@@ -2279,6 +2291,8 @@ const SITE_I18N = {
     stripe_redirecting: 'सुरक्षित भुगतान पर भेजा जा रहा है…',
     privacy_link: 'Privacy और browser storage',
     proof_reviews: '<strong>★ 4.9</strong> · 80+ समीक्षाएँ',
+    proof_reviews_label: 'समीक्षाएँ',
+    proof_sessions_label: 'सेशन पूर्ण',
     proof_sessions: '<strong>120+</strong> सेशन पूरे',
     proof_award: '<strong>कैलगरी</strong> · लोकल चॉइस 2024 और 2025',
     how_step1_title: 'सेशन चुनें',
@@ -2441,6 +2455,8 @@ const SITE_I18N = {
     stripe_redirecting: 'Переходимо до безпечної оплати…',
     privacy_link: 'Privacy і зберігання в браузері',
     proof_reviews: '<strong>★ 4.9</strong> · 80+ відгуків',
+    proof_reviews_label: 'відгуків',
+    proof_sessions_label: 'зйомок проведено',
     proof_sessions: '<strong>120+</strong> сесій проведено',
     proof_award: '<strong>Калгарі</strong> · локальний вибір 2024 і 2025',
     how_step1_title: 'Оберіть сесію',
@@ -2807,6 +2823,30 @@ async function sendAssistantMessage(event) {
 }
 
 document.addEventListener('DOMContentLoaded', updateAssistantLang);
+</script>
+<script>
+/* Motion / wow layer init — additive, prefers-reduced-motion safe */
+(function(){
+  var mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduce = mq && mq.matches;
+  function finText(el){var t=parseFloat(el.getAttribute('data-cu'))||0,d=parseInt(el.getAttribute('data-dec')||'0',10);return t.toFixed(d)+(el.getAttribute('data-suf')||'');}
+  function countUp(el){if(el.__cuDone)return;el.__cuDone=1;var t=parseFloat(el.getAttribute('data-cu'))||0,d=parseInt(el.getAttribute('data-dec')||'0',10),sf=el.getAttribute('data-suf')||'',dur=1300,st=null;function f(ts){if(!st)st=ts;var p=Math.min((ts-st)/dur,1),e=1-Math.pow(1-p,3);el.textContent=(t*e).toFixed(d)+sf;if(p<1){requestAnimationFrame(f);}else{el.textContent=t.toFixed(d)+sf;}}requestAnimationFrame(f);}
+  if(reduce){document.querySelectorAll('[data-cu]').forEach(function(el){el.textContent=finText(el);});return;}
+  document.documentElement.classList.add('js-anim');
+  setTimeout(function(){
+    document.querySelectorAll('.event-card.card-reveal').forEach(function(el){el.classList.remove('card-reveal','in');});
+    document.querySelectorAll('.reveal:not(.in)').forEach(function(el){el.classList.add('in');});
+    var pb=document.getElementById('proofBar'); if(pb){pb.querySelectorAll('[data-cu]').forEach(countUp);}
+  },2800);
+  function reveal(el){el.classList.add('in');if(el.id==='proofBar'){el.querySelectorAll('[data-cu]').forEach(countUp);}if(el.classList.contains('card-reveal')){el.addEventListener('animationend',function(){el.classList.remove('card-reveal','in');},{once:true});}}
+  var io=('IntersectionObserver'in window)?new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){reveal(en.target);io.unobserve(en.target);}});},{threshold:0.14,rootMargin:'0px 0px -6% 0px'}):null;
+  window.__wowScan=function(){
+    if(!io){document.querySelectorAll('.reveal:not(.in),.event-card.card-reveal:not(.in)').forEach(reveal);return;}
+    document.querySelectorAll('.reveal:not(.in),.event-card.card-reveal:not(.in)').forEach(function(el){io.observe(el);});
+    var pb=document.getElementById('proofBar');if(pb&&!pb.__obs){pb.__obs=1;io.observe(pb);}
+  };
+  window.__wowScan();
+})();
 </script>
 </body>
 </html>
