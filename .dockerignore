@@ -19,6 +19,8 @@ venv/
 AGENTS.md
 .AGENT_COORDINATION.md
 *.log
+*backup*.html
+*.bak*
 FLY_API_TOKEN.txt
 qa/nightly/logs/
 qa/nightly/reports/

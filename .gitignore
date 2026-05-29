@@ -14,6 +14,8 @@ uploads/
 *.log
 logs/
 *.lock
+*backup*.html
+*.bak*
 .timed_cron_state.json
 
 # Google Calendar OAuth secrets
