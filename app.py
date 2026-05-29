@@ -2395,6 +2395,15 @@ def _select_booking_flow_variant(query_value=None, cookie_value=None):
     return "control"
 
 
+@app.route("/index.html")
+@app.route("/book-a-session")
+@app.route("/book-a-session/")
+@app.route("/reserve", methods=["GET"])
+def legacy_booking_entrypoints():
+    """Keep old public links from showing 404/405; send clients to booking home."""
+    return redirect(url_for("index"), code=302)
+
+
 @app.route("/")
 def index():
     """Landing — new v2 design with event grid, featured banner, and booking drawer."""
