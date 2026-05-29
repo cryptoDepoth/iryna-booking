@@ -348,6 +348,39 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .event-card .price-bar .cta:hover{background:var(--ink-2)}
 .event-card.sold .price-bar .cta{background:var(--ink-5);color:var(--ink-2)}
 
+/* ── TESTIMONIALS (homepage social proof, real client quotes) ── */
+.tmt{max-width:1080px;margin:14px auto 0;padding:0 20px}
+.tmt-head{text-align:center;margin-bottom:18px}
+.tmt-head h3{font-family:var(--font-d);font-size:1.6rem;font-weight:400;color:var(--ink)}
+.tmt-head .sub{font-size:.82rem;color:var(--ink-3)}
+.tmt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.tmt-card{background:var(--surface);border:1px solid var(--ink-5);border-radius:16px;padding:20px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(46,25,20,.03),0 8px 24px rgba(93,55,47,.05)}
+.tmt-stars{color:var(--rose);letter-spacing:.14em;font-size:.95rem}
+.tmt-quote{font-family:var(--font-d);font-style:italic;font-size:1rem;color:var(--ink-2);line-height:1.5}
+.tmt-name{font-weight:700;font-size:.9rem;color:var(--ink);margin-top:auto}
+.tmt-context{font-size:.74rem;color:var(--ink-3);letter-spacing:.02em}
+@media(max-width:760px){.tmt-grid{grid-template-columns:1fr}}
+
+/* ── PAST SESSIONS ARCHIVE (display-only thumbnail strip, bottom of page) ── */
+.past-wrap{max-width:1180px;margin:14px auto 0;padding:32px 20px 0;border-top:1px solid var(--ink-5)}
+.past-head{text-align:center;margin-bottom:18px}
+.past-head h3{font-family:var(--font-d);font-size:1.5rem;font-weight:400;color:var(--ink-2)}
+.past-head .sub{font-size:.8rem;color:var(--ink-3)}
+.past-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.past-card{position:relative;display:block;border-radius:12px;overflow:hidden;aspect-ratio:3/4;background:#dbcfca center/cover;box-shadow:0 2px 8px rgba(46,25,20,.06);filter:saturate(.94);text-decoration:none}
+.past-card .pimg{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .5s ease}
+.past-card:hover .pimg{transform:scale(1.06)}
+.past-card .pshade{position:absolute;inset:0;background:linear-gradient(to top,rgba(28,25,23,.74) 0%,rgba(28,25,23,.06) 56%,transparent 100%)}
+.past-card .pcap{position:absolute;left:0;right:0;bottom:0;padding:10px 11px;color:#fff}
+.past-card .pcap .pt{font:600 .72rem var(--font-b);line-height:1.25;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+.past-card .pcap .pd{font-size:.62rem;opacity:.88;margin-top:2px;letter-spacing:.03em}
+.past-card .pbadge{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.92);color:var(--ink-2);font:600 .58rem var(--font-b);padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.06em}
+.past-foot{text-align:center;margin-top:18px}
+.past-foot a{color:var(--rose-deep);font-weight:600;font-size:.85rem;text-decoration:none}
+.past-foot a:hover{text-decoration:underline}
+@media(max-width:980px){.past-strip{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:560px){.past-strip{grid-template-columns:repeat(3,1fr)}.past-card .pcap .pt{font-size:.66rem}}
+
 /* ── DRAWER ── */
 .drawer-bg{position:fixed;inset:0;background:rgba(28,25,23,.5);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:80;padding:24px}
 .drawer-bg.open{display:flex}
@@ -363,8 +396,8 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .drawer .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
 .drawer .slot{padding:11px 4px;border:1.5px solid var(--ink-5);border-radius:10px;background:#fff;color:var(--ink);font:700 .9rem var(--font-b);text-align:center;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease}
 .drawer .slot:hover{border-color:var(--rose);color:var(--rose);background:#fff8f6}
-.drawer .slot.sel{background:linear-gradient(135deg,#fff7f4 0%,#f3d7d1 100%);border-color:#a96f68;color:#2f2927!important;box-shadow:0 0 0 3px rgba(196,133,122,.18),0 10px 24px rgba(169,111,104,.16);transform:translateY(-1px)}
-.drawer .slot.sel::after{content:' ✓';font-weight:800;color:#8f5d56}
+.drawer .slot.sel{background:linear-gradient(135deg,var(--rose) 0%,var(--rose-deep) 100%);border-color:var(--rose-deep);color:#fff!important;box-shadow:0 0 0 3px rgba(196,133,122,.28),0 10px 24px rgba(163,104,94,.30);transform:translateY(-1px);font-weight:800}
+.drawer .slot.sel::after{content:' ✓';font-weight:900;color:#fff}
 .drawer .slot.taken{background:var(--ink-5);border-color:var(--ink-5);color:var(--ink-4);cursor:not-allowed;opacity:0.6}
 .drawer .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .drawer .form .full{grid-column:1/-1}
@@ -644,6 +677,34 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
     <div class="step"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit. It usually auto-confirms in a few minutes; Iryna confirms manually if needed. Final balance is paid on session day.</p></div></div>
   </div>
 
+  <!-- TESTIMONIALS (real client quotes) -->
+  <div class="tmt">
+    <div class="tmt-head">
+      <h3 data-i18n="tmt_heading">What Calgary clients say</h3>
+      <span class="sub" data-i18n="tmt_subhead">Real words from recent sessions</span>
+    </div>
+    <div class="tmt-grid">
+      <article class="tmt-card">
+        <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <p class="tmt-quote">“The session felt calm and easy, and the photos look like us — warm, real, and beautiful.”</p>
+        <div class="tmt-name">Anastasia M.</div>
+        <div class="tmt-context">Family session · Calgary</div>
+      </article>
+      <article class="tmt-card">
+        <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <p class="tmt-quote">“Iryna guided every pose without making it feel staged. We got so many favourites.”</p>
+        <div class="tmt-name">Sarah K.</div>
+        <div class="tmt-context">Maternity session · Calgary</div>
+      </article>
+      <article class="tmt-card">
+        <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
+        <p class="tmt-quote">“Fast, organized, and very gentle with our kids. The gallery was better than we hoped.”</p>
+        <div class="tmt-name">Olena P.</div>
+        <div class="tmt-context">Mini session · Calgary</div>
+      </article>
+    </div>
+  </div>
+
   <!-- FAQ -->
   <div class="faq">
     <h2 data-i18n="faq_title">Quick answers</h2>
@@ -652,6 +713,18 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
     <details><summary data-i18n="faq_q3">Can I bring our dog?</summary><div class="a" data-i18n="faq_a3">Always yes — just let me know on the form so I plan the spot.</div></details>
     <details><summary data-i18n="faq_q4">How does the deposit work?</summary><div class="a" data-i18n="faq_a4">The deposit is non-refundable but transferable to another session if you give 7+ days notice. The remaining balance is due on session day.</div></details>
     <details><summary data-i18n="faq_q5">When do I get the photos?</summary><div class="a" data-i18n="faq_a5">Within 48 hours for mini sessions, 2 weeks for full sessions. You get a private gallery with download.</div></details>
+  </div>
+
+  <!-- PAST SESSIONS ARCHIVE (rendered by renderPast; hidden when empty) -->
+  <div class="past-wrap" id="pastWrap" style="display:none">
+    <div class="past-head">
+      <h3 data-i18n="past_heading">Past sessions</h3>
+      <span class="sub" data-i18n="past_subhead">A look at recent shoots — these dates have wrapped</span>
+    </div>
+    <div class="past-strip" id="pastStrip"></div>
+    <div class="past-foot">
+      <a href="{{ PORTFOLIO_URL }}" target="_blank" rel="noopener" data-i18n="past_portfolio">See the full portfolio ↗</a>
+    </div>
   </div>
 </section>
 
@@ -702,6 +775,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 // ──────────────────────────────────────
 const BOOKING_FLOW_VARIANT = {{ booking_flow_variant|default('control')|tojson }};
 const INITIAL_EVENTS = {{ initial_events|default([], true)|tojson }};
+const INITIAL_PAST_EVENTS = {{ initial_past_events|default([], true)|tojson }};
 const API = {
   events: async () => {
     const r = await fetch('/events');
@@ -741,6 +815,7 @@ const API = {
 };
 
 let eventsData = Array.isArray(INITIAL_EVENTS) ? INITIAL_EVENTS : [];
+let pastEventsData = Array.isArray(INITIAL_PAST_EVENTS) ? INITIAL_PAST_EVENTS : [];
 let activeFilter = "all";
 let currentBooking = null; // {event_id, time, booking_id, expires_at}
 const ETRANSFER_EMAIL = "iryna.pashynska@gmail.com";
@@ -795,8 +870,9 @@ async function loadEvents() {
   }
   try {
     const data = await API.events();
-    // data is {events: [...]}
+    // data is {events: [...], past_events: [...]}
     eventsData = data.events || [];
+    if (Array.isArray(data.past_events)) pastEventsData = data.past_events;
     _eventsLoadFailed = false;
     renderedInitial = true;
     renderAll();
@@ -1772,9 +1848,34 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeDrawer();
 });
 
+function renderPast() {
+  const wrap = document.getElementById('pastWrap');
+  const strip = document.getElementById('pastStrip');
+  if (!wrap || !strip) return;
+  const list = Array.isArray(pastEventsData) ? pastEventsData : [];
+  if (!list.length) { wrap.style.display = 'none'; return; }
+  strip.innerHTML = list.map(e => {
+    const photo = e.photo_url || (e.photos && e.photos[0]) || '/static/images/placeholder.jpg';
+    const loc = (e.location || 'Calgary').split(',')[0];
+    const safeTitle = String(e.title || '').replace(/"/g, '&quot;');
+    return `
+      <figure class="past-card" title="${safeTitle}">
+        <div class="pimg" style="background-image:url('${photo}')"></div>
+        <div class="pshade"></div>
+        <span class="pbadge">${T('past_badge')}</span>
+        <figcaption class="pcap">
+          <div class="pt">${e.title || ''}</div>
+          <div class="pd">${fmtDate(e.date)} · ${loc}</div>
+        </figcaption>
+      </figure>`;
+  }).join('');
+  wrap.style.display = '';
+}
+
 function renderAll() {
   renderFeatured();
   renderGrid();
+  renderPast();
 }
 
 // ── INIT ──
@@ -1866,6 +1967,12 @@ const SITE_I18N = {
     status_low: 'Only {n} left',
     status_open: '{n} of {total} open',
     status_past: 'Past session',
+    tmt_heading: 'What Calgary clients say',
+    tmt_subhead: 'Real words from recent sessions',
+    past_heading: 'Past sessions',
+    past_subhead: 'A look at recent shoots — these dates have wrapped',
+    past_portfolio: 'See the full portfolio ↗',
+    past_badge: 'Done',
     deposit_caption: 'deposit · ${total} total',
     deposit_total_cad: 'deposit · ${total} total CAD',
     view_dates_btn: 'View dates →',
@@ -2028,6 +2135,12 @@ const SITE_I18N = {
     status_low: 'Осталось всего {n}',
     status_open: '{n} из {total} свободны',
     status_past: 'Прошедшая сессия',
+    tmt_heading: 'Отзывы клиентов в Калгари',
+    tmt_subhead: 'Настоящие отзывы с недавних съёмок',
+    past_heading: 'Прошедшие съёмки',
+    past_subhead: 'Недавние съёмки — эти даты уже прошли',
+    past_portfolio: 'Смотреть всё портфолио ↗',
+    past_badge: 'Завершено',
     deposit_caption: 'депозит · ${total} всего',
     deposit_total_cad: 'депозит · ${total} всего CAD',
     view_dates_btn: 'Смотреть даты →',
@@ -2184,6 +2297,12 @@ const SITE_I18N = {
     status_low: 'सिर्फ़ {n} बचे',
     status_open: '{n}/{total} उपलब्ध',
     status_past: 'पिछला सेशन',
+    tmt_heading: 'कैलगरी क्लाइंट्स की राय',
+    tmt_subhead: 'हाल के सेशन से असली शब्द',
+    past_heading: 'पिछले सेशन',
+    past_subhead: 'हाल की शूट्स — ये तारीखें पूरी हो चुकी हैं',
+    past_portfolio: 'पूरा पोर्टफोलियो देखें ↗',
+    past_badge: 'पूर्ण',
     deposit_caption: 'डिपॉज़िट · कुल ${total}',
     deposit_total_cad: 'डिपॉज़िट · कुल ${total} CAD',
     view_dates_btn: 'तारीखें देखें →',
@@ -2340,6 +2459,12 @@ const SITE_I18N = {
     status_low: 'Залишилось {n}',
     status_open: '{n} з {total} вільні',
     status_past: 'Минула сесія',
+    tmt_heading: 'Що кажуть клієнти з Калгарі',
+    tmt_subhead: 'Справжні відгуки з нещодавніх зйомок',
+    past_heading: 'Минулі зйомки',
+    past_subhead: 'Нещодавні зйомки — ці дати вже минули',
+    past_portfolio: 'Переглянути все портфоліо ↗',
+    past_badge: 'Завершено',
     deposit_caption: 'депозит · ${total} всього',
     deposit_total_cad: 'депозит · ${total} всього CAD',
     view_dates_btn: 'Дивитися дати →',

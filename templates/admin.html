@@ -1260,6 +1260,11 @@
                     <div style="color:var(--text-3); font-size:12px; margin-top:4px;">
                         {{ ev.id }} · 📅 {{ ev.date }}
                     </div>
+                    {% if ev.status == 'completed' %}
+                    <div style="color:var(--accent); font-size:11px; margin-top:4px; display:flex; align-items:center; gap:5px;">
+                        📦 Shown in the public “Past sessions” archive{% if ev.hidden %} — currently hidden{% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 <div style="display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;">
                     <a class="btn-outline" style="font-size:12px; padding:6px 12px; text-decoration:none; display:inline-block;" href="/admin/event/{{ ev.id }}" title="Open the slot grid for this event and manually block walk-in clients">

@@ -2416,6 +2416,7 @@ def index():
         "stripe_enabled": bool(STRIPE_SECRET_KEY),
         "booking_flow_variant": booking_flow_variant,
         "initial_events": _public_events_payload(),
+        "initial_past_events": _past_events_payload(),
     }
 
     # ── Direct event link: still render v2 landing, but could auto-open drawer in future ──
@@ -2713,11 +2714,49 @@ def _public_events_payload():
     return result
 
 
+def _past_events_payload(limit=12):
+    """Display-only past / completed sessions for the public 'Past sessions' archive.
+
+    These are NOT bookable, so no slot/DB availability work is done. The archive is
+    pure social proof — small thumbnails of recent shoots — so the landing page still
+    feels alive between upcoming dates and showcases Iryna's range. Hidden events and
+    drafts/cancelled events are never exposed here.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    out = []
+    for ev in EVENTS:
+        if ev.get("hidden"):
+            continue
+        if not ev.get("photos"):
+            continue
+        status = ev.get("status", "")
+        if status in ("draft", "cancelled"):
+            continue
+        is_completed = status == "completed"
+        is_past_date = str(ev.get("date", "")) < today
+        if not (is_completed or is_past_date):
+            continue
+        photos = ev.get("photos", [])
+        out.append({
+            "id": ev["id"],
+            "title": ev.get("title", ""),
+            "subtitle": ev.get("subtitle", ""),
+            "date": ev.get("date", ""),
+            "location": ev.get("location", "Calgary"),
+            "session_type": ev.get("session_type", "mini"),
+            "photo_url": photos[0],
+            "photos": photos,
+        })
+    # Newest first, capped so the strip never grows unbounded.
+    out.sort(key=lambda e: e.get("date", ""), reverse=True)
+    return out[:limit]
+
+
 @app.route("/events")
 def list_events():
     """API: list all events with full details including available spots."""
     result = _public_events_payload()
-    response = jsonify({"events": result})
+    response = jsonify({"events": result, "past_events": _past_events_payload()})
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return response
 
