@@ -4,6 +4,12 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 bookings.db
+booking.db
+data.db
+*.sqlite
+*.sqlite3
+.hermes/live-qa/
+.hermes/codex-client-qa-prompt.md
 uploads/
 *.log
 logs/
