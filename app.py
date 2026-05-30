@@ -856,13 +856,13 @@ def _send_client_reschedule_email(to_email, client_name, old_event_title, old_da
         html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:40px 20px;">
 <tr><td align="center">
-<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.12);">
   <tr><td style="background:linear-gradient(135deg,#c4857a 0%,#a3685e 100%);padding:40px;text-align:center;">
     <p style="margin:0 0 8px;font-size:32px;">📅</p>
     <h1 style="margin:0;color:#fff;font-size:24px;font-weight:normal;letter-spacing:1px;">Session Rescheduled</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.04em;">Pashynska Photography · Calgary</p>
   </td></tr>
   <tr><td style="padding:36px 40px 24px;">
     <p style="margin:0 0 18px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{client_name}</strong>,</p>
@@ -878,10 +878,10 @@ def _send_client_reschedule_email(to_email, client_name, old_event_title, old_da
     {f'<p style="margin:0 0 12px;font-size:14px;color:#7a5a6a;">📍 <strong>Location:</strong> {location}</p>' if location else '<p style="margin:0 0 12px;font-size:14px;color:#7a5a6a;">📍 Exact location will be sent closer to the session date.</p>'}
     <p style="margin:0 0 12px;font-size:14px;color:#7a5a6a;line-height:1.7;">Booking ID: <strong>#{booking_id}</strong></p>
     <p style="margin:0 0 24px;font-size:14px;color:#7a5a6a;line-height:1.7;">Need to change again? DM me on Instagram <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a></p>
-    <p style="margin:12px 0 0;font-size:14px;color:#9b5e8a;"><strong>Iryna Pashynska</strong></p>
+    <p style="margin:12px 0 0;font-size:14px;color:#a3685e;"><strong>Iryna Pashynska</strong></p>
   </td></tr>
-  <tr><td style="background:#f9f1f5;padding:20px 40px;text-align:center;border-top:1px solid #f0e0e8;">
-    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada</p>
+  <tr><td style="background:#fff8f4;padding:20px 40px;text-align:center;border-top:1px solid #f2e3dd;">
+    <p style="margin:0;font-size:12px;color:#b0938b;">Pashynska Photography · Calgary, AB · Canada</p>
   </td></tr>
 </table>
 </td></tr>
@@ -940,13 +940,13 @@ def _send_abandoned_email(booking):
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:40px 20px;">
 <tr><td align="center">
-<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
-  <tr><td style="background:linear-gradient(135deg,#b8a4c8 0%,#9b5e8a 100%);padding:36px 40px;text-align:center;">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.12);">
+  <tr><td style="background:linear-gradient(135deg,#e7c7bf 0%,#a3685e 100%);padding:36px 40px;text-align:center;">
     <p style="margin:0 0 8px;font-size:36px;">📸</p>
-    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">You were so close!</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+    <h1 style="margin:0;color:#fff;font-size:24px;font-weight:400;letter-spacing:-.01em;">You were so close!</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.04em;">Pashynska Photography · Calgary</p>
   </td></tr>
   <tr><td style="padding:36px 40px 28px;">
     <p style="margin:0 0 20px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong> 👋</p>
@@ -961,18 +961,18 @@ def _send_abandoned_email(booking):
     </p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
       <tr><td align="center">
-        <a href="{booking_url}" style="display:inline-block;background:linear-gradient(135deg,#c084a8,#9b5e8a);color:#fff;text-decoration:none;padding:14px 36px;border-radius:50px;font-size:15px;letter-spacing:.5px;">
+        <a href="{booking_url}" style="display:inline-block;background:linear-gradient(135deg,#c4857a,#a3685e);color:#fff;text-decoration:none;padding:14px 36px;border-radius:50px;font-size:15px;letter-spacing:.5px;">
           Check available spots →
         </a>
       </td></tr>
     </table>
-    <p style="margin:0;font-size:13px;color:#b8a0b0;text-align:center;line-height:1.6;">
+    <p style="margin:0;font-size:13px;color:#b0938b;text-align:center;line-height:1.6;">
       No pressure at all — just didn't want you to miss out!
     </p>
   </td></tr>
-  <tr><td style="background:#f9f1f5;padding:20px 40px;text-align:center;border-top:1px solid #f0e0e8;">
-    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada<br>
-    <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
+  <tr><td style="background:#fff8f4;padding:20px 40px;text-align:center;border-top:1px solid #f2e3dd;">
+    <p style="margin:0;font-size:12px;color:#b0938b;">Pashynska Photography · Calgary, AB · Canada<br>
+    <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a></p>
   </td></tr>
 </table></td></tr></table></body></html>"""
 
@@ -1017,29 +1017,29 @@ def _send_reminder_email(booking):
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:40px 20px;">
 <tr><td align="center">
-<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
-  <tr><td style="background:linear-gradient(135deg,#c084a8 0%,#9b5e8a 100%);padding:36px 40px;text-align:center;">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.12);">
+  <tr><td style="background:linear-gradient(135deg,#c4857a 0%,#a3685e 100%);padding:36px 40px;text-align:center;">
     <p style="margin:0 0 8px;font-size:36px;">🌸</p>
-    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">See you in 2 days!</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+    <h1 style="margin:0;color:#fff;font-size:24px;font-weight:400;letter-spacing:-.01em;">See you in 2 days!</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.04em;">Pashynska Photography · Calgary</p>
   </td></tr>
   <tr><td style="padding:36px 40px 28px;">
     <p style="margin:0 0 20px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong>! 👋</p>
     <p style="margin:0 0 24px;font-size:15px;color:#7a5a6a;line-height:1.7;">
       Your mini photo session is just <strong>2 days away</strong>! Here are the details:
     </p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;border-radius:12px;margin-bottom:28px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #ead8d0;border-radius:16px;margin-bottom:28px;box-shadow:0 8px 22px rgba(102,63,53,.06);">
       <tr><td style="padding:20px 24px;">
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
-            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">🗓 Date</td>
-            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{date_nice}</strong></td>
+            <td style="padding:8px 0;border-bottom:1px solid #f2e3dd;color:#7a5a6a;font-size:14px;">🗓 Date</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f2e3dd;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{date_nice}</strong></td>
           </tr>
           <tr>
-            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">⏰ Time</td>
-            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{slot_time}</strong></td>
+            <td style="padding:8px 0;border-bottom:1px solid #f2e3dd;color:#7a5a6a;font-size:14px;">⏰ Time</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f2e3dd;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{slot_time}</strong></td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#7a5a6a;font-size:14px;">📍 Location</td>
@@ -1056,16 +1056,16 @@ def _send_reminder_email(booking):
       <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">😊 &nbsp;Just have fun — I'll guide you the whole time!</td></tr>
     </table>
     <p style="margin:0 0 8px;font-size:14px;color:#7a5a6a;">Questions? DM me on Instagram
-      <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a>
+      <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a>
     </p>
   </td></tr>
-  <tr><td style="padding:24px 40px;text-align:left;border-top:1px solid #f0e0e8;">
+  <tr><td style="padding:24px 40px;text-align:left;border-top:1px solid #f2e3dd;">
     <p style="margin:0;font-size:15px;color:#5a3d4a;">See you soon! 🌸</p>
-    <p style="margin:8px 0 0;font-size:14px;color:#9b5e8a;"><strong>Iryna Pashynska</strong><br>
-    <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
+    <p style="margin:8px 0 0;font-size:14px;color:#a3685e;"><strong>Iryna Pashynska</strong><br>
+    <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a></p>
   </td></tr>
-  <tr><td style="background:#f9f1f5;padding:16px 40px;text-align:center;border-top:1px solid #f0e0e8;">
-    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada</p>
+  <tr><td style="background:#fff8f4;padding:16px 40px;text-align:center;border-top:1px solid #f2e3dd;">
+    <p style="margin:0;font-size:12px;color:#b0938b;">Pashynska Photography · Calgary, AB · Canada</p>
   </td></tr>
 </table></td></tr></table></body></html>"""
 
@@ -1110,29 +1110,29 @@ def _send_24h_reminder_email(booking):
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:40px 20px;">
 <tr><td align="center">
-<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
-  <tr><td style="background:linear-gradient(135deg,#c084a8 0%,#9b5e8a 100%);padding:36px 40px;text-align:center;">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.12);">
+  <tr><td style="background:linear-gradient(135deg,#c4857a 0%,#a3685e 100%);padding:36px 40px;text-align:center;">
     <p style="margin:0 0 8px;font-size:36px;">🌸</p>
-    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">See you tomorrow!</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+    <h1 style="margin:0;color:#fff;font-size:24px;font-weight:400;letter-spacing:-.01em;">See you tomorrow!</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.04em;">Pashynska Photography · Calgary</p>
   </td></tr>
   <tr><td style="padding:36px 40px 28px;">
     <p style="margin:0 0 20px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong>! 👋</p>
     <p style="margin:0 0 24px;font-size:15px;color:#7a5a6a;line-height:1.7;">
       Your mini photo session is <strong>tomorrow</strong>! Here's everything you need:
     </p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;border-radius:12px;margin-bottom:28px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #ead8d0;border-radius:16px;margin-bottom:28px;box-shadow:0 8px 22px rgba(102,63,53,.06);">
       <tr><td style="padding:20px 24px;">
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
-            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">🗓 Date</td>
-            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{date_nice}</strong></td>
+            <td style="padding:8px 0;border-bottom:1px solid #f2e3dd;color:#7a5a6a;font-size:14px;">🗓 Date</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f2e3dd;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{date_nice}</strong></td>
           </tr>
           <tr>
-            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;color:#7a5a6a;font-size:14px;">⏰ Time</td>
-            <td style="padding:8px 0;border-bottom:1px solid #f0e0e8;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{slot_time}</strong></td>
+            <td style="padding:8px 0;border-bottom:1px solid #f2e3dd;color:#7a5a6a;font-size:14px;">⏰ Time</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f2e3dd;text-align:right;"><strong style="color:#5a3d4a;font-size:14px;">{slot_time}</strong></td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#7a5a6a;font-size:14px;">📍 Location</td>
@@ -1149,11 +1149,11 @@ def _send_24h_reminder_email(booking):
       <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">😊 &nbsp;Most importantly — just have fun!</td></tr>
     </table>
     <p style="margin:0 0 8px;font-size:14px;color:#7a5a6a;">Questions? DM me on Instagram
-      <a href="https://instagram.com/pashynska.photo" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a>
+      <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a>
     </p>
   </td></tr>
-  <tr><td style="background:#f9f1f5;padding:16px 40px;text-align:center;border-top:1px solid #f0e0e8;">
-    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada</p>
+  <tr><td style="background:#fff8f4;padding:16px 40px;text-align:center;border-top:1px solid #f2e3dd;">
+    <p style="margin:0;font-size:12px;color:#b0938b;">Pashynska Photography · Calgary, AB · Canada</p>
   </td></tr>
 </table></td></tr></table></body></html>"""
 
@@ -1189,13 +1189,13 @@ def _send_review_email(booking):
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 20px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:40px 20px;">
 <tr><td align="center">
-<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.07);">
-  <tr><td style="background:linear-gradient(135deg,#e8c4d8 0%,#c084a8 100%);padding:36px 40px;text-align:center;">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.12);">
+  <tr><td style="background:linear-gradient(135deg,#f2c9bf 0%,#c4857a 100%);padding:36px 40px;text-align:center;">
     <p style="margin:0 0 8px;font-size:36px;">⭐</p>
-    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">How were your photos?</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px;">Pashynska Photography</p>
+    <h1 style="margin:0;color:#fff;font-size:24px;font-weight:400;letter-spacing:-.01em;">How were your photos?</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.04em;">Pashynska Photography · Calgary</p>
   </td></tr>
   <tr><td style="padding:36px 40px 28px;">
     <p style="margin:0 0 16px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong>! 🌸</p>
@@ -1213,22 +1213,22 @@ def _send_review_email(booking):
         </a>
       </td></tr>
       <tr><td align="center">
-        <a href="{insta_url}" style="display:inline-block;background:linear-gradient(135deg,#c084a8,#9b5e8a);color:#fff;text-decoration:none;padding:12px 28px;border-radius:50px;font-size:14px;letter-spacing:.5px;">
+        <a href="{insta_url}" style="display:inline-block;background:linear-gradient(135deg,#c4857a,#a3685e);color:#fff;text-decoration:none;padding:12px 28px;border-radius:50px;font-size:14px;letter-spacing:.5px;">
           📸 Tag me on Instagram
         </a>
       </td></tr>
     </table>
-    <p style="margin:20px 0 0;font-size:14px;color:#b8a0b0;text-align:center;line-height:1.6;">
+    <p style="margin:20px 0 0;font-size:14px;color:#b0938b;text-align:center;line-height:1.6;">
       And I'd love to see you again for your next session! 💜
     </p>
   </td></tr>
-  <tr><td style="padding:24px 40px;text-align:left;border-top:1px solid #f0e0e8;">
+  <tr><td style="padding:24px 40px;text-align:left;border-top:1px solid #f2e3dd;">
     <p style="margin:0;font-size:15px;color:#5a3d4a;">Thank you so much! 🌸</p>
-    <p style="margin:8px 0 0;font-size:14px;color:#9b5e8a;"><strong>Iryna Pashynska</strong><br>
-    <a href="{insta_url}" style="color:#c084a8;text-decoration:none;">@pashynska.photo</a></p>
+    <p style="margin:8px 0 0;font-size:14px;color:#a3685e;"><strong>Iryna Pashynska</strong><br>
+    <a href="{insta_url}" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a></p>
   </td></tr>
-  <tr><td style="background:#f9f1f5;padding:16px 40px;text-align:center;border-top:1px solid #f0e0e8;">
-    <p style="margin:0;font-size:12px;color:#b8a0b0;">Pashynska Photography · Calgary, AB · Canada</p>
+  <tr><td style="background:#fff8f4;padding:16px 40px;text-align:center;border-top:1px solid #f2e3dd;">
+    <p style="margin:0;font-size:12px;color:#b0938b;">Pashynska Photography · Calgary, AB · Canada</p>
   </td></tr>
 </table></td></tr></table></body></html>"""
 
