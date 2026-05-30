@@ -1049,6 +1049,7 @@
                         <option value="confirmed" {% if filters.status == 'confirmed' %}selected{% endif %}>✅ Confirmed</option>
                         <option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>❌ Cancelled</option>
                         <option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expired</option>
+                        <option value="partial_payment" {% if filters.status == 'partial_payment' %}selected{% endif %}>⚠️ Partial payment</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1115,6 +1116,7 @@
         <button class="filter-btn {% if filters.status == 'confirmed' %}active{% endif %}" onclick="setStatusFilter('confirmed')">✅ Confirmed</button>
         <button class="filter-btn {% if filters.status == 'cancelled' %}active{% endif %}" onclick="setStatusFilter('cancelled')">❌ Cancelled</button>
         <button class="filter-btn {% if filters.status == 'expired' %}active{% endif %}" onclick="setStatusFilter('expired')">Expired</button>
+        <button class="filter-btn {% if filters.status == 'partial_payment' %}active{% endif %}" onclick="setStatusFilter('partial_payment')">⚠️ Partial</button>
         <div class="search-wrap">
             <span class="search-icon">🔍</span>
             <input class="search-input" type="text" id="search" placeholder="Search by name, email, Instagram…" oninput="doSearch(this.value)">
@@ -1172,6 +1174,7 @@
                             {% elif b.status == 'confirmed' %}Confirmed
                             {% elif b.status == 'cancelled' %}Cancelled
                             {% elif b.status == 'expired' %}Expired
+                            {% elif b.status == 'partial_payment' %}⚠️ Partial payment
                             {% else %}{{ b.status }}{% endif %}
                         </span>
                     </td>

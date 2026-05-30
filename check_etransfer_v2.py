@@ -218,22 +218,74 @@ def get_pending_bookings(within_minutes=30, grace_minutes=60):
     return rows
 
 
+def _get_booking_full_price(booking):
+    """Full session price for a booking (balance + overpayment cap).
+    Reads events.yaml by event_id; falls back to a safe default."""
+    try:
+        import yaml
+        event_id = booking.get("event_id")
+        if event_id and os.path.exists(EVENTS_YAML_PATH):
+            with open(EVENTS_YAML_PATH) as f:
+                data = yaml.safe_load(f)
+            for ev in (data.get("events", []) or []):
+                if ev.get("id") == event_id:
+                    fp = ev.get("full_price")
+                    if fp is not None:
+                        return float(fp)
+    except Exception:
+        pass
+    return 190.0
+
+
 def match_by_amount_only(amount, bookings):
-    """Match payment to booking(s) by exact amount only.
-    Returns (booking, ambiguity_list) where ambiguity_list is other bookings with same amount."""
-    candidates = []
+    """Match an e-Transfer to a pending booking by amount (asymmetric, money-safe).
+
+    Bands:
+      1. Exact (within $0.01)                     -> 'exact'     -> auto-confirm
+      2. Overpaid (> expected, up to full price)  -> 'overpaid'  -> auto-confirm (records actual)
+      3. Underpaid (0.3x .. 1x expected)          -> 'underpaid' -> record only, DO NOT confirm
+      4. Otherwise                                -> orphan
+
+    An auto-action fires ONLY when exactly one booking is in the chosen band. If
+    two or more sit in the same band the result is ambiguous and goes to manual
+    review — we never silently confirm the wrong booking.
+
+    Returns (booking, ambiguity_list, match_type) where
+      match_type = 'exact' | 'overpaid' | 'underpaid' | None
+    """
+    exact, overpaid, underpaid = [], [], []
     for b in bookings:
         expected = get_expected_amount_for_booking(b["id"])
-        # Exact match only
-        if abs(amount - expected) < 0.01:
-            candidates.append(b)
+        diff = amount - expected
+        if abs(diff) < 0.01:
+            exact.append(b)
+        elif diff > 0:
+            full = _get_booking_full_price(b)
+            cap = full if full > expected else expected * 2
+            if amount <= cap + 1.0:  # generous, but never beyond the full session price
+                overpaid.append((b, diff))
+        elif diff < 0 and amount >= expected * 0.3:
+            underpaid.append((b, abs(diff)))
 
-    if not candidates:
-        return None, []
-    if len(candidates) == 1:
-        return candidates[0], []
-    # Ambiguity: multiple bookings with same amount
-    return None, candidates
+    # 1) Exact wins
+    if exact:
+        if len(exact) == 1:
+            return exact[0], [], 'exact'
+        return None, exact, None  # ambiguous — multiple exact matches
+
+    # 2) Overpaid -> auto-confirm, but only if unambiguous
+    if overpaid:
+        if len(overpaid) > 1:
+            return None, [b for b, _ in overpaid], None
+        return overpaid[0][0], [], 'overpaid'
+
+    # 3) Underpaid -> record only, but only if unambiguous
+    if underpaid:
+        if len(underpaid) > 1:
+            return None, [b for b, _ in underpaid], None
+        return underpaid[0][0], [], 'underpaid'
+
+    return None, [], None
 
 
 def confirm_booking(booking_id, paid_amount=None):
@@ -244,6 +296,26 @@ def confirm_booking(booking_id, paid_amount=None):
         UPDATE bookings
         SET confirmed=1, paid=1, status='confirmed', paid_amount=?
         WHERE id=?
+    """, (paid_amount, booking_id))
+    updated = c.rowcount
+    conn.commit()
+    conn.close()
+    return updated > 0
+
+
+def record_partial_payment(booking_id, paid_amount):
+    """Record a partial/underpayment WITHOUT confirming the booking.
+
+    Sets paid_amount + status='partial_payment', but ONLY while the booking is
+    still unconfirmed (confirmed=0) — so a stray later e-Transfer can never flip
+    an already-confirmed booking back to unpaid. Returns True if a row changed.
+    """
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE bookings
+        SET paid_amount=?, status='partial_payment'
+        WHERE id=? AND confirmed=0
     """, (paid_amount, booking_id))
     updated = c.rowcount
     conn.commit()
@@ -290,6 +362,50 @@ def _notify_admin_orphan(amount, body, msg_id):
         print(f"[admin] Orphan alert sent for ${amount:.2f}")
     except Exception as e:
         print(f"[admin] Failed to send orphan alert: {e}")
+
+
+def _notify_admin_overpaid(booking, expected, actual):
+    """Notify admin: client paid more than expected — auto-confirmed."""
+    try:
+        from app import _tg_message
+        diff = actual - expected
+        total = _get_booking_full_price(booking)
+        balance = max(total - actual, 0)
+        lines = [
+            f"💰 **Payment received (overpaid)**",
+            f"",
+            f"Booking #{booking['id']} — {booking.get('name', '?')}",
+            f"Expected: ${expected:.2f}",
+            f"Received: ${actual:.2f}  (+${diff:.2f})",
+            f"",
+            f"✅ Auto-confirmed",
+            f"Remaining balance: ${balance:.2f}",
+        ]
+        _tg_message("\n".join(lines))
+        print(f"[admin] Overpaid alert sent for #{booking['id']} (${actual:.2f})")
+    except Exception as e:
+        print(f"[admin] Failed to send overpaid alert: {e}")
+
+
+def _notify_admin_underpaid(booking, expected, actual):
+    """Notify admin: client paid less than expected — NOT confirmed."""
+    try:
+        from app import _tg_message
+        diff = expected - actual
+        lines = [
+            f"⚠️ **Payment received (UNDERPAID)**",
+            f"",
+            f"Booking #{booking['id']} — {booking.get('name', '?')}",
+            f"Expected: ${expected:.2f}",
+            f"Received: ${actual:.2f}  (-${diff:.2f})",
+            f"",
+            f"❌ NOT confirmed — recorded as partial_payment.",
+            f"Action: confirm manually or contact the client.",
+        ]
+        _tg_message("\n".join(lines))
+        print(f"[admin] Underpaid alert sent for #{booking['id']} (${actual:.2f})")
+    except Exception as e:
+        print(f"[admin] Failed to send underpaid alert: {e}")
 
 
 def _parse_email_datetime(value):
@@ -377,7 +493,7 @@ def check_single_email(email, bookings):
         print(f"   [skip] No time-valid bookings for message {msg_id}")
         return None, None
 
-    matched, ambiguous = match_by_amount_only(amount, bookings)
+    matched, ambiguous, match_type = match_by_amount_only(amount, bookings)
 
     if ambiguous:
         print(f"   ⚠️ Ambiguity: ${amount:.2f} matches {len(ambiguous)} bookings")
@@ -395,14 +511,33 @@ def check_single_email(email, bookings):
         mark_message_processed(msg_id, None, amount)
         return None, None
 
-    # Confirm
-    if confirm_booking(matched["id"], amount):
-        mark_message_processed(msg_id, matched["id"], amount)
-        print(f"   ✅ CONFIRMED Booking #{matched['id']} — ${amount:.2f}")
-        return matched["id"], None
-    else:
+    expected = get_expected_amount_for_booking(matched["id"])
+
+    if match_type in ('exact', 'overpaid'):
+        # Auto-confirm with the ACTUAL amount received (balance = full_price - amount).
+        if confirm_booking(matched["id"], amount):
+            mark_message_processed(msg_id, matched["id"], amount)
+            if match_type == 'overpaid':
+                _notify_admin_overpaid(matched, expected, amount)
+            print(f"   ✅ CONFIRMED Booking #{matched['id']} — ${amount:.2f} ({match_type})")
+            return matched["id"], None
         print(f"   ❌ DB update failed for #{matched['id']}")
         return None, None
+
+    if match_type == 'underpaid':
+        # Record the payment but DO NOT confirm — admin handles it.
+        if record_partial_payment(matched["id"], amount):
+            mark_message_processed(msg_id, matched["id"], amount)
+            _notify_admin_underpaid(matched, expected, amount)
+            print(f"   ⚠️ UNDERPAID Booking #{matched['id']} — ${amount:.2f} (expected ${expected:.2f}); NOT confirmed")
+            return matched["id"], None
+        # Booking already confirmed or gone — mark processed so we don't retry-loop.
+        print(f"   [skip] Could not record partial payment for #{matched['id']} (already confirmed?)")
+        mark_message_processed(msg_id, matched["id"], amount)
+        return None, None
+
+    print(f"   ❌ Unhandled match_type for #{matched['id']}")
+    return None, None
 
 
 if __name__ == "__main__":

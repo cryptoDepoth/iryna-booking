@@ -103,7 +103,8 @@
   .status-confirmed              { background: var(--success-bg); color: var(--success); }
   .status-reserved,
   .status-pending,
-  .status-pending_payment        { background: var(--warn-bg); color: var(--warn); }
+  .status-pending_payment,
+  .status-partial_payment        { background: var(--warn-bg); color: var(--warn); }
   .status-cancelled,
   .status-expired,
   .status-void                   { background: var(--danger-bg); color: var(--danger); }
@@ -228,6 +229,12 @@
       </div>
     </div>
   </section>
+
+  {% if booking.status == 'partial_payment' %}
+  <div style="margin:0 0 4px;padding:13px 16px;background:var(--warn-bg);color:var(--warn);border-radius:12px;font-size:14px;line-height:1.55;">
+    ⚠️ <strong>Partial payment received</strong> — ${{ '%.2f'|format(booking.paid_amount or 0) }} recorded. This booking is <strong>NOT confirmed</strong>. Confirm manually or contact the client about the remaining amount.
+  </div>
+  {% endif %}
 
   <div class="grid">
     <!-- CLIENT -->
