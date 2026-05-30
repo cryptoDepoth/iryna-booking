@@ -379,7 +379,8 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .past-foot a{color:var(--rose-deep);font-weight:600;font-size:.85rem;text-decoration:none}
 .past-foot a:hover{text-decoration:underline}
 @media(max-width:980px){.past-strip{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:560px){.past-strip{grid-template-columns:repeat(3,1fr)}.past-card .pcap .pt{font-size:.66rem}}
+@media(max-width:620px){.past-strip{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.past-strip{grid-template-columns:repeat(2,1fr);gap:12px}.past-card .pcap .pt{font-size:.84rem}.past-card .pcap .pd{font-size:.7rem}}
 
 /* ── MOTION / WOW LAYER — additive, prefers-reduced-motion safe ── */
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -598,6 +599,20 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   .drawer .dphoto h2{font-size:1.4rem}
 }
 @keyframes slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+/* ── MOBILE POLISH (touch targets · proof bar · lighter weight) ── */
+@media(max-width:480px){
+  .proof{gap:6px 14px;font-size:.8rem;line-height:1.5}
+  .proof .sep{display:none}
+  .proof span strong{font-weight:500}
+}
+@media(max-width:640px){
+  .drawer .slot{padding:15px 4px}
+  .drawer .btn{padding:16px}
+  .event-card .price-bar .cta{padding:12px 18px}
+  .event-card .photo .status,.event-card .photo .countdown{font-weight:500}
+  .assistant-send{width:46px;height:46px}
+}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-glass.css') }}?v=glass-1">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
