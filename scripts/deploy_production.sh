@@ -21,7 +21,7 @@ if [[ ! -x "$FLY" ]]; then
   exit 2
 fi
 
-python -m pytest -q
+python3 -m pytest -q
 "$FLY" deploy --remote-only --yes -a "$APP"
 
 python - <<'PY'
