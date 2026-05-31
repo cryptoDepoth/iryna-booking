@@ -1945,6 +1945,8 @@ def init_db():
         ("bookings",  "full_price",        "ALTER TABLE bookings ADD COLUMN full_price REAL"),
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
+        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
     ]
     for _tbl, _col, _ddl in _migrations:
         try:
@@ -6180,9 +6182,300 @@ def admin_update_event_meta(event_id):
     return jsonify({"success": True})
 
 
+
+
+# ─────────────────────────────────────────────
+#  INTERAC TRANSFER LEDGER HELPERS
+# ─────────────────────────────────────────────
+
+def _ensure_etransfers_table(conn=None):
+    """Ensure the Interac ledger exists (safe to call from routes/tests)."""
+    own = conn is None
+    conn = conn or db_conn()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS etransfers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reference_number TEXT UNIQUE,
+            message_id TEXT,
+            sender_name TEXT,
+            amount REAL,
+            memo TEXT,
+            direction TEXT DEFAULT 'in',
+            email_date TEXT,
+            matched_booking_id INTEGER,
+            status TEXT DEFAULT 'unmatched',
+            source TEXT DEFAULT 'email',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    if own:
+        conn.close()
+
+
+def _clean_transfer_sender(raw):
+    if not raw:
+        return ""
+    import re as _re
+    s = str(raw).strip()
+    s = _re.sub(r"\s+and\s+it\s*$", "", s, flags=_re.I)
+    s = _re.sub(r"\s+and\s*$", "", s, flags=_re.I)
+    s = _re.sub(r"\s{2,}", " ", s).strip()
+    return s.title() if (s.isupper() or s.islower()) else s
+
+
+def _normalise_transfer_status(status):
+    status = (status or "unmatched").strip().lower()
+    return status if status in {"unmatched", "matched", "ignored"} else "unmatched"
+
+
+def _transfer_ref_from_csv(row_num, date, sender, amount):
+    base = f"csv:{row_num}:{date}:{sender}:{amount}"
+    return hashlib.sha1(base.encode("utf-8", "ignore")).hexdigest()[:20]
+
+
+def _import_etransfers_csv(file_obj):
+    """Import the exported Interac CSV into etransfers.
+
+    The historical CSV has no real Interac reference number, so rows get stable
+    csv:* references. Live emails will use the actual Reference Number when present.
+    """
+    import csv as _csv
+    import io as _io
+    raw = file_obj.read()
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8-sig", "replace")
+    reader = _csv.DictReader(_io.StringIO(raw))
+    conn = db_conn()
+    _ensure_etransfers_table(conn)
+    inserted = updated = skipped = 0
+    for idx, row in enumerate(reader, start=1):
+        date = (row.get("Date") or row.get("date") or "").strip()
+        sender = _clean_transfer_sender(row.get("Sender") or row.get("sender") or "")
+        amount_raw = (row.get("Amount ($)") or row.get("Amount") or row.get("amount") or "").strip()
+        direction_raw = (row.get("Direction") or row.get("direction") or "IN").strip().upper()
+        subject = (row.get("Subject") or row.get("subject") or "").strip()
+        if not date or not amount_raw:
+            skipped += 1
+            continue
+        try:
+            amount = float(str(amount_raw).replace("$", "").replace(",", "").strip())
+        except ValueError:
+            skipped += 1
+            continue
+        direction = "out" if "OUT" in direction_raw else "in"
+        # Usually we only care about incoming client payments; still keep outgoing
+        # rows so the historical ledger matches the CSV and can be filtered.
+        ref = _transfer_ref_from_csv(row.get("#") or idx, date, sender, f"{amount:.2f}")
+        try:
+            conn.execute("""
+                INSERT INTO etransfers
+                    (reference_number, sender_name, amount, memo, direction, email_date, status, source)
+                VALUES (?, ?, ?, ?, ?, ?, 'unmatched', 'csv')
+            """, (ref, sender, amount, subject, direction, date))
+            inserted += 1
+        except sqlite3.IntegrityError:
+            conn.execute("""
+                UPDATE etransfers
+                   SET sender_name=COALESCE(NULLIF(?, ''), sender_name),
+                       amount=COALESCE(?, amount),
+                       memo=COALESCE(NULLIF(?, ''), memo),
+                       direction=COALESCE(NULLIF(?, ''), direction),
+                       email_date=COALESCE(NULLIF(?, ''), email_date)
+                 WHERE reference_number=?
+            """, (sender, amount, subject, direction, date, ref))
+            updated += 1
+    conn.commit()
+    conn.close()
+    return {"inserted": inserted, "updated": updated, "skipped": skipped}
+
+
+def _transfer_booking_options(limit=250):
+    conn = db_conn()
+    rows = conn.execute("""
+        SELECT id, date, time, name, email, phone, instagram, session_type,
+               status, confirmed, paid_amount, deposit_amount, full_price, event_id
+          FROM bookings
+         WHERE status NOT IN ('cancelled','expired')
+         ORDER BY date DESC, time ASC
+         LIMIT ?
+    """, (limit,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def _link_transfer_to_booking(transfer_id, booking_id):
+    """Manual admin link: attach transfer and raise paid_amount safely.
+
+    - Never lowers paid_amount.
+    - If amount >= expected deposit: mark confirmed/paid.
+    - If amount < expected deposit: mark partial_payment, not confirmed.
+    """
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        transfer = conn.execute("SELECT * FROM etransfers WHERE id=?", (transfer_id,)).fetchone()
+        booking = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        if not transfer:
+            conn.rollback(); return False, "Transfer not found"
+        if not booking:
+            conn.rollback(); return False, "Booking not found"
+        amount = float(transfer["amount"] or 0)
+        current_paid = float(booking["paid_amount"] or 0)
+        new_paid = max(current_paid, amount)
+        deposit = float(booking["deposit_amount"] or 0)
+        if deposit <= 0:
+            ev = get_event_by_id(booking["event_id"]) if booking["event_id"] else None
+            deposit = float((ev or {}).get("deposit") or 0)
+        if deposit <= 0:
+            deposit = new_paid
+        if new_paid + 0.01 >= deposit:
+            conn.execute("""
+                UPDATE bookings
+                   SET paid_amount=?, paid=1, confirmed=1, status='confirmed'
+                 WHERE id=?
+            """, (new_paid, booking_id))
+        else:
+            conn.execute("""
+                UPDATE bookings
+                   SET paid_amount=?, paid=0, confirmed=0, status='partial_payment'
+                 WHERE id=? AND confirmed=0
+            """, (new_paid, booking_id))
+        conn.execute("""
+            UPDATE etransfers
+               SET matched_booking_id=?, status='matched'
+             WHERE id=?
+        """, (booking_id, transfer_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        log.exception("[transfers] link failed")
+        return False, str(e)
+    finally:
+        conn.close()
+    try:
+        sync_to_notion(booking_id)
+    except Exception:
+        pass
+    return True, None
+
 # ─────────────────────────────────────────────
 #  CLIENT DATABASE ROUTES
 # ─────────────────────────────────────────────
+
+
+
+@app.route("/admin/transfers")
+@admin_required
+def admin_transfers():
+    """Interac e-Transfer ledger: imported CSV + live email scans."""
+    status = _normalise_transfer_status(request.args.get("status") or "unmatched")
+    if request.args.get("status") == "all":
+        status = "all"
+    search = (request.args.get("search") or "").strip()
+    direction = (request.args.get("direction") or "in").strip().lower()
+    if direction not in {"in", "out", "all"}:
+        direction = "in"
+    conn = db_conn()
+    _ensure_etransfers_table(conn)
+    conditions = []
+    params = []
+    if status != "all":
+        conditions.append("t.status = ?")
+        params.append(status)
+    if direction != "all":
+        conditions.append("COALESCE(t.direction,'in') = ?")
+        params.append(direction)
+    if search:
+        like = f"%{search}%"
+        conditions.append("(t.sender_name LIKE ? OR t.memo LIKE ? OR t.reference_number LIKE ? OR b.name LIKE ? OR b.email LIKE ?)")
+        params.extend([like, like, like, like, like])
+    where = " AND ".join(conditions) if conditions else "1=1"
+    rows = conn.execute(f"""
+        SELECT t.*, b.name AS booking_name, b.email AS booking_email, b.date AS booking_date,
+               b.time AS booking_time, b.session_type AS booking_session, b.status AS booking_status
+          FROM etransfers t
+          LEFT JOIN bookings b ON b.id = t.matched_booking_id
+         WHERE {where}
+         ORDER BY COALESCE(t.email_date, t.created_at) DESC, t.id DESC
+         LIMIT 500
+    """, params).fetchall()
+    stats_row = conn.execute("""
+        SELECT COUNT(*) AS total,
+               SUM(CASE WHEN status='matched' THEN 1 ELSE 0 END) AS matched,
+               SUM(CASE WHEN status='unmatched' THEN 1 ELSE 0 END) AS unmatched,
+               SUM(CASE WHEN status='ignored' THEN 1 ELSE 0 END) AS ignored,
+               SUM(CASE WHEN COALESCE(direction,'in')='in' THEN COALESCE(amount,0) ELSE 0 END) AS incoming_total
+          FROM etransfers
+    """).fetchone()
+    conn.close()
+    grouped = []
+    current_day = None
+    for r in rows:
+        d = dict(r)
+        day = (d.get("email_date") or d.get("created_at") or "")[:10] or "Unknown date"
+        if not grouped or grouped[-1]["day"] != day:
+            grouped.append({"day": day, "items": []})
+        grouped[-1]["items"].append(d)
+    return render_template(
+        "admin_transfers.html",
+        grouped=grouped,
+        stats=dict(stats_row) if stats_row else {},
+        booking_options=_transfer_booking_options(),
+        filters={"status": status, "direction": direction, "search": search},
+    )
+
+
+@app.route("/admin/transfers/import", methods=["POST"])
+@admin_required
+def admin_transfers_import():
+    file = request.files.get("csv")
+    if not file:
+        return jsonify({"success": False, "error": "CSV file is required"}), 400
+    try:
+        result = _import_etransfers_csv(file.stream)
+        return jsonify({"success": True, **result})
+    except Exception as e:
+        log.exception("[transfers] CSV import failed")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/admin/transfers/<int:transfer_id>/link", methods=["POST"])
+@admin_required
+def admin_transfer_link(transfer_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        booking_id = int(data.get("booking_id") or 0)
+    except (TypeError, ValueError):
+        booking_id = 0
+    if booking_id <= 0:
+        return jsonify({"success": False, "error": "Booking is required"}), 400
+    ok, err = _link_transfer_to_booking(transfer_id, booking_id)
+    if not ok:
+        return jsonify({"success": False, "error": err or "Could not link"}), 400
+    return jsonify({"success": True})
+
+
+@app.route("/admin/transfers/<int:transfer_id>/ignore", methods=["POST"])
+@admin_required
+def admin_transfer_ignore(transfer_id):
+    conn = db_conn()
+    _ensure_etransfers_table(conn)
+    conn.execute("UPDATE etransfers SET status='ignored' WHERE id=?", (transfer_id,))
+    conn.commit(); conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/admin/transfers/<int:transfer_id>/unlink", methods=["POST"])
+@admin_required
+def admin_transfer_unlink(transfer_id):
+    conn = db_conn()
+    _ensure_etransfers_table(conn)
+    conn.execute("UPDATE etransfers SET matched_booking_id=NULL, status='unmatched' WHERE id=?", (transfer_id,))
+    conn.commit(); conn.close()
+    return jsonify({"success": True})
+
 
 @app.route("/admin/clients")
 @admin_required

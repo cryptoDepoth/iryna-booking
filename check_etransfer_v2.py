@@ -65,6 +65,16 @@ def mark_message_processed(message_id, booking_id, amount):
                  WHERE message_id=?
                    AND (booking_id IS NULL OR booking_id=?)
             """, (booking_id, amount, message_id, booking_id))
+    # Auto-link the ledger entry for this email to the booking it confirmed.
+    if booking_id is not None:
+        try:
+            c.execute(
+                "UPDATE etransfers SET matched_booking_id=?, status='matched' "
+                "WHERE message_id=? AND (matched_booking_id IS NULL OR matched_booking_id=?)",
+                (booking_id, message_id, booking_id),
+            )
+        except Exception:
+            pass
     conn.commit()
     conn.close()
 
@@ -182,6 +192,80 @@ def extract_payment_info(body_text):
             except Exception:
                 pass
     return None
+
+
+def clean_sender_name(raw):
+    """Normalize an Interac sender name, stripping subject-parse artifacts like
+    a trailing 'and it' (from '...from NAME and it has been deposited')."""
+    if not raw:
+        return ""
+    s = re.sub(r"\s+and\s+it\s*$", "", str(raw).strip(), flags=re.I)
+    s = re.sub(r"\s+and\s*$", "", s, flags=re.I)
+    s = re.sub(r"\s{2,}", " ", s).strip()
+    # ALL-CAPS or all-lower bank names read nicer in Title Case; leave mixed case alone.
+    return s.title() if (s.isupper() or s.islower()) else s
+
+
+def extract_etransfer_details(body_text):
+    """Pull reference number, sender name, and memo from an Interac e-Transfer body."""
+    details = {"reference_number": None, "sender_name": None, "memo": None}
+    if not body_text:
+        return details
+    m = re.search(r"Reference\s*Number[:\s]*([A-Za-z0-9]+)", body_text, re.I)
+    if m:
+        details["reference_number"] = m.group(1).strip()
+    m = re.search(r"Sent\s*From[:\s]*([^\n\r]+)", body_text, re.I)
+    if not m:
+        m = re.search(r"received\s*\$?[0-9,]+\.?\d*\s*from\s+([^\n\r]+?)(?:\s+and\s+it\b|\.|\n|$)", body_text, re.I)
+    if m:
+        details["sender_name"] = clean_sender_name(m.group(1))
+    m = re.search(r"Message[:\s]*([^\n\r]+)", body_text, re.I)
+    if m:
+        details["memo"] = m.group(1).strip()
+    return details
+
+
+def record_etransfer(reference_number=None, message_id=None, sender_name=None, amount=None,
+                     memo=None, email_date=None, direction="in", source="email",
+                     matched_booking_id=None, status=None):
+    """Insert/UPSERT a transfer into the etransfers ledger.
+
+    Keyed on reference_number (falls back to a message-id-based key) so repeated
+    scans of the same email/CSV row never create duplicates.
+    """
+    ref = reference_number or (f"msg:{message_id}" if message_id else None)
+    if not ref:
+        return False
+    if status is None:
+        status = "matched" if matched_booking_id else "unmatched"
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        c.execute("""
+            INSERT INTO etransfers (reference_number, message_id, sender_name, amount, memo,
+                                    direction, email_date, matched_booking_id, status, source)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (ref, message_id, sender_name, amount, memo, direction, email_date,
+              matched_booking_id, status, source))
+    except sqlite3.IntegrityError:
+        # Already in the ledger — fill in any blanks, never wipe existing data.
+        c.execute("""
+            UPDATE etransfers
+               SET message_id=COALESCE(?, message_id),
+                   sender_name=COALESCE(?, sender_name),
+                   amount=COALESCE(amount, ?),
+                   memo=COALESCE(memo, ?),
+                   email_date=COALESCE(email_date, ?)
+             WHERE reference_number=?
+        """, (message_id, sender_name, amount, memo, email_date, ref))
+        if matched_booking_id:
+            c.execute("""
+                UPDATE etransfers SET matched_booking_id=?, status='matched'
+                 WHERE reference_number=? AND (matched_booking_id IS NULL OR matched_booking_id=?)
+            """, (matched_booking_id, ref, matched_booking_id))
+    conn.commit()
+    conn.close()
+    return True
 
 
 def get_expected_amount_for_booking(booking_id):
@@ -716,6 +800,21 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
         return None, None
 
     print(f"   💰 Extracted amount: ${amount:.2f}")
+
+    # Ledger: record every incoming transfer (even if it never matches a booking).
+    try:
+        _d = extract_etransfer_details(body)
+        record_etransfer(
+            reference_number=_d.get("reference_number"),
+            message_id=msg_id,
+            sender_name=_d.get("sender_name"),
+            amount=amount,
+            memo=_d.get("memo"),
+            email_date=str(email.get("date") or ""),
+            source="email",
+        )
+    except Exception as _e:
+        print(f"   [ledger] record failed: {_e}")
 
     reconciliation_bookings = reconciliation_bookings or []
     processed = get_processed_email(msg_id)
