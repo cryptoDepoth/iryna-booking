@@ -69,6 +69,35 @@
   .legend-swatch.free { background: var(--surface); }
   .legend-swatch.pending { background: var(--warn-bg); border-color: var(--warn-bg); }
   .legend-swatch.confirmed { background: var(--success-bg); border-color: var(--success-bg); }
+  .legend-swatch.blocked { background: var(--danger-bg); border-color: var(--danger-bg); }
+
+  .session-stats {
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px; margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    box-shadow: var(--shadow); padding: 14px 16px;
+  }
+  .stat-card .num { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stat-card .lbl { color: var(--text-2); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+  .command-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(340px, .75fr);
+    gap: 16px;
+    align-items: start;
+  }
+  .board-card, .roster-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 18px;
+    min-width: 0;
+  }
+  .section-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  .section-head h2 { font-size: 16px; margin: 0 0 2px; }
+  .section-head p { font-size: 12px; color: var(--text-2); margin: 0; }
 
   /* Slot grid */
   .slot-grid {
@@ -79,26 +108,66 @@
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
     padding: 14px 16px;
     transition: border-color .15s, box-shadow .15s;
-    cursor: pointer;
+    cursor: default;
   }
   .slot.free:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,.10); }
   .slot.pending { background: var(--warn-bg); border-color: var(--warn-bg); cursor: default; }
   .slot.confirmed { background: var(--success-bg); border-color: var(--success-bg); cursor: default; }
+  .slot.blocked { background: var(--danger-bg); border-color: #fecaca; cursor: default; }
   .slot-time { font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
   .slot-label { font-size: 11px; color: var(--text-2); margin-top: 2px; font-variant-numeric: tabular-nums; }
   .slot-status { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-top: 6px; display: inline-block; }
   .slot.free .slot-status { color: var(--accent); }
   .slot.pending .slot-status { color: var(--warn); }
   .slot.confirmed .slot-status { color: var(--success); }
+  .slot.blocked .slot-status { color: var(--danger); }
   .slot-client {
     font-size: 12px; color: var(--text); margin-top: 6px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .slot-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .slot-actions .mini-btn { font-size: 11px; padding: 5px 9px; }
+  .slot-close { color: var(--danger); border-color: #fecaca; }
+  .slot-close:hover { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
   .slot-link {
     display: inline-block; font-size: 11px; color: var(--text-2);
     margin-top: 4px; text-decoration: underline; text-underline-offset: 2px;
   }
   .slot-link:hover { color: var(--accent); }
+
+  /* Client roster */
+  .roster-list { display: flex; flex-direction: column; gap: 10px; }
+  .roster-empty {
+    color: var(--text-2); background: var(--surface2); border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm); padding: 24px; text-align: center; font-size: 13px;
+  }
+  .roster-row {
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); padding: 12px;
+  }
+  .roster-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .roster-name { font-weight: 700; font-size: 14px; color: var(--text); }
+  .roster-meta { font-size: 12px; color: var(--text-2); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .roster-contact { margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; color: var(--text-2); }
+  .roster-contact a { color: var(--accent); text-decoration: none; }
+  .roster-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .mini-btn {
+    font-size: 11px; font-weight: 700; padding: 5px 9px; border-radius: 6px;
+    border: 1px solid var(--border-strong); background: var(--surface); color: var(--text);
+    cursor: pointer; font-family: inherit; text-decoration: none;
+  }
+  .mini-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .mini-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .mini-btn.primary:hover { background: var(--accent-strong); color: #fff; }
+  .mini-btn.green { background: var(--success); color: #fff; border-color: var(--success); }
+  .mini-btn.warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-bg); }
+  .badge {
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+    border-radius: 20px; padding: 3px 8px; white-space: nowrap;
+  }
+  .badge.confirmed { background: var(--success-bg); color: var(--success); }
+  .badge.reserved, .badge.pending_payment, .badge.partial_payment { background: var(--warn-bg); color: var(--warn); }
+  .badge.no_show { background: var(--surface2); color: var(--text-2); }
 
   /* Modal */
   .modal-backdrop {
@@ -149,6 +218,15 @@
   .toast.show { opacity: 1; transform: translateY(0); }
   .toast.ok  { border-left: 3px solid var(--success); }
   .toast.err { border-left: 3px solid var(--danger); }
+  @media (max-width: 980px) {
+    .command-grid { grid-template-columns: 1fr; }
+    .session-stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .roster-contact { grid-template-columns: 1fr; }
+    .topbar { padding: 0 16px; }
+    .topbar-nav { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -176,21 +254,51 @@
     </div>
   </section>
 
-  <div class="legend">
-    <span class="legend-item"><span class="legend-swatch free"></span>Free — click to block</span>
-    <span class="legend-item"><span class="legend-swatch pending"></span>Reserved (awaiting payment)</span>
-    <span class="legend-item"><span class="legend-swatch confirmed"></span>Confirmed / paid</span>
+  <div class="session-stats" aria-live="polite">
+    <div class="stat-card"><div class="num" id="statBooked">—</div><div class="lbl">Booked</div></div>
+    <div class="stat-card"><div class="num" id="statConfirmed">—</div><div class="lbl">Paid</div></div>
+    <div class="stat-card"><div class="num" id="statPending">—</div><div class="lbl">Pending</div></div>
+    <div class="stat-card"><div class="num" id="statBlocked">—</div><div class="lbl">Closed</div></div>
+    <div class="stat-card"><div class="num" id="statFree">—</div><div class="lbl">Free</div></div>
   </div>
 
-  <div id="slotGrid" class="slot-grid" aria-live="polite">
-    <div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-2);">Loading slots…</div>
+  <div class="command-grid">
+    <section class="board-card">
+      <div class="section-head">
+        <div>
+          <h2>Slot Board</h2>
+          <p>Free slots can be booked manually or closed from this board.</p>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch free"></span>Free</span>
+        <span class="legend-item"><span class="legend-swatch pending"></span>Reserved</span>
+        <span class="legend-item"><span class="legend-swatch confirmed"></span>Confirmed / paid</span>
+        <span class="legend-item"><span class="legend-swatch blocked"></span>Closed</span>
+      </div>
+      <div id="slotGrid" class="slot-grid" aria-live="polite">
+        <div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-2);">Loading slots…</div>
+      </div>
+    </section>
+
+    <aside class="roster-card">
+      <div class="section-head">
+        <div>
+          <h2>Clients In This Session</h2>
+          <p>Contact details, payments, and quick actions in one place.</p>
+        </div>
+      </div>
+      <div id="rosterList" class="roster-list" aria-live="polite">
+        <div class="roster-empty">Loading clients…</div>
+      </div>
+    </aside>
   </div>
 </main>
 
-<!-- Modal: Block slot manually -->
+<!-- Modal: Manual booking -->
 <div id="modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
   <form class="modal" id="bookForm" onsubmit="submitBooking(event)">
-    <h2 id="modalTitle">Block slot</h2>
+    <h2 id="modalTitle">Book slot</h2>
     <p class="sub" id="modalSub">Pick this slot for a walk-in client — they won't appear on the public calendar.</p>
 
     <div class="field">
@@ -218,7 +326,31 @@
 
     <div class="modal-actions">
       <button class="btn btn-outline" type="button" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-accent" type="submit">Block slot</button>
+      <button class="btn btn-accent" type="submit">Book slot</button>
+    </div>
+  </form>
+</div>
+
+<!-- Modal: Edit contact -->
+<div id="contactModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+  <form class="modal" id="contactForm" onsubmit="submitContact(event)">
+    <h2 id="contactTitle">Edit contact</h2>
+    <p class="sub" id="contactSub">Update email, phone or Instagram for this booking and client profile.</p>
+    <div class="field">
+      <label for="contactEmail">Email</label>
+      <input id="contactEmail" name="email" type="email" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="contactPhone">Phone</label>
+      <input id="contactPhone" name="phone" type="tel" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="contactInstagram">Instagram</label>
+      <input id="contactInstagram" name="instagram" type="text" autocomplete="off" placeholder="@handle or handle" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" type="button" onclick="closeContactModal()">Cancel</button>
+      <button class="btn btn-accent" type="submit">Save contact</button>
     </div>
   </form>
 </div>
@@ -229,8 +361,11 @@
   const eventId = {{ event.id|tojson }};
   const toastEl = document.getElementById('toast');
   const modalEl = document.getElementById('modal');
+  const contactModalEl = document.getElementById('contactModal');
   const gridEl  = document.getElementById('slotGrid');
+  const rosterEl = document.getElementById('rosterList');
   let pendingSlot = null;
+  let contactBooking = null;
   let toastTimer;
 
   function showToast(msg, type) {
@@ -245,6 +380,8 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
+  function money(n) { return '$' + (Number(n || 0)).toFixed(2); }
+  function canConfirm(b) { return ['reserved', 'pending_payment', 'partial_payment'].includes(b.status) && !b.confirmed; }
 
   async function loadSlots() {
     gridEl.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-2);">Loading slots…</div>';
@@ -265,7 +402,17 @@
       return;
     }
     const data = await res.json();
+    renderStats(data.summary || {});
     renderGrid(data.slots || []);
+    renderRoster(data.bookings || []);
+  }
+
+  function renderStats(summary) {
+    document.getElementById('statBooked').textContent = summary.booked ?? '0';
+    document.getElementById('statConfirmed').textContent = summary.confirmed ?? '0';
+    document.getElementById('statPending').textContent = summary.pending ?? '0';
+    document.getElementById('statBlocked').textContent = summary.blocked ?? '0';
+    document.getElementById('statFree').textContent = summary.free ?? '0';
   }
 
   function renderGrid(slots) {
@@ -279,23 +426,105 @@
       const openLink = s.booking_id
         ? `<a class="slot-link" href="/admin/booking/${s.booking_id}" onclick="event.stopPropagation();">Open #${s.booking_id} →</a>`
         : '';
-      const onclick = (state === 'free') ? `onclick="openModal('${esc(s.time)}','${esc(s.label)}')"` : '';
-      const statusLabel = state === 'free' ? 'Free' : (state === 'confirmed' ? 'Confirmed' : 'Reserved');
+      const freeActions = state === 'free'
+        ? `<div class="slot-actions">
+             <button class="mini-btn primary" type="button" data-slot-action="book" data-time="${esc(s.time)}" data-label="${esc(s.label)}">Book</button>
+             <button class="mini-btn slot-close" type="button" data-slot-action="close" data-time="${esc(s.time)}" data-label="${esc(s.label)}">× Close</button>
+           </div>`
+        : '';
+      const blockedActions = state === 'blocked' && s.booking_id
+        ? `<div class="slot-actions"><button class="mini-btn slot-close" type="button" data-slot-action="reopen" data-booking-id="${Number(s.booking_id)}" data-time="${esc(s.time)}">Reopen</button></div>`
+        : '';
+      const statusLabel = state === 'free'
+        ? 'Free'
+        : (state === 'blocked' ? 'Closed' : (state === 'confirmed' ? 'Confirmed' : 'Reserved'));
       return `
-        <div class="slot ${state}" ${onclick}>
+        <div class="slot ${state}">
           <div class="slot-time">${esc(s.time)}</div>
           <div class="slot-label">${esc(s.label)}</div>
           <div class="slot-status">${statusLabel}</div>
           ${clientLine}
           ${openLink}
+          ${freeActions}
+          ${blockedActions}
         </div>
       `;
     }).join('');
   }
 
+  function renderRoster(bookings) {
+    if (!bookings.length) {
+      rosterEl.innerHTML = '<div class="roster-empty">No clients booked into this photosession yet.</div>';
+      return;
+    }
+    rosterEl.innerHTML = bookings.map(b => {
+      const ig = b.instagram ? `<a href="https://instagram.com/${esc(b.instagram)}" target="_blank" rel="noopener">@${esc(b.instagram)}</a>` : '—';
+      const phone = b.phone ? `<a href="tel:${esc(b.phone)}">${esc(b.phone)}</a>` : '—';
+      const email = b.email ? `<a href="mailto:${esc(b.email)}">${esc(b.email)}</a>` : '—';
+      const confirmAction = canConfirm(b)
+        ? `<button class="mini-btn green" type="button" data-roster-action="confirm" data-booking-id="${Number(b.id)}" data-name="${esc(b.name)}" data-amount="${Number(b.deposit_amount || b.paid_amount || 0)}">Confirm</button>`
+        : '';
+      const balanceAction = b.status === 'confirmed'
+        ? `<button class="mini-btn warn" type="button" data-roster-action="balance" data-booking-id="${Number(b.id)}" data-name="${esc(b.name)}">Balance</button>`
+        : '';
+      return `
+        <div class="roster-row">
+          <div class="roster-top">
+            <div>
+              <div class="roster-name">${esc(b.name || 'Client')}</div>
+              <div class="roster-meta"><span>${esc(b.time || '')}</span><span>Paid ${money(b.paid_amount)}</span></div>
+            </div>
+            <span class="badge ${esc(b.status || '')}">${esc((b.status || 'pending').replace(/_/g, ' '))}</span>
+          </div>
+          <div class="roster-contact">
+            <span>Phone: ${phone}</span>
+            <span>Instagram: ${ig}</span>
+            <span style="grid-column:1/-1;">Email: ${email}</span>
+          </div>
+          <div class="roster-actions">
+            <a class="mini-btn primary" href="/admin/booking/${b.id}">Open</a>
+            ${confirmAction}
+            ${balanceAction}
+            <a class="mini-btn" href="/admin?reschedule_id=${b.id}">Reschedule</a>
+            <button class="mini-btn" type="button" data-roster-action="contact" data-booking-id="${Number(b.id)}" data-name="${esc(b.name)}" data-email="${esc(b.email)}" data-phone="${esc(b.phone)}" data-instagram="${esc(b.instagram)}">Edit contact</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  gridEl.addEventListener('click', (e) => {
+    const button = e.target.closest('[data-slot-action]');
+    if (!button) return;
+    const action = button.dataset.slotAction;
+    const time = button.dataset.time || '';
+    const label = button.dataset.label || time;
+    if (action === 'book') openModal(time, label);
+    if (action === 'close') closeSlot(time, label);
+    if (action === 'reopen') unblockSlot(Number(button.dataset.bookingId || 0), time);
+  });
+
+  rosterEl.addEventListener('click', (e) => {
+    const button = e.target.closest('[data-roster-action]');
+    if (!button) return;
+    const id = Number(button.dataset.bookingId || 0);
+    const name = button.dataset.name || '';
+    const action = button.dataset.rosterAction;
+    if (action === 'confirm') confirmBooking(id, name, Number(button.dataset.amount || 0));
+    if (action === 'balance') requestBalance(id, name);
+    if (action === 'contact') {
+      openContactModal(
+        id,
+        name,
+        button.dataset.email || '',
+        button.dataset.phone || '',
+        button.dataset.instagram || ''
+      );
+    }
+  });
+
   function openModal(time, label) {
     pendingSlot = time;
-    document.getElementById('modalSub').textContent = 'Slot: ' + label + ' — pick this slot for a walk-in client. They won\'t appear on the public calendar.';
+    document.getElementById('modalSub').textContent = 'Slot: ' + label + ' — add a client manually to this time.';
     document.getElementById('bookForm').reset();
     document.getElementById('bPaid').checked = true;
     modalEl.classList.add('show');
@@ -306,7 +535,91 @@
     modalEl.classList.remove('show');
   }
   modalEl.addEventListener('click', (e) => { if (e.target === modalEl) closeModal(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+  contactModalEl.addEventListener('click', (e) => { if (e.target === contactModalEl) closeContactModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeModal();
+      closeContactModal();
+    }
+  });
+
+  function openContactModal(id, name, email, phone, instagram) {
+    contactBooking = id;
+    document.getElementById('contactSub').textContent = 'Update contact details for ' + (name || 'this client') + '.';
+    document.getElementById('contactEmail').value = email || '';
+    document.getElementById('contactPhone').value = phone || '';
+    document.getElementById('contactInstagram').value = instagram || '';
+    contactModalEl.classList.add('show');
+    setTimeout(() => document.getElementById('contactEmail').focus(), 50);
+  }
+
+  function closeContactModal() {
+    contactBooking = null;
+    contactModalEl.classList.remove('show');
+  }
+
+  async function submitContact(ev) {
+    ev.preventDefault();
+    if (!contactBooking) return;
+    const body = {
+      email: document.getElementById('contactEmail').value.trim(),
+      phone: document.getElementById('contactPhone').value.trim(),
+      instagram: document.getElementById('contactInstagram').value.trim(),
+    };
+    showToast('Saving contact…');
+    let res;
+    try {
+      res = await fetch('/admin/booking/' + encodeURIComponent(contactBooking) + '/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) { showToast('Network error', 'err'); return; }
+    if (res.status === 401 || res.status === 403) {
+      const next = encodeURIComponent(location.pathname);
+      location.href = '/admin/login?next=' + next;
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.success) {
+      showToast('Contact updated ✓', 'ok');
+      closeContactModal();
+      loadSlots();
+    } else {
+      showToast((data && data.error) || ('HTTP ' + res.status), 'err');
+    }
+  }
+
+  async function confirmBooking(id, name, amount) {
+    if (!confirm(`Confirm booking #${id} for ${name || 'client'}?\n\nThis marks $${Number(amount || 0).toFixed(2)} CAD as paid and sends the confirmation email.`)) return;
+    const res = await fetch('/admin/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: id, paid_amount: Number(amount || 0) }),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.success) {
+      showToast('Booking confirmed ✓', 'ok');
+      loadSlots();
+    } else {
+      showToast((data && data.error) || 'Failed to confirm', 'err');
+    }
+  }
+
+  async function requestBalance(id, name) {
+    if (!confirm(`Send remaining balance request to ${name || 'this client'}?`)) return;
+    const res = await fetch('/admin/request-balance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking_id: id }),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.success) {
+      showToast('Balance request sent ✓', 'ok');
+    } else {
+      showToast((data && data.error) || 'Failed to send balance request', 'err');
+    }
+  }
 
   async function submitBooking(ev) {
     ev.preventDefault();
@@ -319,7 +632,7 @@
       instagram: document.getElementById('bInsta').value.trim(),
       mark_paid: document.getElementById('bPaid').checked,
     };
-    showToast('Blocking slot…');
+    showToast('Creating manual booking…');
     let res;
     try {
       res = await fetch('/admin/api/event/' + encodeURIComponent(eventId) + '/manual-book', {
@@ -336,8 +649,48 @@
     let data = null;
     try { data = await res.json(); } catch (e) {}
     if (res.ok && data && data.success) {
-      showToast('Slot blocked ✓ (#' + data.booking_id + ')', 'ok');
+      showToast('Manual booking created ✓ (#' + data.booking_id + ')', 'ok');
       closeModal();
+      loadSlots();
+    } else {
+      showToast((data && data.error) || ('HTTP ' + res.status), 'err');
+    }
+  }
+
+  async function closeSlot(time, label) {
+    if (!confirm(`Close ${label || time}?\n\nThis makes the time unavailable on the public booking page.`)) return;
+    showToast('Closing slot…');
+    let res;
+    try {
+      res = await fetch('/admin/api/event/' + encodeURIComponent(eventId) + '/block-slot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ time: time, reason: 'Closed by admin' }),
+      });
+    } catch (e) { showToast('Network error', 'err'); return; }
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.success) {
+      showToast('Slot closed ✓', 'ok');
+      loadSlots();
+    } else {
+      showToast((data && data.error) || ('HTTP ' + res.status), 'err');
+    }
+  }
+
+  async function unblockSlot(bookingId, time) {
+    if (!confirm(`Reopen ${time || 'this slot'}?`)) return;
+    showToast('Reopening slot…');
+    let res;
+    try {
+      res = await fetch('/admin/api/event/' + encodeURIComponent(eventId) + '/unblock-slot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+    } catch (e) { showToast('Network error', 'err'); return; }
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.success) {
+      showToast('Slot reopened ✓', 'ok');
       loadSlots();
     } else {
       showToast((data && data.error) || ('HTTP ' + res.status), 'err');

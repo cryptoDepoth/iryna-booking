@@ -222,14 +222,17 @@ def test_gallery_button_saves_url_and_emails(admin_client, monkeypatch):
 def test_review_request_button_sends_and_stamps(admin_client, monkeypatch):
     """'Send review request' button → POST /send-review → email goes out
     and the booking row gets review_email_sent stamped."""
-    monkeypatch.setattr(
-        booking_app, "_send_email_with_attachment",
-        lambda *a, **k: True, raising=False
-    )
+    captured = {}
+    def fake_review_email(*args, **kwargs):
+        captured["html"] = args[4]
+        return True
+    monkeypatch.setattr(booking_app, "_send_email_raw", fake_review_email, raising=False)
     bid = _insert_booking()
     resp = admin_client.post(f"/admin/booking/{bid}/send-review", headers=_hdrs(), json={})
     assert resp.status_code == 200
     assert resp.get_json() == {"success": True}
+    assert "https://review.pashynskaphoto.com" in captured["html"]
+    assert "Leave a Google Review" in captured["html"]
     # The DB row must now carry the timestamp.
     conn = booking_app.db_conn()
     row = conn.execute("SELECT review_email_sent FROM bookings WHERE id=?", (bid,)).fetchone()

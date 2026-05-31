@@ -8,6 +8,8 @@ Rules:
 4. Old emails won't match new bookings (check booking created_at vs email date)
 5. Dynamic pricing: reads deposit from events.yaml via booking event_id
 6. Ambiguity alert: if same amount matches multiple bookings → admin notification
+7. Reconciliation: later Interac emails may correct paid_amount for an already
+   confirmed booking when the email strongly matches name/date/time.
 """
 
 import os
@@ -16,11 +18,13 @@ import re
 import json
 import sqlite3
 import subprocess
+from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "bookings.db"))
 EVENTS_YAML_PATH = os.environ.get("EVENTS_YAML_PATH",
     os.path.join(os.path.dirname(__file__), "events.yaml"))
+ETRANSFER_EMAIL_PAGE_SIZE = int(os.environ.get("ETRANSFER_EMAIL_PAGE_SIZE", "75"))
 
 
 def get_db():
@@ -30,34 +34,63 @@ def get_db():
 
 
 def is_message_processed(message_id):
+    return get_processed_email(message_id) is not None
+
+
+def get_processed_email(message_id):
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT id FROM processed_emails WHERE message_id = ?", (message_id,))
+    c.execute("SELECT * FROM processed_emails WHERE message_id = ?", (message_id,))
     row = c.fetchone()
     conn.close()
-    return row is not None
+    return dict(row) if row else None
 
 
 def mark_message_processed(message_id, booking_id, amount):
     conn = get_db()
     c = conn.cursor()
-    c.execute("""
-        INSERT INTO processed_emails (message_id, booking_id, amount)
-        VALUES (?, ?, ?)
-    """, (message_id, booking_id, amount))
+    try:
+        c.execute("""
+            INSERT INTO processed_emails (message_id, booking_id, amount)
+            VALUES (?, ?, ?)
+        """, (message_id, booking_id, amount))
+    except sqlite3.IntegrityError:
+        # A message can be first recorded as an orphan, then later become a
+        # safe reconciliation match once the booking is confirmed/manual-fixed.
+        # Only attach/update it when doing so cannot steal it from another row.
+        if booking_id is not None:
+            c.execute("""
+                UPDATE processed_emails
+                   SET booking_id=?, amount=?, processed_at=CURRENT_TIMESTAMP
+                 WHERE message_id=?
+                   AND (booking_id IS NULL OR booking_id=?)
+            """, (booking_id, amount, message_id, booking_id))
     conn.commit()
     conn.close()
 
 
-def get_emails():
+def get_emails(page_size=None):
     """Fetch recent emails via Himalaya CLI."""
+    page_size = int(page_size or ETRANSFER_EMAIL_PAGE_SIZE)
+    commands = [
+        [
+            "himalaya", "envelope", "list",
+            "--folder", "INBOX",
+            "--page-size", str(page_size),
+            "-o", "json",
+            "order", "by", "date", "desc",
+        ],
+        ["himalaya", "envelope", "list", "--folder", "INBOX", "-o", "json"],
+    ]
     try:
-        result = subprocess.run(
-            ["himalaya", "envelope", "list", "--folder", "INBOX", "-o", "json"],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode != 0:
-            print(f"[himalaya] envelope list failed: rc={result.returncode}")
+        result = None
+        for cmd in commands:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                break
+        if result is None or result.returncode != 0:
+            rc = result.returncode if result else "?"
+            print(f"[himalaya] envelope list failed: rc={rc}")
             return None
         lines = result.stdout.strip().split("\n")
         json_line = None
@@ -218,9 +251,44 @@ def get_pending_bookings(within_minutes=30, grace_minutes=60):
     return rows
 
 
+def get_reconciliation_bookings(within_days=45):
+    """Confirmed bookings that can still receive a corrected Interac amount.
+
+    These are not candidates for auto-confirming; they are candidates for
+    raising paid_amount when an Interac email arrives late or after a manual
+    confirmation. Keep the window narrow enough to avoid matching old inbox
+    history forever, but wide enough for future sessions already booked.
+    """
+    conn = get_db()
+    c = conn.cursor()
+    today = datetime.now().date()
+    date_cutoff = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+    created_cutoff = (datetime.now() - timedelta(days=within_days)).strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("""
+        SELECT * FROM bookings
+        WHERE status='confirmed'
+          AND confirmed=1
+          AND paid=1
+          AND date >= ?
+          AND created_at >= ?
+        ORDER BY date ASC, time ASC
+    """, (date_cutoff, created_cutoff))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+
 def _get_booking_full_price(booking):
     """Full session price for a booking (balance + overpayment cap).
     Reads events.yaml by event_id; falls back to a safe default."""
+    try:
+        stored = booking.get("full_price")
+        if stored is not None:
+            stored = float(stored)
+            if stored > 0:
+                return stored
+    except Exception:
+        pass
     try:
         import yaml
         event_id = booking.get("event_id")
@@ -323,6 +391,144 @@ def record_partial_payment(booking_id, paid_amount):
     return updated > 0
 
 
+def reconcile_confirmed_payment(booking_id, paid_amount):
+    """Raise paid_amount for an already-confirmed booking.
+
+    Never lowers money, never changes date/time/client/status, and never sends
+    client email. This is for delayed Interac messages correcting an amount
+    that was previously entered as the standard deposit.
+    """
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE bookings
+        SET paid=1, paid_amount=?
+        WHERE id=?
+          AND confirmed=1
+          AND status='confirmed'
+          AND (paid_amount IS NULL OR paid_amount < ?)
+    """, (paid_amount, booking_id, paid_amount - 0.009))
+    updated = c.rowcount
+    conn.commit()
+    conn.close()
+    return updated > 0
+
+
+_MONTHS = {
+    1: ("jan", "january"),
+    2: ("feb", "february"),
+    3: ("mar", "march"),
+    4: ("apr", "april"),
+    5: ("may",),
+    6: ("jun", "june"),
+    7: ("jul", "july"),
+    8: ("aug", "august"),
+    9: ("sep", "sept", "september"),
+    10: ("oct", "october"),
+    11: ("nov", "november"),
+    12: ("dec", "december"),
+}
+
+
+def _body_has_booking_date(body, booking):
+    raw = booking.get("date")
+    if not raw:
+        return False
+    text = (body or "").lower()
+    try:
+        dt = datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        return raw.lower() in text
+    day = dt.day
+    suffix = "th"
+    if day % 10 == 1 and day != 11:
+        suffix = "st"
+    elif day % 10 == 2 and day != 12:
+        suffix = "nd"
+    elif day % 10 == 3 and day != 13:
+        suffix = "rd"
+    variants = {
+        raw.lower(),
+        f"{dt.month}/{day}",
+        f"{dt.month:02d}/{day:02d}",
+        f"{day}/{dt.month}",
+        f"{day:02d}/{dt.month:02d}",
+    }
+    for month in _MONTHS.get(dt.month, ()):
+        variants.add(f"{month} {day}")
+        variants.add(f"{month} {day}{suffix}")
+        variants.add(f"{day} {month}")
+    return any(v in text for v in variants)
+
+
+def _body_has_booking_time(body, booking):
+    raw = booking.get("time")
+    if not raw:
+        return False
+    text = (body or "").lower().replace(".", "")
+    try:
+        hh, mm = [int(x) for x in raw.split(":", 1)]
+    except Exception:
+        return raw.lower() in text
+    hour12 = hh % 12 or 12
+    ampm = "am" if hh < 12 else "pm"
+    variants = {
+        f"{hh:02d}:{mm:02d}",
+        f"{hh}:{mm:02d}",
+        f"{hour12}:{mm:02d}",
+        f"{hour12}:{mm:02d} {ampm}",
+        f"{hour12}:{mm:02d}{ampm}",
+    }
+    if mm == 0:
+        variants.update({f"{hour12} {ampm}", f"{hour12}{ampm}", f"{hh:02d}:00"})
+    return any(v in text for v in variants)
+
+
+def _body_has_booking_name(body, booking):
+    text = re.sub(r"[^a-z0-9а-яіїєґё]+", " ", (body or "").lower())
+    tokens = [
+        t for t in re.split(r"\s+", (booking.get("name") or "").lower())
+        if len(t) >= 3
+    ]
+    if not tokens:
+        return False
+    return sum(1 for token in tokens if token in text.split()) >= min(2, len(tokens))
+
+
+def match_reconciliation_payment(amount, bookings, body):
+    """Find one confirmed booking whose Interac email strongly identifies it."""
+    matches = []
+    for b in bookings:
+        try:
+            current_paid = float(b.get("paid_amount") or 0)
+        except Exception:
+            current_paid = 0.0
+        if amount <= current_paid + 0.009:
+            continue
+
+        expected = get_expected_amount_for_booking(b["id"])
+        full = _get_booking_full_price(b)
+        cap = full if full > expected else expected * 2
+        if amount < expected * 0.3 or amount > cap + 1.0:
+            continue
+
+        name_ok = _body_has_booking_name(body, b)
+        date_ok = _body_has_booking_date(body, b)
+        time_ok = _body_has_booking_time(body, b)
+        score = sum([name_ok, date_ok, time_ok])
+        if score >= 2:
+            matches.append((score, b))
+
+    if not matches:
+        return None, []
+    matches.sort(key=lambda item: item[0], reverse=True)
+    best_score = matches[0][0]
+    best = [b for score, b in matches if score == best_score]
+    if len(best) == 1:
+        return best[0], []
+    return None, best
+
+
 def _notify_admin_ambiguity(amount, candidates):
     """Send admin notification when amount matches multiple bookings."""
     # This will be called from timed_cron.py context where app functions are available
@@ -408,6 +614,26 @@ def _notify_admin_underpaid(booking, expected, actual):
         print(f"[admin] Failed to send underpaid alert: {e}")
 
 
+def _notify_admin_reconciled(booking, previous, actual):
+    """Notify admin that a later Interac email corrected paid_amount."""
+    try:
+        from app import _tg_message
+        total = _get_booking_full_price(booking)
+        balance = max(total - actual, 0)
+        lines = [
+            f"✅ **Payment amount corrected from Interac**",
+            f"",
+            f"Booking #{booking['id']} — {booking.get('name', '?')}",
+            f"Previous paid amount: ${previous:.2f}",
+            f"Interac amount: ${actual:.2f}",
+            f"Remaining balance now: ${balance:.2f}",
+        ]
+        _tg_message("\n".join(lines))
+        print(f"[admin] Reconciled paid_amount for #{booking['id']}: ${previous:.2f} -> ${actual:.2f}")
+    except Exception as e:
+        print(f"[admin] Failed to send reconciliation alert: {e}")
+
+
 def _parse_email_datetime(value):
     """Parse Himalaya envelope date to naive UTC datetime.
 
@@ -429,6 +655,13 @@ def _parse_email_datetime(value):
             return dt
         except ValueError:
             continue
+    try:
+        dt = parsedate_to_datetime(text)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except Exception:
+        pass
     return None
 
 
@@ -466,15 +699,11 @@ def _filter_bookings_created_before_email(email, bookings):
     return safe
 
 
-def check_single_email(email, bookings):
+def check_single_email(email, bookings, reconciliation_bookings=None):
     """Process one email against current pending bookings.
     Returns (confirmed_booking_id, ambiguity_list) or (None, None)."""
     msg_id = str(email.get("id", ""))
     if not msg_id:
-        return None, None
-
-    if is_message_processed(msg_id):
-        print(f"   [skip] Message {msg_id} already processed")
         return None, None
 
     body = read_message_body(msg_id)
@@ -488,12 +717,38 @@ def check_single_email(email, bookings):
 
     print(f"   💰 Extracted amount: ${amount:.2f}")
 
-    bookings = _filter_bookings_created_before_email(email, bookings)
-    if not bookings:
-        print(f"   [skip] No time-valid bookings for message {msg_id}")
+    reconciliation_bookings = reconciliation_bookings or []
+    processed = get_processed_email(msg_id)
+    if processed:
+        # Do not re-confirm/re-run side effects. The one safe exception is
+        # money reconciliation: an earlier run may have recorded the Interac
+        # email as orphan/processed before a manual confirmation existed.
+        recon_candidates = _filter_bookings_created_before_email(email, reconciliation_bookings)
+        processed_booking_id = processed.get("booking_id")
+        if processed_booking_id:
+            recon_candidates = [
+                b for b in recon_candidates
+                if str(b.get("id")) == str(processed_booking_id)
+            ]
+        reconciled, recon_ambiguous = match_reconciliation_payment(amount, recon_candidates, body)
+        if recon_ambiguous:
+            print(f"   ⚠️ Reconciliation ambiguity: ${amount:.2f} matches {len(recon_ambiguous)} confirmed bookings")
+            _notify_admin_ambiguity(amount, recon_ambiguous)
+            return None, recon_ambiguous
+        if reconciled is not None:
+            previous = float(reconciled.get("paid_amount") or 0)
+            if reconcile_confirmed_payment(reconciled["id"], amount):
+                mark_message_processed(msg_id, reconciled["id"], amount)
+                _notify_admin_reconciled(reconciled, previous, amount)
+                print(f"   ✅ RECONCILED processed message {msg_id}: Booking #{reconciled['id']} ${previous:.2f} → ${amount:.2f}")
+            return None, None
+        print(f"   [skip] Message {msg_id} already processed")
         return None, None
 
-    matched, ambiguous, match_type = match_by_amount_only(amount, bookings)
+    original_booking_count = len(bookings or [])
+    bookings = _filter_bookings_created_before_email(email, bookings or [])
+
+    matched, ambiguous, match_type = match_by_amount_only(amount, bookings) if bookings else (None, [], None)
 
     if ambiguous:
         print(f"   ⚠️ Ambiguity: ${amount:.2f} matches {len(ambiguous)} bookings")
@@ -505,6 +760,24 @@ def check_single_email(email, bookings):
         return None, ambiguous
 
     if matched is None:
+        recon_candidates = _filter_bookings_created_before_email(email, reconciliation_bookings)
+        reconciled, recon_ambiguous = match_reconciliation_payment(amount, recon_candidates, body)
+        if recon_ambiguous:
+            print(f"   ⚠️ Reconciliation ambiguity: ${amount:.2f} matches {len(recon_ambiguous)} confirmed bookings")
+            _notify_admin_ambiguity(amount, recon_ambiguous)
+            return None, recon_ambiguous
+        if reconciled is not None:
+            previous = float(reconciled.get("paid_amount") or 0)
+            if reconcile_confirmed_payment(reconciled["id"], amount):
+                mark_message_processed(msg_id, reconciled["id"], amount)
+                _notify_admin_reconciled(reconciled, previous, amount)
+                print(f"   ✅ RECONCILED Booking #{reconciled['id']} paid_amount ${previous:.2f} → ${amount:.2f}")
+            return None, None
+
+        if not original_booking_count:
+            print(f"   [skip] No pending bookings for message {msg_id}; no safe reconciliation match")
+            return None, None
+
         print(f"   ❌ No booking matches ${amount:.2f}")
         # Orphan payment: e-Transfer received but no matching pending booking
         _notify_admin_orphan(amount, body, msg_id)

@@ -29,6 +29,7 @@ from check_etransfer_v2 import (
     check_single_email,
     get_pending_bookings as get_v2_pending_bookings,
     get_emails as get_v2_emails,
+    get_reconciliation_bookings as get_v2_reconciliation_bookings,
     is_etransfer_email as is_v2_etransfer_email,
 )
 
@@ -447,24 +448,27 @@ def main(max_minutes=20, interval_seconds=60, booking_id=None):
             print(f"      #{b['id']}: {b['name'] or '(no name)'} @ {b['time']} ({b['email']}){time_left}")
         
         # Fetch emails
-        emails = get_emails()
+        emails = get_v2_emails()
         if emails is None:
             print("   ⚠️ Could not fetch emails from Gmail.")
             continue
         
         # Filter e-Transfer emails
-        etransfers = [e for e in emails if is_etransfer_email(e)]
+        etransfers = [e for e in emails if is_v2_etransfer_email(e)]
         if not etransfers:
             print("   📭 No e-Transfer emails found.")
             continue
-        
+
         print(f"   💰 {len(etransfers)} e-Transfer email(s) found.")
-        
+        reconciliation = get_v2_reconciliation_bookings(within_days=120)
+        if booking_id is not None:
+            reconciliation = [b for b in reconciliation if str(b.get("id")) == str(booking_id)]
+
         # Process each email using v2 safe checker (amount-only, processed_emails ledger)
         for email in etransfers:
             print(f"\n   📧 Checking: {email.get('subject', 'No subject')}")
 
-            result = check_single_email(email, bookings)
+            result = check_single_email(email, bookings, reconciliation)
             if result is None:
                 continue
             confirmed_id, ambiguous = result

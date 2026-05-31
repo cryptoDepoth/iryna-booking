@@ -208,7 +208,8 @@ def _watcher_thread():
     log_w.info("[watcher] Global e-Transfer + slot-expiry watcher started")
 
     from check_etransfer_v2 import (
-        get_pending_bookings, get_emails, is_etransfer_email, check_single_email
+        get_pending_bookings, get_reconciliation_bookings,
+        get_emails, is_etransfer_email, check_single_email
     )
 
     while True:
@@ -223,16 +224,17 @@ def _watcher_thread():
         # 2. Poll Gmail for e-Transfer notifications and match to pending bookings.
         try:
             pending = get_pending_bookings(within_minutes=30)
-            if pending:
+            reconciliation = get_reconciliation_bookings(within_days=120)
+            if pending or reconciliation:
                 emails = get_emails()
                 if emails:
                     for email in emails:
                         if is_etransfer_email(email):
-                            confirmed_id, _ambiguous = check_single_email(email, pending)
+                            confirmed_id, _ambiguous = check_single_email(email, pending, reconciliation)
                             if confirmed_id:
                                 _after_auto_payment_confirmed(confirmed_id)
             else:
-                log_w.debug("[watcher] No pending bookings")
+                log_w.debug("[watcher] No pending/reconciliation bookings")
         except Exception as e:
             log_w.error(f"[watcher] e-Transfer check error: {e}")
 
@@ -1170,7 +1172,8 @@ def _send_review_email(booking):
         return False
 
     insta_url = "https://instagram.com/pashynska.photo"
-    google_review_url = os.environ.get("GOOGLE_REVIEW_URL", "https://g.page/r/pashynska-photography/review")
+    google_review_url = os.environ.get("GOOGLE_REVIEW_URL", "https://review.pashynskaphoto.com")
+    safe_name = _html_escape(name or "there")
 
     subject = "How were your photos? 🌸"
 
@@ -1198,7 +1201,7 @@ def _send_review_email(booking):
     <p style="margin:8px 0 0;color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.04em;">Pashynska Photography · Calgary</p>
   </td></tr>
   <tr><td style="padding:36px 40px 28px;">
-    <p style="margin:0 0 16px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong>! 🌸</p>
+    <p style="margin:0 0 16px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{safe_name}</strong>! 🌸</p>
     <p style="margin:0 0 20px;font-size:15px;color:#7a5a6a;line-height:1.7;">
       I hope you've had a chance to look through your photos and love them as much as I do!
       It was such a pleasure photographing you.
@@ -3601,6 +3604,11 @@ def _stripe_balance_idempotency_key(booking, balance_due):
     return f"balance-{booking_id}-{cents}-{digest}"
 
 
+def _stripe_custom_payment_name(description):
+    text = (description or "").strip()
+    return text[:120] if text else "Custom Photography Payment"
+
+
 def _booking_total_price(booking, event=None):
     """Return the agreed full session price in CAD.
 
@@ -3860,6 +3868,90 @@ def stripe_create_checkout():
         return jsonify({"error": "Failed to create checkout session"}), 500
 
 
+@app.route("/admin/stripe-link", methods=["POST"])
+@admin_required
+def admin_create_stripe_link():
+    """Create a one-off Stripe Checkout link for custom admin requests.
+
+    This is intentionally separate from booking deposits/balances: it does not
+    mutate a booking row and does not email clients automatically. The admin can
+    copy the returned Stripe URL and send it manually.
+    """
+    data = request.get_json(silent=True) or {}
+    raw_amount = str(data.get("amount") or "").strip().replace(",", ".")
+    description = _stripe_custom_payment_name(data.get("description"))
+    client_email = str(data.get("email") or "").strip().lower()
+
+    try:
+        amount = round(float(raw_amount), 2)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Enter a valid amount"}), 400
+    if amount <= 0:
+        return jsonify({"success": False, "error": "Amount must be greater than zero"}), 400
+    if amount > 10000:
+        return jsonify({"success": False, "error": "Amount is too high for a one-off link"}), 400
+    if client_email and not _re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$", client_email):
+        return jsonify({"success": False, "error": "Enter a valid client email or leave it blank"}), 400
+
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"success": False, "error": "Stripe is not configured"}), 503
+
+    try:
+        import stripe as _stripe
+    except ImportError:
+        return jsonify({"success": False, "error": "Stripe library not installed"}), 503
+
+    amount_cents = int(round(amount * 100))
+    base_url = BASE_URL or CANONICAL_SITE_URL
+    try:
+        session_obj = _stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "cad",
+                    "product_data": {
+                        "name": description,
+                        "description": "Pashynska Photography custom payment",
+                    },
+                    "unit_amount": amount_cents,
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            customer_email=client_email or None,
+            success_url=f"{base_url}/payment/custom/success",
+            cancel_url=f"{base_url}/",
+            metadata={
+                "payment_type": "custom_admin_link",
+                "description": description,
+                "client_email": client_email,
+                "amount_cad": f"{amount:.2f}",
+            },
+            billing_address_collection="auto",
+            payment_method_options={},
+        )
+    except _stripe.error.StripeError as e:
+        log.error(f"[admin_stripe_link] Stripe error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception as e:
+        log.exception(f"[admin_stripe_link] Unexpected error: {e}")
+        return jsonify({"success": False, "error": "Failed to create Stripe link"}), 500
+
+    log.info(f"[admin_stripe_link] created ${amount:.2f} CAD link: {description!r}")
+    return jsonify({
+        "success": True,
+        "checkout_url": session_obj.url,
+        "session_id": getattr(session_obj, "id", ""),
+        "amount": amount,
+        "description": description,
+    })
+
+
+@app.route("/payment/custom/success")
+def custom_payment_success():
+    return render_template("custom_payment_success.html", email=EMAIL)
+
+
 @app.route("/stripe/webhook", methods=["POST"])
 def stripe_webhook():
     """Handle Stripe webhook events.
@@ -3907,6 +3999,35 @@ def stripe_webhook():
             log.warning("[stripe-webhook] checkout.session.completed with empty data.object (thin payload?)")
             return jsonify({"ok": True})
         metadata    = session_obj.get("metadata", {})
+        payment_type = (metadata.get("payment_type") or "deposit").strip().lower()
+
+        if payment_type == "custom_admin_link":
+            amount_received_cents = session_obj.get("amount_total", 0) or 0
+            amount_paid = amount_received_cents / 100.0
+            customer_details = session_obj.get("customer_details", {}) or {}
+            customer_email = (
+                customer_details.get("email")
+                or session_obj.get("customer_email")
+                or metadata.get("client_email")
+                or ""
+            )
+            description = metadata.get("description") or "Custom Photography Payment"
+            try:
+                _notify_admin(
+                    f"💳 <b>Custom Stripe Payment Paid</b>\n\n"
+                    f"🧾 {_tg_escape(description)}\n"
+                    f"📧 {_tg_escape(customer_email or 'No email')}\n"
+                    f"💰 <b>${amount_paid:.2f} CAD</b>\n\n"
+                    f"Manual Stripe link payment — no booking was changed."
+                )
+            except Exception as e:
+                log.error(f"[stripe-webhook] Telegram custom payment notify error: {e}")
+            log.info(
+                f"[stripe-webhook] Custom payment completed: "
+                f"${amount_paid:.2f} CAD description={description!r}"
+            )
+            return jsonify({"ok": True})
+
         booking_id  = metadata.get("booking_id")
         token       = metadata.get("confirmation_token", "")
 
@@ -3930,7 +4051,6 @@ def stripe_webhook():
             return jsonify({"ok": True})
 
         booking = dict(row)
-        payment_type = (metadata.get("payment_type") or "deposit").strip().lower()
         # Balance-payment sessions are created after a booking is already confirmed.
         # Do not run the deposit confirmation side-effects again; just record the
         # additional amount and notify admins.
@@ -4169,6 +4289,122 @@ def admin_health():
     }), 200 if overall_ok else 503
 
 
+def _admin_event_is_current(ev):
+    """Admin organizer cards: show only actionable future/current sessions."""
+    if not ev or ev.get("hidden"):
+        return False
+    return (ev.get("status") or "").lower() in ("active", "upcoming")
+
+
+def _admin_event_date_key(ev):
+    raw = (ev or {}).get("date") or "9999-12-31"
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except Exception:
+        return datetime.max.date()
+
+
+def _admin_is_internal_block(row):
+    data = dict(row) if not isinstance(row, dict) else row
+    return (
+        (data.get("session_type") or "") == "internal_block"
+        or str(data.get("name") or "").startswith("⛔")
+    )
+
+
+def _admin_event_summary(ev, conn=None, today=None):
+    """Small event-first view model for /admin and /admin/event/<id>."""
+    close_conn = False
+    if conn is None:
+        conn = db_conn()
+        close_conn = True
+    today = today or datetime.now().date()
+    event_id = ev.get("id") or ""
+    event_date = ev.get("date") or ""
+    slots = generate_slots(ev)
+    active_status_filter = "status NOT IN ('cancelled','expired')"
+
+    rows = []
+    date_rows = []
+    try:
+        if event_id:
+            rows = conn.execute(
+                f"""SELECT * FROM bookings
+                    WHERE {active_status_filter}
+                      AND (event_id=? OR ((event_id IS NULL OR event_id='') AND date=?))
+                    ORDER BY date ASC, time ASC""",
+                (event_id, event_date),
+            ).fetchall()
+        elif event_date:
+            rows = conn.execute(
+                f"""SELECT * FROM bookings
+                    WHERE {active_status_filter} AND date=?
+                    ORDER BY date ASC, time ASC""",
+                (event_date,),
+            ).fetchall()
+        if event_date:
+            date_rows = conn.execute(
+                f"""SELECT time, name, session_type FROM bookings
+                    WHERE {active_status_filter} AND date=?""",
+                (event_date,),
+            ).fetchall()
+    finally:
+        if close_conn:
+            conn.close()
+
+    booking_rows = [dict(r) for r in rows]
+    taken_times = {r["time"] for r in date_rows if r["time"]}
+    total_slots = len(slots)
+    blocked_rows = [b for b in booking_rows if _admin_is_internal_block(b)]
+    client_rows = [b for b in booking_rows if not _admin_is_internal_block(b)]
+    occupied_slots = len(taken_times) if total_slots else len(booking_rows)
+    booked_slots = len(client_rows)
+    confirmed = sum(1 for b in client_rows if b.get("confirmed") or b.get("status") == "confirmed")
+    pending = sum(
+        1 for b in client_rows
+        if (b.get("status") in ("reserved", "pending_payment", "partial_payment"))
+        and not b.get("confirmed")
+    )
+    free = max(total_slots - occupied_slots, 0) if total_slots else 0
+    paid_total = sum(float(b.get("paid_amount") or 0) for b in client_rows)
+    event_day = _admin_event_date_key(ev)
+
+    return {
+        "id": event_id,
+        "title": ev.get("title") or event_id or "Untitled session",
+        "date": event_date,
+        "start_time": ev.get("start_time") or "",
+        "end_time": ev.get("end_time") or "",
+        "status": ev.get("status") or "",
+        "session_type": ev.get("session_type") or "",
+        "location": ev.get("location") or "",
+        "deposit": float(ev.get("deposit") or 0),
+        "full_price": float(ev.get("full_price") or 0),
+        "total_slots": total_slots,
+        "booked": booked_slots,
+        "confirmed": confirmed,
+        "pending": pending,
+        "blocked": len(blocked_rows),
+        "occupied": occupied_slots,
+        "free": free,
+        "paid_total": paid_total,
+        "attention_count": pending,
+        "is_future": event_day >= today,
+        "occupancy": int((occupied_slots / total_slots) * 100) if total_slots else 0,
+    }
+
+
+def _admin_event_summaries():
+    today = datetime.now().date()
+    current_events = [ev for ev in EVENTS if _admin_event_is_current(ev)]
+    current_events.sort(key=lambda ev: (_admin_event_date_key(ev) < today, _admin_event_date_key(ev)))
+    conn = db_conn()
+    try:
+        return [_admin_event_summary(ev, conn=conn, today=today) for ev in current_events]
+    finally:
+        conn.close()
+
+
 @app.route("/admin")
 @admin_required
 def admin():
@@ -4276,11 +4512,17 @@ def admin():
     session_types = [row["session_type"] for row in c.fetchall()]
     conn.close()
 
+    event_summaries = _admin_event_summaries()
+    next_event = next((ev for ev in event_summaries if ev.get("is_future")), None)
+
     return render_template("admin.html",
                            bookings=rows,
                            filtered_stats=filtered_stats,
                            overall_stats=overall_stats,
                            events=EVENTS,
+                           event_summaries=event_summaries,
+                           next_event=next_event,
+                           now=datetime.now(),
                            session_types=session_types,
                            filters={
                                "date_from": date_from,
@@ -4680,6 +4922,117 @@ def admin_booking_detail(booking_id):
     return render_template("booking_detail.html", booking=booking, event=event)
 
 
+@app.route("/admin/booking/<int:booking_id>/contact", methods=["POST"])
+@admin_required
+def admin_booking_contact(booking_id):
+    """Update operator-corrected contact fields for one booking.
+
+    This deliberately does not touch money, status, dates, calendars, or
+    outbound messages. It corrects the contact details the photographer needs
+    to communicate with the client, then mirrors those fields onto the client
+    profile for future lookup.
+    """
+    data = request.get_json(silent=True) or {}
+    if "phone" not in data and "instagram" not in data and "email" not in data:
+        return jsonify({"success": False, "error": "phone, email or instagram required"}), 400
+
+    conn = db_conn()
+    c = conn.cursor()
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        row = c.execute(
+            "SELECT id, email, name, phone, instagram FROM bookings WHERE id=?",
+            (booking_id,),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            conn.close()
+            return jsonify({"success": False, "error": "Booking not found"}), 404
+
+        old_email = (row["email"] or "").strip().lower()
+        email = old_email
+        if "email" in data:
+            email = str(data.get("email") or "").strip().lower()
+            if not email:
+                conn.rollback()
+                conn.close()
+                return jsonify({"success": False, "error": "Email cannot be blank"}), 400
+            if len(email) > 254 or not _re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$", email):
+                conn.rollback()
+                conn.close()
+                return jsonify({"success": False, "error": "Enter a valid email address"}), 400
+
+        phone = (row["phone"] or "")
+        if "phone" in data:
+            phone = str(data.get("phone") or "").strip()[:30]
+
+        instagram = (row["instagram"] or "").strip().lstrip("@")
+        if "instagram" in data:
+            instagram_raw = str(data.get("instagram") or "").strip()
+            if "instagram.com/" in instagram_raw:
+                instagram_raw = instagram_raw.split("instagram.com/", 1)[1].split("?", 1)[0].split("#", 1)[0]
+            instagram = instagram_raw.strip().strip("/").lstrip("@")[:80]
+
+        c.execute(
+            "UPDATE bookings SET email=?, phone=?, instagram=? WHERE id=?",
+            (email, phone, instagram, booking_id),
+        )
+
+        if email:
+            if old_email and old_email.lower() != email.lower():
+                old_client = c.execute(
+                    "SELECT id FROM clients WHERE LOWER(email)=LOWER(?)",
+                    (old_email,),
+                ).fetchone()
+                new_client = c.execute(
+                    "SELECT id FROM clients WHERE LOWER(email)=LOWER(?)",
+                    (email,),
+                ).fetchone()
+                other_old_bookings = c.execute(
+                    """SELECT COUNT(*) AS n FROM bookings
+                       WHERE LOWER(email)=LOWER(?) AND id<>?""",
+                    (old_email, booking_id),
+                ).fetchone()["n"]
+                if old_client and not new_client and other_old_bookings == 0:
+                    c.execute(
+                        "UPDATE clients SET email=?, last_seen=CURRENT_TIMESTAMP WHERE id=?",
+                        (email, old_client["id"]),
+                    )
+            c.execute(
+                """UPDATE clients
+                   SET phone=?, instagram=?, last_seen=CURRENT_TIMESTAMP
+                   WHERE LOWER(email)=LOWER(?)""",
+                (phone, instagram, email),
+            )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        log.exception(f"[admin_contact] failed for booking #{booking_id}: {e}")
+        return jsonify({"success": False, "error": "Server error"}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    # If the profile row did not exist yet, create it after the transaction.
+    if email:
+        try:
+            sync_client(email, row["name"] or "", phone, instagram)
+        except Exception as _e:
+            log.warning(f"[admin_contact] sync_client failed for #{booking_id}: {_e}")
+
+    log.info(f"[admin] booking #{booking_id} contact updated")
+    return jsonify({
+        "success": True,
+        "booking_id": booking_id,
+        "email": email,
+        "phone": phone,
+        "instagram": instagram,
+    })
+
+
 @app.route("/admin/booking/<int:booking_id>/invoice", methods=["GET", "POST"])
 @admin_required
 def admin_booking_invoice(booking_id):
@@ -4713,6 +5066,61 @@ def admin_booking_send_invoice(booking_id):
         _admin_invoice_pdf_bytes(booking), f"invoice-{booking_id}.pdf", "application/pdf"
     )
     return jsonify({"success": bool(sent)})
+
+
+@app.route("/admin/booking/<int:booking_id>/recheck-payment", methods=["POST"])
+@admin_required
+def admin_booking_recheck_payment(booking_id):
+    """Re-read recent Interac emails for this booking and safely raise paid_amount.
+
+    This is admin-only and intentionally narrow: it does not confirm, cancel,
+    reschedule, email the client, or lower recorded money. It only lets the same
+    reconciliation logic used by the watcher correct a confirmed booking whose
+    actual Interac amount arrived later or was previously marked as orphan.
+    """
+    booking = _admin_booking_row_or_404(booking_id)
+    if not booking:
+        return jsonify({"error": "Booking not found"}), 404
+    if booking.get("status") != "confirmed" and not booking.get("confirmed"):
+        return jsonify({"error": "Booking must be confirmed before payment recheck"}), 400
+
+    previous_paid = _booking_paid_amount(dict(booking), get_event_by_id(booking.get("event_id")) or {})
+    try:
+        from check_etransfer_v2 import get_emails, is_etransfer_email, check_single_email
+
+        emails = get_emails(page_size=100)
+        if emails is None:
+            return jsonify({"error": "Could not fetch Gmail / Interac emails"}), 502
+
+        candidate = dict(booking)
+        touched = 0
+        for email in emails:
+            if not is_etransfer_email(email):
+                continue
+            check_single_email(email, [], [candidate])
+            refreshed = _admin_booking_row_or_404(booking_id)
+            if refreshed:
+                new_paid = _booking_paid_amount(dict(refreshed), get_event_by_id(refreshed.get("event_id")) or {})
+                if new_paid > previous_paid + 0.009:
+                    touched += 1
+                    previous_paid = new_paid
+                    candidate = dict(refreshed)
+
+        refreshed = _admin_booking_row_or_404(booking_id)
+        event = get_event_by_id(refreshed.get("event_id")) if refreshed and refreshed.get("event_id") else None
+        paid_amount = _booking_paid_amount(dict(refreshed), event or {}) if refreshed else previous_paid
+        balance_due = _booking_balance_due(dict(refreshed), event or {}) if refreshed else 0.0
+    except Exception as e:
+        log.exception(f"[admin-recheck-payment] failed for booking #{booking_id}: {e}")
+        return jsonify({"error": "Payment recheck failed"}), 500
+
+    return jsonify({
+        "success": True,
+        "booking_id": booking_id,
+        "updated": bool(touched),
+        "paid_amount": round(paid_amount, 2),
+        "balance_due": round(balance_due, 2),
+    })
 
 
 @app.route("/admin/booking/<int:booking_id>/wfolio", methods=["POST"])
@@ -4752,14 +5160,8 @@ def admin_booking_send_review(booking_id):
     booking = _admin_booking_row_or_404(booking_id)
     if not booking:
         return jsonify({"error": "Booking not found"}), 404
-    review_url = "https://g.page/r/CenY1x2zXYc_EAE/review"
-    sent = _send_email_with_attachment(
-        booking.get("email", ""), booking.get("name", "Client"),
-        "Could you leave a quick review?",
-        f"Thank you for choosing Pashynska Photography. Review link: {review_url}",
-        f"<p>Thank you for choosing Pashynska Photography.</p><p><a href=\"{review_url}\">Leave a Google Review</a></p>",
-        None, "review.txt", "text/plain"
-    )
+    review_url = os.environ.get("GOOGLE_REVIEW_URL", "https://review.pashynskaphoto.com")
+    sent = _send_review_email(dict(booking))
     if sent:
         conn = db_conn()
         conn.execute("UPDATE bookings SET review_email_sent=? WHERE id=?", (datetime.now(timezone.utc).isoformat(), booking_id))
@@ -5823,25 +6225,52 @@ def admin_event_slots(event_id):
 
     conn = db_conn()
     rows = conn.execute(
-        """SELECT id, time, name, email, status, confirmed, paid, paid_amount, deposit_amount
+        """SELECT id, date, time, name, email, phone, instagram, status,
+                  confirmed, paid, paid_amount, deposit_amount, full_price,
+                  event_id, reserved_until, session_type
            FROM bookings
            WHERE date=? AND status NOT IN ('cancelled','expired')""",
         (target_date,),
     ).fetchall()
+    summary = _admin_event_summary(ev, conn=conn)
     conn.close()
     by_time = {r["time"]: dict(r) for r in rows}
     out = []
     for s in base:
         b = by_time.get(s["time"])
+        is_block = bool(b and _admin_is_internal_block(b))
         out.append({
             "time": s["time"],
             "label": s["label"],
             "state": (
+                "blocked" if is_block else
                 "confirmed" if (b and b.get("confirmed")) else
                 ("pending" if b else "free")
             ),
             "booking_id": b["id"] if b else None,
-            "client": (b.get("name") if b else None),
+            "client": ("Closed" if is_block else (b.get("name") if b else None)),
+        })
+    event_roster = []
+    for row in rows:
+        b = dict(row)
+        if b.get("event_id") and b.get("event_id") != ev.get("id"):
+            continue
+        if _admin_is_internal_block(b):
+            continue
+        event_roster.append({
+            "id": b.get("id"),
+            "date": b.get("date"),
+            "time": b.get("time"),
+            "name": b.get("name") or "",
+            "email": b.get("email") or "",
+            "phone": b.get("phone") or "",
+            "instagram": (b.get("instagram") or "").lstrip("@"),
+            "status": b.get("status") or "",
+            "confirmed": bool(b.get("confirmed")),
+            "paid": bool(b.get("paid")),
+            "paid_amount": float(b.get("paid_amount") or 0),
+            "deposit_amount": float(b.get("deposit_amount") or ev.get("deposit") or 0),
+            "full_price": float(b.get("full_price") or ev.get("full_price") or 0),
         })
     return jsonify({
         "event": {
@@ -5852,8 +6281,157 @@ def admin_event_slots(event_id):
             "deposit": float(ev.get("deposit") or 0),
             "full_price": float(ev.get("full_price") or 0),
         },
+        "summary": summary,
         "slots": out,
+        "bookings": event_roster,
     })
+
+
+@app.route("/admin/api/event/<event_id>/block-slot", methods=["POST"])
+@admin_required
+def admin_event_block_slot(event_id):
+    """Close one free slot without creating a real client booking."""
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"success": False, "error": "Event not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    slot_time = (data.get("time") or "").strip()
+    reason = (data.get("reason") or "").strip()[:120] or "Closed by admin"
+    if not slot_time:
+        return jsonify({"success": False, "error": "Slot time is required"}), 400
+
+    valid_times = {s["time"] for s in generate_slots(ev)}
+    if slot_time not in valid_times:
+        return jsonify({"success": False, "error": "Slot is not part of this event"}), 400
+
+    event_date = ev.get("date")
+    if not event_date:
+        return jsonify({"success": False, "error": "Event has no date"}), 400
+
+    now = datetime.now()
+    expires = (now + timedelta(days=365)).isoformat()
+    deposit_amt = float(ev.get("deposit") or 0)
+    full_price = float(ev.get("full_price") or 0) or (deposit_amt * 2)
+
+    conn = db_conn()
+    c = conn.cursor()
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        c.execute(
+            """SELECT id FROM bookings
+               WHERE date=? AND time=?
+                 AND status NOT IN ('cancelled','expired')
+                 AND (confirmed=1 OR reserved_until > ?)""",
+            (event_date, slot_time, now.isoformat()),
+        )
+        if c.fetchone():
+            conn.rollback()
+            conn.close()
+            return jsonify({"success": False, "error": "Slot already taken"}), 409
+
+        c.execute(
+            """DELETE FROM bookings
+               WHERE date=? AND time=?
+                 AND (status IN ('cancelled','expired')
+                      OR (status IN ('reserved','pending_payment') AND reserved_until <= ?))""",
+            (event_date, slot_time, now.isoformat()),
+        )
+        token = secrets.token_urlsafe(16)
+        c.execute(
+            """INSERT INTO bookings
+                 (date, time, name, email, phone, instagram, session_type,
+                  status, reserved_until, event_id, confirmation_token,
+                  deposit_amount, full_price, confirmed, paid, paid_amount)
+               VALUES (?, ?, ?, '', '', '', 'internal_block',
+                       'reserved', ?, ?, ?, ?, ?, 0, 0, 0)""",
+            (event_date, slot_time, f"⛔ {reason}", expires, ev["id"],
+             token, deposit_amt, full_price),
+        )
+        booking_id = c.lastrowid
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        log.exception(f"[admin_event_block_slot] {e}")
+        return jsonify({"success": False, "error": "Server error"}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    log.info(f"[admin_event_block_slot] event={event_id} {event_date} {slot_time} booking_id={booking_id}")
+    return jsonify({
+        "success": True,
+        "booking_id": booking_id,
+        "date": event_date,
+        "time": slot_time,
+        "reason": reason,
+    })
+
+
+@app.route("/admin/api/event/<event_id>/unblock-slot", methods=["POST"])
+@admin_required
+def admin_event_unblock_slot(event_id):
+    """Reopen a slot that was previously closed with an internal block."""
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"success": False, "error": "Event not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    booking_id = data.get("booking_id")
+    slot_time = (data.get("time") or "").strip()
+    if not booking_id and not slot_time:
+        return jsonify({"success": False, "error": "booking_id or time required"}), 400
+
+    conn = db_conn()
+    c = conn.cursor()
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        if booking_id:
+            row = c.execute(
+                "SELECT * FROM bookings WHERE id=? AND status NOT IN ('cancelled','expired')",
+                (booking_id,),
+            ).fetchone()
+        else:
+            row = c.execute(
+                """SELECT * FROM bookings
+                   WHERE date=? AND time=? AND status NOT IN ('cancelled','expired')""",
+                (ev.get("date"), slot_time),
+            ).fetchone()
+        if not row:
+            conn.rollback()
+            conn.close()
+            return jsonify({"success": False, "error": "Closed slot not found"}), 404
+        row_dict = dict(row)
+        if row_dict.get("event_id") and row_dict.get("event_id") != ev.get("id"):
+            conn.rollback()
+            conn.close()
+            return jsonify({"success": False, "error": "Slot belongs to another event"}), 400
+        if not _admin_is_internal_block(row_dict):
+            conn.rollback()
+            conn.close()
+            return jsonify({"success": False, "error": "Only internally closed slots can be reopened"}), 400
+
+        c.execute(
+            "UPDATE bookings SET status='cancelled', reserved_until=NULL WHERE id=?",
+            (row_dict["id"],),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        log.exception(f"[admin_event_unblock_slot] {e}")
+        return jsonify({"success": False, "error": "Server error"}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    log.info(f"[admin_event_unblock_slot] event={event_id} booking_id={row_dict['id']}")
+    return jsonify({"success": True, "booking_id": row_dict["id"]})
 
 
 @app.route("/admin/api/event/<event_id>/block-day", methods=["POST"])

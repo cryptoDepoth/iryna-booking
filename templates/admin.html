@@ -126,6 +126,123 @@
         }
         .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 
+        /* ── EVENT-FIRST ORGANIZER ── */
+        .session-organizer {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 340px;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+        .session-main,
+        .attention-panel {
+            min-width: 0;
+        }
+        .session-strip {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 16px 18px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+        .session-strip .label {
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            margin-bottom: 3px;
+        }
+        .session-strip h2 { font-size: 19px; line-height: 1.2; margin: 0 0 5px; }
+        .session-strip .meta { color: var(--text-2); font-size: 13px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .session-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 14px;
+        }
+        .session-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 16px 18px;
+            min-width: 0;
+        }
+        .session-card.is-next { border-color: #fed7aa; box-shadow: 0 0 0 3px rgba(249,115,22,.10); }
+        .session-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        .session-card h3 { font-size: 16px; line-height: 1.25; margin: 0; }
+        .status-pill {
+            font-size: 10px; font-weight: 800; letter-spacing: .05em;
+            text-transform: uppercase; padding: 4px 8px; border-radius: 20px;
+            background: var(--gray-light); color: var(--gray-text); white-space: nowrap;
+        }
+        .status-pill.active { background: var(--green-light); color: var(--green-text); }
+        .status-pill.upcoming { background: var(--blue-light); color: var(--blue-text); }
+        .session-card-meta { color: var(--text-2); font-size: 12px; display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .session-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 12px; }
+        .session-metric {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 6px;
+            text-align: center;
+        }
+        .session-metric b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+        .session-metric span { display: block; font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+        .session-progress { height: 7px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin-bottom: 12px; }
+        .session-progress span { display: block; height: 100%; background: linear-gradient(90deg, #16a34a, #f97316); border-radius: 99px; }
+        .session-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .session-attn {
+            margin-top: 10px;
+            background: var(--yellow-light);
+            color: var(--yellow-text);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .attention-panel {
+            background: #111827;
+            color: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            padding: 18px;
+            align-self: start;
+        }
+        .attention-panel h2 { font-size: 15px; margin: 0 0 8px; }
+        .attention-panel p { color: #cbd5e1; font-size: 12px; margin-bottom: 14px; }
+        .attention-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            padding: 10px 0;
+            border-top: 1px solid rgba(255,255,255,.10);
+        }
+        .attention-item:first-of-type { border-top: 0; }
+        .attention-item strong { display: block; font-size: 13px; }
+        .attention-item span { color: #cbd5e1; font-size: 12px; }
+        .attention-item a { color: #fdba74; font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .organizer-empty {
+            background: var(--surface);
+            border: 1px dashed var(--border-strong);
+            border-radius: var(--radius);
+            padding: 28px;
+            text-align: center;
+            color: var(--text-2);
+        }
+        @media (max-width: 980px) {
+            .session-organizer { grid-template-columns: 1fr; }
+            .session-strip { align-items: flex-start; flex-direction: column; }
+        }
+        @media (max-width: 620px) {
+            .session-metrics { grid-template-columns: repeat(2, 1fr); }
+        }
+
         /* ── OPERATIONAL DASHBOARD ── */
         .ops-dash {
             display: grid;
@@ -353,10 +470,27 @@
             box-shadow: var(--shadow);
             overflow: hidden;
         }
+        .bookings-card { overflow: hidden; }
+        .table-scroll {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-gutter: stable;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
         }
+        .bookings-table { min-width: 0; table-layout: fixed; }
+        .bookings-table th:nth-child(1), .bookings-table td:nth-child(1) { width: 60px; }
+        .bookings-table th:nth-child(2), .bookings-table td:nth-child(2) { width: 105px; }
+        .bookings-table th:nth-child(3), .bookings-table td:nth-child(3) { width: 145px; }
+        .bookings-table th:nth-child(4), .bookings-table td:nth-child(4) { width: 210px; }
+        .bookings-table th:nth-child(5), .bookings-table td:nth-child(5) { width: 125px; }
+        .bookings-table th:nth-child(6), .bookings-table td:nth-child(6) { width: 120px; }
+        .bookings-table th:nth-child(7), .bookings-table td:nth-child(7) { width: 125px; }
+        .bookings-table th:nth-child(8), .bookings-table td:nth-child(8) { width: 115px; }
+        .bookings-table th:nth-child(9), .bookings-table td:nth-child(9) { width: 225px; }
         thead th {
             background: var(--surface-2);
             padding: 10px 16px;
@@ -373,6 +507,7 @@
             padding: 13px 16px;
             border-bottom: 1px solid var(--border);
             vertical-align: middle;
+            overflow-wrap: anywhere;
         }
         tbody tr:last-child td { border-bottom: none; }
         tbody tr:hover td { background: #fafbfc; }
@@ -383,6 +518,7 @@
         tbody tr.row-confirmed td { background: #f9fffe; }
         tbody tr.row-confirmed:hover td { background: #f0fdf4; }
         tbody tr.row-cancelled td, tbody tr.row-expired td { opacity: 0.55; }
+        .bookings-table td.actions-cell { width: 225px; min-width: 225px; }
 
         /* ── BADGES ── */
         .badge {
@@ -418,7 +554,8 @@
         .cell-amount.none { color: var(--text-3); font-weight: 400; }
 
         /* ── ACTION BUTTONS ── */
-        .actions { display: flex; gap: 6px; }
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; width: 225px; }
+        .actions button { padding: 5px 8px; font-size: 11px; }
         .btn-confirm {
             display: inline-flex; align-items: center; gap: 5px;
             padding: 6px 12px;
@@ -813,6 +950,32 @@
             border-top: 1px solid var(--border);
             margin-top: 4px;
         }
+        .stripe-result {
+            display: none;
+            margin-top: 16px;
+            padding: 12px;
+            background: var(--green-light);
+            border: 1px solid #bbf7d0;
+            border-radius: var(--radius);
+        }
+        .stripe-result.show { display: block; }
+        .stripe-result label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: var(--green-text);
+            margin-bottom: 6px;
+        }
+        .stripe-result input {
+            width: 100%;
+            border: 1px solid #86efac;
+            border-radius: 7px;
+            padding: 9px 10px;
+            color: var(--text);
+            font: inherit;
+        }
 
         /* ── RESPONSIVE ── */
         @media (max-width: 1100px) {
@@ -898,7 +1061,7 @@
         <span style="color:#4b5563; font-weight:400;">/ Admin</span>
     </div>
     <div class="topbar-right">
-        <a href="#bookings-section" class="topbar-link" style="font-size:13px;">Bookings</a>
+        <a href="#bookings-section" class="topbar-link" style="font-size:13px;">All bookings</a>
         <a href="#events-section" class="topbar-link" style="font-size:13px;">Events & slots</a>
         <a href="/admin/clients" class="topbar-link" style="font-size:13px;">👥 Clients</a>
         <a href="/admin/health" class="topbar-link" style="font-size:13px;">Health</a>
@@ -912,69 +1075,99 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
         <div class="page-title">
-            <h1>Today's Operations</h1>
-            <p>What's happening across your bookings & next session.</p>
+            <h1>Photosession Organizer</h1>
+            <p>Open a session first, then work the clients and slots inside it.</p>
         </div>
         <div class="page-actions">
-            <a href="#events-section" class="btn-outline" style="text-decoration:none;">✦ Manage events</a>
+            <button class="btn-outline" type="button" onclick="openStripeModal()">💳 Stripe link</button>
+            <a href="#events-section" class="btn-outline" style="text-decoration:none;">✦ Edit session setup</a>
             <button class="btn-outline" onclick="location.reload()">↻ Refresh</button>
         </div>
     </div>
 
-    {# ─ figure out the next upcoming session ─ #}
-    {% set _today = (now.strftime('%Y-%m-%d') if now is defined and now else '') %}
-    {% set _ev_sorted = (events|sort(attribute='date')) if events else [] %}
-    {% set upcoming = none %}
-    {% if _ev_sorted %}
-        {% if _today %}
-            {% for ev in _ev_sorted if ev.date >= _today and (upcoming is none) %}{% set upcoming = ev %}{% endfor %}
-        {% endif %}
-        {% if upcoming is none %}{% set upcoming = _ev_sorted[0] %}{% endif %}
-    {% endif %}
-
-    <!-- OPERATIONAL DASHBOARD HERO -->
-    <div class="ops-dash">
-        {# LEFT — needs action OR all clear #}
-        {% if filtered_stats.pending and filtered_stats.pending > 0 %}
-        <div class="ops-card action">
-            <div class="head"><span>⚡ Needs your attention</span><span class="ico">⏳</span></div>
-            <div class="big">{{ filtered_stats.pending }} pending {{ 'payment' if filtered_stats.pending == 1 else 'payments' }}</div>
-            <div class="sub">Auto-verifier checks Gmail every minute. If a client paid early or in cash, confirm manually.</div>
-            <a href="#tbody" class="pill-cta" onclick="setStatusFilter('pending')">Review pending →</a>
-        </div>
-        {% else %}
-        <div class="ops-card calm">
-            <div class="head"><span>✓ All clear</span><span class="ico">🌿</span></div>
-            <div class="big">No pending payments</div>
-            <div class="sub">Every reserved slot has been confirmed. You're caught up — new bookings will surface here.</div>
-        </div>
-        {% endif %}
-
-        {# RIGHT — next upcoming session spotlight #}
-        <div class="ops-spotlight">
-            {% if upcoming %}
-            <span class="eyebrow">Next session</span>
-            <h3>{{ upcoming.title }}</h3>
-            <div class="meta-row">
-                <span>📅 <strong>{{ upcoming.date }}</strong>{% if upcoming.start_time %} · {{ upcoming.start_time }}{% endif %}</span>
-                {% if upcoming.location %}<span>📍 {{ upcoming.location.split(',')[0] }}</span>{% endif %}
-                {% if upcoming.session_type %}<span>🏷️ {{ upcoming.session_type }}</span>{% endif %}
+    <!-- EVENT-FIRST ORGANIZER -->
+    <section class="session-organizer" data-next-event-id="{{ next_event.id if next_event else '' }}">
+        <div class="session-main">
+            <div class="session-strip">
+                <div>
+                    <div class="label">Next session</div>
+                    {% if next_event %}
+                    <h2>{{ next_event.title }}</h2>
+                    <div class="meta">
+                        <span>📅 {{ next_event.date }}{% if next_event.start_time %} · {{ next_event.start_time }}{% endif %}</span>
+                        {% if next_event.location %}<span>📍 {{ next_event.location.split(',')[0] }}</span>{% endif %}
+                        <span>{{ next_event.booked }} / {{ next_event.total_slots }} booked</span>
+                    </div>
+                    {% else %}
+                    <h2>No active or upcoming sessions</h2>
+                    <div class="meta"><span>Create the next photosession below to start taking bookings.</span></div>
+                    {% endif %}
+                </div>
+                {% if next_event %}
+                <a class="btn-save" href="/admin/event/{{ next_event.id }}" style="text-decoration:none;">Open session</a>
+                {% else %}
+                <a class="btn-save" href="#events-section" style="text-decoration:none;">Create session</a>
+                {% endif %}
             </div>
-            {% if upcoming.total_spots %}
-            {% set _booked = upcoming.total_spots - (upcoming.spots_left if upcoming.spots_left is defined else upcoming.total_spots) %}
-            {% set _pct = (100 * _booked / upcoming.total_spots) | round(0, 'floor') %}
-            <div class="progress-wrap">
-                <div class="progress-bar"><span style="width: {{ _pct }}%"></span></div>
-                <div class="progress-num"><strong>{{ _booked }}</strong> / {{ upcoming.total_spots }} booked</div>
+
+            {% if event_summaries %}
+            <div class="session-grid">
+                {% for ev in event_summaries %}
+                <article class="session-card {% if next_event and ev.id == next_event.id %}is-next{% endif %}">
+                    <div class="session-card-head">
+                        <h3>{{ ev.title }}</h3>
+                        <span class="status-pill {{ ev.status }}">{{ ev.status or 'session' }}</span>
+                    </div>
+                    <div class="session-card-meta">
+                        <span>📅 {{ ev.date or 'No date' }}{% if ev.start_time %} · {{ ev.start_time }}–{{ ev.end_time }}{% endif %}</span>
+                        {% if ev.location %}<span>📍 {{ ev.location.split(',')[0] }}</span>{% endif %}
+                    </div>
+                    <div class="session-metrics">
+                        <div class="session-metric"><b>{{ ev.booked }}</b><span>Booked</span></div>
+                        <div class="session-metric"><b>{{ ev.confirmed }}</b><span>Paid</span></div>
+                        <div class="session-metric"><b>{{ ev.pending }}</b><span>Pending</span></div>
+                        <div class="session-metric"><b>{{ ev.free }}</b><span>Free</span></div>
+                    </div>
+                    <div class="session-progress" aria-label="{{ ev.occupancy }}% booked"><span style="width: {{ ev.occupancy }}%"></span></div>
+                    <div class="session-actions">
+                        <a class="btn-save" href="/admin/event/{{ ev.id }}" style="text-decoration:none;">Open session</a>
+                        <a class="btn-outline" href="/?event={{ ev.id }}" target="_blank">View public</a>
+                    </div>
+                    {% if ev.attention_count %}
+                    <div class="session-attn">{{ ev.attention_count }} client{{ '' if ev.attention_count == 1 else 's' }} awaiting payment or follow-up</div>
+                    {% endif %}
+                </article>
+                {% endfor %}
             </div>
-            {% endif %}
             {% else %}
-            <span class="eyebrow">Next session</span>
-            <h3>No upcoming sessions scheduled</h3>
-            <div class="spotlight-empty">Create one below to start taking bookings.</div>
+            <div class="organizer-empty">No active/upcoming photosessions yet.</div>
             {% endif %}
         </div>
-    </div>
+
+        <aside class="attention-panel">
+            <h2>Needs Attention</h2>
+            <p>Grouped by photosession so you do not hunt through the full booking table.</p>
+            {% set attention_events = event_summaries | selectattr('attention_count') | list %}
+            {% if attention_events %}
+                {% for ev in attention_events %}
+                <div class="attention-item">
+                    <div>
+                        <strong>{{ ev.title }}</strong>
+                        <span>{{ ev.attention_count }} pending · {{ ev.date }}</span>
+                    </div>
+                    <a href="/admin/event/{{ ev.id }}">Open</a>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="attention-item">
+                    <div>
+                        <strong>All clear</strong>
+                        <span>No pending session payments right now.</span>
+                    </div>
+                </div>
+            {% endif %}
+        </aside>
+    </section>
 
     <!-- KEY METRICS ROW -->
     <div class="ops-row">
@@ -1003,7 +1196,7 @@
     <!-- BOOKINGS HEADER -->
     <div class="page-header" id="bookings-section" style="margin-top:8px; margin-bottom:14px;">
         <div class="page-title">
-            <h1 style="font-size:18px;">Bookings</h1>
+            <h1 style="font-size:18px;">All bookings</h1>
             <p>Showing {{ filtered_stats.total }} of {{ overall_stats.total }} total bookings</p>
         </div>
     </div>
@@ -1124,8 +1317,9 @@
     </div>
 
     <!-- TABLE -->
-    <div class="card">
-        <table>
+    <div class="card bookings-card">
+        <div class="table-scroll" aria-label="All bookings table">
+        <table class="bookings-table">
             <thead>
                 <tr>
                     <th>#</th>
@@ -1136,7 +1330,7 @@
                     <th>Instagram</th>
                     <th>Status</th>
                     <th>Deposit paid</th>
-                    <th>Actions</th>
+                    <th class="actions-head">Actions</th>
                 </tr>
             </thead>
             <tbody id="tbody">
@@ -1147,7 +1341,7 @@
 
                     <td class="cell-id">#{{ b.id }}</td>
 
-                    <td>
+                    <td class="actions-cell">
                         <div class="cell-time">{{ b.time }}</div>
                         <div style="color:var(--text-3);font-size:12px;">{{ b.date }}</div>
                     </td>
@@ -1197,7 +1391,7 @@
                         {% elif b.status == 'confirmed' %}
                             <button class="btn-done" disabled>✓ Done</button>
                             <button class="btn-mark-paid" onclick='markPaid({{ b.id }}, {{ (b.name or "") | tojson }})'>💰 Mark Paid</button>
-                            <button class="btn-balance" onclick='requestBalance({{ b.id }}, {{ (b.name or "") | tojson }})'>💸 Request Balance</button>
+                            <button class="btn-balance" onclick='requestBalance({{ b.id }}, {{ (b.name or "") | tojson }})'>💸 Balance</button>
                             <button class="btn-reschedule" onclick='openRescheduleModal({{ b.id }}, {{ (b.name or "") | tojson }}, {{ (b.date or "") | tojson }}, {{ (b.time or "") | tojson }}, {{ (b.event_id or "") | tojson }})'>📅 Reschedule</button>
                             <button class="btn-delete" onclick='deleteBooking({{ b.id }}, {{ (b.name or "") | tojson }})'>🗑️ Delete</button>
                         {% else %}
@@ -1216,6 +1410,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
     <!-- PAGINATION -->
@@ -1504,6 +1699,42 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
+     STRIPE LINK MODAL
+═════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="stripe-modal" onclick="closeStripeModalOutside(event)">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stripe-modal-title">
+        <div class="modal-title" id="stripe-modal-title">💳 Create Stripe payment link</div>
+        <div class="modal-subtitle">Create a one-off card payment link. No booking is changed and no client email is sent automatically.</div>
+
+        <div class="modal-grid">
+            <div class="form-group">
+                <label>Amount CAD *</label>
+                <input type="number" id="stripe-amount" min="1" step="0.01" placeholder="120.50">
+            </div>
+            <div class="form-group">
+                <label>Client email optional</label>
+                <input type="email" id="stripe-email" placeholder="client@example.com">
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+                <label>Description</label>
+                <input type="text" id="stripe-description" maxlength="120" placeholder="Boho photoshoot payment">
+            </div>
+        </div>
+
+        <div class="stripe-result" id="stripe-result">
+            <label>Stripe link</label>
+            <input id="stripe-link-output" type="text" readonly>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn-outline" type="button" onclick="closeStripeModal()">Close</button>
+            <button class="btn-outline" type="button" onclick="copyStripeLink()">Copy link</button>
+            <button class="btn-save" type="button" id="stripe-create-btn" onclick="createStripeLink()">Create link</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
      CREATE EVENT MODAL
 ═════════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="create-modal" onclick="closeCreateModalOutside(event)">
@@ -1680,6 +1911,67 @@
         el.textContent = msg;
         el.className = 'show ' + (type || '');
         setTimeout(() => el.className = '', 3500);
+    }
+
+    function openStripeModal() {
+        document.getElementById('stripe-modal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+        const amount = document.getElementById('stripe-amount');
+        if (amount) setTimeout(() => amount.focus(), 80);
+    }
+    function closeStripeModal() {
+        document.getElementById('stripe-modal').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+    function closeStripeModalOutside(e) {
+        if (e.target === document.getElementById('stripe-modal')) closeStripeModal();
+    }
+    async function createStripeLink() {
+        const btn = document.getElementById('stripe-create-btn');
+        const result = document.getElementById('stripe-result');
+        const output = document.getElementById('stripe-link-output');
+        const body = {
+            amount: document.getElementById('stripe-amount').value,
+            email: document.getElementById('stripe-email').value.trim(),
+            description: document.getElementById('stripe-description').value.trim(),
+        };
+        btn.disabled = true;
+        btn.textContent = 'Creating…';
+        try {
+            const res = await fetch('/admin/stripe-link', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            const data = await res.json().catch(() => null);
+            if (res.ok && data && data.success) {
+                output.value = data.checkout_url;
+                result.classList.add('show');
+                toast('Stripe link created', 'success');
+            } else {
+                toast((data && data.error) || ('HTTP ' + res.status), 'error');
+            }
+        } catch (err) {
+            toast('Network error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Create link';
+        }
+    }
+    async function copyStripeLink() {
+        const output = document.getElementById('stripe-link-output');
+        if (!output || !output.value) {
+            toast('Create a link first', 'error');
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(output.value);
+            toast('Link copied', 'success');
+        } catch (err) {
+            output.select();
+            document.execCommand('copy');
+            toast('Link copied', 'success');
+        }
     }
 
     /* ── delete ── */
@@ -2291,7 +2583,10 @@
 
     // Close with Escape
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') closeCreateModal();
+        if (e.key === 'Escape') {
+            closeCreateModal();
+            closeStripeModal();
+        }
     });
 
     function addNewIncludedRow() {

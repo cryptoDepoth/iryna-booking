@@ -24,6 +24,8 @@ def _init_db(path):
             created_at TEXT,
             reserved_until TEXT,
             paid_amount REAL,
+            deposit_amount REAL,
+            full_price REAL,
             event_id TEXT
         )
     """)
@@ -177,3 +179,121 @@ def test_check_single_email_does_not_finalize_ambiguous_same_amount_message(tmp_
 
     assert processed is None
     assert confirmed_count == 0
+
+
+def test_check_single_email_reconciles_late_interac_amount_for_confirmed_booking(tmp_path, monkeypatch):
+    db_path = tmp_path / "bookings.db"
+    conn = _init_db(str(db_path))
+    now = datetime(2026, 5, 30, 12, 0, 0)
+    cur = conn.execute("""
+        INSERT INTO bookings(date,time,name,email,phone,instagram,session_type,
+                             status,paid,confirmed,created_at,reserved_until,
+                             paid_amount,deposit_amount,full_price,event_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        "2026-07-04", "13:30", "Yulia Levitskaya", "yulia@example.com",
+        "5874324626", "", "mini", "confirmed", 1, 1,
+        (now - timedelta(hours=12)).strftime('%Y-%m-%d %H:%M:%S'),
+        None, 110.25, 110.25, 220.50, "canoe-mini-session-2026-07-04",
+    ))
+    booking_id = cur.lastrowid
+    conn.commit(); conn.close()
+
+    body = """
+    Interac e-Transfer: You've received $120.50 from Yulia Levitskaya.
+    Message:
+    Canoe mini session, July 4th, 1:30 pm
+    Amount:
+    $120.50 (CAD)
+    Sent From:
+    Yulia Levitskaya
+    """
+    monkeypatch.setattr(checker, "DB_PATH", str(db_path))
+    monkeypatch.setattr(checker, "read_message_body", lambda message_id: body)
+    monkeypatch.setattr(checker, "_notify_admin_reconciled", lambda *a, **k: None)
+
+    reconciliation = checker.get_reconciliation_bookings(within_days=45)
+    confirmed_id, ambiguous = checker.check_single_email(
+        {"id": "late-msg", "date": now.strftime('%Y-%m-%d %H:%M:%S')},
+        [],
+        reconciliation,
+    )
+
+    assert confirmed_id is None
+    assert ambiguous is None
+
+    conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT status, paid, confirmed, paid_amount FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    processed = conn.execute("SELECT message_id, amount FROM processed_emails WHERE message_id='late-msg'").fetchone()
+    conn.close()
+
+    assert dict(row) == {"status": "confirmed", "paid": 1, "confirmed": 1, "paid_amount": 120.50}
+    assert processed["amount"] == 120.50
+
+
+def test_check_single_email_reconciles_previously_processed_orphan_interac(tmp_path, monkeypatch):
+    """A real Interac email may be seen before a safe match exists.
+
+    If it was recorded as an orphan, later hourly watcher passes must still be
+    able to use the same email to raise paid_amount on a strongly identified
+    confirmed booking.
+    """
+    db_path = tmp_path / "bookings.db"
+    conn = _init_db(str(db_path))
+    now = datetime(2026, 5, 30, 12, 0, 0)
+    cur = conn.execute("""
+        INSERT INTO bookings(date,time,name,email,phone,instagram,session_type,
+                             status,paid,confirmed,created_at,reserved_until,
+                             paid_amount,deposit_amount,full_price,event_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        "2026-07-04", "13:30", "Yulia Levitskaya", "yulia@example.com",
+        "5874324626", "", "mini", "confirmed", 1, 1,
+        (now - timedelta(hours=12)).strftime('%Y-%m-%d %H:%M:%S'),
+        None, 110.25, 110.25, 220.50, "canoe-mini-session-2026-07-04",
+    ))
+    booking_id = cur.lastrowid
+    conn.execute(
+        "INSERT INTO processed_emails(message_id, booking_id, amount) VALUES (?, ?, ?)",
+        ("orphan-before-manual-confirm", None, 120.50),
+    )
+    conn.commit(); conn.close()
+
+    body = """
+    Interac e-Transfer: You've received $120.50 from Yulia Levitskaya.
+    Message:
+    Canoe mini session, July 4th, 1:30 pm
+    Amount:
+    $120.50 (CAD)
+    Sent From:
+    Yulia Levitskaya
+    """
+    monkeypatch.setattr(checker, "DB_PATH", str(db_path))
+    monkeypatch.setattr(checker, "read_message_body", lambda message_id: body)
+    monkeypatch.setattr(checker, "_notify_admin_reconciled", lambda *a, **k: None)
+
+    reconciliation = checker.get_reconciliation_bookings(within_days=45)
+    confirmed_id, ambiguous = checker.check_single_email(
+        {"id": "orphan-before-manual-confirm", "date": now.strftime('%a, %d %b %Y %H:%M:%S +0000')},
+        [],
+        reconciliation,
+    )
+
+    assert confirmed_id is None
+    assert ambiguous is None
+
+    conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT status, paid, confirmed, paid_amount FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    processed = conn.execute(
+        "SELECT booking_id, amount FROM processed_emails WHERE message_id='orphan-before-manual-confirm'"
+    ).fetchone()
+    conn.close()
+
+    assert dict(row) == {"status": "confirmed", "paid": 1, "confirmed": 1, "paid_amount": 120.50}
+    assert processed["booking_id"] == booking_id
+    assert processed["amount"] == 120.50
+
+
+def test_parse_email_datetime_accepts_rfc2822_headers():
+    parsed = checker._parse_email_datetime("Fri, 29 May 2026 23:52:00 -0600")
+    assert parsed == datetime(2026, 5, 30, 5, 52, 0)

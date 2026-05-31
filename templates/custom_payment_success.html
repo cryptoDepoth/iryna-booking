@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment received · Pashynska Photography</title>
+  <style>
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --border: #e4e7ec;
+      --text: #111827;
+      --text-2: #6b7280;
+      --accent: #f97316;
+      --green: #16a34a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    .card {
+      width: min(100%, 520px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 16px 48px rgba(17,24,39,.08);
+      text-align: center;
+    }
+    .check {
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      display: inline-grid;
+      place-items: center;
+      background: #dcfce7;
+      color: var(--green);
+      font-size: 25px;
+      margin-bottom: 18px;
+    }
+    h1 { margin: 0 0 10px; font-size: 24px; }
+    p { margin: 0 0 18px; color: var(--text-2); }
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="check">✓</div>
+    <h1>Payment received</h1>
+    <p>Thank you. Iryna has received your Stripe payment and will match it with your session or invoice.</p>
+    <a href="/">Back to booking site</a>
+  </main>
+</body>
+</html>

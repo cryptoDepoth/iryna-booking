@@ -173,6 +173,19 @@
   .detail-empty p { font-size: 14px; text-align: center; }
   .detail-content { padding: 24px; display: none; }
   .detail-content.show { display: block; }
+  .mobile-back-btn {
+    display: none;
+    margin-bottom: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
 
   /* Profile header */
   .profile-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 20px; }
@@ -326,6 +339,21 @@
     .detail-panel { display: none; }
     .detail-panel.mobile-show { display: block; }
     .layout.detail-open .list-panel { display: none; }
+    .mobile-back-btn { display: inline-flex; align-items: center; gap: 6px; }
+    .booking-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px 10px;
+      align-items: start;
+    }
+    .booking-date,
+    .booking-time,
+    .booking-type { min-width: 0; }
+    .booking-time { text-align: right; }
+    .booking-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-badge { justify-self: end; text-align: right; }
+    .booking-amount { grid-column: 1 / 2; }
+    .booking-actions { grid-column: 1 / -1; margin-top: 4px; }
   }
 </style>
 </head>
@@ -529,9 +557,19 @@ async function openClient(id) {
     }
     currentClient = data.client;
     renderDetail(data);
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      document.getElementById("layout").classList.add("detail-open");
+      document.getElementById("detailPanel").classList.add("mobile-show");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   } catch(e) {
     document.getElementById("detailContent").innerHTML = `<div style="padding:60px;text-align:center;color:var(--danger)">Failed to load client:<br>${esc(e.message || e)}</div>`;
   }
+}
+
+function closeMobileDetail() {
+  document.getElementById("layout").classList.remove("detail-open");
+  document.getElementById("detailPanel").classList.remove("mobile-show");
 }
 
 function renderDetail({ client, bookings, notes }) {
@@ -580,6 +618,8 @@ function renderDetail({ client, bookings, notes }) {
   </div>`).join("");
 
   const html = `
+    <button class="mobile-back-btn" onclick="closeMobileDetail()">← Clients</button>
+
     <div class="profile-head">
       <div class="profile-avatar">${initials}</div>
       <div class="profile-info">
@@ -789,7 +829,11 @@ function editInvoiceAmounts(bookingId, fullPrice, depositAmount, paidAmount) {
 function fmtDate(iso) {
   if (!iso) return "—";
   try {
-    const d = new Date(iso);
+    const raw = String(iso);
+    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const d = m
+      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      : new Date(raw);
     return d.toLocaleDateString("en-CA", { year:"numeric", month:"short", day:"numeric" });
   } catch { return iso; }
 }

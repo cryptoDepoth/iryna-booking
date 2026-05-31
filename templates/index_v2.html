@@ -542,8 +542,8 @@ body[data-ab-booking-flow="one_step"] .drawer .ab-preview{display:block}
 footer{text-align:center;padding:32px;color:var(--ink-4);font-size:.85rem;border-top:1px solid rgba(0,0,0,.04)}
 footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
-.toast{position:fixed;bottom:24px;right:24px;background:#1c1917;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(8px);transition:.25s;z-index:99}
-.toast.show{opacity:1;transform:translateY(0)}
+.toast{position:fixed;bottom:24px;right:24px;background:#1c1917;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px);transition:opacity .25s,transform .25s,visibility 0s linear .25s;z-index:99}
+.toast.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);transition:opacity .25s,transform .25s}
 
 .assistant-launch{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--rose) 0%,#a3707a 100%);color:#fff;box-shadow:0 6px 24px rgba(196,133,122,.35),0 2px 8px rgba(0,0,0,.12);z-index:70;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s,background .18s;animation:assistantPulse 3s ease-in-out infinite}
 .assistant-launch:hover{transform:translateY(-3px) scale(1.06);box-shadow:0 10px 36px rgba(196,133,122,.45),0 4px 12px rgba(0,0,0,.15)}
@@ -554,6 +554,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 @keyframes dotBounce{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 .assistant-panel{position:fixed;right:22px;bottom:90px;width:min(380px,calc(100vw - 32px));max-height:min(620px,calc(100vh - 118px));background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.22);z-index:75;display:none;overflow:hidden;flex-direction:column}
 .assistant-panel.open{display:flex}
+.drawer-bg.open ~ .assistant-widget{display:none}
 .assistant-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--ink-5);background:var(--page-bg)}
 .assistant-title{font:600 .92rem var(--font-b);color:var(--ink)}
 .assistant-sub{font-size:.72rem;color:var(--ink-3);line-height:1.35;margin-top:1px}
@@ -869,6 +870,7 @@ const STRIPE_ENABLED = {{ stripe_enabled | tojson }};
 let payTimer = null;
 
 const toast = (msg) => {
+  if (!msg) return;
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
@@ -1149,6 +1151,11 @@ document.getElementById('filters').addEventListener('click', (e) => {
 });
 
 /* drawer */
+function showDrawer() {
+  toggleAssistant(false);
+  document.getElementById('drawer').classList.add('open');
+}
+
 async function openDrawer(id) {
   let e = eventsData.find(x => x.id === id);
   // Fallback: if events not loaded yet, fetch from API
@@ -1210,7 +1217,7 @@ async function openDrawer(id) {
         <input placeholder="${T('ig_ph')}" id="wIg">
       </div>
       <button class="btn" onclick="joinWaitlist('${e.id}')">${T('join_waitlist_btn')}</button>`;
-    document.getElementById('drawer').classList.add('open');
+    showDrawer();
     return;
   }
 
@@ -1231,7 +1238,7 @@ async function openDrawer(id) {
       </div>
       <a class="btn" href="https://instagram.com/pashynska.photo" target="_blank" style="display:block;text-align:center;text-decoration:none">Message on Instagram</a>
       <button class="btn-ghost" onclick="closeDrawer()">${T('close_btn')}</button>`;
-    document.getElementById('drawer').classList.add('open');
+    showDrawer();
     return;
   }
 
@@ -1253,7 +1260,7 @@ async function openDrawer(id) {
         </div>
         <button class="btn" onclick="joinWaitlist('${e.id}')">${T('join_waitlist_btn')}</button>
         <button class="btn-ghost" onclick="closeDrawer()" style="margin-top:10px">${T('close_btn')}</button>`;
-      document.getElementById('drawer').classList.add('open');
+      showDrawer();
       return;
     }
 
@@ -1297,7 +1304,7 @@ async function openDrawer(id) {
       </div>
       <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', document.getElementById('bookingDate')?.value || '${selectedDate}')">${T('continue_btn')}</button>
       <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">${T('pay_note')}</p>`;
-    document.getElementById('drawer').classList.add('open');
+    showDrawer();
   } catch (err) {
     console.error('Failed to load slots:', err);
     toast(T('toast_error_slots'));
@@ -2051,6 +2058,7 @@ const SITE_I18N = {
     reserve_error: 'Something went wrong. Please try again.',
     toast_error_events: 'Error loading sessions. Please refresh.',
     toast_error_slots: 'Error loading slots. Please try again.',
+    toast_loading_slots: 'Loading available times…',
     toast_loading_session: 'Loading session info… please try again in a moment.',
     toast_no_reservation: 'No active reservation',
     toast_network_error: 'Network error. Please try again.',

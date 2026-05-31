@@ -14,6 +14,7 @@ booking flow. Three things have to stay true:
 """
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -69,9 +70,21 @@ def test_admin_event_page_renders_for_admin(admin_client):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     # Hallmarks of templates/admin_event.html, not the generic dashboard.
-    assert "Block slot" in body
+    assert "Book slot" in body
     assert "id=\"slotGrid\"" in body
     assert ev["title"] in body
+
+
+def test_admin_event_uses_data_actions_not_broken_inline_onclicks():
+    """JS-rendered buttons must not embed JSON strings inside double-quoted
+    onclick attributes; that broke Book/Close/Edit contact in browsers."""
+    html = Path("templates/admin_event.html").read_text(encoding="utf-8")
+    assert 'data-slot-action="book"' in html
+    assert 'data-slot-action="close"' in html
+    assert 'data-roster-action="contact"' in html
+    assert 'onclick="openModal(' not in html
+    assert 'onclick="closeSlot(' not in html
+    assert 'onclick="openContactModal(' not in html
 
 
 def test_admin_event_page_returns_404_for_unknown_id(admin_client):
@@ -261,3 +274,51 @@ def test_manual_book_unknown_event_returns_404(admin_client):
         json={"time": "10:00", "name": "X"},
     )
     assert resp.status_code == 404
+
+
+def test_block_slot_closes_free_slot_and_unblock_reopens_it(admin_client):
+    ev = _first_event()
+    slot_time = booking_app.generate_slots(ev)[0]["time"]
+
+    closed = admin_client.post(
+        f"/admin/api/event/{ev['id']}/block-slot",
+        headers=_hdrs(),
+        json={"time": slot_time, "reason": "Lunch"},
+    )
+    assert closed.status_code == 200, closed.get_data(as_text=True)
+    booking_id = closed.get_json()["booking_id"]
+
+    body = admin_client.get(f"/admin/api/event/{ev['id']}/slots", headers=_hdrs()).get_json()
+    slot = next(s for s in body["slots"] if s["time"] == slot_time)
+    assert slot["state"] == "blocked"
+    assert not body["bookings"]
+
+    reopened = admin_client.post(
+        f"/admin/api/event/{ev['id']}/unblock-slot",
+        headers=_hdrs(),
+        json={"booking_id": booking_id},
+    )
+    assert reopened.status_code == 200
+
+    body = admin_client.get(f"/admin/api/event/{ev['id']}/slots", headers=_hdrs()).get_json()
+    slot = next(s for s in body["slots"] if s["time"] == slot_time)
+    assert slot["state"] == "free"
+
+
+def test_unblock_slot_refuses_real_client_booking(admin_client):
+    ev = _first_event()
+    slot_time = booking_app.generate_slots(ev)[0]["time"]
+    created = admin_client.post(
+        f"/admin/api/event/{ev['id']}/manual-book",
+        headers=_hdrs(),
+        json={"time": slot_time, "name": "Real Client", "mark_paid": True},
+    )
+    assert created.status_code == 200
+
+    reopened = admin_client.post(
+        f"/admin/api/event/{ev['id']}/unblock-slot",
+        headers=_hdrs(),
+        json={"booking_id": created.get_json()["booking_id"]},
+    )
+    assert reopened.status_code == 400
+    assert "internally" in reopened.get_json()["error"].lower()

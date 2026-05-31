@@ -262,6 +262,24 @@
           {% else %}—{% endif %}
         </span>
       </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <div class="field" style="margin-bottom:10px;">
+          <label for="contactEmail">Email</label>
+          <input class="input" id="contactEmail" type="email" value="{{ booking.email|e if booking.email else '' }}" placeholder="client@example.com">
+        </div>
+        <div class="field-grid" style="grid-template-columns:1fr 1fr; margin:0 0 10px;">
+          <div class="field">
+            <label for="contactPhone">Phone</label>
+            <input class="input" id="contactPhone" type="tel" value="{{ booking.phone|e if booking.phone else '' }}" placeholder="+1 403 555 1234">
+          </div>
+          <div class="field">
+            <label for="contactInstagram">Instagram</label>
+            <input class="input" id="contactInstagram" type="text" value="{{ booking.instagram|e if booking.instagram else '' }}" placeholder="@handle">
+          </div>
+        </div>
+        <button class="btn btn-outline" type="button" onclick="saveContact()">Save contact</button>
+        <p class="hint">Updates this booking and the matching client profile only.</p>
+      </div>
     </section>
 
     <!-- SESSION -->
@@ -344,6 +362,7 @@
         <a class="btn btn-outline" href="/admin/booking/{{ booking.id }}/invoice" target="_blank" rel="noopener">⬇ Download PDF</a>
         <button class="btn btn-accent" type="button" onclick="sendInvoice()">📧 Email invoice</button>
         <button class="btn btn-primary" type="button" onclick="requestBalance()">💸 Request balance</button>
+        <button class="btn btn-outline" type="button" onclick="recheckPayment()">↻ Recheck Interac</button>
       </div>
     </section>
 
@@ -451,6 +470,21 @@
     return null;
   }
 
+  async function saveContact() {
+    const email = (document.getElementById('contactEmail').value || '').trim();
+    const phone = (document.getElementById('contactPhone').value || '').trim();
+    const instagram = (document.getElementById('contactInstagram').value || '').trim();
+    showToast('Saving contact…');
+    const r = await adminPost('/contact', { email: email, phone: phone, instagram: instagram });
+    if (!r) return;
+    if (r.ok && r.data && r.data.success) {
+      showToast('Contact updated ✓', 'ok');
+      setTimeout(() => location.reload(), 650);
+    } else {
+      showToast((r.data && r.data.error) || 'Failed to update contact', 'err');
+    }
+  }
+
   async function requestBalance() {
     const balance = recalcInvoice();
     if (balance <= 0) { showToast('No remaining balance to request', 'err'); return; }
@@ -470,6 +504,23 @@
       showToast('Balance request sent ✓' + linkNote, 'ok');
     } else {
       showToast((data && data.error) || 'Failed to send balance request', 'err');
+    }
+  }
+
+  async function recheckPayment() {
+    showToast('Checking recent Interac emails…');
+    const r = await adminPost('/recheck-payment');
+    if (!r) return;
+    if (r.ok && r.data && r.data.success) {
+      const paid = Number(r.data.paid_amount || 0).toFixed(2);
+      const balance = Number(r.data.balance_due || 0).toFixed(2);
+      const message = r.data.updated
+        ? 'Payment corrected ✓ Paid $' + paid + ', balance $' + balance
+        : 'No newer Interac amount found';
+      showToast(message, r.data.updated ? 'ok' : '');
+      if (r.data.updated) setTimeout(() => location.reload(), 800);
+    } else {
+      showToast((r.data && r.data.error) || 'Failed to recheck Interac', 'err');
     }
   }
 

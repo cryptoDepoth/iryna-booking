@@ -18,6 +18,7 @@ import tempfile
 import pytest
 
 import app as booking_app
+import check_etransfer_v2 as checker
 
 
 # ── fixtures ──────────────────────────────────────────────────────────
@@ -220,9 +221,9 @@ def test_admin_review_email(admin_client, monkeypatch):
     captured = {}
     def mock_email(*a, **k):
         captured["called"] = True
+        captured["args"] = a
         return True
-    monkeypatch.setattr(booking_app, "_send_email_with_attachment", mock_email, raising=False)
-    monkeypatch.setattr(booking_app, "_send_email_raw", lambda *a, **k: True, raising=False)
+    monkeypatch.setattr(booking_app, "_send_email_raw", mock_email, raising=False)
 
     booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
 
@@ -231,6 +232,8 @@ def test_admin_review_email(admin_client, monkeypatch):
     data = resp.get_json()
     assert data.get("success") is True
     assert captured.get("called") is True
+    assert "https://review.pashynskaphoto.com" in captured["args"][4]
+    assert "Thank you for choosing Pashynska Photography. Review link" not in captured["args"][4]
 
 
 # 8. Detail page exposes one-page invoice/balance generator fields
@@ -250,7 +253,41 @@ def test_admin_booking_detail_has_inline_invoice_generator(admin_client, monkeyp
     assert "invoicePaidAmount" in html
     assert "invoiceBalanceDue" in html
     assert "Request balance" in html
+    assert "Recheck Interac" in html
     assert "300.00" in html
+
+
+def test_admin_recheck_payment_updates_paid_amount_from_interac(admin_client, monkeypatch):
+    """Admin can trigger the same safe Interac reconciliation from booking detail."""
+    booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
+    conn = sqlite3.connect(booking_app.DB_PATH)
+    conn.execute(
+        "UPDATE bookings SET event_id=?, date=?, time=?, name=?, full_price=?, paid_amount=?, deposit_amount=? WHERE id=?",
+        ("canoe-mini-session-2026-07-04", "2026-07-04", "13:30", "Yulia Levitskaya", 220.50, 110.25, 110.25, booking_id),
+    )
+    conn.commit()
+    conn.close()
+
+    def fake_check_single_email(email, pending, reconciliation):
+        assert pending == []
+        assert reconciliation and reconciliation[0]["id"] == booking_id
+        conn = sqlite3.connect(booking_app.DB_PATH)
+        conn.execute("UPDATE bookings SET paid_amount=? WHERE id=?", (120.50, booking_id))
+        conn.commit()
+        conn.close()
+        return None, None
+
+    monkeypatch.setattr(checker, "get_emails", lambda page_size=None: [{"id": "interac-194", "subject": "Interac e-Transfer"}])
+    monkeypatch.setattr(checker, "is_etransfer_email", lambda email: True)
+    monkeypatch.setattr(checker, "check_single_email", fake_check_single_email)
+
+    resp = admin_client.post(f"/admin/booking/{booking_id}/recheck-payment", json={})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["updated"] is True
+    assert data["paid_amount"] == 120.50
+    assert data["balance_due"] == 100.0
 
 
 # 9. Admin can edit invoice amounts from detail page without prompts
