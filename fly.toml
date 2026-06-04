@@ -7,6 +7,7 @@ app = 'iryna-booking'
 primary_region = 'sjc'
 
 [build]
+  dockerfile = "Dockerfile"
 
 [http_service]
   internal_port = 8080
@@ -24,10 +25,10 @@ primary_region = 'sjc'
     path = "/healthz"
 
 [[vm]]
-  memory = '256mb'
+  memory = '512mb'
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 256
+  memory_mb = 512
 
 [env]
   DB_PATH            = "/data/bookings.db"

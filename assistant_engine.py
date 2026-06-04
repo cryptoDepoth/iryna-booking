@@ -515,7 +515,7 @@ def _call_zai(message: str, history: list[dict[str, str]], context: dict[str, An
             "Content-Type": "application/json",
         },
         json=payload,
-        timeout=float(os.environ.get("ASSISTANT_ZAI_TIMEOUT", "18")),
+        timeout=float(os.environ.get("ASSISTANT_ZAI_TIMEOUT", "12")),
     )
     if response.status_code >= 400:
         raise RuntimeError(f"Z.ai API error {response.status_code}: {response.text[:400]}")
@@ -804,14 +804,15 @@ def answer_assistant_message(
     try:
         provider = os.environ.get("AI_PROVIDER", "auto").strip().lower()
         answer = None
-        if provider in {"auto", "openrouter"}:
-            answer = _call_openrouter(clean_message, clean_history, context, lang)
-            if answer:
-                source = "openrouter"
-        if not answer and provider in {"auto", "zai", "z.ai"}:
+        # ZAI first — glm-4.5-air is fast and already configured with API key
+        if provider in {"auto", "zai", "z.ai"}:
             answer = _call_zai(clean_message, clean_history, context, lang)
             if answer:
                 source = "zai"
+        if not answer and provider in {"auto", "openrouter"}:
+            answer = _call_openrouter(clean_message, clean_history, context, lang)
+            if answer:
+                source = "openrouter"
         if not answer and provider in {"auto", "openai"}:
             answer = _call_openai(clean_message, clean_history, context, lang)
             if answer:

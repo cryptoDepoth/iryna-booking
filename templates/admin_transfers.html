@@ -31,6 +31,17 @@
       <input type="file" name="csv" accept=".csv" required>
       <button class="btn" type="submit">⬆ Import CSV</button>
     </form>
+    <button class="btn ghost" type="button" onclick="autoLinkTransfers()" title="Associate transfers with bookings by name (does not change any booking's payment)">🔗 Auto-link matching</button>
+    <script>
+    async function autoLinkTransfers(){
+      try{
+        const res=await fetch('/admin/transfers/auto-link',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+        const d=await res.json().catch(()=>({}));
+        if(res.ok&&d.success){alert('Auto-linked '+(d.auto_linked||0)+' transfer(s) by name.');location.reload();}
+        else{alert((d&&d.error)||'Auto-link failed');}
+      }catch(e){alert('Auto-link error');}
+    }
+    </script>
   </section>
   <section class="stats">
     <div class="stat"><b>{{ stats.total or 0 }}</b><span>Total rows</span></div>

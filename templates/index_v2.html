@@ -569,6 +569,8 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 .assistant-form input:focus{border-color:var(--rose);box-shadow:0 0 0 3px rgba(196,133,122,.12)}
 .assistant-send{width:42px;height:42px;border-radius:50%;border:0;background:var(--rose);color:#fff;font-size:18px;font-weight:700;cursor:pointer;flex:0 0 auto}
 .assistant-send:disabled{opacity:.55;cursor:not-allowed}
+.assistant-book-chip{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:7px 14px;border:0;border-radius:20px;background:var(--rose);color:#fff;font-size:.78rem;font-weight:600;cursor:pointer;transition:background .15s,transform .12s}
+.assistant-book-chip:hover{background:var(--rose-deep);transform:translateY(-1px)}
 @media(max-width:560px){
   .assistant-launch{right:16px;bottom:16px;width:54px;height:54px}
   .assistant-launch svg{width:24px;height:24px}
@@ -2824,8 +2826,13 @@ async function sendAssistantMessage(event) {
     if (typing) {
       typing.classList.remove('loading');
       typing.innerHTML = escapeAssistantHtml(answer);
+      // Smart "Book this" chip
+      const matched = _matchEventInText(answer);
+      if (matched) _addBookChip(typing, matched.id);
     } else {
-      addAssistantMessage('bot', answer);
+      const msgEl = addAssistantMessage('bot', answer);
+      const matched = _matchEventInText(answer);
+      if (matched && msgEl) _addBookChip(msgEl, matched.id);
     }
     assistantHistory.push({role: 'assistant', content: answer});
     assistantHistory = assistantHistory.slice(-10);
@@ -2846,6 +2853,32 @@ async function sendAssistantMessage(event) {
 }
 
 document.addEventListener('DOMContentLoaded', updateAssistantLang);
+
+// ── Smart "Book this session" chip in assistant chat ──
+function _matchEventInText(text) {
+  // Find the first active event whose title/type appears in the answer
+  if (typeof eventsData === 'undefined' || !Array.isArray(eventsData)) return null;
+  const lower = (text || '').toLowerCase();
+  for (const ev of eventsData) {
+    const title = (ev.title || '').toLowerCase();
+    const stype = (ev.session_type || ev.type || '').toLowerCase();
+    if (title.length > 4 && lower.includes(title)) return ev;
+    if (stype.length > 3 && lower.includes(stype) && lower.includes((ev.date || '').slice(5))) return ev;
+  }
+  return null;
+}
+function _addBookChip(msgEl, eventId) {
+  const chip = document.createElement('button');
+  chip.className = 'assistant-book-chip';
+  const isRu = (typeof CURRENT_LANG !== 'undefined' && (CURRENT_LANG === 'ru' || CURRENT_LANG === 'uk'));
+  chip.textContent = isRu ? '→ Забронировать эту сессию' : '→ Book this session';
+  chip.onclick = function() {
+    toggleAssistant(false); // close chat
+    if (typeof openDrawer === 'function') openDrawer(eventId);
+  };
+  msgEl.appendChild(chip);
+}
+
 </script>
 <script>
 /* Motion / wow layer init — additive, prefers-reduced-motion safe */

@@ -17,7 +17,7 @@ import json
 import os
 import sys
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOKEN_PATH = os.path.join(HERE, "token.json")
 CRED_PATH = os.path.join(HERE, "credentials.json")
@@ -30,7 +30,20 @@ def _service():
     from googleapiclient.discovery import build
 
     creds = None
-    if os.path.exists(TOKEN_PATH):
+    # Production: token comes from env vars (no browser, no token.json file)
+    refresh_token = os.environ.get("GOOGLE_CALENDAR_REFRESH_TOKEN")
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    if refresh_token and client_id and client_secret:
+        creds = Credentials(
+            token=None,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=SCOPES,
+        )
+    elif os.path.exists(TOKEN_PATH):
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:

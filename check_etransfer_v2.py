@@ -18,6 +18,8 @@ import re
 import json
 import sqlite3
 import subprocess
+import threading
+import time
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 
@@ -25,6 +27,11 @@ DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "boo
 EVENTS_YAML_PATH = os.environ.get("EVENTS_YAML_PATH",
     os.path.join(os.path.dirname(__file__), "events.yaml"))
 ETRANSFER_EMAIL_PAGE_SIZE = int(os.environ.get("ETRANSFER_EMAIL_PAGE_SIZE", "75"))
+ETRANSFER_EMAIL_LOOKBACK_DAYS = int(os.environ.get("ETRANSFER_EMAIL_LOOKBACK_DAYS", "120"))
+ETRANSFER_EMAIL_TIMEOUT = int(os.environ.get("ETRANSFER_EMAIL_TIMEOUT", "20"))
+_EMAIL_FETCH_LOCK = threading.Lock()
+_EMAIL_FETCH_CACHE = {"ts": 0.0, "page_size": None, "lookback_days": None, "emails": None}
+_EMAIL_FETCH_CACHE_TTL = int(os.environ.get("ETRANSFER_EMAIL_CACHE_TTL", "60"))
 
 
 def get_db():
@@ -79,63 +86,132 @@ def mark_message_processed(message_id, booking_id, amount):
     conn.close()
 
 
-def get_emails(page_size=None):
-    """Fetch recent emails via Himalaya CLI."""
+def get_emails(page_size=None, lookback_days=None):
+    """Fetch recent incoming Interac emails via Himalaya CLI.
+
+    Guardrails for production:
+    - filter on the Gmail server instead of listing the entire INBOX;
+    - only one Himalaya fetch may run at a time;
+    - recent successful results are cached briefly;
+    - timeout is short so Gmail slowness cannot make Fly mark the app unhealthy.
+    """
     page_size = int(page_size or ETRANSFER_EMAIL_PAGE_SIZE)
-    commands = [
-        [
+    lookback_days = max(1, int(lookback_days or ETRANSFER_EMAIL_LOOKBACK_DAYS))
+    now = time.time()
+    cached = _EMAIL_FETCH_CACHE
+    if (
+        cached.get("emails") is not None
+        and cached.get("page_size") == page_size
+        and cached.get("lookback_days") == lookback_days
+        and now - float(cached.get("ts") or 0) <= _EMAIL_FETCH_CACHE_TTL
+    ):
+        return cached.get("emails")
+
+    if not _EMAIL_FETCH_LOCK.acquire(blocking=False):
+        print("[himalaya] envelope list skipped: another fetch is already running")
+        return cached.get("emails")
+
+    try:
+        after_date = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).date().isoformat()
+        base_command = [
             "himalaya", "envelope", "list",
+            "--quiet",
             "--folder", "INBOX",
             "--page-size", str(page_size),
             "-o", "json",
-            "order", "by", "date", "desc",
-        ],
-        ["himalaya", "envelope", "list", "--folder", "INBOX", "-o", "json"],
-    ]
-    try:
-        result = None
-        for cmd in commands:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                break
-        if result is None or result.returncode != 0:
-            rc = result.returncode if result else "?"
-            print(f"[himalaya] envelope list failed: rc={rc}")
+            "from", "interac.ca",
+            "and", "after", after_date,
+        ]
+        commands = [
+            base_command + ["order", "by", "date", "desc"],
+            base_command,
+        ]
+        try:
+            result = None
+            for cmd in commands:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=ETRANSFER_EMAIL_TIMEOUT)
+                if result.returncode == 0:
+                    break
+            if result is None or result.returncode != 0:
+                rc = result.returncode if result else "?"
+                detail = ((result.stderr if result else "") or "").strip()[-300:]
+                print(f"[himalaya] filtered Interac envelope list failed: rc={rc} {detail}")
+                return None
+            raw = result.stdout.strip()
+            if not raw:
+                emails = []
+                _EMAIL_FETCH_CACHE.update({
+                    "ts": time.time(),
+                    "page_size": page_size,
+                    "lookback_days": lookback_days,
+                    "emails": emails,
+                })
+                return emails
+            try:
+                parsed = json.loads(raw)
+                emails = parsed if isinstance(parsed, list) else []
+                _EMAIL_FETCH_CACHE.update({
+                    "ts": time.time(),
+                    "page_size": page_size,
+                    "lookback_days": lookback_days,
+                    "emails": emails,
+                })
+                return emails
+            except json.JSONDecodeError:
+                pass
+            lines = raw.split("\n")
+            json_line = None
+            for line in lines:
+                line = line.strip()
+                if line.startswith("[") or line.startswith("{"):
+                    json_line = line
+                    break
+            emails = [] if not json_line else json.loads(json_line)
+            _EMAIL_FETCH_CACHE.update({
+                "ts": time.time(),
+                "page_size": page_size,
+                "lookback_days": lookback_days,
+                "emails": emails,
+            })
+            return emails
+        except Exception as e:
+            print(f"[himalaya] Error fetching emails: {e}")
             return None
-        lines = result.stdout.strip().split("\n")
-        json_line = None
-        for line in lines:
-            line = line.strip()
-            if line.startswith("[") or line.startswith("{"):
-                json_line = line
-                break
-        if not json_line:
-            return []
-        return json.loads(json_line)
-    except Exception as e:
-        print(f"[himalaya] Error fetching emails: {e}")
-        return None
+    finally:
+        _EMAIL_FETCH_LOCK.release()
 
 
 def is_etransfer_email(email):
-    """Check if email is an Interac e-Transfer notification."""
+    """Check if an envelope is an incoming Interac payment notification.
+
+    Interac also sends outgoing-transfer notifications. Those must never
+    confirm a client booking merely because the amount happens to match.
+    """
     subject = email.get("subject", "").lower()
     sender = email.get("from", {}).get("addr", "").lower()
 
-    keywords = ["interac", "e-transfer", "etransfer", "transfer received", "deposit received"]
+    incoming_markers = [
+        "you've received",
+        "you have received",
+        "funds deposited",
+        "funds have been deposited",
+        "automatically deposited",
+        "transfer received",
+        "deposit received",
+    ]
     sender_domains = ["interac.ca", "payments.interac.ca", "notify.interac.ca"]
 
-    has_keyword = any(kw in subject for kw in keywords)
+    is_incoming = any(marker in subject for marker in incoming_markers)
     from_interac = any(domain in sender for domain in sender_domains)
 
-    return has_keyword or from_interac
+    return bool(from_interac and is_incoming)
 
 
 def read_message_body(email_id):
     """Return normalized plain text for a Himalaya message id."""
     try:
         result = subprocess.run(
-            ["himalaya", "message", "read", str(email_id), "-o", "json"],
+            ["himalaya", "message", "read", str(email_id), "--quiet", "-o", "json"],
             capture_output=True, text=True, timeout=15
         )
         if result.returncode != 0:
@@ -307,7 +383,7 @@ def get_expected_amount_for_booking(booking_id):
     return 95.0
 
 
-def get_pending_bookings(within_minutes=30, grace_minutes=60):
+def get_pending_bookings(within_minutes=30, grace_minutes=60, pending_payment_hours=24):
     """Get bookings awaiting payment, created within recent window.
 
     grace_minutes: also include bookings whose reservation expired up to
@@ -318,18 +394,22 @@ def get_pending_bookings(within_minutes=30, grace_minutes=60):
     conn = get_db()
     c = conn.cursor()
     now = datetime.now()
-    # Accept bookings that still have an active hold OR expired within the grace window
+    # Plain reservations are short-lived. Once the client says payment was
+    # submitted, keep the booking matchable while Interac/Gmail is delayed.
     grace_cutoff = (now - timedelta(minutes=grace_minutes)).strftime('%Y-%m-%d %H:%M:%S')
     created_cutoff = (now - timedelta(minutes=within_minutes + grace_minutes)).strftime('%Y-%m-%d %H:%M:%S')
+    pending_cutoff = (now - timedelta(hours=pending_payment_hours)).strftime('%Y-%m-%d %H:%M:%S')
     c.execute("""
         SELECT * FROM bookings
-        WHERE status IN ('reserved', 'pending_payment')
-        AND reserved_until > ?
-        AND confirmed = 0
+        WHERE confirmed = 0
         AND paid = 0
-        AND created_at > ?
+        AND (
+            (status = 'reserved' AND reserved_until > ? AND created_at > ?)
+            OR
+            (status = 'pending_payment' AND created_at > ?)
+        )
         ORDER BY created_at DESC
-    """, (grace_cutoff, created_cutoff))
+    """, (grace_cutoff, created_cutoff, pending_cutoff))
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return rows
@@ -613,18 +693,54 @@ def match_reconciliation_payment(amount, bookings, body):
     return None, best
 
 
+def match_ambiguous_pending_by_body(bookings, body):
+    """Resolve an amount collision only when the Interac body is strongly unique.
+
+    Mini-session clients commonly owe the same deposit. Name/date/time can
+    safely distinguish them, but weak or tied matches must remain manual.
+    """
+    matches = []
+    for booking in bookings:
+        score = sum([
+            _body_has_booking_name(body, booking),
+            _body_has_booking_date(body, booking),
+            _body_has_booking_time(body, booking),
+        ])
+        if score >= 2:
+            matches.append((score, booking))
+    if not matches:
+        return None
+    matches.sort(key=lambda item: item[0], reverse=True)
+    best_score = matches[0][0]
+    best = [booking for score, booking in matches if score == best_score]
+    return best[0] if len(best) == 1 else None
+
+
+def _classify_amount_for_booking(amount, booking):
+    expected = get_expected_amount_for_booking(booking["id"])
+    diff = amount - expected
+    if abs(diff) < 0.01:
+        return "exact"
+    if diff > 0:
+        full = _get_booking_full_price(booking)
+        cap = full if full > expected else expected * 2
+        return "overpaid" if amount <= cap + 1.0 else None
+    if amount >= expected * 0.3:
+        return "underpaid"
+    return None
+
+
 def _notify_admin_ambiguity(amount, candidates):
     """Send admin notification when amount matches multiple bookings."""
-    # This will be called from timed_cron.py context where app functions are available
     try:
-        from app import _tg_message
+        from app import _notify_admin
         lines = [f"⚠️ **Ambiguous payment: ${amount:.2f}**",
                  f"Matches {len(candidates)} bookings:", ""]
         for b in candidates:
             lines.append(f"  • #{b['id']} {b['name']} @ {b['date']} {b['time']} ({b['email']})")
         lines.append("")
         lines.append("Please manually confirm the correct booking.")
-        _tg_message("\n".join(lines))
+        _notify_admin("\n".join(lines))
         print(f"[admin] Ambiguity alert sent for ${amount:.2f}")
     except Exception as e:
         print(f"[admin] Failed to send ambiguity alert: {e}")
@@ -633,7 +749,7 @@ def _notify_admin_ambiguity(amount, candidates):
 def _notify_admin_orphan(amount, body, msg_id):
     """Send admin notification when e-Transfer has no matching pending booking."""
     try:
-        from app import _tg_message
+        from app import _notify_admin
         # Extract sender info from body for context
         snippet = body[:500].replace('\n', ' ').strip()
         lines = [
@@ -648,7 +764,7 @@ def _notify_admin_orphan(amount, body, msg_id):
             f"Message ID: `{msg_id}`",
             f"Action needed: check if client paid without booking, or booking expired."
         ]
-        _tg_message("\n".join(lines))
+        _notify_admin("\n".join(lines))
         print(f"[admin] Orphan alert sent for ${amount:.2f}")
     except Exception as e:
         print(f"[admin] Failed to send orphan alert: {e}")
@@ -657,7 +773,7 @@ def _notify_admin_orphan(amount, body, msg_id):
 def _notify_admin_overpaid(booking, expected, actual):
     """Notify admin: client paid more than expected — auto-confirmed."""
     try:
-        from app import _tg_message
+        from app import _notify_admin
         diff = actual - expected
         total = _get_booking_full_price(booking)
         balance = max(total - actual, 0)
@@ -671,7 +787,7 @@ def _notify_admin_overpaid(booking, expected, actual):
             f"✅ Auto-confirmed",
             f"Remaining balance: ${balance:.2f}",
         ]
-        _tg_message("\n".join(lines))
+        _notify_admin("\n".join(lines))
         print(f"[admin] Overpaid alert sent for #{booking['id']} (${actual:.2f})")
     except Exception as e:
         print(f"[admin] Failed to send overpaid alert: {e}")
@@ -680,7 +796,7 @@ def _notify_admin_overpaid(booking, expected, actual):
 def _notify_admin_underpaid(booking, expected, actual):
     """Notify admin: client paid less than expected — NOT confirmed."""
     try:
-        from app import _tg_message
+        from app import _notify_admin
         diff = expected - actual
         lines = [
             f"⚠️ **Payment received (UNDERPAID)**",
@@ -692,7 +808,7 @@ def _notify_admin_underpaid(booking, expected, actual):
             f"❌ NOT confirmed — recorded as partial_payment.",
             f"Action: confirm manually or contact the client.",
         ]
-        _tg_message("\n".join(lines))
+        _notify_admin("\n".join(lines))
         print(f"[admin] Underpaid alert sent for #{booking['id']} (${actual:.2f})")
     except Exception as e:
         print(f"[admin] Failed to send underpaid alert: {e}")
@@ -701,7 +817,7 @@ def _notify_admin_underpaid(booking, expected, actual):
 def _notify_admin_reconciled(booking, previous, actual):
     """Notify admin that a later Interac email corrected paid_amount."""
     try:
-        from app import _tg_message
+        from app import _notify_admin
         total = _get_booking_full_price(booking)
         balance = max(total - actual, 0)
         lines = [
@@ -712,7 +828,7 @@ def _notify_admin_reconciled(booking, previous, actual):
             f"Interac amount: ${actual:.2f}",
             f"Remaining balance now: ${balance:.2f}",
         ]
-        _tg_message("\n".join(lines))
+        _notify_admin("\n".join(lines))
         print(f"[admin] Reconciled paid_amount for #{booking['id']}: ${previous:.2f} -> ${actual:.2f}")
     except Exception as e:
         print(f"[admin] Failed to send reconciliation alert: {e}")
@@ -765,7 +881,7 @@ def _parse_db_datetime(value):
     return None
 
 
-def _filter_bookings_created_before_email(email, bookings):
+def _filter_bookings_created_before_email(email, bookings, body=None):
     """Prevent stale e-Transfer emails from confirming future bookings."""
     email_dt = _parse_email_datetime(email.get("date"))
     if email_dt is None:
@@ -780,6 +896,17 @@ def _filter_bookings_created_before_email(email, bookings):
         # Allow a small clock-skew grace window, but reject old emails for new bookings.
         if created_dt <= email_dt + timedelta(minutes=2):
             safe.append(booking)
+            continue
+        # Some clients pay first, then finish the booking form. Permit that
+        # only when the Interac message strongly identifies this exact booking.
+        if body and created_dt <= email_dt + timedelta(hours=24):
+            score = sum([
+                _body_has_booking_name(body, booking),
+                _body_has_booking_date(body, booking),
+                _body_has_booking_time(body, booking),
+            ])
+            if score >= 2:
+                safe.append(booking)
     return safe
 
 
@@ -788,6 +915,17 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
     Returns (confirmed_booking_id, ambiguity_list) or (None, None)."""
     msg_id = str(email.get("id", ""))
     if not msg_id:
+        return None, None
+
+    reconciliation_bookings = reconciliation_bookings or []
+    processed = get_processed_email(msg_id)
+    if processed and processed.get("booking_id") is not None:
+        # Already-linked messages have completed their payment side effects.
+        # Avoid re-reading every old Gmail body on every watcher pass.
+        print(f"   [skip] Message {msg_id} already linked to booking #{processed.get('booking_id')}")
+        return None, None
+    if processed and not reconciliation_bookings:
+        print(f"   [skip] Message {msg_id} already processed; no reconciliation candidates")
         return None, None
 
     body = read_message_body(msg_id)
@@ -816,13 +954,11 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
     except Exception as _e:
         print(f"   [ledger] record failed: {_e}")
 
-    reconciliation_bookings = reconciliation_bookings or []
-    processed = get_processed_email(msg_id)
     if processed:
         # Do not re-confirm/re-run side effects. The one safe exception is
         # money reconciliation: an earlier run may have recorded the Interac
         # email as orphan/processed before a manual confirmation existed.
-        recon_candidates = _filter_bookings_created_before_email(email, reconciliation_bookings)
+        recon_candidates = _filter_bookings_created_before_email(email, reconciliation_bookings, body)
         processed_booking_id = processed.get("booking_id")
         if processed_booking_id:
             recon_candidates = [
@@ -844,22 +980,30 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
         print(f"   [skip] Message {msg_id} already processed")
         return None, None
 
-    original_booking_count = len(bookings or [])
-    bookings = _filter_bookings_created_before_email(email, bookings or [])
+    bookings = _filter_bookings_created_before_email(email, bookings or [], body)
+    eligible_pending_count = len(bookings)
 
     matched, ambiguous, match_type = match_by_amount_only(amount, bookings) if bookings else (None, [], None)
 
     if ambiguous:
-        print(f"   ⚠️ Ambiguity: ${amount:.2f} matches {len(ambiguous)} bookings")
-        _notify_admin_ambiguity(amount, ambiguous)
-        # Do NOT mark ambiguous messages as processed.
-        # A common real-world case is two temporary reservations with the same
-        # deposit amount. One may expire moments later; keeping the message
-        # unprocessed lets the watcher retry and confirm the remaining booking.
-        return None, ambiguous
+        strong_match = match_ambiguous_pending_by_body(ambiguous, body)
+        if strong_match is not None:
+            matched = strong_match
+            match_type = _classify_amount_for_booking(amount, matched)
+            ambiguous = []
+            print(
+                f"   ✅ Strong body match resolved amount collision: "
+                f"Booking #{matched['id']} ({match_type})"
+            )
+        else:
+            print(f"   ⚠️ Ambiguity: ${amount:.2f} matches {len(ambiguous)} bookings")
+            _notify_admin_ambiguity(amount, ambiguous)
+            # Do NOT mark ambiguous messages as processed. A later retry may
+            # become unique after a temporary reservation is released.
+            return None, ambiguous
 
     if matched is None:
-        recon_candidates = _filter_bookings_created_before_email(email, reconciliation_bookings)
+        recon_candidates = _filter_bookings_created_before_email(email, reconciliation_bookings, body)
         reconciled, recon_ambiguous = match_reconciliation_payment(amount, recon_candidates, body)
         if recon_ambiguous:
             print(f"   ⚠️ Reconciliation ambiguity: ${amount:.2f} matches {len(recon_ambiguous)} confirmed bookings")
@@ -873,8 +1017,8 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
                 print(f"   ✅ RECONCILED Booking #{reconciled['id']} paid_amount ${previous:.2f} → ${amount:.2f}")
             return None, None
 
-        if not original_booking_count:
-            print(f"   [skip] No pending bookings for message {msg_id}; no safe reconciliation match")
+        if not eligible_pending_count:
+            print(f"   [skip] No eligible pending bookings for message {msg_id}; no safe reconciliation match")
             return None, None
 
         print(f"   ❌ No booking matches ${amount:.2f}")
@@ -902,7 +1046,7 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
             mark_message_processed(msg_id, matched["id"], amount)
             _notify_admin_underpaid(matched, expected, amount)
             print(f"   ⚠️ UNDERPAID Booking #{matched['id']} — ${amount:.2f} (expected ${expected:.2f}); NOT confirmed")
-            return matched["id"], None
+            return None, None
         # Booking already confirmed or gone — mark processed so we don't retry-loop.
         print(f"   [skip] Could not record partial payment for #{matched['id']} (already confirmed?)")
         mark_message_processed(msg_id, matched["id"], amount)
@@ -920,7 +1064,7 @@ if __name__ == "__main__":
         sys.exit(1)
     etransfers = [e for e in emails if is_etransfer_email(e)]
     print(f"Found {len(etransfers)} e-Transfer emails")
-    bookings = get_pending_booking()
+    bookings = get_pending_bookings()
     print(f"Found {len(bookings)} pending bookings")
     for e in etransfers:
         check_single_email(e, bookings)

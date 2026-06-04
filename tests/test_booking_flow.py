@@ -5,6 +5,7 @@ Uses a temp SQLite database and mocks external services.
 """
 import os
 import tempfile
+from datetime import datetime, timedelta
 import pytest
 
 import app as booking_app  # noqa: E402
@@ -199,6 +200,31 @@ def test_reserve_and_confirm_flow(client):
     assert status2["confirmed"] is True
     assert status2["paid"] is True
     assert status2["paid_amount"] == 95.00
+
+
+def test_payment_submitted_extends_slot_protection_for_interac_delay(client):
+    c, db_path = client_tuple = client
+    slot_time, _date, event_id = _first_slot(client_tuple)
+    reserve = _reserve(c, slot_time, event_id, email="slow-interac@test.com")
+    booking_id = reserve.get_json()["booking_id"]
+    token = reserve.get_json()["confirmation_token"]
+
+    before = datetime.now()
+    response = c.post("/confirm", json={
+        "booking_id": booking_id,
+        "confirmation_token": token,
+    })
+
+    assert response.status_code == 200
+    conn = booking_app.db_conn()
+    row = conn.execute(
+        "SELECT status, reserved_until FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    assert row["status"] == "pending_payment"
+    protected_until = datetime.fromisoformat(row["reserved_until"])
+    assert protected_until >= before + timedelta(hours=23)
 
 
 def test_reserve_hides_slot(client):
@@ -472,6 +498,24 @@ def test_health_endpoint_returns_json(client):
     assert "checks" in data
     assert "database" in data["checks"]
     assert data["checks"]["database"]["ok"] is True
+
+
+def test_health_endpoint_exposes_last_gmail_scan_failure(client, monkeypatch):
+    c, _ = client
+    monkeypatch.setitem(booking_app._watcher_state, "last_email_scan_ok", False)
+    monkeypatch.setitem(booking_app._watcher_state, "last_email_scan_error", "filtered scan timed out")
+    monkeypatch.setitem(booking_app._watcher_state, "last_email_scan_at", "2026-06-04T10:00:00+00:00")
+
+    resp = c.get("/admin/health", headers={"X-Admin-Key": "test-admin-key"})
+
+    assert resp.status_code == 503
+    email_health = resp.get_json()["checks"]["email_himalaya"]
+    assert email_health["ok"] is False
+    assert email_health["error"] in {
+        "filtered scan timed out",
+        "himalaya CLI not found in PATH — emails will silently fail",
+    }
+    assert email_health["last_scan_at"] == "2026-06-04T10:00:00+00:00"
 
 
 def test_public_events_exclude_past_and_hidden_sessions(client, monkeypatch):

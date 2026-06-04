@@ -33,8 +33,10 @@ import sqlite3
 import requests
 import threading
 import sys
+import re
 import time
 import yaml
+from html import escape as html_escape
 
 # ===== LOGGING =====
 # Write log to persistent volume when available, else next to app
@@ -172,6 +174,12 @@ def _inject_site_links():
 # original domain via Cf-Worker and 301 to the canonical site.
 @app.before_request
 def _canonical_redirect():
+    # Never redirect machine-to-machine webhooks. Stripe signs the exact POST
+    # payload and expects this endpoint to answer directly; a 301 from the
+    # legacy pashynska.agency Cloudflare Worker prevents auto-confirmation.
+    if request.path in ("/stripe/webhook", "/telegram/webhook"):
+        return None
+
     cf_worker = request.headers.get("Cf-Worker", "").lower()
     if cf_worker in ("pashynska.agency", "www.pashynska.agency"):
         new_url = request.url.replace(
@@ -192,6 +200,14 @@ PYTHON_BIN = os.environ.get("PYTHON_BIN", sys.executable)
 import threading as _threading
 
 _watcher_started = False
+_watcher_state = {
+    "last_email_scan_at": None,
+    "last_email_scan_ok": None,
+    "last_email_scan_error": None,
+    "last_email_count": 0,
+    "last_auto_confirmed_booking_id": None,
+    "last_auto_confirmed_at": None,
+}
 
 def _watcher_thread():
     """Daemon thread — does two periodic jobs:
@@ -204,6 +220,12 @@ def _watcher_thread():
     """
     import time as _time
     CHECK_INTERVAL = 30  # seconds — fast enough to free slots for the next visitor
+    EMAIL_POLL_INTERVAL = int(os.environ.get("ETRANSFER_EMAIL_POLL_INTERVAL", "60"))
+    RECONCILIATION_INTERVAL = int(os.environ.get("ETRANSFER_RECONCILIATION_INTERVAL", "1800"))
+    LIVE_EMAIL_PAGE_SIZE = int(os.environ.get("ETRANSFER_LIVE_EMAIL_PAGE_SIZE", "25"))
+    LIVE_EMAIL_LOOKBACK_DAYS = int(os.environ.get("ETRANSFER_LIVE_EMAIL_LOOKBACK_DAYS", "7"))
+    last_email_poll = 0.0
+    last_reconciliation_poll = 0.0
     log_w = logging.getLogger("watcher")
     log_w.info("[watcher] Global e-Transfer + slot-expiry watcher started")
 
@@ -223,19 +245,47 @@ def _watcher_thread():
 
         # 2. Poll Gmail for e-Transfer notifications and match to pending bookings.
         try:
+            now = _time.time()
             pending = get_pending_bookings(within_minutes=30)
-            reconciliation = get_reconciliation_bookings(within_days=120)
-            if pending or reconciliation:
-                emails = get_emails()
-                if emails:
+            should_poll_email = bool(pending) and (now - last_email_poll >= EMAIL_POLL_INTERVAL)
+
+            # Reconciliation is useful, but it is not time-critical. Running it
+            # every 30 seconds kept spawning slow Gmail/Himalaya processes and
+            # caused Fly health-check flapping under load.
+            reconciliation = []
+            if now - last_reconciliation_poll >= RECONCILIATION_INTERVAL:
+                reconciliation = get_reconciliation_bookings(within_days=120)
+                should_poll_email = should_poll_email or bool(reconciliation)
+                last_reconciliation_poll = now
+
+            if should_poll_email:
+                last_email_poll = now
+                emails = get_emails(
+                    page_size=LIVE_EMAIL_PAGE_SIZE,
+                    lookback_days=LIVE_EMAIL_LOOKBACK_DAYS,
+                )
+                _watcher_state["last_email_scan_at"] = datetime.now(timezone.utc).isoformat()
+                _watcher_state["last_email_scan_ok"] = emails is not None
+                _watcher_state["last_email_scan_error"] = (
+                    None if emails is not None else "Could not fetch filtered Interac emails from Gmail"
+                )
+                _watcher_state["last_email_count"] = len(emails or [])
+                if emails is None:
+                    log_w.error("[watcher] Filtered Interac Gmail scan failed")
+                elif emails:
                     for email in emails:
                         if is_etransfer_email(email):
                             confirmed_id, _ambiguous = check_single_email(email, pending, reconciliation)
                             if confirmed_id:
                                 _after_auto_payment_confirmed(confirmed_id)
+                                _watcher_state["last_auto_confirmed_booking_id"] = confirmed_id
+                                _watcher_state["last_auto_confirmed_at"] = datetime.now(timezone.utc).isoformat()
             else:
-                log_w.debug("[watcher] No pending/reconciliation bookings")
+                log_w.debug("[watcher] No pending/reconciliation work or email poll throttled")
         except Exception as e:
+            _watcher_state["last_email_scan_at"] = datetime.now(timezone.utc).isoformat()
+            _watcher_state["last_email_scan_ok"] = False
+            _watcher_state["last_email_scan_error"] = str(e)
             log_w.error(f"[watcher] e-Transfer check error: {e}")
 
         _time.sleep(CHECK_INTERVAL)
@@ -364,6 +414,15 @@ def admin_required(f):
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "792920251")  # Andrzej — always gets copies
+TELEGRAM_EXTRA_ADMIN_CHAT_IDS = os.environ.get("TELEGRAM_EXTRA_ADMIN_CHAT_IDS", "")
+# Telegram users allowed to press admin inline buttons. Usernames are case-insensitive
+# and do not include @. Default allows Iryna's public account once Telegram includes
+# username in callback_query.from. User IDs are more reliable and can be supplied via env.
+TELEGRAM_ALLOWED_ADMIN_USERNAMES = os.environ.get(
+    "TELEGRAM_ALLOWED_ADMIN_USERNAMES",
+    "pashynskaphoto",
+)
+TELEGRAM_ALLOWED_ADMIN_USER_IDS = os.environ.get("TELEGRAM_ALLOWED_ADMIN_USER_IDS", "")
 # Secret token for the Telegram webhook (set when calling setWebhook). When set,
 # every incoming POST /telegram/webhook must carry the matching value in the
 # X-Telegram-Bot-Api-Secret-Token header — otherwise the request is rejected.
@@ -373,6 +432,45 @@ TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 BASE_URL = os.environ.get("BOOKING_BASE_URL", "")
 # CANONICAL_SITE_URL / CANONICAL_SITE_HOST live near the top of this module so
 # _canonical_redirect (which runs before this point) can use them too.
+
+
+def _split_csv_env(value):
+    """Parse comma/space-separated env values into non-empty strings."""
+    if not value:
+        return []
+    return [item.strip() for item in re.split(r"[,\s]+", str(value)) if item.strip()]
+
+
+def _telegram_admin_chat_ids():
+    """All chats that should receive booking admin notifications/buttons."""
+    ids = []
+    for chat_id in [TELEGRAM_CHAT_ID, TELEGRAM_ADMIN_CHAT_ID, *_split_csv_env(TELEGRAM_EXTRA_ADMIN_CHAT_IDS)]:
+        if chat_id and str(chat_id) not in [str(existing) for existing in ids]:
+            ids.append(str(chat_id))
+    return ids
+
+
+def _telegram_allowed_admin_usernames():
+    return {u.lower().lstrip("@") for u in _split_csv_env(TELEGRAM_ALLOWED_ADMIN_USERNAMES)}
+
+
+def _telegram_allowed_admin_user_ids():
+    ids = {str(i) for i in _split_csv_env(TELEGRAM_ALLOWED_ADMIN_USER_IDS)}
+    # In a private Telegram chat, chat_id equals user_id; keep existing admin chats
+    # allowed unless a deployment overrides with more specific user IDs.
+    ids.update(str(i) for i in [TELEGRAM_CHAT_ID, TELEGRAM_ADMIN_CHAT_ID] if i)
+    return ids
+
+
+def _is_telegram_admin_callback(cb):
+    """Return True if callback_query.from is allowed to mutate bookings."""
+    user = cb.get("from") or {}
+    user_id = str(user.get("id") or "")
+    username = str(user.get("username") or "").lower().lstrip("@")
+    return bool(
+        (user_id and user_id in _telegram_allowed_admin_user_ids())
+        or (username and username in _telegram_allowed_admin_usernames())
+    )
 
 
 def _tg_send(chat_id, text, reply_markup=None):
@@ -396,14 +494,14 @@ def _tg_send(chat_id, text, reply_markup=None):
         else:
             log.error(f"[tg] Send failed ({r.status_code}): {r.text[:200]}")
     except Exception as e:
-        log.error(f"[tg] Send error: {e}")
-    return None
+        log.error(f"[tg] Error: {e}")
 
 
 def _notify_admin(message, reply_markup=None):
-    """Send notification to both Iryna and Andrzej via Telegram."""
-    _tg_send(TELEGRAM_CHAT_ID, message, reply_markup=reply_markup)
-    _tg_send(TELEGRAM_ADMIN_CHAT_ID, message, reply_markup=reply_markup)
+    """Send notification to all configured booking admins via Telegram."""
+    for chat_id in _telegram_admin_chat_ids():
+        _tg_send(chat_id, message, reply_markup=reply_markup)
+
 
 
 def _tg_escape(value):
@@ -526,8 +624,7 @@ def _notify_payment_pending(booking_id, client_name, client_email, event_date,
         link_row.append({"text": "📸 Instagram", "url": f"https://instagram.com/{ig_clean}"})
 
     keyboard = {"inline_keyboard": [action_row, link_row]}
-    _tg_send(TELEGRAM_CHAT_ID, text, reply_markup=keyboard)
-    _tg_send(TELEGRAM_ADMIN_CHAT_ID, text, reply_markup=keyboard)
+    _notify_admin(text, reply_markup=keyboard)
 
 
 def _send_client_email(to_email, client_name, event_date, slot_time, event_title, booking_id, location=None, location_url=None):
@@ -1369,6 +1466,322 @@ def healthz():
     return jsonify({"ok": True, "service": "iryna-booking"}), 200
 
 
+_REVIEW_AI_RATE: dict[str, list[float]] = {}
+_REVIEW_STYLE_LABELS = {
+    "family": "family photo session",
+    "maternity": "maternity photo session",
+    "couple": "couple photo session",
+    "newborn": "newborn photo session",
+}
+_REVIEW_STATIC_FALLBACKS = {
+    "family": [
+        "We had a wonderful family photo session with Iryna. She made everyone feel comfortable, guided us gently, and captured beautiful natural moments that really feel like us. The photos are warm, timeless, and full of emotion. Highly recommend Pashynska Photography for families in Calgary.",
+        "Iryna is incredibly talented with families. She kept our kids engaged, found perfect light, and the photos turned out better than we ever imagined. Natural, emotional, and authentic — exactly what we wanted.",
+        "Amazing experience from start to finish. Iryna created a relaxed atmosphere and captured genuine smiles and candid moments. The gallery is stunning — every photo tells a story. We will treasure them forever.",
+    ],
+    "maternity": [
+        "Iryna made my maternity session feel calm, beautiful, and very comfortable. She guided the poses naturally and captured such tender, meaningful photos. The final gallery feels elegant, warm, and emotional. I highly recommend Pashynska Photography.",
+        "A truly magical experience. Iryna knew exactly how to highlight the beauty of pregnancy with soft light and graceful poses. The photos are intimate, artistic, and deeply personal — I will cherish them forever.",
+        "I felt so at ease during my maternity shoot. Iryna created a peaceful environment and captured moments I didn't even realize were happening. Every image is soft, glowing, and full of love.",
+    ],
+    "couple": [
+        "Our couple session with Iryna was relaxed, natural, and so much fun. She helped us feel comfortable in front of the camera and captured genuine connection instead of stiff poses. The photos are beautiful and full of emotion.",
+        "Iryna has a gift for capturing real connection. The session felt like a date, not a photoshoot. The photos are romantic, authentic, and absolutely stunning — we couldn't be happier.",
+        "We were nervous about being photographed, but Iryna made it effortless. She found the perfect light and caught us laughing and truly enjoying each other. Highly recommend for any couple in Calgary.",
+    ],
+    "newborn": [
+        "Iryna was patient, gentle, and thoughtful during our newborn session. She created a calm experience and captured beautiful details and family moments we will treasure forever. The photos feel warm, natural, and timeless.",
+        "The newborn session exceeded every expectation. Iryna was so gentle with our baby and captured tiny details we will never forget. The photos are soft, pure, and absolutely heart-melting.",
+        "We are so grateful for Iryna's patience and artistry. She created a safe, warm environment for our newborn and captured the most precious family moments. Every photo is a treasure.",
+    ],
+}
+
+
+def _review_fallback(style: str) -> str:
+    variants = _REVIEW_STATIC_FALLBACKS.get(style, _REVIEW_STATIC_FALLBACKS["family"])
+    return variants[int(time.time() * 1000) % len(variants)]
+
+
+def _review_ai_allowed(ip_key: str) -> bool:
+    now = time.time()
+    window = 60.0
+    hits = [ts for ts in _REVIEW_AI_RATE.get(ip_key, []) if now - ts < window]
+    limit = int(os.environ.get("REVIEW_AI_RATE_LIMIT_PER_MINUTE", "12"))
+    if len(hits) >= limit:
+        _REVIEW_AI_RATE[ip_key] = hits
+        return False
+    hits.append(now)
+    _REVIEW_AI_RATE[ip_key] = hits
+    return True
+
+
+def _clean_review_text(text: str) -> str:
+    text = re.sub(r"```.*?```", "", str(text or ""), flags=re.S).strip()
+    text = re.sub(r"^[-*\d.\s]+", "", text).strip().strip('"“”')
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"Pashynka\s+Photography", "Pashynska Photography", text, flags=re.I)
+    text = re.sub(r"Пашынська\s+Фотографія", "Pashynska Photography", text, flags=re.I)
+    text = re.sub(r"Пашинской\s+фотографии", "Ирине", text, flags=re.I)
+    text = re.sub(r"Пашинская\s+фотография", "Pashynska Photography", text, flags=re.I)
+    return text[:900]
+
+
+def _review_ai_endpoint() -> str:
+    url = (os.environ.get("REVIEW_AI_BASE_URL") or os.environ.get("ZAI_CHAT_COMPLETIONS_URL") or "https://api.z.ai/api/paas/v4/chat/completions").strip().rstrip("/")
+    if not url.endswith("/chat/completions"):
+        url = f"{url}/chat/completions"
+    return url
+
+
+def _generate_ai_review_text(style: str, lang: str, previous: str = "") -> tuple[str, str]:
+    """Generate one fresh client-editable Google review draft via Z.ai/GLM."""
+    api_key = os.environ.get("REVIEW_AI_API_KEY", "").strip() or os.environ.get("ZAI_API_KEY", "").strip()
+    if not api_key:
+        return _review_fallback(style), "fallback-no-key"
+
+    model = os.environ.get("REVIEW_AI_MODEL") or os.environ.get("ZAI_MODEL", "glm-4.5-air")
+    style_label = _REVIEW_STYLE_LABELS.get(style, _REVIEW_STYLE_LABELS["family"])
+    if lang == "ru":
+        language = "Russian (use Cyrillic Russian, not Ukrainian, not Belarusian)"
+    elif lang == "uk":
+        language = "Ukrainian"
+    else:
+        language = "English"
+    prompt = (
+        f"Write ONE fresh, natural Google review draft in {language} for Pashynska Photography in Calgary. "
+        f"Session type: {style_label}. The text must sound like a real client, warm and specific, 55-90 words. "
+        "Use the exact business name Pashynska Photography or the photographer name Iryna; never translate or misspell the business name. "
+        "Do not copy common templates. Do not mention that AI wrote it. Do not use hashtags, markdown, bullets, or quotation marks. "
+        "Make it easy for the client to edit before posting. "
+        f"Avoid repeating this previous draft: {previous[:500]}"
+    )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "You write concise, varied, human-sounding photography review drafts."},
+            {"role": "user", "content": prompt},
+        ],
+        "stream": False,
+        "max_tokens": int(os.environ.get("REVIEW_AI_MAX_TOKENS", "220")),
+        "temperature": float(os.environ.get("REVIEW_AI_TEMPERATURE", "0.95")),
+    }
+    thinking = os.environ.get("ZAI_THINKING", "disabled").strip()
+    if thinking:
+        payload["thinking"] = {"type": thinking}
+    response = requests.post(
+        _review_ai_endpoint(),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=float(os.environ.get("REVIEW_AI_TIMEOUT", "14")),
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"Z.ai review API error {response.status_code}: {response.text[:300]}")
+    data = response.json()
+    choice = (data.get("choices") or [{}])[0]
+    message_obj = choice.get("message") or {}
+    content = message_obj.get("content")
+    if isinstance(content, list):
+        content = " ".join(str(item.get("text") if isinstance(item, dict) else item) for item in content)
+    text = _clean_review_text(str(content or ""))
+    return (text or _review_fallback(style), f"zai:{model}")
+
+
+@app.route('/api/review-helper')
+@app.route('/api/review-helper/')
+def review_helper_api_base():
+    """Human-friendly fallback for people opening the API URL directly."""
+    return redirect(url_for('review_helper'))
+
+
+@app.route('/api/review-helper/generate')
+def generate_review_helper_text():
+    style = (request.args.get("style") or "family").strip().lower()
+    lang = (request.args.get("lang") or "en").strip().lower()[:2]
+    previous = request.args.get("previous", "")
+    ip_key = request.headers.get("CF-Connecting-IP") or request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or "unknown"
+    if not _review_ai_allowed(ip_key):
+        return jsonify({"ok": True, "review": _review_fallback(style), "source": "fallback-rate-limit"})
+    try:
+        review, source = _generate_ai_review_text(style, lang, previous)
+        return jsonify({"ok": True, "review": review, "source": source})
+    except Exception as exc:  # noqa: BLE001
+        log.warning(f"[review-ai] generation failed: {type(exc).__name__}: {exc}")
+        return jsonify({"ok": True, "review": _review_fallback(style), "source": "fallback-error"})
+
+
+@app.route('/review-helper')
+def review_helper():
+    """Public helper page that makes it easy for clients to write a Google review."""
+    style = (request.args.get("style") or "family").strip().lower()
+    lang = (request.args.get("lang") or "en").strip().lower()[:2]
+
+    labels = {
+        "en": {
+            "title": "Thank you for trusting Pashynska Photography",
+            "subtitle": "If you loved your session, this helper drafts a warm review you can copy and post on Google.",
+            "copy": "Copy review text",
+            "google": "Open Google Reviews",
+            "copied": "Copied — now paste it into Google Reviews 💛",
+            "edit": "You can edit the text before posting so it sounds exactly like you.",
+            "rotate": "New version",
+        },
+        "ru": {
+            "title": "Спасибо, что выбрали Pashynska Photography",
+            "subtitle": "Если съёмка понравилась, эта страница подготовит тёплый текст отзыва для Google.",
+            "copy": "Скопировать отзыв",
+            "google": "Открыть Google Reviews",
+            "copied": "Скопировано — теперь вставьте текст в Google Reviews 💛",
+            "edit": "Текст можно отредактировать перед публикацией, чтобы он звучал именно как вы.",
+            "rotate": "Новый вариант",
+        },
+    }.get(lang, None)
+    if labels is None:
+        labels = {
+            "title": "Thank you for trusting Pashynska Photography",
+            "subtitle": "This helper drafts a warm review you can copy and post on Google.",
+            "copy": "Copy review text",
+            "google": "Open Google Reviews",
+            "copied": "Copied — now paste it into Google Reviews 💛",
+            "edit": "You can edit the text before posting so it sounds exactly like you.",
+        }
+
+    review_by_style = {
+        "family": "We had a wonderful family photo session with Iryna. She made everyone feel comfortable, guided us gently, and captured beautiful natural moments that really feel like us. The photos are warm, timeless, and full of emotion. Highly recommend Pashynska Photography for families in Calgary.",
+        "maternity": "Iryna made my maternity session feel calm, beautiful, and very comfortable. She guided the poses naturally and captured such tender, meaningful photos. The final gallery feels elegant, warm, and emotional. I highly recommend Pashynska Photography.",
+        "couple": "Our couple session with Iryna was relaxed, natural, and so much fun. She helped us feel comfortable in front of the camera and captured genuine connection instead of stiff poses. The photos are beautiful and full of emotion.",
+        "newborn": "Iryna was patient, gentle, and thoughtful during our newborn session. She created a calm experience and captured beautiful details and family moments we will treasure forever. The photos feel warm, natural, and timeless.",
+    }
+    review_text = request.args.get("text") or review_by_style.get(style, review_by_style["family"])
+    google_review_url = os.environ.get("GOOGLE_REVIEW_URL", "https://g.page/r/CenY1x2zXYc_EAE/review")
+
+    # Multi-variant review texts by style
+    reviews_family = [
+        "We had a wonderful family photo session with Iryna. She made everyone feel comfortable, guided us gently, and captured beautiful natural moments that really feel like us. The photos are warm, timeless, and full of emotion. Highly recommend Pashynska Photography for families in Calgary.",
+        "Iryna is incredibly talented with families. She kept our kids engaged, found perfect light, and the photos turned out better than we ever imagined. Natural, emotional, and authentic — exactly what we wanted.",
+        "Amazing experience from start to finish. Iryna created a relaxed atmosphere and captured genuine smiles and candid moments. The gallery is stunning — every photo tells a story. We will treasure them forever."
+    ]
+    reviews_maternity = [
+        "Iryna made my maternity session feel calm, beautiful, and very comfortable. She guided the poses naturally and captured such tender, meaningful photos. The final gallery feels elegant, warm, and emotional. I highly recommend Pashynska Photography.",
+        "A truly magical experience. Iryna knew exactly how to highlight the beauty of pregnancy with soft light and graceful poses. The photos are intimate, artistic, and deeply personal — I will cherish them forever.",
+        "I felt so at ease during my maternity shoot. Iryna created a peaceful environment and captured moments I didn't even realize were happening. Every image is soft, glowing, and full of love."
+    ]
+    reviews_couple = [
+        "Our couple session with Iryna was relaxed, natural, and so much fun. She helped us feel comfortable in front of the camera and captured genuine connection instead of stiff poses. The photos are beautiful and full of emotion.",
+        "Iryna has a gift for capturing real connection. The session felt like a date, not a photoshoot. The photos are romantic, authentic, and absolutely stunning — we couldn't be happier.",
+        "We were nervous about being photographed, but Iryna made it effortless. She found the perfect light and caught us laughing and truly enjoying each other. Highly recommend for any couple in Calgary."
+    ]
+    reviews_newborn = [
+        "Iryna was patient, gentle, and thoughtful during our newborn session. She created a calm experience and captured beautiful details and family moments we will treasure forever. The photos feel warm, natural, and timeless.",
+        "The newborn session exceeded every expectation. Iryna was so gentle with our baby and captured tiny details we will never forget. The photos are soft, pure, and absolutely heart-melting.",
+        "We are so grateful for Iryna's patience and artistry. She created a safe, warm environment for our newborn and captured the most precious family moments. Every photo is a treasure."
+    ]
+    review_variants = {
+        "family": reviews_family,
+        "maternity": reviews_maternity,
+        "couple": reviews_couple,
+        "newborn": reviews_newborn,
+    }
+    variants = review_variants.get(style, reviews_family)
+    # pick variant index from query or rotate randomly client-side
+    variant_idx = 0
+    try:
+        vi = request.args.get("v")
+        if vi is not None:
+            variant_idx = int(vi) % len(variants)
+    except Exception:
+        pass
+    review_text = request.args.get("text") or variants[variant_idx]
+
+    # Inline HTML keeps this page deploy-safe even if templates are out of sync.
+    from flask import Response
+    # Build JS array of variants for client rotation
+    safe_variants_js = json.dumps(variants)
+    html = f"""<!doctype html>
+<html lang=\"{html_escape(lang or 'en')}\">
+<head>
+  <meta charset=\"utf-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+  <title>Review Helper · Pashynska Photography</title>
+  <style>
+    :root {{ --bg:#fff8f5; --card:#ffffff; --ink:#342521; --muted:#7d6860; --accent:#c58b7c; --accent2:#8f5d55; }}
+    * {{ box-sizing:border-box; }}
+    body {{ margin:0; font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif; background:radial-gradient(circle at top,#ffe8df 0,#fff8f5 42%,#f7efeb 100%); color:var(--ink); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:22px; }}
+    .card {{ width:min(720px,100%); background:rgba(255,255,255,.88); border:1px solid rgba(197,139,124,.28); border-radius:28px; box-shadow:0 24px 70px rgba(76,45,35,.14); padding:clamp(24px,5vw,44px); }}
+    .eyebrow {{ letter-spacing:.14em; text-transform:uppercase; color:var(--accent2); font-size:12px; font-weight:700; }}
+    h1 {{ font-family:Georgia,serif; font-size:clamp(30px,6vw,52px); line-height:1.02; margin:12px 0 14px; }}
+    p {{ color:var(--muted); font-size:17px; line-height:1.6; }}
+    textarea {{ width:100%; min-height:190px; margin:18px 0; padding:18px; border-radius:20px; border:1px solid rgba(143,93,85,.25); font:16px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif; color:var(--ink); background:#fffdfc; resize:vertical; }}
+    .actions {{ display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; align-items:center; }}
+    button, a.btn, .btn-ghost {{ appearance:none; border:0; border-radius:999px; padding:15px 20px; font-weight:800; font-size:15px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }}
+    button {{ background:var(--accent2); color:white; }}
+    a.btn {{ background:#fff; color:var(--accent2); border:1px solid rgba(143,93,85,.28); }}
+    .btn-ghost {{ background:transparent; color:var(--muted); border:1px solid rgba(143,93,85,.25); padding:10px 16px; font-size:13px; }}
+    .btn-ghost:hover {{ color:var(--accent2); border-color:var(--accent2); }}
+    .hint {{ margin-top:16px; font-size:14px; color:var(--muted); }}
+    .toast {{ margin-top:14px; color:#2f6f46; font-weight:700; min-height:20px; }}
+    .meta {{ display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted); margin-top:6px; }}
+  </style>
+</head>
+<body>
+  <main class=\"card\">
+    <div class=\"eyebrow\">Pashynska Photography · Review helper</div>
+    <h1>{html_escape(labels['title'])}</h1>
+    <p>{html_escape(labels['subtitle'])}</p>
+    <textarea id=\"reviewText\">{html_escape(review_text)}</textarea>
+    <div class=\"actions\">
+      <button type=\"button\" onclick=\"copyReview()\">{html_escape(labels['copy'])}</button>
+      <a class=\"btn\" href=\"{html_escape(google_review_url)}\" target=\"_blank\" rel=\"noopener\">⭐ {html_escape(labels['google'])}</a>
+      <button type=\"button\" class=\"btn-ghost\" onclick=\"rotateReview()\" title=\"Generate another review\">↻ {html_escape(labels.get('rotate','New version'))}</button>
+    </div>
+    <div class=\"meta\"><span id=\"variantLabel\">Version <span id=\"variantNum\">1</span> of {len(variants)}</span></div>
+    <div class=\"toast\" id=\"toast\"></div>
+    <p class=\"hint\">{html_escape(labels['edit'])}</p>
+  </main>
+  <script>
+    const FALLBACK_REVIEWS = {safe_variants_js};
+    const REVIEW_STYLE = {style!r};
+    const REVIEW_LANG = {lang!r};
+    let currentIndex = {variant_idx};
+    let aiCount = 0;
+    async function loadAiReview(isInitial=false) {{
+      const textarea = document.getElementById('reviewText');
+      const toast = document.getElementById('toast');
+      const previous = textarea.value || '';
+      if (!isInitial) toast.textContent = 'Generating a fresh review ✨';
+      try {{
+        const params = new URLSearchParams({{style: REVIEW_STYLE, lang: REVIEW_LANG, previous}});
+        params.set('nonce', String(Date.now()) + Math.random().toString(16).slice(2));
+        const res = await fetch('/api/review-helper/generate?' + params.toString(), {{headers: {{'Accept':'application/json'}}}});
+        const data = await res.json();
+        if (!data.ok || !data.review) throw new Error(data.error || 'empty review');
+        textarea.value = data.review;
+        aiCount += 1;
+        document.getElementById('variantLabel').innerHTML = 'AI version <span id="variantNum">' + aiCount + '</span>';
+        toast.textContent = isInitial ? '' : 'Fresh AI review generated ✨';
+      }} catch(e) {{
+        currentIndex = (currentIndex + 1) % FALLBACK_REVIEWS.length;
+        textarea.value = FALLBACK_REVIEWS[currentIndex];
+        document.getElementById('variantNum').textContent = String(currentIndex + 1);
+        toast.textContent = isInitial ? '' : 'Backup review version loaded ✨';
+      }}
+      if (!isInitial) setTimeout(() => {{ toast.textContent = ''; }}, 2500);
+    }}
+    function rotateReview() {{
+      return loadAiReview(false);
+    }}
+    async function copyReview() {{
+      const text = document.getElementById('reviewText').value;
+      try {{ await navigator.clipboard.writeText(text); }}
+      catch(e) {{ const t=document.getElementById('reviewText'); t.focus(); t.select(); document.execCommand('copy'); }}
+      document.getElementById('toast').textContent = {labels['copied']!r};
+    }}
+    document.addEventListener('DOMContentLoaded', () => loadAiReview(true));
+  </script>
+</body>
+</html>"""
+    return Response(html, mimetype="text/html")
+
+
 @app.route('/callback')
 def oauth_callback():
     """Generic OAuth redirect target for Meta/Threads testing.
@@ -1810,6 +2223,7 @@ SESSION_PRICE = _active.get("deposit", 95)
 SESSION_TOTAL = _active.get("full_price", 190)
 EMAIL = SETTINGS.get("photographer_email", "")
 RESERVATION_MINUTES = SETTINGS.get("reservation_minutes", 15)
+PENDING_PAYMENT_HOURS = int(os.environ.get("PENDING_PAYMENT_HOURS", "24"))
 DATE = _active.get("date", "")
 START_TIME = _active.get("start_time", "10:00")
 END_TIME = _active.get("end_time", "16:00")
@@ -2274,7 +2688,10 @@ except Exception as _be:
     log.warning(f"[backup] Startup backup failed: {_be}")
 
 def expire_reservations():
-    """Mark expired reserved/pending_payment rows as 'expired' so slots open back up.
+    """Release expired holds so abandoned slots become bookable again.
+
+    Plain reservations use the short reservation window. Clicking "I paid"
+    extends pending_payment until the configured review window expires.
     Returns count of expired bookings."""
     conn = db_conn()
     c = conn.cursor()
@@ -3369,8 +3786,10 @@ def confirm_payment():
     client_ig = row["instagram"]
     session_type = row["session_type"]
     
-    # Extend reservation window
-    new_expires = (datetime.now() + timedelta(minutes=RESERVATION_MINUTES)).isoformat()
+    # A client who says payment was sent must not lose the slot while Interac
+    # or Gmail is delayed. Keep it protected long enough for automation/admin
+    # review, then let the normal expiry sweep release it.
+    new_expires = (datetime.now() + timedelta(hours=PENDING_PAYMENT_HOURS)).isoformat()
     c.execute("""
         UPDATE bookings
         SET status='pending_payment', reserved_until=?, confirmed=0, paid=0
@@ -4242,9 +4661,18 @@ def admin_health():
 
     # Himalaya email CLI
     himalaya_ok = shutil.which("himalaya") is not None
+    last_scan_failed = _watcher_state.get("last_email_scan_ok") is False
     status["email_himalaya"] = {
-        "ok": himalaya_ok,
-        "error": None if himalaya_ok else "himalaya CLI not found in PATH — emails will silently fail",
+        "ok": himalaya_ok and not last_scan_failed,
+        "error": (
+            _watcher_state.get("last_email_scan_error")
+            if himalaya_ok
+            else "himalaya CLI not found in PATH — emails will silently fail"
+        ),
+        "last_scan_at": _watcher_state.get("last_email_scan_at"),
+        "last_scan_email_count": _watcher_state.get("last_email_count", 0),
+        "last_auto_confirmed_booking_id": _watcher_state.get("last_auto_confirmed_booking_id"),
+        "last_auto_confirmed_at": _watcher_state.get("last_auto_confirmed_at"),
     }
 
     # Telegram bot
@@ -6360,6 +6788,40 @@ def _link_transfer_to_booking(transfer_id, booking_id):
         pass
     return True, None
 
+
+def _auto_link_etransfers():
+    """Reconciliation: associate unmatched incoming transfers with a booking when
+    EXACTLY ONE active booking's name strongly matches the sender (>=2 shared name
+    tokens, e.g. first + last). Sets matched_booking_id + status='matched' ONLY —
+    it never changes a booking's payment/confirmation (use the per-row Link for
+    that). Conservative by design: ambiguous senders stay unmatched for manual
+    review. Returns the number newly linked."""
+    def toks(name):
+        return set(t for t in re.split(r"[^a-z]+", (name or "").lower()) if len(t) >= 2)
+    conn = db_conn(); conn.row_factory = sqlite3.Row
+    _ensure_etransfers_table(conn)
+    transfers = conn.execute(
+        "SELECT id, sender_name FROM etransfers "
+        "WHERE direction='in' AND matched_booking_id IS NULL AND status='unmatched'"
+    ).fetchall()
+    bookings = conn.execute(
+        "SELECT id, name FROM bookings WHERE status NOT IN ('cancelled','expired')"
+    ).fetchall()
+    btoks = [(b["id"], toks(b["name"])) for b in bookings]
+    linked = 0
+    for t in transfers:
+        st = toks(t["sender_name"])
+        if len(st) < 2:
+            continue  # need at least a first + last name to be confident
+        ids = {bid for bid, bt in btoks if bt and len(st & bt) >= 2}
+        if len(ids) == 1:
+            conn.execute("UPDATE etransfers SET matched_booking_id=?, status='matched' WHERE id=?",
+                         (ids.pop(), t["id"]))
+            linked += 1
+    conn.commit(); conn.close()
+    return linked
+
+
 # ─────────────────────────────────────────────
 #  CLIENT DATABASE ROUTES
 # ─────────────────────────────────────────────
@@ -6435,10 +6897,18 @@ def admin_transfers_import():
         return jsonify({"success": False, "error": "CSV file is required"}), 400
     try:
         result = _import_etransfers_csv(file.stream)
+        result["auto_linked"] = _auto_link_etransfers()
         return jsonify({"success": True, **result})
     except Exception as e:
         log.exception("[transfers] CSV import failed")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/admin/transfers/auto-link", methods=["POST"])
+@admin_required
+def admin_transfers_auto_link():
+    """Associate matching transfers with bookings by name (no payment changes)."""
+    return jsonify({"success": True, "auto_linked": _auto_link_etransfers()})
 
 
 @app.route("/admin/transfers/<int:transfer_id>/link", methods=["POST"])
@@ -7260,14 +7730,68 @@ def telegram_webhook():
         return jsonify({"ok": False, "error": "webhook not configured"}), 503
 
     data = request.get_json(silent=True) or {}
+
+    # ── Handle incoming text messages (AI assistant chat) ──
     if "callback_query" not in data:
+        msg = data.get("message", {})
+        text = (msg.get("text") or "").strip()
+        chat_id = msg.get("chat", {}).get("id")
+        if text and chat_id and not msg.get("forward_date"):
+            # Skip commands like /start, /help — handled elsewhere
+            if text.startswith("/"):
+                return jsonify({"ok": True})
+            # Rate limit per chat_id
+            ip_key = f"tg:{chat_id}"
+            if not check_assistant_rate_limit(ip_key):
+                _tg_send(chat_id, "⚠️ Too many messages. Please wait a few minutes.")
+                return jsonify({"ok": True})
+            record_assistant_request(ip_key)
+            # Detect language from Telegram user
+            lang_code = (msg.get("from", {}).get("language_code") or "en")[:2]
+            lang = lang_code if lang_code in ("ru", "uk", "hi") else "en"
+            try:
+                from assistant_engine import answer_assistant_message
+                result = answer_assistant_message(
+                    message=text,
+                    history=[],
+                    events=EVENTS,
+                    settings=SETTINGS,
+                    lang=lang,
+                    db_path=DB_PATH,
+                )
+                answer = result.get("answer", "")
+            except Exception as exc:
+                log.error(f"[tg-assistant] AI call failed: {exc}")
+                answer = "Sorry, I couldn't process that. Please try again or DM @pashynska.photo on Instagram."
+            # Telegram limit: 4096 chars per message
+            if len(answer) > 4000:
+                for i in range(0, len(answer), 4000):
+                    _tg_send(chat_id, answer[i:i+4000])
+            else:
+                _tg_send(chat_id, answer)
         return jsonify({"ok": True})
 
     cb = data["callback_query"]
     cb_data = cb.get("data", "")
     chat_id = cb["message"]["chat"]["id"]
     message_id = cb["message"]["message_id"]
-    from_user = cb.get("from", {}).get("first_name", "Admin")
+    from_user_obj = cb.get("from", {}) or {}
+    from_user = from_user_obj.get("first_name") or from_user_obj.get("username") or "Admin"
+
+    if not _is_telegram_admin_callback(cb):
+        username = from_user_obj.get("username") or ""
+        user_id = from_user_obj.get("id") or ""
+        log.warning(f"[tg-webhook] Unauthorized callback user_id={user_id} username={username!r} data={cb_data!r}")
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery",
+            json={
+                "callback_query_id": cb["id"],
+                "text": "This admin action is not enabled for your Telegram account yet.",
+                "show_alert": True,
+            },
+            timeout=5
+        )
+        return jsonify({"ok": True})
 
     # Acknowledge immediately (removes spinner on button)
     requests.post(
@@ -7342,9 +7866,9 @@ def telegram_webhook():
             )
         except Exception as e:
             log.warning(f"[tg-webhook] editMessageText failed for #{booking_id}: {e}")
-        other_chat = TELEGRAM_ADMIN_CHAT_ID if str(chat_id) != TELEGRAM_ADMIN_CHAT_ID else TELEGRAM_CHAT_ID
-        if other_chat:
-            _tg_send(other_chat, updated_text)
+        for other_chat in _telegram_admin_chat_ids():
+            if str(other_chat) != str(chat_id):
+                _tg_send(other_chat, updated_text)
 
         def _run_confirm_side_effects():
             try:
@@ -7382,9 +7906,9 @@ def telegram_webhook():
                   "text": updated_text, "parse_mode": "HTML"},
             timeout=5
         )
-        other_chat = TELEGRAM_ADMIN_CHAT_ID if str(chat_id) != TELEGRAM_ADMIN_CHAT_ID else TELEGRAM_CHAT_ID
-        if other_chat:
-            _tg_send(other_chat, updated_text)
+        for other_chat in _telegram_admin_chat_ids():
+            if str(other_chat) != str(chat_id):
+                _tg_send(other_chat, updated_text)
 
     return jsonify({"ok": True})
 
