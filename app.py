@@ -527,21 +527,34 @@ def _notify_waitlist_signup(entry):
 
 def _notify_new_reservation(booking_id, client_name, client_email, event_date,
                             slot_time, event_title, session_type, client_ig,
-                            client_phone=None):
+                            client_phone=None, selected_addons=None,
+                            addons_total=0.0, marketing_consent=None):
     """Send NEW reservation notification with inline confirm/cancel buttons."""
     ig_clean = (client_ig or "").lstrip("@")
     phone_display = client_phone or "N/A"
     admin_url = f"{BASE_URL}/admin" if BASE_URL else "/admin"
+    addon_lines = ""
+    if selected_addons:
+        addon_lines = "\n<b>Selected add-ons</b>\n"
+        for addon in selected_addons:
+            addon_lines += (
+                f"• {_tg_escape(_strip_tags((addon or {}).get('title')))} — "
+                f"${_money((addon or {}).get('price')):.2f} CAD\n"
+            )
+        addon_lines += f"Selected add-ons: ${_money(addons_total):.2f} CAD\n"
+    consent_line = f"Marketing consent: {_tg_escape(marketing_consent)}\n" if marketing_consent in ("yes", "no") else ""
     
     text = (
         f"🆕 <b>New reservation #{booking_id}</b>\n\n"
-        f"👤 {client_name or '(no name)'}\n"
-        f"📧 {client_email}\n"
-        f"📞 {phone_display}\n"
+        f"👤 {_tg_escape(_strip_tags(client_name or '(no name)'))}\n"
+        f"📧 {_tg_escape(_strip_tags(client_email))}\n"
+        f"📞 {_tg_escape(_strip_tags(phone_display))}\n"
         f"📱 Instagram: @{ig_clean or 'N/A'}\n\n"
-        f"📅 {event_date} @ {slot_time}\n"
-        f"🎉 {event_title}\n"
-        f"🏷 Session: {session_type or 'N/A'}\n"
+        f"📅 {_tg_escape(_strip_tags(event_date))} @ {_tg_escape(_strip_tags(slot_time))}\n"
+        f"🎉 {_tg_escape(_strip_tags(event_title))}\n"
+        f"🏷 Session: {_tg_escape(_strip_tags(session_type or 'N/A'))}\n"
+        f"{addon_lines}"
+        f"{consent_line}"
         f"⏱️ Expires in {RESERVATION_MINUTES} min\n\n"
         f"<b>Press below when client pays:</b>"
     )
@@ -575,6 +588,33 @@ def _booking_success_url(booking_id, token=None, absolute_base=None, **extra_par
         params["token"] = token
     params.update({k: v for k, v in extra_params.items() if v is not None})
     return f"{path}?{urlencode(params)}"
+
+
+def _questionnaire_url_for_booking(booking, event):
+    if not booking or not event or not _questionnaire_config_for_event(event):
+        return None
+    if not (booking.get("confirmed") or booking.get("paid") or booking.get("status") == "confirmed"):
+        return None
+    token = booking.get("confirmation_token")
+    if not token:
+        return None
+    from urllib.parse import urlencode
+    base = (BASE_URL or CANONICAL_SITE_URL).rstrip("/")
+    return f"{base}/questionnaire?{urlencode({'booking_id': booking.get('id'), 'token': token})}"
+
+
+def _client_email_context(booking, event):
+    booking = booking or {}
+    event = event or {}
+    return {
+        "selected_addons": _booking_addons(booking),
+        "addons_total": _booking_addons_total(booking),
+        "total_price": _booking_total_price(booking, event),
+        "amount_due_today": _money(booking.get("deposit_amount") or event.get("deposit") or SESSION_PRICE),
+        "remaining_balance": _booking_balance_due(booking, event),
+        "marketing_consent": booking.get("marketing_consent"),
+        "questionnaire_url": _questionnaire_url_for_booking(booking, event),
+    }
 
 
 def _notify_payment_pending(booking_id, client_name, client_email, event_date,
@@ -627,7 +667,11 @@ def _notify_payment_pending(booking_id, client_name, client_email, event_date,
     _notify_admin(text, reply_markup=keyboard)
 
 
-def _send_client_email(to_email, client_name, event_date, slot_time, event_title, booking_id, location=None, location_url=None):
+def _send_client_email(to_email, client_name, event_date, slot_time, event_title, booking_id,
+                       location=None, location_url=None, selected_addons=None,
+                       addons_total=0.0, total_price=None, amount_due_today=None,
+                       remaining_balance=None, marketing_consent=None,
+                       questionnaire_url=None):
     """Send premium HTML confirmation email to client via Himalaya CLI.
 
     Returns True only when SMTP/Himalaya accepts the message. This is used by
@@ -661,6 +705,69 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         safe_date = _html_escape(date_nice)
         safe_time = _html_escape(str(slot_time or ""))
         safe_booking = _html_escape(str(booking_id))
+        safe_questionnaire_url = _html_escape(str(questionnaire_url or ""))
+
+        amount_lines_plain = []
+        amount_rows_html = []
+        if selected_addons:
+            addon_titles = []
+            for addon in selected_addons:
+                title = _clean_text((addon or {}).get("title"), "Add-on")
+                price = _money((addon or {}).get("price"))
+                addon_titles.append(f"- {title}: ${price:.2f} CAD")
+            amount_lines_plain.append("Selected add-ons:\n" + "\n".join(addon_titles))
+            amount_lines_plain.append(f"Selected add-ons: ${_money(addons_total):.2f} CAD")
+            amount_rows_html.append(
+                "<tr><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;color:#9a756d;font-size:13px;\">Selected add-ons</td>"
+                f"<td style=\"padding:9px 0;border-top:1px solid #f2e3dd;text-align:right;color:#4b2f38;font-size:14px;font-weight:700;\">${_money(addons_total):.2f} CAD</td></tr>"
+            )
+            for addon in selected_addons:
+                title = _html_escape(_clean_text((addon or {}).get("title"), "Add-on"))
+                price = _money((addon or {}).get("price"))
+                amount_rows_html.append(
+                    "<tr><td colspan=\"2\" style=\"padding:4px 0;color:#7a5a6a;font-size:13px;\">"
+                    f"• {title} — ${price:.2f} CAD</td></tr>"
+                )
+        if amount_due_today is not None:
+            amount_lines_plain.append(f"Amount due today: ${_money(amount_due_today):.2f} CAD")
+            amount_rows_html.append(
+                "<tr><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;color:#9a756d;font-size:13px;\">Amount due today</td>"
+                f"<td style=\"padding:9px 0;border-top:1px solid #f2e3dd;text-align:right;color:#4b2f38;font-size:14px;font-weight:700;\">${_money(amount_due_today):.2f} CAD</td></tr>"
+            )
+        if remaining_balance is not None:
+            amount_lines_plain.append(f"Remaining balance: ${_money(remaining_balance):.2f} CAD")
+            amount_rows_html.append(
+                "<tr><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;color:#9a756d;font-size:13px;\">Remaining balance</td>"
+                f"<td style=\"padding:9px 0;border-top:1px solid #f2e3dd;text-align:right;color:#4b2f38;font-size:14px;font-weight:700;\">${_money(remaining_balance):.2f} CAD</td></tr>"
+            )
+        if total_price is not None:
+            amount_lines_plain.append(f"Session total: ${_money(total_price):.2f} CAD")
+        consent_plain = ""
+        consent_html = ""
+        if marketing_consent in ("yes", "no"):
+            consent_text = (
+                "You selected: yes, I allow selected photos/videos for portfolio and marketing."
+                if marketing_consent == "yes"
+                else "You selected: no, please keep my gallery private."
+            )
+            consent_plain = f"\nPrivacy/marketing preference: {consent_text}\n"
+            consent_html = (
+                "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fff;border:1px solid #ead8d0;border-radius:16px;margin:0 0 20px;\">"
+                f"<tr><td style=\"padding:15px 18px;color:#6d4d55;font-size:14px;line-height:1.55;\"><strong>Privacy preference:</strong> {_html_escape(consent_text)}</td></tr></table>"
+            )
+        questionnaire_plain = ""
+        questionnaire_html = ""
+        if questionnaire_url:
+            questionnaire_plain = f"\nOptional session questionnaire: {questionnaire_url}\n"
+            questionnaire_html = (
+                "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fff8f4;border:1px solid #f1dfd8;border-radius:16px;margin:0 0 20px;\">"
+                "<tr><td style=\"padding:16px 18px;color:#6d4d55;font-size:14px;line-height:1.6;\">"
+                "<strong>Optional session questionnaire</strong><br>"
+                f"<a href=\"{safe_questionnaire_url}\" style=\"color:#c4857a;text-decoration:none;font-weight:700;\">Share preparation details</a>"
+                "</td></tr></table>"
+            )
+        amount_plain = ("\n" + "\n".join(amount_lines_plain) + "\n") if amount_lines_plain else ""
+        amount_html = "".join(amount_rows_html)
 
         subject = f"Booking Confirmed — {event_text} on {date_nice}"
         location_line = f"Location: {location_text}\n" if location_text else "Location details will be sent closer to the session date.\n"
@@ -705,6 +812,9 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
             f"Time: {slot_time}\n"
             f"{location_line}"
             f"Booking ID: #{booking_id}\n\n"
+            f"{amount_plain}"
+            f"{consent_plain}"
+            f"{questionnaire_plain}"
             f"Meeting point: {location_text}\n"
             f"Maps: {location_url or 'Will be sent closer to the date'}\n"
             f"Arrive 5–10 minutes early. Your session starts at {slot_time} on {date_nice}.\n\n"
@@ -765,10 +875,14 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
           <tr><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;color:#9a756d;font-size:13px;\">When we meet</td><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;text-align:right;color:#4b2f38;font-size:14px;font-weight:700;\">{safe_date} · {safe_time}</td></tr>
           <tr><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;color:#9a756d;font-size:13px;\">Location</td><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;text-align:right;color:#4b2f38;font-size:14px;\">{location_html}</td></tr>
           <tr><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;color:#9a756d;font-size:13px;\">Booking</td><td style=\"padding:9px 0;border-top:1px solid #f2e3dd;text-align:right;color:#4b2f38;font-size:14px;font-weight:700;\">#{safe_booking}</td></tr>
+          {amount_html}
           <tr><td colspan=\"2\" style=\"padding:14px 0 4px;text-align:center;\"><a href=\"{calendar_url}\" style=\"display:inline-block;background:#4b2f38;color:#ffffff;text-decoration:none;border-radius:12px;padding:11px 18px;font-size:13px;font-weight:700;\">📅 Add to Calendar</a></td></tr>
         </table>
       </td></tr>
     </table>
+
+    {consent_html}
+    {questionnaire_html}
 
     <div class=\"timeline-card\" style=\"background:#ffffff;border:1px solid #ead8d0;border-radius:24px;padding:24px 22px;margin:0 0 24px;box-shadow:0 1px 0 rgba(255,255,255,.8) inset,0 10px 26px rgba(102,63,53,.08);\">
       <h2 style=\"margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;font-weight:400;color:#4b2f38;\">What happens next</h2>
@@ -1389,6 +1503,7 @@ def _after_auto_payment_confirmed(booking_id):
                 booking_id=booking_id,
                 location=ev.get("location"),
                 location_url=ev.get("location_url"),
+                **_client_email_context(booking, ev),
             )
         notify_payment_confirmed(booking_id, booking.get("paid_amount"))
         log.info(f"[auto-confirm] Booking #{booking_id} side-effects complete; calendar={event_url or 'none'}")
@@ -2156,6 +2271,172 @@ def get_event_by_id(event_id):
     return None
 
 
+BUILTIN_ADDONS = {
+    "extra-10-edited-images": {
+        "id": "extra-10-edited-images",
+        "title": "10 Extra Edited Images",
+        "description": (
+            "Add 10 additional professionally edited images to your final gallery. "
+            "Best value. Individual extra edited images can be purchased later for $10/image."
+        ),
+        "price": 50.0,
+        "active": False,
+    },
+    "short-vertical-reel": {
+        "id": "short-vertical-reel",
+        "title": "Short Vertical Behind-the-Scenes Reel",
+        "description": (
+            "Add a short vertical video up to 1 minute from your session, perfect for "
+            "Instagram Reels, Stories, or family memories."
+        ),
+        "price": 50.0,
+        "active": False,
+    },
+}
+
+
+def _money(value, default=0.0):
+    try:
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return round(float(default or 0), 2)
+
+
+def _event_active_addons(event):
+    """Return sanitized active flat-price add-ons from event config."""
+    out = []
+    for addon in (event or {}).get("addons") or []:
+        if not isinstance(addon, dict):
+            continue
+        addon_id = str(addon.get("id") or "").strip()
+        if not addon_id or addon.get("active") is not True:
+            continue
+        title = str(addon.get("title") or BUILTIN_ADDONS.get(addon_id, {}).get("title") or addon_id).strip()
+        description = str(addon.get("description") or BUILTIN_ADDONS.get(addon_id, {}).get("description") or "").strip()
+        out.append({
+            "id": addon_id[:80],
+            "title": title[:120],
+            "description": description[:500],
+            "price": _money(addon.get("price"), 0.0),
+            "active": True,
+        })
+    return out
+
+
+def _validate_selected_addons(event, selected_ids):
+    """Validate requested add-on ids against the selected event config."""
+    if selected_ids in (None, "", []):
+        return [], 0.0
+    if not isinstance(selected_ids, list):
+        raise ValueError("Add-ons must be sent as a list")
+    active = {a["id"]: a for a in _event_active_addons(event)}
+    selected = []
+    seen = set()
+    for raw_id in selected_ids:
+        addon_id = str(raw_id or "").strip()
+        if not addon_id or addon_id in seen:
+            continue
+        addon = active.get(addon_id)
+        if not addon:
+            raise ValueError(f"Unknown or inactive add-on: {addon_id}")
+        selected.append({
+            "id": addon["id"],
+            "title": addon["title"],
+            "description": addon["description"],
+            "price": addon["price"],
+        })
+        seen.add(addon_id)
+    total = round(sum(_money(a.get("price")) for a in selected), 2)
+    return selected, total
+
+
+def _booking_addons(booking):
+    raw = (booking or {}).get("selected_addons_json")
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _booking_addons_total(booking):
+    amount = _money((booking or {}).get("addons_total"), 0.0)
+    if amount > 0:
+        return amount
+    return round(sum(_money(a.get("price")) for a in _booking_addons(booking) if isinstance(a, dict)), 2)
+
+
+def _event_agreement_config(event):
+    cfg = (event or {}).get("agreement") or {}
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def _event_requires_agreement(event):
+    return bool(_event_agreement_config(event).get("enabled"))
+
+
+def _terms_version(event):
+    cfg = _event_agreement_config(event)
+    return str(cfg.get("terms_version") or cfg.get("version") or "booking-terms-v1")[:80]
+
+
+def _questionnaire_config_for_event(event):
+    cfg = (event or {}).get("questionnaire") or {}
+    if not isinstance(cfg, dict) or not cfg.get("enabled"):
+        return None
+    session_type = str((event or {}).get("session_type") or "").strip().lower()
+    if session_type == "mini":
+        return None
+    allowed = [str(x).strip().lower() for x in (cfg.get("session_types") or ["individual", "custom", "private"])]
+    if session_type and session_type not in allowed:
+        return None
+    if (cfg.get("timing") or "after_confirmed_payment") != "after_confirmed_payment":
+        return None
+    return cfg
+
+
+def _strip_tags(value):
+    text = re.sub(r"<[^>]*>", "", str(value or ""))
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _slugify_addon_id(value):
+    slug = re.sub(r"[^a-z0-9]+", "-", str(value or "").lower()).strip("-")
+    return slug[:80] or f"custom-addon-{secrets.token_hex(3)}"
+
+
+def _sanitize_event_addons(raw_addons):
+    """Normalize admin-submitted add-ons before writing events.yaml."""
+    if not isinstance(raw_addons, list):
+        return []
+    cleaned = []
+    seen = set()
+    for raw in raw_addons:
+        if not isinstance(raw, dict) or raw.get("active") is not True:
+            continue
+        raw_id = str(raw.get("id") or "").strip()
+        raw_title = _strip_tags(raw.get("title") or "")
+        addon_id = raw_id or _slugify_addon_id(raw_title)
+        if addon_id in seen:
+            continue
+        default = BUILTIN_ADDONS.get(addon_id, {})
+        title = _strip_tags(raw_title or default.get("title") or addon_id)[:120]
+        description = _strip_tags(raw.get("description") or default.get("description") or "")[:500]
+        if title.lower() == "full gallery upgrade" or addon_id == "full-gallery-upgrade":
+            continue
+        cleaned.append({
+            "id": addon_id[:80],
+            "title": title,
+            "description": description,
+            "price": _money(raw.get("price"), default.get("price", 0.0)),
+            "active": True,
+        })
+        seen.add(addon_id)
+    return cleaned
+
+
 def _booking_type(ev):
     """Admin-selected booking behavior for an event.
 
@@ -2357,6 +2638,14 @@ def init_db():
         ("bookings",  "deposit_amount",    "ALTER TABLE bookings ADD COLUMN deposit_amount REAL"),
         # Store full_price in booking so invoice always matches what was agreed
         ("bookings",  "full_price",        "ALTER TABLE bookings ADD COLUMN full_price REAL"),
+        # Session-inspired add-ons, agreement, and optional post-confirmation questionnaire
+        ("bookings",  "selected_addons_json", "ALTER TABLE bookings ADD COLUMN selected_addons_json TEXT"),
+        ("bookings",  "addons_total",      "ALTER TABLE bookings ADD COLUMN addons_total REAL DEFAULT 0"),
+        ("bookings",  "marketing_consent", "ALTER TABLE bookings ADD COLUMN marketing_consent TEXT"),
+        ("bookings",  "agreement_name",    "ALTER TABLE bookings ADD COLUMN agreement_name TEXT"),
+        ("bookings",  "agreement_accepted_at", "ALTER TABLE bookings ADD COLUMN agreement_accepted_at TEXT"),
+        ("bookings",  "terms_version",     "ALTER TABLE bookings ADD COLUMN terms_version TEXT"),
+        ("bookings",  "questionnaire_answers_json", "ALTER TABLE bookings ADD COLUMN questionnaire_answers_json TEXT"),
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
@@ -3100,8 +3389,10 @@ def _public_events_payload():
             # Get first photo URL
             photos = ev.get("photos", [])
             photo_url = photos[0] if photos else "/static/images/placeholder.jpg"
+            active_addons = _event_active_addons(ev)
+            agreement_cfg = _event_agreement_config(ev)
 
-            result.append({
+            payload = {
                 "id": ev["id"],
                 "title": ev.get("title", ""),
                 "subtitle": ev.get("subtitle", ""),
@@ -3131,7 +3422,17 @@ def _public_events_payload():
                 "photo": photo_url,
                 "photos": photos,
                 "included": ev.get("included", []),
-            })
+            }
+            if active_addons:
+                payload["addons"] = active_addons
+            if agreement_cfg.get("enabled"):
+                payload["agreement"] = {
+                    "enabled": True,
+                    "require_terms": bool(agreement_cfg.get("require_terms", True)),
+                    "require_marketing_choice": bool(agreement_cfg.get("require_marketing_choice", True)),
+                    "terms_version": _terms_version(ev),
+                }
+            result.append(payload)
     conn.close()
     return result
 
@@ -3551,6 +3852,34 @@ def reserve_slot():
     if slot_time not in valid_slot_times:
         return jsonify({"success": False, "error": "Selected time is not available for this event"}), 400
 
+    try:
+        selected_addons, addons_total = _validate_selected_addons(ev, data.get("addons") or [])
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+    agreement_enabled = _event_requires_agreement(ev)
+    agreement_cfg = _event_agreement_config(ev)
+    marketing_consent = (data.get("marketing_consent") or "").strip().lower()
+    agreement_name = _strip_tags(data.get("agreement_name") or "")[:120]
+    terms_accepted = data.get("terms_accepted") is True or str(data.get("terms_accepted")).lower() in ("true", "1", "yes", "on")
+    agreement_accepted_at = None
+    terms_version = None
+
+    if agreement_enabled:
+        if agreement_cfg.get("require_terms", True) and not terms_accepted:
+            return jsonify({"success": False, "error": "Please accept the booking terms"}), 400
+        if not agreement_name:
+            return jsonify({"success": False, "error": "Please enter your electronic signature name"}), 400
+        if agreement_cfg.get("require_marketing_choice", True):
+            if marketing_consent not in ("yes", "no"):
+                return jsonify({"success": False, "error": "Please choose your photo/video marketing privacy preference"}), 400
+        elif marketing_consent and marketing_consent not in ("yes", "no"):
+            return jsonify({"success": False, "error": "Marketing consent must be yes or no"}), 400
+        terms_version = _terms_version(ev)
+    else:
+        marketing_consent = None
+        agreement_name = None
+
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     if isinstance(ip, str) and ',' in ip:
         ip = ip.split(',')[0].strip()
@@ -3604,12 +3933,22 @@ def reserve_slot():
 
         token = secrets.token_urlsafe(16)
         _deposit_amt = float(ev.get("deposit") or SESSION_PRICE)
-        _full_price = float(ev.get("full_price") or 0) or _deposit_amt * 2
+        _base_full_price = float(ev.get("full_price") or 0) or _deposit_amt * 2
+        _full_price = round(_base_full_price + addons_total, 2)
+        if agreement_enabled and terms_accepted:
+            agreement_accepted_at = now.isoformat()
         c.execute("""
             INSERT INTO bookings
-                (date, time, name, email, phone, instagram, session_type, status, reserved_until, event_id, confirmation_token, deposit_amount, full_price)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?)
-        """, (event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type, expires.isoformat(), ev["id"], token, _deposit_amt, _full_price))
+                (date, time, name, email, phone, instagram, session_type, status, reserved_until,
+                 event_id, confirmation_token, deposit_amount, full_price, selected_addons_json,
+                 addons_total, marketing_consent, agreement_name, agreement_accepted_at, terms_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type,
+            expires.isoformat(), ev["id"], token, _deposit_amt, _full_price,
+            json.dumps(selected_addons, ensure_ascii=False) if selected_addons else None,
+            addons_total, marketing_consent, agreement_name, agreement_accepted_at, terms_version,
+        ))
 
         if c.rowcount == 0:
             conn.rollback()
@@ -3641,6 +3980,9 @@ def reserve_slot():
         session_type=session_type,
         client_ig=client_ig,
         client_phone=client_phone,
+        selected_addons=selected_addons,
+        addons_total=addons_total,
+        marketing_consent=marketing_consent,
     )
 
     return jsonify({
@@ -3675,13 +4017,21 @@ def payment():
     ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
     if not ev:
         ev = {}
+    booking["selected_addons"] = _booking_addons(booking)
+    amount_due_today = _money(booking.get("deposit_amount") or ev.get("deposit") or SESSION_PRICE)
+    remaining_balance = _booking_balance_due(booking, ev)
 
     return render_template("payment.html",
         booking=booking,
         date=ev.get("date", DATE),
         time=booking.get("time", ""),
         name=booking.get("name", ""),
-        price=ev.get("deposit", SESSION_PRICE) if ev.get("deposit") is not None else SESSION_PRICE,
+        price=amount_due_today,
+        amount_due_today=amount_due_today,
+        remaining_balance=remaining_balance,
+        total_price=_booking_total_price(booking, ev),
+        selected_addons=booking.get("selected_addons") or [],
+        addons_total=_booking_addons_total(booking),
         session_length=ev.get("session_length", SESSION_LENGTH),
         event_title=ev.get("title", "Mini Session"),
         email=EMAIL,
@@ -3869,6 +4219,11 @@ def success():
 
     booking = dict(row)
     ev = get_event_by_id(booking["event_id"]) if booking and booking.get("event_id") else get_active_event()
+    booking["selected_addons"] = _booking_addons(booking)
+    amount_due_today = _money(booking.get("deposit_amount") or (ev or {}).get("deposit") or SESSION_PRICE)
+    total_price = _booking_total_price(booking, ev or {})
+    remaining_balance = _booking_balance_due(booking, ev or {})
+    questionnaire_url = _questionnaire_url_for_booking(booking, ev or {})
     location_text = ev.get("location", "Calgary, AB") if ev else "Calgary, AB"
     location_url = ev.get("location_url") if ev else None
     # If no explicit location_url but we have a location, generate a Google Maps search link
@@ -3886,8 +4241,100 @@ def success():
         location=location_text,
         location_url=location_url,
         booking=booking,
-        confirmation_token=booking.get("confirmation_token") if booking else ""
+        confirmation_token=booking.get("confirmation_token") if booking else "",
+        selected_addons=booking.get("selected_addons") or [],
+        addons_total=_booking_addons_total(booking),
+        amount_due_today=amount_due_today,
+        total_price=total_price,
+        remaining_balance=remaining_balance,
+        questionnaire_url=questionnaire_url,
     )
+
+
+@app.route("/questionnaire", methods=["GET", "POST"])
+def questionnaire():
+    """Optional post-confirmation prep questionnaire, protected by booking id + token."""
+    booking_id = request.args.get("booking_id")
+    token = (request.args.get("token") or "").strip()
+    if not booking_id or not token:
+        return redirect(url_for("index"))
+
+    conn = db_conn()
+    row = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    if not row:
+        conn.close()
+        return redirect(url_for("index"))
+    booking = dict(row)
+    stored_token = str(booking.get("confirmation_token") or "")
+    if not stored_token or not hmac.compare_digest(stored_token, token):
+        conn.close()
+        return redirect(url_for("index"))
+
+    event = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else None
+    cfg = _questionnaire_config_for_event(event)
+    if not cfg:
+        conn.close()
+        return redirect(url_for("index"))
+    if not (booking.get("confirmed") or booking.get("paid") or booking.get("status") == "confirmed"):
+        conn.close()
+        return jsonify({"error": "questionnaire is available after booking confirmation"}), 403
+
+    fields = [f for f in (cfg.get("fields") or []) if isinstance(f, dict) and f.get("id")]
+    existing = {}
+    if booking.get("questionnaire_answers_json"):
+        try:
+            existing = json.loads(booking.get("questionnaire_answers_json") or "{}")
+        except Exception:
+            existing = {}
+
+    if request.method == "POST":
+        answers = {}
+        for field in fields:
+            field_id = str(field.get("id") or "")[:80]
+            answers[field_id] = _strip_tags(request.form.get(field_id) or "")[:1000]
+        conn.execute(
+            "UPDATE bookings SET questionnaire_answers_json=? WHERE id=?",
+            (json.dumps(answers, ensure_ascii=False), booking_id),
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("success", booking_id=booking_id, token=token))
+
+    conn.close()
+    controls = []
+    for field in fields:
+        field_id = str(field.get("id") or "")[:80]
+        label = _html_escape(str(field.get("label") or field_id))
+        value = _html_escape(str(existing.get(field_id) or ""))
+        field_type = str(field.get("type") or "textarea")
+        required = " required" if field.get("required") else ""
+        if field_type == "select":
+            options = []
+            for opt in field.get("options") or []:
+                opt_text = str(opt)
+                selected = " selected" if opt_text == existing.get(field_id) else ""
+                options.append(f"<option value=\"{_html_escape(opt_text)}\"{selected}>{_html_escape(opt_text)}</option>")
+            control = f"<select id=\"{_html_escape(field_id)}\" name=\"{_html_escape(field_id)}\"{required}>{''.join(options)}</select>"
+        else:
+            control = f"<textarea id=\"{_html_escape(field_id)}\" name=\"{_html_escape(field_id)}\" rows=\"5\"{required}>{value}</textarea>"
+        controls.append(f"<label for=\"{_html_escape(field_id)}\">{label}</label>{control}")
+
+    safe_title = _html_escape((event or {}).get("title") or "Photo Session")
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Session questionnaire · Pashynska Photography</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7efe9;color:#3f2d33;margin:0;padding:24px}}
+main{{max-width:680px;margin:0 auto;background:#fff;border:1px solid #ead8d0;border-radius:18px;padding:24px;box-shadow:0 14px 38px rgba(93,55,47,.12)}}
+h1{{font-size:24px;margin:0 0 8px}}p{{color:#765e66;line-height:1.55}}label{{display:block;margin:18px 0 7px;font-weight:700}}
+textarea,select{{width:100%;box-sizing:border-box;border:1px solid #d9c9c2;border-radius:10px;padding:12px;font:inherit}}
+button{{margin-top:18px;background:#1c1917;color:#fff;border:0;border-radius:12px;padding:13px 18px;font-weight:700;cursor:pointer}}
+</style></head><body><main>
+<h1>Optional session questionnaire</h1>
+<p>{safe_title}. Share anything helpful before your session. This is optional and does not affect your confirmed booking.</p>
+<form method="post">{''.join(controls)}<button type="submit">Save questionnaire</button></form>
+</main></body></html>"""
+
 
 @app.route("/privacy")
 def privacy():
@@ -4037,13 +4484,17 @@ def _booking_total_price(booking, event=None):
     defaults are only fallbacks for older rows.
     """
     event = event or {}
-    for value in (booking.get("full_price"), event.get("full_price"), SESSION_TOTAL):
+    booking_price = _money(booking.get("full_price"), 0.0)
+    if booking_price > 0:
+        return booking_price
+    addons_total = _booking_addons_total(booking)
+    for value in (event.get("full_price"), SESSION_TOTAL):
         try:
             amount = float(value or 0)
         except (TypeError, ValueError):
             amount = 0.0
         if amount > 0:
-            return round(amount, 2)
+            return round(amount + addons_total, 2)
     return 0.0
 
 
@@ -4479,7 +4930,7 @@ def stripe_webhook():
             amount_received_cents = session_obj.get("amount_total", 0)
             amount_paid = amount_received_cents / 100.0
             ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
-            total_price = float((ev or {}).get("full_price") or SESSION_TOTAL or 0)
+            total_price = _booking_total_price(booking, ev or {})
             current_paid = float(booking.get("paid_amount") or booking.get("deposit_amount") or (ev or {}).get("deposit") or SESSION_PRICE or 0)
             new_paid_total = round(min(current_paid + amount_paid, total_price or current_paid + amount_paid), 2)
             conn.execute(
@@ -4521,6 +4972,7 @@ def stripe_webhook():
         )
         conn.commit()
         conn.close()
+        booking.update({"confirmed": 1, "paid": 1, "status": "confirmed", "paid_amount": amount_paid})
 
         log.info(f"[stripe-webhook] Booking #{booking_id} auto-confirmed via Stripe (${amount_paid:.2f} CAD)")
 
@@ -4545,6 +4997,7 @@ def stripe_webhook():
                 booking_id=booking_id,
                 location=ev.get("location"),
                 location_url=ev.get("location_url") if ev else None,
+                **_client_email_context(booking, ev or {}),
             )
         except Exception as e:
             log.error(f"[stripe-webhook] Email error for #{booking_id}: {e}")
@@ -4904,6 +5357,9 @@ def admin():
     c.execute(sql, params_with_limit)
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
+    for row in rows:
+        row["selected_addons"] = _booking_addons(row)
+        row["addons_total"] = _booking_addons_total(row)
 
     # Calculate stats based on filtered results
     filtered_stats = {
@@ -5349,6 +5805,11 @@ def admin_booking_detail(booking_id):
     if not booking:
         return jsonify({"error": "Booking not found"}), 404
     event = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else None
+    booking["selected_addons"] = _booking_addons(booking)
+    try:
+        booking["questionnaire_answers"] = json.loads(booking.get("questionnaire_answers_json") or "{}")
+    except Exception:
+        booking["questionnaire_answers"] = {}
     return render_template("booking_detail.html", booking=booking, event=event)
 
 
@@ -5699,7 +6160,8 @@ def admin_confirm():
             event_title=ev.get("title", "Mini Session"),
             booking_id=booking_id,
             location=ev.get("location"),
-            location_url=ev.get("location_url")
+            location_url=ev.get("location_url"),
+            **_client_email_context(booking, ev),
         )
 
     # Notify admin on Telegram so manual confirmations stay in sync with
@@ -6226,6 +6688,12 @@ def admin_update_event(event_id):
                 datetime.strptime(d, "%Y-%m-%d")
                 cleaned.append(d)
             event["blackout_dates"] = cleaned
+        if "addons" in data:
+            addons = _sanitize_event_addons(data.get("addons") or [])
+            if addons:
+                event["addons"] = addons
+            else:
+                event.pop("addons", None)
     except ValueError as e:
         return jsonify({"error": f"Invalid value: {e}"}), 400
 
@@ -6483,6 +6951,9 @@ def admin_create_event():
         "included": [i.strip() for i in data.get("included", []) if str(i).strip()],
         "photos": [],
     }
+    addons = _sanitize_event_addons(data.get("addons") or [])
+    if addons:
+        new_event["addons"] = addons
 
     events_list.append(new_event)
     yaml_data["events"] = events_list
@@ -6990,7 +7461,8 @@ def admin_event_slots(event_id):
     rows = conn.execute(
         """SELECT id, date, time, name, email, phone, instagram, status,
                   confirmed, paid, paid_amount, deposit_amount, full_price,
-                  event_id, reserved_until, session_type
+                  event_id, reserved_until, session_type, selected_addons_json,
+                  addons_total
            FROM bookings
            WHERE date=? AND status NOT IN ('cancelled','expired')""",
         (target_date,),
@@ -7034,6 +7506,8 @@ def admin_event_slots(event_id):
             "paid_amount": float(b.get("paid_amount") or 0),
             "deposit_amount": float(b.get("deposit_amount") or ev.get("deposit") or 0),
             "full_price": float(b.get("full_price") or ev.get("full_price") or 0),
+            "selected_addons": _booking_addons(b),
+            "addons_total": _booking_addons_total(b),
         })
     return jsonify({
         "event": {
@@ -7839,6 +8313,7 @@ def telegram_webhook():
         )
         conn.commit()
         conn.close()
+        booking.update({"confirmed": 1, "paid": 1, "status": "confirmed", "paid_amount": deposit_amount})
 
         ev = get_event_by_id(booking.get("event_id"))
         event_title = ev.get("title", "Mini Session") if ev else "Mini Session"
@@ -7882,7 +8357,9 @@ def telegram_webhook():
                         slot_time=booking.get("time", ""),
                         event_title=event_title,
                         booking_id=booking_id,
-                        location=ev.get("location")
+                        location=ev.get("location"),
+                        location_url=ev.get("location_url"),
+                        **_client_email_context(booking, ev),
                     )
                 log.info(f"[tg-webhook] Booking #{booking_id} side-effects complete")
             except Exception as e:

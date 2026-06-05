@@ -467,12 +467,15 @@
       const balanceAction = b.status === 'confirmed'
         ? `<button class="mini-btn warn" type="button" data-roster-action="balance" data-booking-id="${Number(b.id)}" data-name="${esc(b.name)}">Balance</button>`
         : '';
+      const addonLine = Array.isArray(b.selected_addons) && b.selected_addons.length
+        ? `<span>Add-ons ${money(b.addons_total)} · ${b.selected_addons.map(a => esc(a.title || 'Add-on')).join(', ')}</span>`
+        : '';
       return `
         <div class="roster-row">
           <div class="roster-top">
             <div>
               <div class="roster-name">${esc(b.name || 'Client')}</div>
-              <div class="roster-meta"><span>${esc(b.time || '')}</span><span>Paid ${money(b.paid_amount)}</span></div>
+              <div class="roster-meta"><span>${esc(b.time || '')}</span><span>Paid ${money(b.paid_amount)}</span>${addonLine}</div>
             </div>
             <span class="badge ${esc(b.status || '')}">${esc((b.status || 'pending').replace(/_/g, ' '))}</span>
           </div>

@@ -330,13 +330,27 @@
           <span class="key" data-i18n="summary_includes">Includes</span>
           <span data-i18n="summary_includes_value">15 edited photos + all originals</span>
         </div>
+        {% if selected_addons %}
         <div class="summary-row">
-          <span class="key" data-i18n="summary_balance">Balance at session</span>
-          <span>$95 + GST</span>
+          <span class="key">Selected add-ons</span>
+          <span>
+            {% for addon in selected_addons %}
+              {{ addon.title|e }}{% if not loop.last %}<br>{% endif %}
+            {% endfor %}
+          </span>
         </div>
         <div class="summary-row">
-          <span class="key" data-i18n="summary_deposit">Deposit due now</span>
-          <span class="val-rose">${{ price }} CAD</span>
+          <span class="key">Selected add-ons total</span>
+          <span>${{ "%.2f"|format(addons_total or 0) }} CAD</span>
+        </div>
+        {% endif %}
+        <div class="summary-row">
+          <span class="key">Remaining balance</span>
+          <span>${{ "%.2f"|format(remaining_balance or 0) }} CAD</span>
+        </div>
+        <div class="summary-row">
+          <span class="key">Amount due today</span>
+          <span class="val-rose">${{ "%.2f"|format(amount_due_today or price) }} CAD</span>
         </div>
       </div>
     </div>

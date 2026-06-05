@@ -42,3 +42,20 @@ def test_public_assistant_widget_posts_to_assistant_chat_endpoint():
     assert 'id="assistantWidget"' in html
     assert "fetch('/assistant/chat'" in html
     assert "updateAssistantLang" in html
+
+
+def test_drawer_contains_addons_agreement_and_amount_summary_hooks():
+    """Session-inspired upgrades must remain wired through the current drawer."""
+    html = TEMPLATE.read_text()
+
+    assert "renderAddonsSection" in html
+    assert "getSelectedAddons" in html
+    assert "updateBookingSummary" in html
+    assert "booking-addon" in html
+    assert "marketing_consent" in html
+    assert "terms_accepted" in html
+    assert "agreement_name" in html
+    assert "Amount due today" in html
+    assert "Remaining balance" in html
+    assert "Change time" in html
+    assert "questionnaire" not in html.lower() or "after_confirmed_payment" in html

@@ -146,3 +146,42 @@ def test_confirmation_email_plain_text_includes_location_url_and_arrival(monkeyp
     assert "maps.app.goo.gl" in plain_part or "google.com/maps" in plain_part
     assert "Arrive 5–10 minutes early" in plain_part or "Arrive 5-10 minutes early" in plain_part
     assert "Add to Calendar" in plain_part
+
+
+def test_confirmation_email_includes_addons_amounts_consent_and_questionnaire(monkeypatch):
+    captured = {}
+
+    def fake_run(cmd, input=None, capture_output=None, text=None, timeout=None):
+        captured["input"] = input
+        return SimpleNamespace(returncode=0, stderr="")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    booking_app._send_client_email(
+        to_email="client@example.com",
+        client_name="Anna Client",
+        event_date="2026-08-10",
+        slot_time="10:00",
+        event_title="Individual Portraits",
+        booking_id=99,
+        location="River Park",
+        selected_addons=[
+            {"title": "<script>Bad</script>Short Vertical Behind-the-Scenes Reel", "price": 50.0},
+        ],
+        addons_total=50.0,
+        total_price=300.0,
+        amount_due_today=100.0,
+        remaining_balance=200.0,
+        marketing_consent="no",
+        questionnaire_url="https://book.test/questionnaire?booking_id=99&token=abc",
+    )
+    email = captured["input"]
+
+    assert "Selected add-ons" in email
+    assert "Short Vertical Behind-the-Scenes Reel" in email
+    assert "Selected add-ons: $50.00 CAD" in email
+    assert "Amount due today: $100.00 CAD" in email
+    assert "Remaining balance: $200.00 CAD" in email
+    assert "keep my gallery private" in email.lower()
+    assert "Optional session questionnaire" in email
+    assert "https://book.test/questionnaire" in email
+    assert "<script>" not in email

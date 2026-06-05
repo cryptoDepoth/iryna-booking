@@ -440,6 +440,18 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .drawer input{width:100%;padding:12px 14px;background:#fff;border:1.5px solid var(--ink-5);border-radius:10px;font:.92rem var(--font-b);outline:none}
 .drawer input:focus{border-color:var(--rose);box-shadow:0 0 0 3px rgba(196,133,122,.12)}
 .field-error{display:block;color:#e53e3e;font-size:.72rem;margin-top:4px;}
+.drawer .addon-section,.drawer .agreement-section,.drawer .booking-summary{border:1px solid var(--ink-5);border-radius:14px;background:#fff;padding:13px 14px;margin:0 0 14px}
+.drawer .addon-option{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--ink-5)}
+.drawer .addon-option:first-of-type{border-top:0}
+.drawer .addon-option input{width:18px;height:18px;margin-top:2px;accent-color:var(--rose)}
+.drawer .addon-title{font-weight:700;font-size:.9rem;color:var(--ink)}
+.drawer .addon-desc{font-size:.78rem;color:var(--ink-3);line-height:1.4;margin-top:3px}
+.drawer .addon-price{font-weight:800;color:var(--rose);white-space:nowrap}
+.drawer .agreement-section label{display:flex;gap:9px;align-items:flex-start;font-size:.82rem;line-height:1.45;color:var(--ink-2);margin:8px 0}
+.drawer .agreement-section input[type="checkbox"],.drawer .agreement-section input[type="radio"]{width:17px;height:17px;flex:0 0 auto;margin-top:1px;accent-color:var(--rose)}
+.drawer .booking-summary .summary-row{display:flex;justify-content:space-between;gap:12px;font-size:.84rem;padding:5px 0;border-bottom:1px solid var(--ink-5)}
+.drawer .booking-summary .summary-row:last-child{border-bottom:0;font-weight:800}
+.drawer .change-time{border:0;background:transparent;color:var(--rose);font-weight:800;cursor:pointer;padding:0;font-size:.78rem}
 .drawer .btn{display:block;width:100%;padding:15px;background:var(--ink);color:#fff;border:0;border-radius:12px;font:600 .92rem var(--font-b);cursor:pointer;margin-top:18px;letter-spacing:.02em}
 .drawer .btn:hover{background:var(--ink-2)}
 .drawer .btn:disabled{opacity:0.5;cursor:not-allowed}
@@ -870,6 +882,8 @@ let currentBooking = null; // {event_id, time, booking_id, expires_at}
 const ETRANSFER_EMAIL = "iryna.pashynska@gmail.com";
 const STRIPE_ENABLED = {{ stripe_enabled | tojson }};
 let payTimer = null;
+let currentDrawerEventId = null;
+let currentDrawerDate = null;
 
 const toast = (msg) => {
   if (!msg) return;
@@ -897,6 +911,71 @@ function addDaysISO(days) {
   d.setDate(d.getDate() + days);
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
+}
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function money(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+}
+function activeAddons(eventObj) {
+  return Array.isArray(eventObj?.addons) ? eventObj.addons.filter(a => a && a.active !== false) : [];
+}
+function getSelectedAddons() {
+  return Array.from(document.querySelectorAll('.booking-addon:checked')).map(input => input.dataset.addonId).filter(Boolean);
+}
+function selectedAddonDetails(eventObj) {
+  const ids = new Set(getSelectedAddons());
+  return activeAddons(eventObj).filter(a => ids.has(a.id));
+}
+function renderAddonsSection(eventObj) {
+  const addons = activeAddons(eventObj);
+  if (!addons.length) return '';
+  return `<section class="addon-section" aria-label="Add-ons">
+    <div class="lbl">Add-ons</div>
+    ${addons.map(addon => `
+      <label class="addon-option">
+        <input type="checkbox" class="booking-addon" data-addon-id="${escapeHtml(addon.id)}" data-price="${Number(addon.price || 0)}" onchange="updateBookingSummary()">
+        <span>
+          <span class="addon-title">${escapeHtml(addon.title || 'Add-on')}</span>
+          <span class="addon-desc">${escapeHtml(addon.description || '')}</span>
+        </span>
+        <span class="addon-price">$${money(addon.price)}</span>
+      </label>`).join('')}
+  </section>`;
+}
+function renderAgreementSection(eventObj) {
+  if (!eventObj?.agreement?.enabled) return '';
+  return `<section class="agreement-section" aria-label="Booking agreement">
+    <div class="lbl">Booking terms</div>
+    <label><input type="checkbox" id="termsAccepted"> <span>I agree to the booking terms, including the non-refundable reservation payment and rescheduling/cancellation policy shown for this session.</span></label>
+    <input id="agreementName" class="full" type="text" autocomplete="name" placeholder="Electronic signature / full legal name">
+    <div class="lbl" style="margin-top:12px">Photo/video privacy</div>
+    <label><input type="radio" name="marketingConsent" value="yes"> <span>Yes, I allow Pashynska Photography to use selected photos/videos from this session for portfolio, website, social media, ads, and marketing.</span></label>
+    <label><input type="radio" name="marketingConsent" value="no"> <span>No, please keep my gallery private.</span></label>
+  </section>`;
+}
+function changeTimeFocus() {
+  document.getElementById('slotsBox')?.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function updateBookingSummary() {
+  const e = eventsData.find(x => x.id === currentDrawerEventId);
+  const box = document.getElementById('bookingSummary');
+  if (!e || !box) return;
+  const time = document.querySelector('#slotsBox .slot.sel')?.dataset.time || '';
+  const date = document.getElementById('bookingDate')?.value || currentDrawerDate || e.date;
+  const addons = selectedAddonDetails(e);
+  const addonsTotal = addons.reduce((sum, addon) => sum + Number(addon.price || 0), 0);
+  const dueToday = Number(e.deposit || e.price || 0);
+  const total = Number(e.full_price || e.price || 0) + addonsTotal;
+  const remaining = Math.max(0, total - dueToday);
+  box.innerHTML = `
+    <div class="summary-row"><span>${escapeHtml(e.title || 'Session')}</span><button type="button" class="change-time" onclick="changeTimeFocus()">Change time</button></div>
+    <div class="summary-row"><span>${fmtDate(date)} · ${escapeHtml(time)}</span><span>${escapeHtml(e.location || 'Calgary')}</span></div>
+    ${addonsTotal ? `<div class="summary-row"><span>Selected add-ons</span><span>$${money(addonsTotal)} CAD</span></div>` : ''}
+    <div class="summary-row"><span>Amount due today</span><span>$${money(dueToday)} CAD</span></div>
+    <div class="summary-row"><span>Remaining balance</span><span>$${money(remaining)} CAD</span></div>`;
 }
 function daysUntil(iso) {
   return Math.ceil((new Date(iso + "T00:00:00") - new Date()) / 86400000);
@@ -1248,6 +1327,8 @@ async function openDrawer(id) {
   try {
     toast(T('toast_loading_slots'));
     const selectedDate = e.booking_type === 'rolling_availability' ? todayISO() : e.date;
+    currentDrawerEventId = e.id;
+    currentDrawerDate = selectedDate;
     const slotsData = await API.slots(selectedDate, e.id);
     const availableSlots = slotsData.slots || [];
     if (availableSlots.length === 0 && e.booking_type !== 'rolling_availability') {
@@ -1296,6 +1377,8 @@ async function openDrawer(id) {
         `).join('')}
       </div>
       <div id="slotEmptyMsg" style="display:${availableSlots.length ? 'none' : 'block'};background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;font-size:.86rem;margin-bottom:14px;text-align:center">${slotsData.foreign_booked ? T('slot_foreign_msg', {ig: slotsData.instagram_handle || '@pashynska.photo'}) : T('no_slots_msg')}</div>
+      <div class="booking-summary" id="bookingSummary"></div>
+      ${renderAddonsSection(e)}
       <div class="form">
         <input data-ph="full_name" placeholder="${T('full_name')}" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
         <input data-ph="phone_ph" placeholder="${T('phone_ph')}" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
@@ -1304,9 +1387,11 @@ async function openDrawer(id) {
         <!-- Honeypot: invisible field — bots fill it, humans don't see it -->
         <input type="text" id="hp_website" name="website" style="position:absolute;left:-9999px;opacity:0" tabindex="-1" autocomplete="off" placeholder="Leave empty">
       </div>
+      ${renderAgreementSection(e)}
       <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', document.getElementById('bookingDate')?.value || '${selectedDate}')">${T('continue_btn')}</button>
       <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">${T('pay_note')}</p>`;
     showDrawer();
+    updateBookingSummary();
   } catch (err) {
     console.error('Failed to load slots:', err);
     toast(T('toast_error_slots'));
@@ -1316,6 +1401,7 @@ async function openDrawer(id) {
 function pickSlot(btn) {
   btn.parentNode.querySelectorAll('.slot').forEach(s => s.classList.remove('sel'));
   btn.classList.add('sel');
+  updateBookingSummary();
 }
 
 async function reloadSlotsForSelectedDate(eventId) {
@@ -1333,6 +1419,8 @@ async function reloadSlotsForSelectedDate(eventId) {
     if (empty) empty.style.display = slots.length ? 'none' : 'block';
     const dateLabel = document.getElementById('drawerDateLabel');
     if (dateLabel) dateLabel.textContent = fmtDate(input.value);
+    currentDrawerDate = input.value;
+    updateBookingSummary();
   } catch (err) {
     console.error('Failed to reload slots:', err);
     toast(T('toast_error_slots'));
@@ -1429,8 +1517,18 @@ async function reserveSlot(eventId, eventDate) {
   const phone = document.getElementById('fPhone').value.trim();
   const email = document.getElementById('fEmail').value.trim();
   const ig    = document.getElementById('fIg').value.trim();
+  const eventObj = eventsData.find(e => e.id === eventId) || {};
+  const agreementEnabled = !!eventObj.agreement?.enabled;
+  const termsAccepted = !!document.getElementById('termsAccepted')?.checked;
+  const agreementName = document.getElementById('agreementName')?.value.trim() || '';
+  const marketingConsent = document.querySelector('input[name="marketingConsent"]:checked')?.value || '';
 
   if (!validateBookingForm()) return;
+  if (agreementEnabled) {
+    if (!termsAccepted) { toast('Please accept the booking terms.'); return; }
+    if (!agreementName) { showFieldError('agreementName', 'Please enter your full legal name.'); return; }
+    if (!['yes','no'].includes(marketingConsent)) { toast('Please choose your photo/video privacy preference.'); return; }
+  }
 
   // ── reCAPTCHA v3 verification (anti-bot) ─────────────────────────
   let recaptchaToken = '';
@@ -1464,7 +1562,11 @@ async function reserveSlot(eventId, eventDate) {
       email: email,
       phone: phone,
       instagram: ig,
-      session_type: eventsData.find(e => e.id === eventId)?.session_type || 'mini',
+      session_type: eventObj.session_type || 'mini',
+      addons: getSelectedAddons(),
+      terms_accepted: termsAccepted,
+      agreement_name: agreementName,
+      marketing_consent: marketingConsent,
       recaptcha_token: recaptchaToken,
       website: HONEYPOT  // honeypot — empty for humans, filled by bots
     });
@@ -1480,7 +1582,11 @@ async function reserveSlot(eventId, eventDate) {
         name: name,
         email: email,
         phone: phone,
-        instagram: ig
+        instagram: ig,
+        addons: selectedAddonDetails(eventObj),
+        addons_total: selectedAddonDetails(eventObj).reduce((sum, addon) => sum + Number(addon.price || 0), 0),
+        amount_due_today: Number(eventObj.deposit || eventObj.price || 0),
+        total_price: Number(eventObj.full_price || eventObj.price || 0) + selectedAddonDetails(eventObj).reduce((sum, addon) => sum + Number(addon.price || 0), 0),
       };
       goToPayment(eventId, eventDate);
     } else {
@@ -1510,7 +1616,14 @@ function goToPayment(eventId, eventDate) {
   const amt = e.deposit || 0;
   if (currentBooking) currentBooking.amt = amt;
   const sessionMin = e.session_length || 20;
-  const remaining = Math.max(0, (e.full_price || 0) - amt);
+  const addons = currentBooking?.addons || [];
+  const addonsTotal = Number(currentBooking?.addons_total || 0);
+  const totalPrice = Number(currentBooking?.total_price || ((e.full_price || 0) + addonsTotal));
+  const remaining = Math.max(0, totalPrice - amt);
+  const addonsRows = addonsTotal ? `
+      <div class="row"><span class="key">Selected add-ons</span><span>$${money(addonsTotal)} CAD</span></div>
+      ${addons.map(addon => `<div class="row"><span class="key">${escapeHtml(addon.title || 'Add-on')}</span><span>$${money(addon.price)} CAD</span></div>`).join('')}
+    ` : '';
   document.getElementById('dbody').innerHTML = `
     <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
       <button onclick="restoreDrawer('${eventId}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;cursor:pointer;font-size:14px">‹</button>
@@ -1529,8 +1642,9 @@ function goToPayment(eventId, eventDate) {
       <div class="row"><span class="key">${T('pay_row_session')}</span><span>${T('pay_session_min', {title: e.title, min: sessionMin})}</span></div>
       <div class="row"><span class="key">${T('pay_row_date')}</span><span>${fmtDate(eventDate)}</span></div>
       <div class="row"><span class="key">${T('pay_row_time')}</span><span>${time}</span></div>
-      <div class="row"><span class="key">${T('pay_row_balance')}</span><span>$${remaining} + GST</span></div>
-      <div class="row"><span class="key">${T('pay_row_deposit')}</span><span class="val-rose">$${amt} CAD</span></div>
+      ${addonsRows}
+      <div class="row"><span class="key">Remaining balance</span><span>$${money(remaining)} CAD</span></div>
+      <div class="row"><span class="key">Amount due today</span><span class="val-rose">$${money(amt)} CAD</span></div>
     </div>
 
     <div style="font-size:.82rem;color:var(--ink-3);margin:-2px 0 12px;line-height:1.5">${T('pay_choose_method')}</div>
@@ -1887,6 +2001,8 @@ async function joinWaitlist(eventId) {
 
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('open');
+  currentDrawerEventId = null;
+  currentDrawerDate = null;
   if (payTimer) clearInterval(payTimer);
   if (typeof stopStatusPolling === 'function') stopStatusPolling();
   // Restore drawer photo aspect ratio

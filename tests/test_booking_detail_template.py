@@ -7,6 +7,7 @@ renders the full template. These tests pin every section we expect to find,
 plus the visual coherence with admin.html / admin_clients.html.
 """
 import os
+import json
 import sqlite3
 import tempfile
 
@@ -117,6 +118,45 @@ def test_booking_detail_payment_math_is_correct(admin_client):
     body = admin_client.get(f"/admin/booking/{bid}", headers=_hdrs()).get_data(as_text=True)
     assert "$250.00" in body  # deposit + paid
     assert "$500.00" in body  # full_price for lilac-jun7
+
+
+def test_booking_detail_renders_addons_agreement_and_questionnaire_safely(admin_client):
+    """Admin detail should show new booking snapshot fields without raw HTML."""
+    bid = _insert_booking(
+        full_price=300.0,
+        deposit_amount=100.0,
+        paid_amount=100.0,
+        addons_total=50.0,
+        selected_addons_json=json.dumps([
+            {
+                "id": "extra-10-edited-images",
+                "title": "<script>Bad Addon</script>10 Extra Edited Images",
+                "description": "Safe description",
+                "price": 50.0,
+            }
+        ]),
+        marketing_consent="no",
+        agreement_name='<img src=x onerror=alert(1)> Client Name',
+        agreement_accepted_at="2026-08-01T10:05:00",
+        terms_version="booking-terms-v1",
+        questionnaire_answers_json=json.dumps({
+            "session_goals": "<script>alert(1)</script>Natural photos",
+        }),
+    )
+
+    body = admin_client.get(f"/admin/booking/{bid}", headers=_hdrs()).get_data(as_text=True)
+
+    assert "Selected add-ons" in body
+    assert "Add-ons total" in body
+    assert "10 Extra Edited Images" in body
+    assert "Marketing consent" in body
+    assert "Keep gallery private" in body
+    assert "Electronic signature" in body
+    assert "Questionnaire answers" in body
+    assert "Natural photos" in body
+    assert "<script>Bad Addon</script>" not in body
+    assert "<script>alert(1)</script>" not in body
+    assert '<img src=x onerror=alert(1)>' not in body
 
 
 def test_booking_detail_payment_marks_zero_balance_paid(admin_client):

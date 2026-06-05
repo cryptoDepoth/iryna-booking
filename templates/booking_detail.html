@@ -322,6 +322,20 @@
         <span class="lbl">Full price</span>
         <span class="val">${{ "%.2f"|format(full_price or 0) }}</span>
       </div>
+      {% if booking.selected_addons %}
+      <div class="row">
+        <span class="lbl">Selected add-ons</span>
+        <span class="val">
+          {% for addon in booking.selected_addons %}
+            {{ addon.title|e }} (${{ "%.2f"|format(addon.price|float) }}){% if not loop.last %}<br>{% endif %}
+          {% endfor %}
+        </span>
+      </div>
+      <div class="row">
+        <span class="lbl">Add-ons total</span>
+        <span class="val">${{ "%.2f"|format(booking.addons_total or 0) }}</span>
+      </div>
+      {% endif %}
       <div class="row">
         <span class="lbl">Paid so far</span>
         <span class="val">${{ "%.2f"|format(paid) }}</span>
@@ -331,6 +345,54 @@
         <span class="val {{ 'paid' if remaining <= 0 else 'unpaid' }}">${{ "%.2f"|format(remaining if remaining > 0 else 0) }}</span>
       </div>
     </section>
+
+    {% if booking.marketing_consent or booking.agreement_name or booking.questionnaire_answers %}
+    <section class="card grid-full">
+      <h2 class="card-title">📝 Agreement &amp; Preferences</h2>
+      {% if booking.marketing_consent %}
+      <div class="row">
+        <span class="lbl">Marketing consent</span>
+        <span class="val">
+          {% if booking.marketing_consent == 'yes' %}
+            Yes, portfolio/marketing use allowed
+          {% elif booking.marketing_consent == 'no' %}
+            Keep gallery private
+          {% else %}
+            {{ booking.marketing_consent|e }}
+          {% endif %}
+        </span>
+      </div>
+      {% endif %}
+      {% if booking.agreement_name %}
+      <div class="row">
+        <span class="lbl">Electronic signature</span>
+        <span class="val">{{ booking.agreement_name|e }}</span>
+      </div>
+      {% endif %}
+      {% if booking.agreement_accepted_at %}
+      <div class="row">
+        <span class="lbl">Accepted at</span>
+        <span class="val">{{ booking.agreement_accepted_at|e }}</span>
+      </div>
+      {% endif %}
+      {% if booking.terms_version %}
+      <div class="row">
+        <span class="lbl">Terms version</span>
+        <span class="val">{{ booking.terms_version|e }}</span>
+      </div>
+      {% endif %}
+      {% if booking.questionnaire_answers %}
+      <div class="row" style="align-items:flex-start;">
+        <span class="lbl">Questionnaire answers</span>
+        <span class="val">
+          {% for key, value in booking.questionnaire_answers.items() %}
+            <strong>{{ key|replace('_', ' ')|title|e }}:</strong> {{ value|e }}{% if not loop.last %}<br>{% endif %}
+          {% endfor %}
+        </span>
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
 
     <!-- INVOICE -->
     <section class="card">

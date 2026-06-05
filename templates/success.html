@@ -624,10 +624,34 @@
         <span class="key" data-i18n="payment_label">Payment</span>
         <span class="val" data-i18n="payment_method">Interac e-Transfer</span>
       </div>
+      {% if selected_addons %}
       <div class="detail-row">
-        <span class="key" data-i18n="amount_label">Amount</span>
-        <span class="val">${{ "%.2f"|format(price) }} CAD</span>
+        <span class="key">Selected add-ons</span>
+        <span class="val">
+          {% for addon in selected_addons %}
+            {{ addon.title|e }}{% if not loop.last %}<br>{% endif %}
+          {% endfor %}
+        </span>
       </div>
+      <div class="detail-row">
+        <span class="key">Selected add-ons total</span>
+        <span class="val">${{ "%.2f"|format(addons_total or 0) }} CAD</span>
+      </div>
+      {% endif %}
+      <div class="detail-row">
+        <span class="key">Amount due today</span>
+        <span class="val">${{ "%.2f"|format(amount_due_today or price) }} CAD</span>
+      </div>
+      <div class="detail-row">
+        <span class="key">Remaining balance</span>
+        <span class="val">${{ "%.2f"|format(remaining_balance or 0) }} CAD</span>
+      </div>
+      {% if questionnaire_url %}
+      <div class="detail-row">
+        <span class="key">Optional questionnaire</span>
+        <span class="val"><a href="{{ questionnaire_url|e }}">Open preparation form</a></span>
+      </div>
+      {% endif %}
       <div class="detail-row">
         <span class="key" data-i18n="status_label">Status</span>
         <span class="val" id="detail-status" data-i18n="{% if booking and booking.confirmed %}confirmed_status{% else %}pending_verify{% endif %}">{% if booking and booking.confirmed %}Confirmed ✓{% else %}Pending verification{% endif %}</span>

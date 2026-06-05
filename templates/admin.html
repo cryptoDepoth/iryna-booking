@@ -1380,6 +1380,11 @@
                         {% else %}
                         <span class="cell-amount none">—</span>
                         {% endif %}
+                        {% if b.selected_addons %}
+                        <div style="font-size:11px;color:var(--accent);font-weight:700;margin-top:4px;">
+                            Add-ons ${{ "%.2f"|format(b.addons_total or 0) }}
+                        </div>
+                        {% endif %}
                     </td>
 
                     <td>
@@ -1486,6 +1491,7 @@
                 <button class="ev-tab active" data-ev="{{ ev.id }}" data-tab="schedule" onclick="switchTab('{{ ev.id }}','schedule')">📅 Schedule</button>
                 <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="info" onclick="switchTab('{{ ev.id }}','info')">✏️ Info</button>
                 <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="included" onclick="switchTab('{{ ev.id }}','included')">✅ What's included</button>
+                <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="addons" onclick="switchTab('{{ ev.id }}','addons')">➕ Add-ons</button>
                 <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="photos" onclick="switchTab('{{ ev.id }}','photos')">📸 Photos <span id="photos-count-{{ ev.id }}" style="background:var(--accent-light);color:var(--accent);border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px;">{{ (ev.photos or [])|length }}</span></button>
             </div>
 
@@ -1634,6 +1640,58 @@
                         style="margin-top:8px; display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border:1px dashed var(--accent); border-radius:var(--radius); background:var(--accent-light); color:var(--accent); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">
                     + Add custom item
                 </button>
+            </div>
+
+            <!-- ── TAB: ADD-ONS ── -->
+            <div id="tab-addons-{{ ev.id }}" class="ev-tab-panel" style="display:none;">
+                {% set extra = namespace(active=false, price=50) %}
+                {% set reel = namespace(active=false, price=50) %}
+                {% for addon in (ev.addons or []) %}
+                    {% if addon.id == 'extra-10-edited-images' %}
+                        {% set extra.active = addon.active %}
+                        {% set extra.price = addon.price %}
+                    {% elif addon.id == 'short-vertical-reel' %}
+                        {% set reel.active = addon.active %}
+                        {% set reel.price = addon.price %}
+                    {% endif %}
+                {% endfor %}
+                <p style="font-size:13px;color:var(--text-2);margin-bottom:14px;">Optional flat-price add-ons shown in the booking drawer. Deposit stays unchanged; add-ons increase the remaining balance.</p>
+                <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+                    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:var(--surface);">
+                        <label style="display:flex;align-items:center;gap:10px;font-weight:700;margin-bottom:10px;">
+                            <input type="checkbox" id="addon-extra-active-{{ ev.id }}" {% if extra.active %}checked{% endif %} style="width:16px;height:16px;accent-color:var(--accent);">
+                            10 Extra Edited Images
+                        </label>
+                        <div class="form-group" style="max-width:180px;margin:0;">
+                            <label>Price CAD</label>
+                            <input type="number" id="addon-extra-price-{{ ev.id }}" value="{{ extra.price|default(50) }}" min="0" step="5">
+                        </div>
+                    </div>
+                    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:var(--surface);">
+                        <label style="display:flex;align-items:center;gap:10px;font-weight:700;margin-bottom:10px;">
+                            <input type="checkbox" id="addon-reel-active-{{ ev.id }}" {% if reel.active %}checked{% endif %} style="width:16px;height:16px;accent-color:var(--accent);">
+                            Short Vertical Behind-the-Scenes Reel
+                        </label>
+                        <div class="form-group" style="max-width:180px;margin:0;">
+                            <label>Price CAD</label>
+                            <input type="number" id="addon-reel-price-{{ ev.id }}" value="{{ reel.price|default(50) }}" min="0" step="5">
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:18px;">
+                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);display:block;margin-bottom:8px;">Custom add-ons</label>
+                    <div id="custom-addons-{{ ev.id }}">
+                        {% for addon in (ev.addons or []) if addon.id not in ['extra-10-edited-images','short-vertical-reel'] %}
+                        <div class="addon-custom-row" data-addon-id="{{ addon.id|e }}" style="display:grid;grid-template-columns:1fr 1fr 110px auto;gap:8px;margin-bottom:8px;align-items:center;">
+                            <input class="addon-title" type="text" value="{{ addon.title|e }}" placeholder="Title">
+                            <input class="addon-description" type="text" value="{{ addon.description|default('')|e }}" placeholder="Description">
+                            <input class="addon-price" type="number" value="{{ addon.price|default(0) }}" min="0" step="5" placeholder="Price">
+                            <label style="display:flex;gap:6px;align-items:center;font-size:12px;"><input class="addon-active" type="checkbox" {% if addon.active %}checked{% endif %}> Active</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn-outline" style="font-size:12px;padding:7px 12px;" onclick="addCustomAddonRow('{{ ev.id }}')">+ Custom add-on</button>
+                </div>
             </div>
 
             <!-- ── TAB: PHOTOS ── -->
@@ -1800,6 +1858,27 @@
             <div class="form-group">
                 <label>Full price (CAD)</label>
                 <input type="number" id="new-fullprice" value="300" min="0" step="5">
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <div class="modal-section-label" style="margin-top:4px;">➕ Add-ons</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
+                    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--surface);">
+                        <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;">
+                            <input type="checkbox" id="new-addon-extra-active" style="width:15px;height:15px;accent-color:var(--accent);">
+                            10 Extra Edited Images
+                        </label>
+                        <input type="number" id="new-addon-extra-price" value="50" min="0" step="5" placeholder="Price CAD">
+                    </div>
+                    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--surface);">
+                        <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;">
+                            <input type="checkbox" id="new-addon-reel-active" style="width:15px;height:15px;accent-color:var(--accent);">
+                            Short Vertical Behind-the-Scenes Reel
+                        </label>
+                        <input type="number" id="new-addon-reel-price" value="50" min="0" step="5" placeholder="Price CAD">
+                    </div>
+                </div>
+                <div id="new-custom-addons" style="margin-top:10px;"></div>
+                <button type="button" class="btn-outline" style="font-size:12px;padding:7px 12px;margin-top:8px;" onclick="addNewCustomAddonRow()">+ Custom add-on</button>
             </div>
             <div class="form-group">
                 <label>Initial status</label>
@@ -2451,6 +2530,7 @@
             session_type:   document.getElementById(`session-type-${eventId}`)?.value,
             availability_horizon_days: parseInt(document.getElementById(`horizon-${eventId}`)?.value) || 90,
             blackout_dates: (document.getElementById(`blackout-${eventId}`)?.value || '').split(',').map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)),
+            addons:         collectAddons(eventId),
         };
 
         // --- META payload (new route) ---
@@ -2515,7 +2595,7 @@
     }
     function switchTab(eventId, tab) {
         // Hide all panels for this event
-        ['schedule','info','included','photos'].forEach(t => {
+        ['schedule','info','included','addons','photos'].forEach(t => {
             const panel = document.getElementById(`tab-${t}-${eventId}`);
             if (panel) panel.style.display = t === tab ? '' : 'none';
         });
@@ -2523,6 +2603,83 @@
         document.querySelectorAll(`.ev-tab[data-ev="${eventId}"]`).forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tab);
         });
+    }
+
+    function collectAddons(eventId) {
+        const addons = [
+            {
+                id: 'extra-10-edited-images',
+                title: '10 Extra Edited Images',
+                price: parseFloat(document.getElementById(`addon-extra-price-${eventId}`)?.value || '50'),
+                active: !!document.getElementById(`addon-extra-active-${eventId}`)?.checked,
+            },
+            {
+                id: 'short-vertical-reel',
+                title: 'Short Vertical Behind-the-Scenes Reel',
+                price: parseFloat(document.getElementById(`addon-reel-price-${eventId}`)?.value || '50'),
+                active: !!document.getElementById(`addon-reel-active-${eventId}`)?.checked,
+            },
+        ];
+        const customList = document.getElementById(`custom-addons-${eventId}`);
+        (customList ? customList.querySelectorAll('.addon-custom-row') : []).forEach((row, idx) => {
+            const title = row.querySelector('.addon-title')?.value.trim() || '';
+            addons.push({
+                id: row.dataset.addonId || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `custom-addon-${idx + 1}`,
+                title,
+                description: row.querySelector('.addon-description')?.value.trim() || '',
+                price: parseFloat(row.querySelector('.addon-price')?.value || '0'),
+                active: !!row.querySelector('.addon-active')?.checked,
+            });
+        });
+        return addons;
+    }
+
+    function addonCustomRowHtml(addon) {
+        const dataId = addon && addon.id ? ` data-addon-id="${escapeAttr(addon.id)}"` : '';
+        return `<div class="addon-custom-row"${dataId} style="display:grid;grid-template-columns:1fr 1fr 110px auto;gap:8px;margin-bottom:8px;align-items:center;">
+            <input class="addon-title" type="text" value="${escapeAttr(addon?.title || '')}" placeholder="Title">
+            <input class="addon-description" type="text" value="${escapeAttr(addon?.description || '')}" placeholder="Description">
+            <input class="addon-price" type="number" value="${Number(addon?.price || 0)}" min="0" step="5" placeholder="Price">
+            <label style="display:flex;gap:6px;align-items:center;font-size:12px;"><input class="addon-active" type="checkbox" ${addon?.active === false ? '' : 'checked'}> Active</label>
+        </div>`;
+    }
+
+    function addCustomAddonRow(eventId) {
+        const list = document.getElementById(`custom-addons-${eventId}`);
+        if (list) list.insertAdjacentHTML('beforeend', addonCustomRowHtml({active:true}));
+    }
+
+    function collectNewAddons() {
+        const addons = [
+            {
+                id: 'extra-10-edited-images',
+                title: '10 Extra Edited Images',
+                price: parseFloat(document.getElementById('new-addon-extra-price')?.value || '50'),
+                active: !!document.getElementById('new-addon-extra-active')?.checked,
+            },
+            {
+                id: 'short-vertical-reel',
+                title: 'Short Vertical Behind-the-Scenes Reel',
+                price: parseFloat(document.getElementById('new-addon-reel-price')?.value || '50'),
+                active: !!document.getElementById('new-addon-reel-active')?.checked,
+            },
+        ];
+        document.querySelectorAll('#new-custom-addons .addon-custom-row').forEach((row, idx) => {
+            const title = row.querySelector('.addon-title')?.value.trim() || '';
+            addons.push({
+                id: row.dataset.addonId || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `custom-addon-${idx + 1}`,
+                title,
+                description: row.querySelector('.addon-description')?.value.trim() || '',
+                price: parseFloat(row.querySelector('.addon-price')?.value || '0'),
+                active: !!row.querySelector('.addon-active')?.checked,
+            });
+        });
+        return addons;
+    }
+
+    function addNewCustomAddonRow() {
+        const list = document.getElementById('new-custom-addons');
+        if (list) list.insertAdjacentHTML('beforeend', addonCustomRowHtml({active:true}));
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -2658,6 +2815,7 @@
             location:       document.getElementById('new-location').value.trim(),
             featured:       document.getElementById('new-featured').checked,
             included,
+            addons:         collectNewAddons(),
             booking_type:   bookingType,
             session_type:   sessionType,
             availability_horizon_days: bookingType === 'rolling_availability' ? horizon : undefined,

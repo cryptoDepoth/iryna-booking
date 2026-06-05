@@ -163,6 +163,42 @@ class TestBug002SendClientEmailReturnsStatus:
         )
         assert result is False
 
+
+def test_new_reservation_telegram_escapes_addons_and_consent(monkeypatch):
+    captured = {}
+
+    def fake_notify(text, reply_markup=None):
+        captured["text"] = text
+        captured["reply_markup"] = reply_markup
+        return True
+
+    monkeypatch.setattr(booking_app, "_notify_admin", fake_notify, raising=False)
+    booking_app._notify_new_reservation(
+        booking_id=123,
+        client_name="<script>Client</script>",
+        client_email="client@example.com",
+        event_date="2026-08-10",
+        slot_time="10:00",
+        event_title="<b>Portraits</b>",
+        session_type="mini",
+        client_ig="client",
+        client_phone="<img src=x onerror=bad()>",
+        selected_addons=[
+            {"title": "<script>Bad</script>Short Vertical Behind-the-Scenes Reel", "price": 50.0},
+        ],
+        addons_total=50.0,
+        marketing_consent="no",
+    )
+
+    text = captured["text"]
+    assert "Selected add-ons" in text
+    assert "Short Vertical Behind-the-Scenes Reel" in text
+    assert "$50.00 CAD" in text
+    assert "Marketing consent: no" in text
+    assert "<script>" not in text
+    assert "onerror=" not in text
+    assert captured["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == "confirm:123"
+
     def test_returns_false_on_exception(self, monkeypatch):
         def raise_error(*a, **kw):
             raise RuntimeError("Himalaya crashed")

@@ -4,6 +4,7 @@ import sqlite3
 import sys
 import tempfile
 import types
+import yaml
 from datetime import datetime as real_datetime
 
 import pytest
@@ -41,6 +42,40 @@ def admin_client(monkeypatch):
 
 def _headers():
     return {"X-Admin-Key": "test-admin-key"}
+
+
+def _yaml_event(**overrides):
+    event = {
+        "id": "addon-event",
+        "title": "Addon Event",
+        "date": "2026-08-01",
+        "start_time": "10:00",
+        "end_time": "11:00",
+        "session_length": 20,
+        "break_length": 10,
+        "slot_interval": 30,
+        "deposit": 100.0,
+        "full_price": 250.0,
+        "location": "Test Park",
+        "session_type": "mini",
+        "booking_type": "fixed_slots",
+        "featured": False,
+        "status": "active",
+        "included": [],
+        "photos": ["/static/images/placeholder.jpg"],
+    }
+    event.update(overrides)
+    return event
+
+
+def _patch_events_yaml(monkeypatch, tmp_path, events):
+    path = tmp_path / "events.yaml"
+    path.write_text(yaml.safe_dump({"events": events, "settings": {}}, sort_keys=False), encoding="utf-8")
+    monkeypatch.setattr(booking_app, "_EVENTS_PATH", str(path))
+    monkeypatch.setattr(booking_app, "EVENTS_YAML_PATH", str(path))
+    monkeypatch.setattr(booking_app, "EVENTS", events)
+    monkeypatch.setattr(booking_app, "SETTINGS", {})
+    return path
 
 
 def _insert_booking(db_path, **overrides):
@@ -240,3 +275,95 @@ def test_admin_stripe_link_requires_admin(admin_client, monkeypatch):
     monkeypatch.setattr(booking_app, "STRIPE_SECRET_KEY", "sk_test")
     resp = c.post("/admin/stripe-link", json={"amount": "25"})
     assert resp.status_code == 401
+
+
+def test_admin_event_update_saves_builtin_and_custom_addons(admin_client, monkeypatch, tmp_path):
+    c, _db_path = admin_client
+    path = _patch_events_yaml(monkeypatch, tmp_path, [_yaml_event()])
+
+    resp = c.post(
+        "/admin/events/addon-event/update",
+        headers=_headers(),
+        json={
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "session_length": 20,
+            "break_length": 10,
+            "deposit": 100,
+            "full_price": 250,
+            "addons": [
+                {"id": "extra-10-edited-images", "title": "10 Extra Edited Images", "price": 50, "active": True},
+                {"id": "short-vertical-reel", "title": "Short Vertical Behind-the-Scenes Reel", "price": 75, "active": True},
+                {"id": "custom-reel-note", "title": "<b>Custom Keepsake</b>", "description": "<script>bad()</script>Safe", "price": 25, "active": True},
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    saved = yaml.safe_load(path.read_text(encoding="utf-8"))["events"][0]
+    assert [a["id"] for a in saved["addons"]] == [
+        "extra-10-edited-images",
+        "short-vertical-reel",
+        "custom-reel-note",
+    ]
+    assert saved["addons"][1]["price"] == 75.0
+    assert saved["addons"][2]["title"] == "Custom Keepsake"
+    assert "<script>" not in saved["addons"][2]["description"]
+
+
+def test_admin_event_update_with_all_addons_disabled_omits_addons_key(admin_client, monkeypatch, tmp_path):
+    c, _db_path = admin_client
+    path = _patch_events_yaml(monkeypatch, tmp_path, [_yaml_event(addons=[
+        {"id": "extra-10-edited-images", "title": "10 Extra Edited Images", "price": 50, "active": True},
+    ])])
+
+    resp = c.post(
+        "/admin/events/addon-event/update",
+        headers=_headers(),
+        json={
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "session_length": 20,
+            "break_length": 10,
+            "deposit": 100,
+            "full_price": 250,
+            "addons": [
+                {"id": "extra-10-edited-images", "title": "10 Extra Edited Images", "price": 50, "active": False},
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    saved = yaml.safe_load(path.read_text(encoding="utf-8"))["events"][0]
+    assert "addons" not in saved
+
+
+def test_admin_event_create_persists_addons(admin_client, monkeypatch, tmp_path):
+    c, _db_path = admin_client
+    path = _patch_events_yaml(monkeypatch, tmp_path, [])
+
+    resp = c.post(
+        "/admin/events/create",
+        headers=_headers(),
+        json={
+            "title": "Individual Portraits",
+            "date": "2026-08-10",
+            "start_time": "10:00",
+            "end_time": "12:00",
+            "session_length": 60,
+            "break_length": 15,
+            "deposit": 150,
+            "full_price": 500,
+            "booking_type": "rolling_availability",
+            "session_type": "individual",
+            "addons": [
+                {"id": "short-vertical-reel", "title": "Short Vertical Behind-the-Scenes Reel", "price": 125, "active": True},
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    saved = yaml.safe_load(path.read_text(encoding="utf-8"))["events"][0]
+    assert saved["session_type"] == "individual"
+    assert saved["addons"][0]["id"] == "short-vertical-reel"
+    assert saved["addons"][0]["price"] == 125.0
