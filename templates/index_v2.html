@@ -13,6 +13,23 @@
 <meta property="og:url" content="https://book.pashynskaphoto.com/">
 <meta property="og:image" content="https://book.pashynskaphoto.com/static/og-image.jpg">
 <meta name="twitter:card" content="summary_large_image">
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog&&window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="$i capture register register_once unregister getFeatureFlag isFeatureEnabled reloadFeatureFlags onFeatureFlags identify setPersonProperties group resetGroups reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_nn3FMVLs4ifQNunBai46VzpFDJDbiM9Kfo34psVansW4', {
+        api_host: 'https://us.i.posthog.com',
+        ui_host: 'https://us.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+        capture_pageview: true,
+        capture_pageleave: true,
+        autocapture: true,
+        mask_all_element_attributes: true,
+        session_recording: {
+            maskAllInputs: true,
+            maskInputOptions: {password: true, email: true, text: true, tel: true, number: true, textarea: true}
+        }
+    });
+</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -348,18 +365,31 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .event-card .price-bar .cta:hover{background:var(--ink-2)}
 .event-card.sold .price-bar .cta{background:var(--ink-5);color:var(--ink-2)}
 
-/* ── TESTIMONIALS (homepage social proof, real client quotes) ── */
-.tmt{max-width:1080px;margin:14px auto 0;padding:0 20px}
-.tmt-head{text-align:center;margin-bottom:18px}
+/* ── TESTIMONIALS (homepage social proof, Wfolio-sourced quotes + photos) ── */
+.tmt{max-width:1160px;margin:18px auto 0;padding:0 0 4px;overflow:hidden}
+.tmt-head{text-align:center;margin-bottom:18px;padding:0 20px}
 .tmt-head h3{font-family:var(--font-d);font-size:1.6rem;font-weight:400;color:var(--ink)}
 .tmt-head .sub{font-size:.82rem;color:var(--ink-3)}
-.tmt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.tmt-card{background:var(--surface);border:1px solid var(--ink-5);border-radius:16px;padding:20px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(46,25,20,.03),0 8px 24px rgba(93,55,47,.05)}
-.tmt-stars{color:var(--rose);letter-spacing:.14em;font-size:.95rem}
-.tmt-quote{font-family:var(--font-d);font-style:italic;font-size:1rem;color:var(--ink-2);line-height:1.5}
-.tmt-name{font-weight:700;font-size:.9rem;color:var(--ink);margin-top:auto}
-.tmt-context{font-size:.74rem;color:var(--ink-3);letter-spacing:.02em}
-@media(max-width:760px){.tmt-grid{grid-template-columns:1fr}}
+.tmt-marquee{position:relative;overflow:hidden;padding:4px 0 14px;cursor:grab;touch-action:pan-y;user-select:none}
+.tmt-marquee:active{cursor:grabbing}
+.tmt-marquee::before,.tmt-marquee::after{content:"";position:absolute;top:0;bottom:0;width:62px;z-index:2;pointer-events:none}
+.tmt-marquee::before{left:0;background:linear-gradient(90deg,var(--bg),rgba(250,247,245,0))}
+.tmt-marquee::after{right:0;background:linear-gradient(270deg,var(--bg),rgba(250,247,245,0))}
+.tmt-track{display:flex;gap:14px;width:max-content;animation:tmt-scroll 64s linear infinite;will-change:transform}
+.tmt-marquee:hover .tmt-track,.tmt-marquee.is-dragging .tmt-track,.tmt-marquee.is-paused .tmt-track{animation-play-state:paused}
+.tmt-card{width:318px;min-height:236px;background:rgba(255,255,255,.78);border:1px solid rgba(93,55,47,.11);border-radius:20px;padding:18px 18px 17px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(46,25,20,.03),0 12px 30px rgba(93,55,47,.07);white-space:normal}
+.tmt-top{display:flex;align-items:center;gap:12px}
+.tmt-avatar{width:58px;height:58px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:3px solid #fff;box-shadow:0 4px 14px rgba(93,55,47,.14);background:#eaded9}
+.tmt-who{min-width:0}
+.tmt-name{font-weight:800;font-size:.92rem;color:var(--ink);line-height:1.15}
+.tmt-source{font-size:.68rem;color:var(--ink-3);margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.tmt-stars{color:var(--rose);letter-spacing:.12em;font-size:.82rem;line-height:1}
+.tmt-quote{font-family:var(--font-d);font-style:italic;font-size:1rem;color:var(--ink-2);line-height:1.46;margin:0}
+.tmt-link{display:inline-flex;align-items:center;gap:6px;align-self:center;margin-top:4px;color:var(--rose-deep);font-size:.82rem;font-weight:700;text-decoration:none}
+.tmt-link:hover{text-decoration:underline}
+@keyframes tmt-scroll{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 7px))}}
+@media(max-width:760px){.tmt{margin-top:16px}.tmt-card{width:282px;min-height:250px}.tmt-marquee::before,.tmt-marquee::after{width:28px}.tmt-track{animation-duration:72s}.tmt-avatar{width:52px;height:52px}.tmt-quote{font-size:.96rem}}
+@media(prefers-reduced-motion:reduce){.tmt-track{animation:none}.tmt-marquee{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-left:20px}.tmt-marquee::before,.tmt-marquee::after{display:none}}
 
 /* ── PAST SESSIONS ARCHIVE (display-only thumbnail strip, bottom of page) ── */
 .past-wrap{max-width:1180px;margin:14px auto 0;padding:32px 20px 0;border-top:1px solid var(--ink-5)}
@@ -395,6 +425,18 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .hero-cta:not(.outline)::after,.event-card .price-bar .cta::after,.cta-shimmer::after{content:"";position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);transform:translateX(-130%);animation:cta-sheen 3.6s ease-in-out infinite;pointer-events:none}
 @keyframes cta-sheen{0%{transform:translateX(-130%)}55%,100%{transform:translateX(130%)}}
 @keyframes slot-pop{0%{transform:translateY(-1px) scale(1)}45%{transform:translateY(-1px) scale(1.11)}100%{transform:translateY(-1px) scale(1)}}
+
+/* Campaign landing cue: shown only for Meta/UTM ad traffic. */
+.campaign-cue{display:none;margin:14px auto 24px;max-width:1120px;background:linear-gradient(135deg,#fffaf8 0%,#f5e8e3 100%);border:1px solid rgba(196,133,122,.24);border-radius:18px;padding:16px 18px;box-shadow:0 10px 28px rgba(120,80,70,.08)}
+.campaign-cue.show{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
+.campaign-cue .eyebrow{font:700 .66rem var(--font-b);letter-spacing:.16em;text-transform:uppercase;color:var(--rose-deep);margin-bottom:4px}
+.campaign-cue h3{font-family:var(--font-d);font-size:1.32rem;font-weight:500;color:var(--ink);line-height:1.15;margin-bottom:4px}
+.campaign-cue p{font-size:.88rem;color:var(--ink-2);line-height:1.45}
+.campaign-cue .mini-proof{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.campaign-cue .mini-proof span{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:999px;padding:6px 10px;font-size:.74rem;color:var(--ink-2);white-space:nowrap}
+.campaign-cue button{background:var(--rose-deep);color:#fff;border:0;border-radius:12px;padding:12px 18px;font:800 .86rem var(--font-b);cursor:pointer;box-shadow:0 10px 22px rgba(163,104,94,.22)}
+.campaign-cue button:hover{filter:brightness(.96)}
+@media(max-width:680px){.campaign-cue.show{grid-template-columns:1fr}.campaign-cue button{width:100%;padding:14px 18px}.campaign-cue{margin-top:10px}}
 .skel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 .skel-card{border:1px solid var(--ink-5);border-radius:16px;overflow:hidden;background:#fff;padding-bottom:16px}
 .skel-img{height:200px}
@@ -690,6 +732,20 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
     <span data-i18n="proof_award"><strong>Calgary</strong> local pick 2024 & 2025</span>
   </div>
 
+  <div class="campaign-cue" id="campaignCue" aria-live="polite">
+    <div>
+      <div class="eyebrow" id="campaignCueEyebrow">Calgary mini session</div>
+      <h3 id="campaignCueTitle">Saw this on Instagram? Pick a real available time here.</h3>
+      <p id="campaignCueBody">No DM back-and-forth: choose a slot, reserve it for 15 minutes, then send the deposit by e-Transfer.</p>
+      <div class="mini-proof">
+        <span>✓ Real available slots</span>
+        <span>✓ Deposit shown before checkout</span>
+        <span>✓ Style/location details after booking</span>
+      </div>
+    </div>
+    <button type="button" onclick="openCampaignCueSession()">Choose a time</button>
+  </div>
+
   <!-- legacy featured-wrap kept hidden so JS that targets it still works -->
   <div class="featured-wrap" id="featuredWrap"></div>
 
@@ -738,32 +794,29 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
     <div class="step reveal"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit. It usually auto-confirms in a few minutes; Iryna confirms manually if needed. Final balance is paid on session day.</p></div></div>
   </div>
 
-  <!-- TESTIMONIALS (real client quotes) -->
-  <div class="tmt">
+  <!-- TESTIMONIALS (real Wfolio reviews with client/session photos) -->
+  <div class="tmt" aria-labelledby="tmtTitle">
     <div class="tmt-head reveal">
-      <h3 data-i18n="tmt_heading">What Calgary clients say</h3>
-      <span class="sub" data-i18n="tmt_subhead">Real words from recent sessions</span>
+      <h3 id="tmtTitle" data-i18n="tmt_heading">What Calgary clients say</h3>
+      <span class="sub" data-i18n="tmt_subhead">Real words and moments from Wfolio reviews</span>
     </div>
-    <div class="tmt-grid">
-      <article class="tmt-card reveal">
-        <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
-        <p class="tmt-quote">“The session felt calm and easy, and the photos look like us — warm, real, and beautiful.”</p>
-        <div class="tmt-name">Anastasia M.</div>
-        <div class="tmt-context">Family session · Calgary</div>
-      </article>
-      <article class="tmt-card reveal">
-        <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
-        <p class="tmt-quote">“Iryna guided every pose without making it feel staged. We got so many favourites.”</p>
-        <div class="tmt-name">Sarah K.</div>
-        <div class="tmt-context">Maternity session · Calgary</div>
-      </article>
-      <article class="tmt-card reveal">
-        <div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div>
-        <p class="tmt-quote">“Fast, organized, and very gentle with our kids. The gallery was better than we hoped.”</p>
-        <div class="tmt-name">Olena P.</div>
-        <div class="tmt-context">Mini session · Calgary</div>
-      </article>
+    <div class="tmt-marquee reveal" id="tmtMarquee" aria-label="Client reviews carousel. Swipe horizontally to browse.">
+      <div class="tmt-track" id="tmtTrack">
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/2HpWvZCv3dvFezuJS3XKy0KuFQKtAW8Z/bM6ws7PK-daz1Ke_k4oE3xoV8j-NBov8/GfUkCKWIe8wxEg64R7ES9Q.jpg" alt="Richelle review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Richelle</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We had a wonderful Mother's Day photo shoot experience. The studio set up was beautiful, the photographer was patient and professional, and the photos turned out absolutely stunning!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHg4edDvF2Abrp/Q34bUnvTd3Z-T86m_iiYecPa-MZoQYfq/-uWVCSaLKnU3O3AYxv_5XQ.jpg" alt="Jaskaran Kaur review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Jaskaran Kaur</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Great photos and easy to download.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/Ltna6LrpZ05NI6FzXn6yOY5C_w4tjnLn/KqIQ_5AUqtWbClEqh3snKKhOcCjcmGAd/ZL6zLwVrNzoiId8TDi_JdQ.jpg" alt="Darian Roberts review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Darian Roberts</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Absolutely wonderful shots! Thank you so much!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/NUDtjTKkURkUeITimhUzorjV-AUnsnwM/Qb0qxsnwqsdpoDlf1cucHbpXf05oaUc0/wZb-BwR9PVYmucrYIffSfA.jpg" alt="Kateryna review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Kateryna</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We needed a photographer for our wedding ceremony, and Irina took wonderful photos for us. It was a pleasure working with her. Highly recommend!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/cV26pRnTDzctIkYi68Uuy9M75Sh2-Y9l/YRW1L5rASoeVZHUtfbsvYsX7Utr3SkZ7/Vv--TkZc0NR7t_d6zwP91Q.jpg" alt="Yasmin review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Yasmin</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“She's amazing! We always love her around our family because she makes it so comfortable for us even with the chaos of all the kids!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/JQCNrqI0_2ucGU37zWGdV-M2dFgtfcc4/LEewC1ezR1O9JROtgkaTD6DHctLHoP2n/OjwlCJcm3ivsQ9vP7FuTDA.jpg" alt="Nazanin Alibhai review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Nazanin Alibhai</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Thank you Iryna! This was such a special shoot for us.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHg7eNSB4KjSBe/WgLx8Sfve6obhgRxBMhf7QMzqx733Bk4/Nu7GDgnlfpnw9vBkc27ylg.jpg" alt="Nazanin Alibhai review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Nazanin Alibhai</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We always have the best photo sessions with Iryna!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHgwE3JifRLhiD/KcUgeTEUmwVM1yRMUAz46jYGPhZkTwUk/9fji68ypOHE45css1YWUMA.jpg" alt="Amarpreet Kaur review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Amarpreet Kaur</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Iryna is so talented and professional, she’s become our favourite! We have had two sessions with her already and can’t wait to get more.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/g1OAyRpGxXbeu6Z4zNJzLiBPO10VeMI5/6x1guwkSatx0OPuUp2qGUSnVEzQ6Bhr_/uB_egkRtPHh1XvJubrmYoQ.jpg" alt="P Kumar review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">P Kumar</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“All pics have been clicked artistically and look very beautiful.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/QxdUhj8-ZIKZ281n7rwTApUqtEM7Tg3B/jX_sOG0uIvZwb3FMJ_5Ul98EeUz6Mxdo/GFWExadhhvc1kHLk-9j_5g.jpg" alt="Alexandria review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Alexandria</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Wonderful photographer to work with. We were instantly comfortable with her.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/Jv5PiAQdo1ZrLWaygQrKa9BBBLwutdbq/BJGcpdB0PpgG9eMbPotVnYEKcNsVaqpm/VmfStCjUjZDVuw4f3gXg9w.jpg" alt="Andrea Jerez review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Andrea Jerez</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Wonderful experience, great studio and we will be returning for more photos in the future.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/QxdUhj8-ZIKZ281n7rwTAm67jn43DtWb/1yJSFglWmcU9MlQAghp5nUajs4-mUoZU/ArO5qnVHNlmM7vDkP_u2iw.jpg" alt="Daneza review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Daneza</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Thank you for doing our wedding photos.”</p></article>
+      </div>
     </div>
+    <a class="tmt-link" href="https://pashynskaphoto.com/reviews" target="_blank" rel="noopener">Read more reviews →</a>
   </div>
 
   <!-- FAQ -->
@@ -872,6 +925,19 @@ const API = {
       body: JSON.stringify(data)
     });
     return r.json();
+  },
+  track: async (data) => {
+    try {
+      const r = await fetch('/track', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+        keepalive: true
+      });
+      return r.ok;
+    } catch (_) {
+      return false;
+    }
   }
 };
 
@@ -884,6 +950,209 @@ const STRIPE_ENABLED = {{ stripe_enabled | tojson }};
 let payTimer = null;
 let currentDrawerEventId = null;
 let currentDrawerDate = null;
+const trackedSessionViews = new Set();
+const trackedFormStarts = new Set();
+
+function getVisitorId() {
+  try {
+    let id = localStorage.getItem('pp_visitor_id');
+    if (!id) {
+      id = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('pp_visitor_id', id);
+    }
+    return id;
+  } catch (_) {
+    if (!window.__ppVisitorId) window.__ppVisitorId = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    return window.__ppVisitorId;
+  }
+}
+
+function captureAttribution() {
+  const params = new URLSearchParams(window.location.search || '');
+  const direct = {
+    utm_source: params.get('utm_source') || '',
+    utm_medium: params.get('utm_medium') || '',
+    utm_campaign: params.get('utm_campaign') || '',
+    utm_content: params.get('utm_content') || '',
+    utm_term: params.get('utm_term') || '',
+    fbclid: params.get('fbclid') || '',
+    gclid: params.get('gclid') || '',
+    referrer: document.referrer || '',
+    landing_url: window.location.href
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem('pp_attribution') || '{}');
+    const merged = {...saved};
+    Object.entries(direct).forEach(([k, v]) => { if (v) merged[k] = v; });
+    if (!merged.landing_url) merged.landing_url = window.location.href;
+    localStorage.setItem('pp_attribution', JSON.stringify(merged));
+    return merged;
+  } catch (_) {
+    return direct;
+  }
+}
+
+function getCampaignLandingCue() {
+  const attribution = captureAttribution();
+  const haystack = [
+    attribution.utm_source,
+    attribution.utm_medium,
+    attribution.utm_campaign,
+    attribution.utm_content,
+    attribution.utm_term,
+    attribution.fbclid ? 'fbclid' : ''
+  ].join(' ').toLowerCase();
+  const isMetaTraffic = /(^|\s)(meta|facebook|instagram|fb|ig|paid|fbclid)(\s|$)/.test(haystack) || !!attribution.fbclid;
+  if (!isMetaTraffic) return null;
+
+  if (/mountain|mountains|quarry|bragg|kananaskis|outdoor/.test(haystack)) {
+    return {
+      eyebrow: 'Mountain mini session · Quarry Lake',
+      title: 'Mountain photos near Calgary — choose your real available time.',
+      body: '20-minute outdoor mini session with 20 edited photos, all originals included, posing help, and the exact spot/details after booking. Reserve a slot first; deposit holds it for 15 minutes.'
+    };
+  }
+  return {
+    eyebrow: 'Calgary photography booking',
+    title: 'Ready to book? Pick a real available time here.',
+    body: 'The available sessions below connect directly to Iryna’s booking flow — choose a slot, reserve it, and finish the deposit step.'
+  };
+}
+
+function renderCampaignLandingCue() {
+  const cue = getCampaignLandingCue();
+  const el = document.getElementById('campaignCue');
+  if (!el || !cue) return;
+  document.getElementById('campaignCueEyebrow').textContent = cue.eyebrow;
+  document.getElementById('campaignCueTitle').textContent = cue.title;
+  document.getElementById('campaignCueBody').textContent = cue.body;
+  el.classList.add('show');
+  trackBookingEvent('campaign_cue_view', '', {eyebrow: cue.eyebrow});
+}
+
+function campaignHintText() {
+  const params = new URLSearchParams(window.location.search || '');
+  return [
+    params.get('utm_campaign') || '',
+    params.get('utm_content') || '',
+    params.get('utm_term') || '',
+    params.get('fbclid') ? 'fbclid' : ''
+  ].join(' ').toLowerCase();
+}
+
+function isBookableEvent(e) {
+  return e && e.status !== 'completed' && Number(e.spots_left || 0) > 0;
+}
+
+function eventSearchText(e) {
+  return [e?.id, e?.title, e?.subtitle, e?.description, e?.location, e?.session_type, e?.type]
+    .join(' ').toLowerCase();
+}
+
+function pickCampaignCueEvent() {
+  const hint = campaignHintText();
+  const events = visibleEvents().filter(isBookableEvent).sort((a, b) => a.date.localeCompare(b.date));
+  if (!events.length) return null;
+
+  // If the ad is specifically Mountain/Quarry/Outdoor, do NOT match every generic "mini".
+  // Paid visitors should see the exact offer from the ad, not the nearest unrelated mini session.
+  if (/mountain|mountains|quarry|bragg|kananaskis|outdoor/.test(hint)) {
+    return events.find(e => /mountain|mountains|quarry|bragg|kananaskis|outdoor/.test(eventSearchText(e)))
+      || events.find(e => e.featured)
+      || events[0];
+  }
+
+  if (/mini/.test(hint)) {
+    return events.find(e => /mini/.test(eventSearchText(e))) || events.find(e => e.featured) || events[0];
+  }
+  return events.find(e => e.featured) || events[0];
+}
+
+function pickHeroEvent() {
+  const campaignEvent = getCampaignLandingCue() ? pickCampaignCueEvent() : null;
+  if (campaignEvent) return campaignEvent;
+  const upcoming = visibleEvents().sort((a, b) => a.date.localeCompare(b.date));
+  return upcoming.find(e => e.featured && isBookableEvent(e))
+    || upcoming.find(isBookableEvent)
+    || upcoming[0]
+    || null;
+}
+
+function openCampaignCueSession() {
+  const event = pickCampaignCueEvent();
+  if (event) {
+    trackBookingEvent('campaign_cue_cta_click', event.id, {title: event.title || ''});
+    openDrawer(event.id);
+    return;
+  }
+  document.getElementById('filters')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function trackBookingEvent(eventName, eventId, metadata) {
+  const attribution = captureAttribution();
+  const payload = {
+    visitor_id: getVisitorId(),
+    event_name: eventName,
+    event_id: eventId || currentDrawerEventId || '',
+    page: window.location.pathname + window.location.search,
+    metadata: metadata || {},
+    ...attribution
+  };
+  if (window.posthog && typeof window.posthog.capture === 'function') {
+    const posthogProps = {
+      pp_visitor_id: payload.visitor_id,
+      event_id: payload.event_id,
+      page: payload.page,
+      ...(payload.metadata || {}),
+      utm_source: payload.utm_source || '',
+      utm_medium: payload.utm_medium || '',
+      utm_campaign: payload.utm_campaign || '',
+      utm_content: payload.utm_content || '',
+      utm_term: payload.utm_term || '',
+      has_fbclid: !!payload.fbclid
+    };
+    window.posthog.capture(`pp_${eventName}`, posthogProps);
+  }
+  API.track(payload);
+}
+
+function trackSessionView(eventId, metadata) {
+  if (!eventId || trackedSessionViews.has(eventId)) return;
+  trackedSessionViews.add(eventId);
+  trackBookingEvent('session_view', eventId, metadata || {});
+}
+
+function observeSessionCards() {
+  const cards = Array.from(document.querySelectorAll('.event-card[data-event-id]'));
+  if (!cards.length) return;
+  if (!('IntersectionObserver' in window)) {
+    cards.slice(0, 4).forEach(card => trackSessionView(card.dataset.eventId, {placement: 'grid'}));
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const card = entry.target;
+      trackSessionView(card.dataset.eventId, {placement: 'grid'});
+      observer.unobserve(card);
+    });
+  }, {threshold: 0.45});
+  cards.forEach(card => observer.observe(card));
+}
+
+function attachFormStartTracking(eventId, eventDate) {
+  const key = `${eventId || ''}:${eventDate || ''}`;
+  if (trackedFormStarts.has(key)) return;
+  ['fName', 'fPhone', 'fEmail', 'fIg'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      if (trackedFormStarts.has(key)) return;
+      trackedFormStarts.add(key);
+      trackBookingEvent('form_started', eventId, {date: eventDate || currentDrawerDate || ''});
+    }, {once: true});
+  });
+}
 
 const toast = (msg) => {
   if (!msg) return;
@@ -945,6 +1214,19 @@ function renderAddonsSection(eventObj) {
       </label>`).join('')}
   </section>`;
 }
+function renderIncludedSection(eventObj) {
+  const items = Array.isArray(eventObj?.included)
+    ? eventObj.included.map(i => String(i || '').trim()).filter(Boolean).slice(0, 6)
+    : [];
+  if (!items.length) return '';
+  return `<section class="included-section" aria-label="What is included" style="background:#fffaf8;border:1px solid rgba(196,133,122,.18);border-radius:12px;padding:12px 14px;margin-bottom:14px">
+    <div class="lbl" style="margin-bottom:8px">What’s included</div>
+    <div style="display:grid;gap:7px;color:var(--ink-2);font-size:.88rem;line-height:1.35">
+      ${items.map(item => `<div>✓ ${escapeHtml(item).replace(/^✓\s*/, '')}</div>`).join('')}
+    </div>
+  </section>`;
+}
+
 function renderAgreementSection(eventObj) {
   if (!eventObj?.agreement?.enabled) return '';
   return `<section class="agreement-section" aria-label="Booking agreement">
@@ -1046,9 +1328,9 @@ let _kbTimers = [];
 function renderFeatured() {
   const host = document.getElementById('heroPhoto');
   if (!host) return;
-  const featured = visibleEvents().filter(e => e.featured).sort((a, b) => a.date.localeCompare(b.date))[0]
-    || visibleEvents().sort((a, b) => a.date.localeCompare(b.date))[0];
+  const featured = pickHeroEvent();
   if (!featured) { host.innerHTML = ''; return; }
+  const campaignCue = getCampaignLandingCue();
   const cdText = countdownText(featured.date, false);
 
   // Build photos list — use photos array if available, fallback to single photo
@@ -1108,9 +1390,10 @@ function renderFeatured() {
       </div>
     </div>`;
 
-  // Start Ken Burns cycle if multiple photos
-  if (photos.length > 1) startKenBurns(host.querySelector('.kb-host'), photos.length);
-}
+	  // Start Ken Burns cycle if multiple photos
+	  if (photos.length > 1) startKenBurns(host.querySelector('.kb-host'), photos.length);
+	  trackSessionView(featured.id, {placement: 'featured', title: featured.title || ''});
+	}
 
 function startKenBurns(host, count) {
   // Clear any previous timers
@@ -1170,7 +1453,7 @@ function renderGrid() {
     const totalPrice = e.full_price || e.price || 0;
     const revDelay = Math.min(i * 65, 390);
     return `
-    <article class="event-card card-reveal ${isSold ? 'sold' : ''}" style="animation-delay:${revDelay}ms" onclick="openDrawer('${e.id}')">
+	    <article class="event-card card-reveal ${isSold ? 'sold' : ''}" data-event-id="${e.id}" style="animation-delay:${revDelay}ms" onclick="openDrawer('${e.id}')">
       <div class="photo">
         <div class="photo-bg" style="background-image:url('${photo}')"></div>
         <div class="status ${b.cls}"><span class="dot"></span>${b.txt}</div>
@@ -1191,9 +1474,10 @@ function renderGrid() {
         </div>
       </div>
     </article>`;
-  }).join('');
-  if (window.__wowScan) window.__wowScan();
-}
+	  }).join('');
+	  observeSessionCards();
+	  if (window.__wowScan) window.__wowScan();
+	}
 
 function setGridEmptyCopy(titleKey, descKey) {
   const empty = document.getElementById('gridEmpty');
@@ -1329,6 +1613,7 @@ async function openDrawer(id) {
     const selectedDate = e.booking_type === 'rolling_availability' ? todayISO() : e.date;
     currentDrawerEventId = e.id;
     currentDrawerDate = selectedDate;
+    trackBookingEvent('drawer_open', e.id, {title: e.title || '', date: selectedDate});
     const slotsData = await API.slots(selectedDate, e.id);
     const availableSlots = slotsData.slots || [];
     if (availableSlots.length === 0 && e.booking_type !== 'rolling_availability') {
@@ -1369,6 +1654,7 @@ async function openDrawer(id) {
           <div style="font-size:.78rem;color:var(--ink-3);margin-top:2px">${e.location || 'Calgary'}</div>
         </div>
       </div>
+      ${renderIncludedSection(e)}
       ${rollingDateControl}
       <div class="lbl">${T('available_slots_lbl')}</div>
       <div class="slots" id="slotsBox">
@@ -1390,9 +1676,10 @@ async function openDrawer(id) {
       ${renderAgreementSection(e)}
       <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', document.getElementById('bookingDate')?.value || '${selectedDate}')">${T('continue_btn')}</button>
       <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">${T('pay_note')}</p>`;
-    showDrawer();
-    updateBookingSummary();
-  } catch (err) {
+	    showDrawer();
+	    updateBookingSummary();
+	    attachFormStartTracking(e.id, selectedDate);
+	  } catch (err) {
     console.error('Failed to load slots:', err);
     toast(T('toast_error_slots'));
   }
@@ -1402,6 +1689,7 @@ function pickSlot(btn) {
   btn.parentNode.querySelectorAll('.slot').forEach(s => s.classList.remove('sel'));
   btn.classList.add('sel');
   updateBookingSummary();
+  trackBookingEvent('slot_selected', currentDrawerEventId, {time: btn.dataset.time || '', date: currentDrawerDate || ''});
 }
 
 async function reloadSlotsForSelectedDate(eventId) {
@@ -1554,6 +1842,8 @@ async function reserveSlot(eventId, eventDate) {
   if (reserveBtn) { reserveBtn.disabled = true; reserveBtn.style.opacity = '.6'; }
 
   try {
+    const attribution = captureAttribution();
+    trackBookingEvent('reserve_attempt', eventId, {time: time, date: eventDate});
     const result = await API.reserve({
       event_id: eventId,
       date: eventDate,
@@ -1568,6 +1858,8 @@ async function reserveSlot(eventId, eventDate) {
       agreement_name: agreementName,
       marketing_consent: marketingConsent,
       recaptcha_token: recaptchaToken,
+      visitor_id: getVisitorId(),
+      ...attribution,
       website: HONEYPOT  // honeypot — empty for humans, filled by bots
     });
 
@@ -1603,6 +1895,7 @@ async function reserveSlot(eventId, eventDate) {
 // ── PAYMENT SCREEN ──
 function goToPayment(eventId, eventDate) {
   const e = eventsData.find(x => x.id === eventId); if (!e) return;
+  trackBookingEvent('payment_view', eventId, {booking_id: currentBooking?.booking_id || '', date: eventDate, time: currentBooking?.time || ''});
   const time = currentBooking?.time || '10:00';
   const name = currentBooking?.name || 'Client';
 
@@ -1796,9 +2089,10 @@ async function startStripeCheckout() {
 }
 
 // ── CONFIRM PAYMENT (CLIENT SIDE) ──
-async function confirmClientPayment(eventId) {
-  if (!currentBooking) { toast(T('toast_no_reservation')); return; }
-  if (payTimer) clearInterval(payTimer);
+	async function confirmClientPayment(eventId) {
+	  if (!currentBooking) { toast(T('toast_no_reservation')); return; }
+	  if (payTimer) clearInterval(payTimer);
+	  trackBookingEvent('payment_sent_clicked', eventId, {booking_id: currentBooking.booking_id || '', method: 'interac'});
 
   try {
     const result = await API.confirm({
@@ -2051,13 +2345,14 @@ function renderAll() {
   renderFeatured();
   renderGrid();
   renderPast();
+  renderCampaignLandingCue();
 }
 
 // ── INIT ──
 loadEvents().then(() => {
-  // Auto-open drawer if direct_event_id is provided
+  // Auto-open drawer for direct event / GBP product links.
   {% if direct_event_id %}
-  setTimeout(() => openDrawer('{{ direct_event_id }}'), 500);
+  setTimeout(() => openDrawer({{ direct_event_id|tojson }}), 500);
   {% endif %}
 });
 </script>
@@ -2145,7 +2440,7 @@ const SITE_I18N = {
     status_open: '{n} of {total} open',
     status_past: 'Past session',
     tmt_heading: 'What Calgary clients say',
-    tmt_subhead: 'Real words from recent sessions',
+    tmt_subhead: 'Real words and moments from Wfolio reviews',
     past_heading: 'Past sessions',
     past_subhead: 'A look at recent shoots — these dates have wrapped',
     past_portfolio: 'See the full portfolio ↗',
@@ -2316,7 +2611,7 @@ const SITE_I18N = {
     status_open: '{n} из {total} свободны',
     status_past: 'Прошедшая сессия',
     tmt_heading: 'Отзывы клиентов в Калгари',
-    tmt_subhead: 'Настоящие отзывы с недавних съёмок',
+    tmt_subhead: 'Настоящие отзывы и фотографии с Wfolio',
     past_heading: 'Прошедшие съёмки',
     past_subhead: 'Недавние съёмки — эти даты уже прошли',
     past_portfolio: 'Смотреть всё портфолио ↗',
@@ -2480,7 +2775,7 @@ const SITE_I18N = {
     status_open: '{n}/{total} उपलब्ध',
     status_past: 'पिछला सेशन',
     tmt_heading: 'कैलगरी क्लाइंट्स की राय',
-    tmt_subhead: 'हाल के सेशन से असली शब्द',
+    tmt_subhead: 'Wfolio समीक्षाओं से असली शब्द और फ़ोटो',
     past_heading: 'पिछले सेशन',
     past_subhead: 'हाल की शूट्स — ये तारीखें पूरी हो चुकी हैं',
     past_portfolio: 'पूरा पोर्टफोलियो देखें ↗',
@@ -2644,7 +2939,7 @@ const SITE_I18N = {
     status_open: '{n} з {total} вільні',
     status_past: 'Минула сесія',
     tmt_heading: 'Що кажуть клієнти з Калгарі',
-    tmt_subhead: 'Справжні відгуки з нещодавніх зйомок',
+    tmt_subhead: 'Справжні відгуки та фото з Wfolio',
     past_heading: 'Минулі зйомки',
     past_subhead: 'Нещодавні зйомки — ці дати вже минули',
     past_portfolio: 'Переглянути все портфоліо ↗',
@@ -2797,9 +3092,53 @@ function setLang(lang) {
   if (typeof updateAssistantLang === 'function') updateAssistantLang();
 }
 
+function initTestimonialCarousel(){
+  const marquee = document.getElementById('tmtMarquee');
+  const track = document.getElementById('tmtTrack');
+  if (!marquee || !track || track.dataset.ready === '1') return;
+  track.dataset.ready = '1';
+  // Duplicate once for seamless CSS marquee. Clones are hidden from screen readers.
+  Array.from(track.children).forEach(card => {
+    const clone = card.cloneNode(true);
+    clone.setAttribute('aria-hidden', 'true');
+    track.appendChild(clone);
+  });
+
+  let dragging = false;
+  let startX = 0;
+  let startScroll = 0;
+  const pause = () => marquee.classList.add('is-paused');
+  const resume = () => {
+    if (!dragging) window.setTimeout(() => marquee.classList.remove('is-paused'), 900);
+  };
+  marquee.addEventListener('pointerdown', ev => {
+    dragging = true;
+    startX = ev.clientX;
+    startScroll = marquee.scrollLeft;
+    marquee.classList.add('is-dragging', 'is-paused');
+    marquee.setPointerCapture?.(ev.pointerId);
+  });
+  marquee.addEventListener('pointermove', ev => {
+    if (!dragging) return;
+    marquee.scrollLeft = startScroll - (ev.clientX - startX);
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(type => marquee.addEventListener(type, ev => {
+    if (!dragging) return;
+    dragging = false;
+    marquee.classList.remove('is-dragging');
+    marquee.releasePointerCapture?.(ev.pointerId);
+    resume();
+  }));
+  marquee.addEventListener('mouseenter', pause);
+  marquee.addEventListener('mouseleave', resume);
+}
+
 // Init from stored preference
 document.addEventListener('DOMContentLoaded', () => {
+  captureAttribution();
+  trackBookingEvent('page_view', '', {});
   applyStaticI18n();
+  initTestimonialCarousel();
   // Active button highlight
   setLang(CURRENT_LANG);
 });

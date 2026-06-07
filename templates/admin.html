@@ -1063,6 +1063,7 @@
     <div class="topbar-right">
         <a href="#bookings-section" class="topbar-link" style="font-size:13px;">All bookings</a>
         <a href="#events-section" class="topbar-link" style="font-size:13px;">Events & slots</a>
+        <a href="/admin/analytics" class="topbar-link" style="font-size:13px;">📊 Analytics</a>
         <a href="/admin/clients" class="topbar-link" style="font-size:13px;">👥 Clients</a>
         <a href="/admin/transfers" class="topbar-link" style="font-size:13px;">💸 Interac</a>
         <a href="/admin/health" class="topbar-link" style="font-size:13px;">Health</a>
@@ -1864,14 +1865,14 @@
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
                     <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--surface);">
                         <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;">
-                            <input type="checkbox" id="new-addon-extra-active" style="width:15px;height:15px;accent-color:var(--accent);">
+                            <input type="checkbox" id="new-addon-extra-active" checked style="width:15px;height:15px;accent-color:var(--accent);">
                             10 Extra Edited Images
                         </label>
                         <input type="number" id="new-addon-extra-price" value="50" min="0" step="5" placeholder="Price CAD">
                     </div>
                     <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--surface);">
                         <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;">
-                            <input type="checkbox" id="new-addon-reel-active" style="width:15px;height:15px;accent-color:var(--accent);">
+                            <input type="checkbox" id="new-addon-reel-active" checked style="width:15px;height:15px;accent-color:var(--accent);">
                             Short Vertical Behind-the-Scenes Reel
                         </label>
                         <input type="number" id="new-addon-reel-price" value="50" min="0" step="5" placeholder="Price CAD">
@@ -2546,19 +2547,24 @@
         const includedItems = Array.from(includedInputs).map(i => i.value.trim()).filter(Boolean);
 
         try {
-            // Fire all three in parallel
-            const [schedRes, metaRes] = await Promise.all([
-                fetch(`/admin/events/${eventId}/update`, {
-                    method: 'POST', headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify(schedPayload)
-                }),
-                fetch(`/admin/events/${eventId}/update-meta`, {
-                    method: 'POST', headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ ...metaPayload, included: includedItems })
-                }),
-            ]);
+            // Save schedule/pricing first, then metadata. These routes both write
+            // events.yaml; firing them in parallel can let the later writer save
+            // a stale copy and silently revert deposit/full_price changes.
+            const schedRes = await fetch(`/admin/events/${eventId}/update`, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(schedPayload)
+            });
+            const schedData = await schedRes.json();
+            if (schedData.error || !schedRes.ok) {
+                toast('Error: ' + (schedData.error || schedRes.statusText), 'error');
+                return;
+            }
 
-            const [schedData, metaData] = await Promise.all([schedRes.json(), metaRes.json()]);
+            const metaRes = await fetch(`/admin/events/${eventId}/update-meta`, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ ...metaPayload, included: includedItems })
+            });
+            const metaData = await metaRes.json();
             const errors = [schedData, metaData].filter(d => d.error).map(d => d.error);
 
             if (errors.length) {

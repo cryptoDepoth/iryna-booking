@@ -1,0 +1,84 @@
+"""Direct event / GBP product deeplink tests."""
+
+import app as booking_app
+
+
+TEST_EVENTS = [
+    {
+        "id": "canoe-mini-session-2026-07-04",
+        "title": "Canoe Mini Session",
+        "date": "2026-07-04",
+        "status": "active",
+        "session_type": "mini",
+        "type": "mini",
+    },
+    {
+        "id": "canoe-mini-session-2026-07-26",
+        "title": "Canoe Mini Session",
+        "date": "2026-07-26",
+        "status": "active",
+        "session_type": "mini",
+        "type": "mini",
+    },
+    {
+        "id": "boho-swing-mini-sessions-2026-07-12",
+        "title": "Boho Swing Mini Sessions",
+        "date": "2026-07-12",
+        "status": "active",
+        "session_type": "mini",
+        "type": "mini",
+    },
+]
+
+
+def _patch_events(monkeypatch):
+    monkeypatch.setattr(booking_app, "EVENTS", [dict(e) for e in TEST_EVENTS])
+    monkeypatch.setattr(booking_app, "_public_events_payload", lambda: [dict(e, spots_left=3, total_spots=4) for e in TEST_EVENTS])
+    monkeypatch.setattr(booking_app, "_past_events_payload", lambda: [])
+
+
+def test_gbp_utm_content_canoe_mini_auto_opens_next_canoe_event(client, monkeypatch):
+    _patch_events(monkeypatch)
+
+    resp = client.get("/?utm_source=google&utm_medium=organic&utm_campaign=gbp_products&utm_content=canoe_mini")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'openDrawer("canoe-mini-session-2026-07-04")' in html
+
+
+def test_exact_event_id_alias_auto_opens_drawer(client, monkeypatch):
+    _patch_events(monkeypatch)
+
+    resp = client.get("/?event_id=boho-swing-mini-sessions-2026-07-12")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'openDrawer("boho-swing-mini-sessions-2026-07-12")' in html
+
+
+def test_unknown_explicit_direct_event_still_404(client, monkeypatch):
+    _patch_events(monkeypatch)
+
+    resp = client.get("/?event=does-not-exist")
+
+    assert resp.status_code == 404
+
+
+def test_unknown_utm_content_keeps_homepage(client, monkeypatch):
+    _patch_events(monkeypatch)
+
+    resp = client.get("/?utm_source=google&utm_content=generic_profile_link")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "setTimeout(() => openDrawer" not in html
+
+
+def test_short_alias_resolver_chooses_next_matching_event(monkeypatch):
+    _patch_events(monkeypatch)
+
+    ev = booking_app.resolve_event_deeplink("boho_swing")
+
+    assert ev is not None
+    assert ev["id"] == "boho-swing-mini-sessions-2026-07-12"

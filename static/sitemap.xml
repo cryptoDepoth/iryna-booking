@@ -44,12 +44,4 @@
     <changefreq>monthly</changefreq>
   </url>
 
-  <!-- Admin login (public page, listed in search) -->
-  <url>
-    <loc>https://book.pashynskaphoto.com/admin/login</loc>
-    <lastmod>2026-05-14</lastmod>
-    <priority>0.1</priority>
-    <changefreq>yearly</changefreq>
-  </url>
-
 </urlset>

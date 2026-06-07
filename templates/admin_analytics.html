@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics · Pashynska Photography</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#f0f2f5; --surface:#fff; --border:#e4e7ec; --text:#111827;
+      --text-2:#6b7280; --text-3:#9ca3af; --accent:#f97316;
+      --green:#16a34a; --blue:#2563eb; --red:#dc2626; --radius:10px;
+      --shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,sans-serif;font-size:14px}
+    .topbar{height:56px;background:#111827;padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+    .brand{display:flex;align-items:center;gap:10px;color:#fff;font-weight:700}.dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+    .toplinks{display:flex;align-items:center;gap:14px}.toplinks a{color:#9ca3af;text-decoration:none;font-size:13px}.toplinks a:hover{color:#fff}
+    .page{max-width:1280px;margin:0 auto;padding:28px 24px 60px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+    h1{font-size:24px;line-height:1.2;margin:0}.muted{color:var(--text-2);font-size:13px;margin-top:4px}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    .filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.field{display:flex;flex-direction:column;gap:5px}
+    label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
+    input{height:38px;border:1px solid var(--border);border-radius:8px;padding:0 10px;font:inherit;background:#fff}
+    .btn{height:38px;border:0;border-radius:8px;background:#111827;color:#fff;padding:0 14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+    .btn.secondary{background:#fff;color:#374151;border:1px solid var(--border)}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}
+    .stat{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:15px;box-shadow:var(--shadow)}
+    .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:800}.stat .v{font-size:26px;font-weight:800;margin-top:6px}
+    .stat .v.green{color:var(--green)}.stat .v.blue{color:var(--blue)}
+    table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+    th,td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+    th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);background:#f9fafb}
+    td:first-child,td:nth-child(2),th:first-child,th:nth-child(2){text-align:left}
+    tr:last-child td{border-bottom:0}.campaign{font-weight:700}.content{color:var(--text-2);max-width:220px;overflow:hidden;text-overflow:ellipsis}
+    .rate{font-weight:800;color:var(--green)}.empty{text-align:center;color:var(--text-2);padding:30px}
+    @media(max-width:760px){.topbar{padding:0 16px}.toplinks{gap:9px}.page{padding:20px 14px}.table-wrap{overflow:auto}th,td{padding:10px 9px}}
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <div class="brand"><span class="dot"></span>Pashynska Admin</div>
+    <div class="toplinks">
+      <a href="/admin">Bookings</a>
+      <a href="/admin/clients">Clients</a>
+      <a href="/">Booking site</a>
+    </div>
+  </nav>
+  <main class="page">
+    <div class="header">
+      <div>
+        <h1>Booking Analytics</h1>
+        <div class="muted">Primary KPI: confirmed paid photography bookings. Grouped by UTM campaign and content.</div>
+      </div>
+      <form class="panel filters" method="get">
+        <div class="field"><label for="date_from">From</label><input id="date_from" name="date_from" type="date" value="{{ date_from }}"></div>
+        <div class="field"><label for="date_to">To</label><input id="date_to" name="date_to" type="date" value="{{ date_to }}"></div>
+        <button class="btn" type="submit">Apply</button>
+        {% if include_internal %}
+          <input type="hidden" name="include_internal" value="1">
+          <a class="btn secondary" href="/admin/analytics?date_from={{ date_from }}&date_to={{ date_to }}">Hide QA</a>
+        {% else %}
+          <a class="btn secondary" href="/admin/analytics?date_from={{ date_from }}&date_to={{ date_to }}&include_internal=1">Show QA</a>
+        {% endif %}
+        <a class="btn secondary" href="/admin/analytics.csv?date_from={{ date_from }}&date_to={{ date_to }}{% if include_internal %}&include_internal=1{% endif %}">Export CSV</a>
+      </form>
+    </div>
+
+    <section class="stats">
+      <div class="stat"><div class="k">Visits</div><div class="v">{{ totals.visits }}</div></div>
+      <div class="stat"><div class="k">Drawer opens</div><div class="v">{{ totals.drawer_opens }}</div></div>
+      <div class="stat"><div class="k">Slot selections</div><div class="v">{{ totals.slot_selections }}</div></div>
+      <div class="stat"><div class="k">Reserve attempts</div><div class="v">{{ totals.reserve_attempts }}</div></div>
+      <div class="stat"><div class="k">Bookings</div><div class="v blue">{{ totals.bookings }}</div></div>
+      <div class="stat"><div class="k">Confirmed</div><div class="v green">{{ totals.confirmed_bookings }}</div></div>
+      <div class="stat"><div class="k">Confirmed rate</div><div class="v green">{{ "%.2f"|format(totals.confirmed_conversion_rate) }}%</div></div>
+    </section>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Campaign</th><th>Content</th><th>Visits</th><th>Session views</th><th>Drawers</th><th>Slots</th>
+            <th>Forms</th><th>Attempts</th><th>Bookings</th><th>Confirmed</th><th>Expired</th><th>Follow-ups</th><th>Booking CR</th><th>Confirmed CR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="campaign">{{ row.campaign }}</td>
+            <td class="content">{{ row.content }}</td>
+            <td>{{ row.visits }}</td>
+            <td>{{ row.session_views }}</td>
+            <td>{{ row.drawer_opens }}</td>
+            <td>{{ row.slot_selections }}</td>
+            <td>{{ row.form_starts }}</td>
+            <td>{{ row.reserve_attempts }}</td>
+            <td>{{ row.bookings }}</td>
+            <td>{{ row.confirmed_bookings }}</td>
+            <td>{{ row.expired_bookings }}</td>
+            <td>{{ row.abandoned_followups }}</td>
+            <td>{{ "%.2f"|format(row.booking_conversion_rate) }}%</td>
+            <td class="rate">{{ "%.2f"|format(row.confirmed_conversion_rate) }}%</td>
+          </tr>
+          {% else %}
+          <tr><td class="empty" colspan="14">No analytics data for this date range yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>

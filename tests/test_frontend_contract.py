@@ -59,3 +59,33 @@ def test_drawer_contains_addons_agreement_and_amount_summary_hooks():
     assert "Remaining balance" in html
     assert "Change time" in html
     assert "questionnaire" not in html.lower() or "after_confirmed_payment" in html
+
+
+def test_meta_campaign_landing_cue_guides_ad_clicks_to_booking_drawer():
+    """Meta ad traffic should see a booking-site cue, not be pushed back to DM."""
+    html = TEMPLATE.read_text()
+
+    assert 'id="campaignCue"' in html
+    assert "getCampaignLandingCue" in html
+    assert "renderCampaignLandingCue" in html
+    assert "openCampaignCueSession" in html
+    assert "campaign_cue_view" in html
+    assert "campaign_cue_cta_click" in html
+    assert "utm_campaign" in html
+    assert "fbclid" in html
+    assert "openDrawer(event.id)" in html
+    assert "Mountain photos near Calgary" in html
+    assert "What’s included" in html
+    assert "renderIncludedSection" in html
+
+
+def test_mountain_campaign_does_not_match_generic_mini_copy_or_sold_out_events():
+    """A Mountain Meta click should route to a bookable mountain/outdoor event, not any generic mini."""
+    html = TEMPLATE.read_text()
+
+    assert "function pickHeroEvent()" in html
+    assert "visibleEvents().filter(isBookableEvent)" in html
+    assert "Number(e.spots_left || 0) > 0" in html
+    assert "mountain|mountains|quarry|bragg|kananaskis|outdoor" in html
+    assert "mountain|mountains|mini|bragg|kananaskis|outdoor" not in html
+    assert "const featured = pickHeroEvent();" in html

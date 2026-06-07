@@ -19,7 +19,7 @@ if _os.path.exists(_env_path):
                     _os.environ[_key] = _val
     print(f"[env] Loaded {_env_path}")
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, Response, has_request_context
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 import json
@@ -91,6 +91,142 @@ def _emit_n8n_event(action, booking=None, **payload):
 
     threading.Thread(target=_post, name=f"n8n-{action}", daemon=True).start()
     return True
+
+
+ANALYTICS_EVENT_ALLOWLIST = {
+    "page_view", "session_view", "event_card_view", "drawer_open", "slot_selected", "form_started",
+    "reserve_attempt", "booking_reserved", "payment_view", "payment_sent_clicked",
+    "booking_confirmed", "booking_expired", "booking_cancelled", "waitlist_joined",
+    "abandoned_followup_sent",
+}
+
+
+def _safe_text(value, max_len=500):
+    """Small analytics sanitizer: store useful attribution, not unbounded payloads."""
+    if value is None:
+        return ""
+    return str(value).strip()[:max_len]
+
+
+def _client_ip():
+    if not has_request_context():
+        return ""
+    ip = request.headers.get("CF-Connecting-IP") or request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or ""
+    return _safe_text(ip, 80)
+
+
+def _normalise_utm(data):
+    utm = data.get("utm") if isinstance(data.get("utm"), dict) else {}
+    return {
+        "utm_source": _safe_text(data.get("utm_source") or utm.get("source"), 120),
+        "utm_medium": _safe_text(data.get("utm_medium") or utm.get("medium"), 120),
+        "utm_campaign": _safe_text(data.get("utm_campaign") or utm.get("campaign"), 180),
+        "utm_content": _safe_text(data.get("utm_content") or utm.get("content"), 180),
+        "utm_term": _safe_text(data.get("utm_term") or utm.get("term"), 180),
+    }
+
+
+def _record_analytics_event(event_name, *, visitor_id="", booking_id=None, event_id="", page="", metadata=None, attribution=None):
+    """Persist a funnel event and upsert its visitor attribution. Fire-and-forget safe."""
+    visitor_id = _safe_text(visitor_id, 120)
+    if not visitor_id:
+        return False
+    event_name = _safe_text(event_name, 80)
+    if event_name not in ANALYTICS_EVENT_ALLOWLIST:
+        event_name = "page_view"
+    attribution = attribution or {}
+    metadata = metadata if isinstance(metadata, dict) else {}
+    request_referrer = request.headers.get("Referer") if has_request_context() else ""
+    user_agent = request.headers.get("User-Agent") if has_request_context() else ""
+    now = datetime.now(timezone.utc).isoformat()
+    conn = db_conn()
+    try:
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO visitor_sessions
+                (visitor_id, first_seen, last_seen, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+                 fbclid, gclid, referrer, landing_url, user_agent, ip_address)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(visitor_id) DO UPDATE SET
+                last_seen=excluded.last_seen,
+                utm_source=COALESCE(NULLIF(visitor_sessions.utm_source,''), excluded.utm_source),
+                utm_medium=COALESCE(NULLIF(visitor_sessions.utm_medium,''), excluded.utm_medium),
+                utm_campaign=COALESCE(NULLIF(visitor_sessions.utm_campaign,''), excluded.utm_campaign),
+                utm_content=COALESCE(NULLIF(visitor_sessions.utm_content,''), excluded.utm_content),
+                utm_term=COALESCE(NULLIF(visitor_sessions.utm_term,''), excluded.utm_term),
+                fbclid=COALESCE(NULLIF(visitor_sessions.fbclid,''), excluded.fbclid),
+                gclid=COALESCE(NULLIF(visitor_sessions.gclid,''), excluded.gclid),
+                referrer=COALESCE(NULLIF(visitor_sessions.referrer,''), excluded.referrer),
+                landing_url=COALESCE(NULLIF(visitor_sessions.landing_url,''), excluded.landing_url),
+                user_agent=COALESCE(NULLIF(visitor_sessions.user_agent,''), excluded.user_agent),
+                ip_address=COALESCE(NULLIF(visitor_sessions.ip_address,''), excluded.ip_address)
+        """, (
+            visitor_id, now, now,
+            _safe_text(attribution.get("utm_source"), 120),
+            _safe_text(attribution.get("utm_medium"), 120),
+            _safe_text(attribution.get("utm_campaign"), 180),
+            _safe_text(attribution.get("utm_content"), 180),
+            _safe_text(attribution.get("utm_term"), 180),
+            _safe_text(attribution.get("fbclid"), 500),
+            _safe_text(attribution.get("gclid"), 500),
+            _safe_text(attribution.get("referrer") or request_referrer, 500),
+            _safe_text(attribution.get("landing_url") or page, 1000),
+            _safe_text(user_agent, 500),
+            _client_ip(),
+        ))
+        c.execute("""
+            INSERT INTO analytics_events
+                (visitor_id, booking_id, event_name, event_id, page, metadata_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            visitor_id,
+            booking_id,
+            event_name,
+            _safe_text(event_id, 160),
+            _safe_text(page, 1000),
+            json.dumps(metadata, ensure_ascii=False, sort_keys=True)[:4000],
+            now,
+        ))
+        conn.commit()
+        return True
+    except Exception as exc:
+        conn.rollback()
+        log.warning(f"[analytics] record failed: {type(exc).__name__}: {exc}")
+        return False
+    finally:
+        conn.close()
+
+
+def _analytics_attribution_from_booking(booking):
+    booking = booking or {}
+    return {
+        "utm_source": booking.get("utm_source"),
+        "utm_medium": booking.get("utm_medium"),
+        "utm_campaign": booking.get("utm_campaign"),
+        "utm_content": booking.get("utm_content"),
+        "utm_term": booking.get("utm_term"),
+        "fbclid": booking.get("fbclid"),
+        "gclid": booking.get("gclid"),
+        "referrer": booking.get("referrer"),
+        "landing_url": booking.get("landing_url"),
+    }
+
+
+def _record_booking_funnel_event(booking, event_name, metadata=None):
+    """Attach downstream lifecycle events to the visitor that created a booking."""
+    booking = booking or {}
+    visitor_id = booking.get("visitor_id")
+    if not visitor_id:
+        return False
+    return _record_analytics_event(
+        event_name,
+        visitor_id=visitor_id,
+        booking_id=booking.get("id"),
+        event_id=booking.get("event_id") or "",
+        page=booking.get("landing_url") or "",
+        metadata=metadata or {},
+        attribution=_analytics_attribution_from_booking(booking),
+    )
 
 
 app = Flask(__name__)
@@ -312,6 +448,9 @@ _login_attempts = {}
 # Public assistant chat has its own, gentler limit. It should tolerate a real
 # conversation without letting one browser hammer the OpenAI API.
 _assistant_attempts = {}
+# First-party analytics receives more hits than booking endpoints, but it is
+# still a public DB write path. Keep this generous enough for real ad traffic.
+_analytics_attempts = {}
 
 def check_login_rate_limit(ip):
     now = time.time()
@@ -353,6 +492,21 @@ def record_assistant_request(ip):
         stale = [k for k, v in _assistant_attempts.items() if not v or v[-1] < cutoff]
         for k in stale:
             del _assistant_attempts[k]
+
+def check_analytics_rate_limit(ip):
+    now = time.time()
+    window = [t for t in _analytics_attempts.get(ip, []) if now - t < 600]
+    _analytics_attempts[ip] = window
+    return len(window) < 180  # 180 funnel hits / 10 min per IP
+
+def record_analytics_request(ip):
+    now = time.time()
+    _analytics_attempts.setdefault(ip, []).append(now)
+    if len(_analytics_attempts) > 10_000:
+        cutoff = now - 600
+        stale = [k for k, v in _analytics_attempts.items() if not v or v[-1] < cutoff]
+        for k in stale:
+            del _analytics_attempts[k]
 
 # ===== ADMIN AUTH =====
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
@@ -1506,6 +1660,11 @@ def _after_auto_payment_confirmed(booking_id):
                 **_client_email_context(booking, ev),
             )
         notify_payment_confirmed(booking_id, booking.get("paid_amount"))
+        _record_booking_funnel_event(
+            booking,
+            "booking_confirmed",
+            {"source": "etransfer_auto", "paid_amount": booking.get("paid_amount")},
+        )
         log.info(f"[auto-confirm] Booking #{booking_id} side-effects complete; calendar={event_url or 'none'}")
     except Exception as e:
         log.error(f"[auto-confirm] side-effects failed for booking #{booking_id}: {e}")
@@ -2240,6 +2399,7 @@ _EVENTS_PATH = (
     os.environ.get("EVENTS_YAML_PATH")
     or os.path.join(os.path.dirname(__file__), "events.yaml")
 )
+_EVENTS_YAML_LOCK = threading.RLock()
 
 def _load_events():
     """Load events from YAML, return list of event dicts."""
@@ -2271,6 +2431,80 @@ def get_event_by_id(event_id):
     return None
 
 
+def _deeplink_key(value):
+    """Normalize GBP/product/session link hints for robust matching."""
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def resolve_event_deeplink(value):
+    """Resolve a direct booking link hint to the next matching public event.
+
+    Supports exact event ids plus short GBP-friendly aliases such as
+    `canoe_mini`, `mountain_mini`, and `boho_swing`. When multiple events match
+    an alias, choose the earliest upcoming/non-completed event so evergreen GBP
+    product links keep opening the next available session instead of the home
+    page.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+
+    exact = get_event_by_id(raw)
+    if exact:
+        return exact
+
+    key = _deeplink_key(raw)
+    if not key:
+        return None
+
+    alias_terms = {
+        "canoemini": ["canoe"],
+        "canoeminisession": ["canoe"],
+        "mountainmini": ["mountain"],
+        "mountainsmini": ["mountain"],
+        "mountainminisession": ["mountain"],
+        "bohoswingmini": ["boho", "swing"],
+        "bohoswingminisession": ["boho", "swing"],
+        "goldenboho": ["golden", "boho"],
+        "goldenbohomini": ["golden", "boho"],
+        "lilacmini": ["lilac"],
+        "family": ["family"],
+        "familysession": ["family"],
+        "maternity": ["maternity"],
+        "maternitysession": ["maternity"],
+        "engagement": ["engagement"],
+        "engagementsession": ["engagement"],
+        "smallwedding": ["small", "wedding"],
+        "fullwedding": ["full", "wedding"],
+    }
+    terms = alias_terms.get(key)
+    if not terms:
+        # Also allow ids/titles typed as loose slugs with underscores/hyphens.
+        terms = [key]
+
+    today = datetime.now().date()
+    candidates = []
+    for ev in EVENTS:
+        haystack = _deeplink_key(" ".join(str(ev.get(field, "")) for field in (
+            "id", "title", "subtitle", "description", "location", "session_type", "type"
+        )))
+        if not all(term in haystack for term in terms):
+            continue
+        if ev.get("status") == "completed":
+            continue
+        try:
+            ev_date = datetime.strptime(str(ev.get("date", "")), "%Y-%m-%d").date()
+        except ValueError:
+            ev_date = today
+        if ev_date < today and ev.get("booking_type") != "rolling_availability":
+            continue
+        candidates.append((ev_date, ev))
+
+    if candidates:
+        return sorted(candidates, key=lambda item: item[0])[0][1]
+    return None
+
+
 BUILTIN_ADDONS = {
     "extra-10-edited-images": {
         "id": "extra-10-edited-images",
@@ -2293,6 +2527,30 @@ BUILTIN_ADDONS = {
         "active": False,
     },
 }
+
+DEFAULT_MINI_AGREEMENT = {
+    "enabled": True,
+    "require_terms": True,
+    "require_marketing_choice": True,
+    "terms_version": "mini-session-terms-v1",
+}
+
+
+def _default_mini_addons():
+    """Default upsells for newly-created instant mini-session events."""
+    return [
+        {**BUILTIN_ADDONS["extra-10-edited-images"], "active": True},
+        {**BUILTIN_ADDONS["short-vertical-reel"], "active": True},
+    ]
+
+
+def _is_instant_mini_event(event):
+    """Return True for public fixed-slot mini sessions that should get defaults."""
+    return (
+        _booking_type(event or {}) == "fixed_slots"
+        and str((event or {}).get("session_type") or (event or {}).get("type") or "mini").lower() == "mini"
+        and not bool((event or {}).get("inquiry_only"))
+    )
 
 
 def _money(value, default=0.0):
@@ -2615,6 +2873,38 @@ def init_db():
         )
     ''')
 
+    # ── first-party ad / funnel analytics ──
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS visitor_sessions (
+            visitor_id TEXT PRIMARY KEY,
+            first_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            utm_source TEXT DEFAULT '',
+            utm_medium TEXT DEFAULT '',
+            utm_campaign TEXT DEFAULT '',
+            utm_content TEXT DEFAULT '',
+            utm_term TEXT DEFAULT '',
+            fbclid TEXT DEFAULT '',
+            gclid TEXT DEFAULT '',
+            referrer TEXT DEFAULT '',
+            landing_url TEXT DEFAULT '',
+            user_agent TEXT DEFAULT '',
+            ip_address TEXT DEFAULT ''
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS analytics_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            visitor_id TEXT NOT NULL,
+            booking_id INTEGER,
+            event_name TEXT NOT NULL,
+            event_id TEXT DEFAULT '',
+            page TEXT DEFAULT '',
+            metadata_json TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # ── migrations: add columns that didn't exist in older installs ──
     _migrations = [
         ("bookings",  "paid_amount",       "ALTER TABLE bookings ADD COLUMN paid_amount REAL"),
@@ -2646,6 +2936,17 @@ def init_db():
         ("bookings",  "agreement_accepted_at", "ALTER TABLE bookings ADD COLUMN agreement_accepted_at TEXT"),
         ("bookings",  "terms_version",     "ALTER TABLE bookings ADD COLUMN terms_version TEXT"),
         ("bookings",  "questionnaire_answers_json", "ALTER TABLE bookings ADD COLUMN questionnaire_answers_json TEXT"),
+        # First-party attribution for Meta/Google/organic comparisons
+        ("bookings",  "visitor_id",        "ALTER TABLE bookings ADD COLUMN visitor_id TEXT"),
+        ("bookings",  "utm_source",        "ALTER TABLE bookings ADD COLUMN utm_source TEXT"),
+        ("bookings",  "utm_medium",        "ALTER TABLE bookings ADD COLUMN utm_medium TEXT"),
+        ("bookings",  "utm_campaign",      "ALTER TABLE bookings ADD COLUMN utm_campaign TEXT"),
+        ("bookings",  "utm_content",       "ALTER TABLE bookings ADD COLUMN utm_content TEXT"),
+        ("bookings",  "utm_term",          "ALTER TABLE bookings ADD COLUMN utm_term TEXT"),
+        ("bookings",  "fbclid",            "ALTER TABLE bookings ADD COLUMN fbclid TEXT"),
+        ("bookings",  "gclid",             "ALTER TABLE bookings ADD COLUMN gclid TEXT"),
+        ("bookings",  "referrer",          "ALTER TABLE bookings ADD COLUMN referrer TEXT"),
+        ("bookings",  "landing_url",       "ALTER TABLE bookings ADD COLUMN landing_url TEXT"),
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
@@ -2677,6 +2978,11 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_bookings_confirmed   ON bookings(confirmed)",
         "CREATE INDEX IF NOT EXISTS idx_bookings_reserved    ON bookings(reserved_until)",
         "CREATE INDEX IF NOT EXISTS idx_bookings_event_id    ON bookings(event_id)",
+        "CREATE INDEX IF NOT EXISTS idx_bookings_utm_campaign ON bookings(utm_campaign)",
+        "CREATE INDEX IF NOT EXISTS idx_bookings_visitor_id   ON bookings(visitor_id)",
+        "CREATE INDEX IF NOT EXISTS idx_analytics_visitor     ON analytics_events(visitor_id)",
+        "CREATE INDEX IF NOT EXISTS idx_analytics_booking     ON analytics_events(booking_id)",
+        "CREATE INDEX IF NOT EXISTS idx_analytics_event_time  ON analytics_events(event_name, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_clients_email        ON clients(email)",
         "CREATE INDEX IF NOT EXISTS idx_waitlist_event_email ON waitlist(event_id, email)",
     ]
@@ -2741,6 +3047,27 @@ def _process_abandoned_emails():
             conn2.commit()
             conn2.close()
             if ok:
+                _record_booking_funnel_event(
+                    b,
+                    "abandoned_followup_sent",
+                    {"channel": "email", "sent_at": now.isoformat()},
+                )
+                _emit_n8n_event(
+                    "booking.abandoned_followup_sent",
+                    booking={
+                        "id": b.get("id"),
+                        "name": b.get("name"),
+                        "email": b.get("email"),
+                        "phone": b.get("phone"),
+                        "instagram": b.get("instagram"),
+                        "date": b.get("date"),
+                        "time": b.get("time"),
+                        "event_id": b.get("event_id"),
+                        "utm_campaign": b.get("utm_campaign"),
+                        "utm_content": b.get("utm_content"),
+                    },
+                    channel="email",
+                )
                 log.info(f"[scheduler] Abandoned email sent → booking #{b['id']} ({b.get('email')})")
         except Exception as e:
             log.error(f"[scheduler] Abandoned email failed for #{b['id']}: {e}")
@@ -2986,18 +3313,18 @@ def expire_reservations():
     c = conn.cursor()
     now = datetime.now().isoformat()
     c.execute("""
-        SELECT id, notion_page_id FROM bookings
+        SELECT * FROM bookings
         WHERE confirmed = 0
           AND paid = 0
           AND reserved_until IS NOT NULL
           AND reserved_until <= ?
           AND status IN ('reserved', 'pending_payment')
     """, (now,))
-    rows = c.fetchall()
+    rows = [dict(row) for row in c.fetchall()]
 
     for row in rows:
         booking_id = row["id"]
-        notion_page_id = row["notion_page_id"]
+        notion_page_id = row.get("notion_page_id")
 
         # Update status to 'expired' instead of deleting
         c.execute("UPDATE bookings SET status='expired', reserved_until=NULL WHERE id=?",
@@ -3016,9 +3343,31 @@ def expire_reservations():
             except Exception as e:
                 log.error(f"[expire] Notion update failed for #{booking_id}: {e}")
 
-    expired_count = len(rows)
     conn.commit()
     conn.close()
+    expired_count = len(rows)
+    for booking in rows:
+        _record_booking_funnel_event(
+            booking,
+            "booking_expired",
+            {"expired_at": now, "status_before": booking.get("status")},
+        )
+        _emit_n8n_event(
+            "booking.expired",
+            booking={
+                "id": booking.get("id"),
+                "name": booking.get("name"),
+                "email": booking.get("email"),
+                "phone": booking.get("phone"),
+                "instagram": booking.get("instagram"),
+                "date": booking.get("date"),
+                "time": booking.get("time"),
+                "event_id": booking.get("event_id"),
+                "status": "expired",
+                "utm_campaign": booking.get("utm_campaign"),
+                "utm_content": booking.get("utm_content"),
+            },
+        )
     return expired_count
 
 # Generate time slots for a specific event
@@ -3118,7 +3467,15 @@ def legacy_booking_entrypoints():
 @app.route("/")
 def index():
     """Landing — new v2 design with event grid, featured banner, and booking drawer."""
-    event_id = request.args.get("event")
+    deeplink_hint = (
+        request.args.get("event")
+        or request.args.get("event_id")
+        or request.args.get("session")
+        or request.args.get("product")
+        or request.args.get("utm_content")
+    )
+    direct_event = resolve_event_deeplink(deeplink_hint)
+    explicit_event_requested = any(request.args.get(name) for name in ("event", "event_id", "session", "product"))
     booking_flow_variant = _select_booking_flow_variant(
         request.args.get("flow"),
         request.cookies.get("booking_flow"),
@@ -3130,12 +3487,11 @@ def index():
         "initial_past_events": _past_events_payload(),
     }
 
-    # ── Direct event link: still render v2 landing, but could auto-open drawer in future ──
-    if event_id:
-        ev = get_event_by_id(event_id)
-        if not ev:
-            return "Event not found", 404
-        return render_template("index_v2.html", direct_event_id=event_id, **template_context)
+    # ── Direct event / GBP product links: render v2 and auto-open the matching drawer ──
+    if direct_event:
+        return render_template("index_v2.html", direct_event_id=direct_event["id"], **template_context)
+    if explicit_event_requested:
+        return "Event not found", 404
 
     # ── Render the new landing grid (v2 design) for all cases ──
     return render_template("index_v2.html", **template_context)
@@ -3783,6 +4139,42 @@ def join_waitlist():
     })
 
 
+@app.route("/track", methods=["POST"])
+def track_event():
+    """Lightweight first-party funnel analytics endpoint.
+
+    It deliberately accepts only a tiny allowlisted payload and never blocks the
+    booking flow if storage fails. This lets ads be compared by real booking
+    outcomes without adding third-party tracking scripts as the source of truth.
+    """
+    ip = _client_ip()
+    if not check_analytics_rate_limit(ip):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    record_analytics_request(ip)
+
+    data = request.get_json(silent=True) or {}
+    visitor_id = _safe_text(data.get("visitor_id"), 120)
+    if not visitor_id:
+        return jsonify({"ok": False, "error": "missing visitor_id"}), 400
+    attribution = _normalise_utm(data)
+    attribution.update({
+        "fbclid": _safe_text(data.get("fbclid"), 500),
+        "gclid": _safe_text(data.get("gclid"), 500),
+        "referrer": _safe_text(data.get("referrer") or request.headers.get("Referer"), 500),
+        "landing_url": _safe_text(data.get("landing_url") or data.get("page"), 1000),
+    })
+    ok = _record_analytics_event(
+        data.get("event_name") or "page_view",
+        visitor_id=visitor_id,
+        booking_id=data.get("booking_id"),
+        event_id=data.get("event_id") or data.get("session_id") or "",
+        page=data.get("page") or "",
+        metadata=data.get("metadata") if isinstance(data.get("metadata"), dict) else {},
+        attribution=attribution,
+    )
+    return jsonify({"ok": bool(ok)})
+
+
 @app.route("/reserve", methods=["POST"])
 def reserve_slot():
     data = request.json or {}
@@ -3796,6 +4188,24 @@ def reserve_slot():
     client_phone = (data.get("phone") or "").strip()
     client_ig = (data.get("instagram") or "").strip()
     session_type = data.get("session_type", "")
+    visitor_id = _safe_text(data.get("visitor_id"), 120)
+    attribution = _normalise_utm(data)
+    attribution.update({
+        "fbclid": _safe_text(data.get("fbclid"), 500),
+        "gclid": _safe_text(data.get("gclid"), 500),
+        "referrer": _safe_text(data.get("referrer") or request.headers.get("Referer"), 500),
+        "landing_url": _safe_text(data.get("landing_url") or request.headers.get("Referer"), 1000),
+    })
+
+    if visitor_id:
+        _record_analytics_event(
+            "reserve_attempt",
+            visitor_id=visitor_id,
+            event_id=event_id or "",
+            page=attribution.get("landing_url") or "",
+            metadata={"time": slot_time, "date": requested_date, "session_type": session_type},
+            attribution=attribution,
+        )
 
     if not slot_time:
         return jsonify({"success": False, "error": "No time slot specified"}), 400
@@ -3941,13 +4351,19 @@ def reserve_slot():
             INSERT INTO bookings
                 (date, time, name, email, phone, instagram, session_type, status, reserved_until,
                  event_id, confirmation_token, deposit_amount, full_price, selected_addons_json,
-                 addons_total, marketing_consent, agreement_name, agreement_accepted_at, terms_version)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 addons_total, marketing_consent, agreement_name, agreement_accepted_at, terms_version,
+                 visitor_id, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+                 fbclid, gclid, referrer, landing_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type,
             expires.isoformat(), ev["id"], token, _deposit_amt, _full_price,
             json.dumps(selected_addons, ensure_ascii=False) if selected_addons else None,
             addons_total, marketing_consent, agreement_name, agreement_accepted_at, terms_version,
+            visitor_id,
+            attribution.get("utm_source"), attribution.get("utm_medium"), attribution.get("utm_campaign"),
+            attribution.get("utm_content"), attribution.get("utm_term"), attribution.get("fbclid"),
+            attribution.get("gclid"), attribution.get("referrer"), attribution.get("landing_url"),
         ))
 
         if c.rowcount == 0:
@@ -3964,6 +4380,16 @@ def reserve_slot():
         conn.close()
 
     # Sync client record (upsert) — creates or updates client profile
+    if visitor_id and booking_id:
+        _record_analytics_event(
+            "booking_reserved",
+            visitor_id=visitor_id,
+            booking_id=booking_id,
+            event_id=ev["id"],
+            page=attribution.get("landing_url") or "",
+            metadata={"time": slot_time, "date": event_date, "session_type": session_type, "deposit": _deposit_amt},
+            attribution=attribution,
+        )
     try:
         sync_client(client_email, client_name, client_phone, client_ig)
     except Exception as _e:
@@ -4147,6 +4573,13 @@ def confirm_payment():
     """, (new_expires, booking_id))
     conn.commit()
     conn.close()
+    row["status"] = "pending_payment"
+    row["reserved_until"] = new_expires
+    _record_booking_funnel_event(
+        row,
+        "payment_sent_clicked",
+        {"pending_until": new_expires, "payment_method": "interac"},
+    )
     
     # Sync to Notion
     sync_to_notion(booking_id)
@@ -4337,6 +4770,7 @@ button{{margin-top:18px;background:#1c1917;color:#fff;border:0;border-radius:12p
 
 
 @app.route("/privacy")
+@app.route("/privacy-policy")
 def privacy():
     """Plain-language privacy and browser storage disclosure for clients.
 
@@ -4973,6 +5407,11 @@ def stripe_webhook():
         conn.commit()
         conn.close()
         booking.update({"confirmed": 1, "paid": 1, "status": "confirmed", "paid_amount": amount_paid})
+        _record_booking_funnel_event(
+            booking,
+            "booking_confirmed",
+            {"source": "stripe", "paid_amount": amount_paid},
+        )
 
         log.info(f"[stripe-webhook] Booking #{booking_id} auto-confirmed via Stripe (${amount_paid:.2f} CAD)")
 
@@ -5288,6 +5727,128 @@ def _admin_event_summaries():
         conn.close()
 
 
+def _analytics_report_range():
+    today = datetime.now().date()
+    default_from = (today - timedelta(days=30)).isoformat()
+    default_to = today.isoformat()
+    date_from = request.args.get("date_from") or default_from
+    date_to = request.args.get("date_to") or default_to
+    def _valid_date(value, fallback):
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+            return value
+        except ValueError:
+            return fallback
+    date_from = _valid_date(date_from, default_from)
+    date_to = _valid_date(date_to, default_to)
+    return date_from, date_to
+
+
+def _analytics_include_internal():
+    """Opt-in flag for QA/smoke campaigns in the admin analytics report."""
+    return str(request.args.get("include_internal", "")).lower() in {"1", "true", "yes", "on"}
+
+
+def _analytics_is_internal_campaign(campaign, content):
+    """Hide synthetic QA campaigns by default so business reports stay clean."""
+    blob = f"{campaign or ''} {content or ''}".lower()
+    internal_prefixes = (
+        "codex_",
+        "playwright_",
+        "browser_smoke",
+        "smoke_",
+        "test_",
+        "qa_",
+    )
+    return any(blob.startswith(prefix) or f" {prefix}" in blob for prefix in internal_prefixes) or "_smoke" in blob
+
+
+def _analytics_campaign_rows(date_from, date_to, include_internal=False):
+    conn = db_conn()
+    try:
+        rows = conn.execute("""
+            WITH event_counts AS (
+                SELECT
+                    COALESCE(NULLIF(v.utm_campaign, ''), '(none)') AS campaign,
+                    COALESCE(NULLIF(v.utm_content, ''), '(none)') AS content,
+                    COUNT(DISTINCT CASE WHEN e.event_name='page_view' THEN e.visitor_id END) AS visits,
+                    SUM(CASE WHEN e.event_name='session_view' THEN 1 ELSE 0 END) AS session_views,
+                    SUM(CASE WHEN e.event_name='drawer_open' THEN 1 ELSE 0 END) AS drawer_opens,
+                    SUM(CASE WHEN e.event_name='slot_selected' THEN 1 ELSE 0 END) AS slot_selections,
+                    SUM(CASE WHEN e.event_name='form_started' THEN 1 ELSE 0 END) AS form_starts,
+                    SUM(CASE WHEN e.event_name='reserve_attempt' THEN 1 ELSE 0 END) AS reserve_attempts,
+                    SUM(CASE WHEN e.event_name='booking_reserved' THEN 1 ELSE 0 END) AS booking_events,
+                    SUM(CASE WHEN e.event_name='booking_confirmed' THEN 1 ELSE 0 END) AS confirmed_events,
+                    SUM(CASE WHEN e.event_name='booking_expired' THEN 1 ELSE 0 END) AS expired_events,
+                    SUM(CASE WHEN e.event_name='abandoned_followup_sent' THEN 1 ELSE 0 END) AS abandoned_followups
+                FROM analytics_events e
+                LEFT JOIN visitor_sessions v ON v.visitor_id = e.visitor_id
+                WHERE date(e.created_at) BETWEEN date(?) AND date(?)
+                GROUP BY campaign, content
+            ),
+            booking_counts AS (
+                SELECT
+                    COALESCE(NULLIF(utm_campaign, ''), '(none)') AS campaign,
+                    COALESCE(NULLIF(utm_content, ''), '(none)') AS content,
+                    COUNT(*) AS bookings,
+                    SUM(CASE WHEN confirmed=1 OR paid=1 OR status='confirmed' THEN 1 ELSE 0 END) AS confirmed_bookings
+                FROM bookings
+                WHERE date(created_at) BETWEEN date(?) AND date(?)
+                GROUP BY campaign, content
+            ),
+            keys AS (
+                SELECT campaign, content FROM event_counts
+                UNION
+                SELECT campaign, content FROM booking_counts
+            )
+            SELECT
+                k.campaign,
+                k.content,
+                COALESCE(e.visits, 0) AS visits,
+                COALESCE(e.session_views, 0) AS session_views,
+                COALESCE(e.drawer_opens, 0) AS drawer_opens,
+                COALESCE(e.slot_selections, 0) AS slot_selections,
+                COALESCE(e.form_starts, 0) AS form_starts,
+                COALESCE(e.reserve_attempts, 0) AS reserve_attempts,
+                COALESCE(b.bookings, e.booking_events, 0) AS bookings,
+                COALESCE(b.confirmed_bookings, e.confirmed_events, 0) AS confirmed_bookings,
+                COALESCE(e.expired_events, 0) AS expired_bookings,
+                COALESCE(e.abandoned_followups, 0) AS abandoned_followups
+            FROM keys k
+            LEFT JOIN event_counts e ON e.campaign=k.campaign AND e.content=k.content
+            LEFT JOIN booking_counts b ON b.campaign=k.campaign AND b.content=k.content
+            ORDER BY confirmed_bookings DESC, bookings DESC, reserve_attempts DESC, visits DESC
+        """, (date_from, date_to, date_from, date_to)).fetchall()
+    finally:
+        conn.close()
+
+    out = []
+    for row in rows:
+        item = dict(row)
+        if not include_internal and _analytics_is_internal_campaign(item.get("campaign"), item.get("content")):
+            continue
+        visits = int(item.get("visits") or 0)
+        bookings = int(item.get("bookings") or 0)
+        confirmed = int(item.get("confirmed_bookings") or 0)
+        item["booking_conversion_rate"] = round((bookings / visits * 100), 2) if visits else 0.0
+        item["confirmed_conversion_rate"] = round((confirmed / visits * 100), 2) if visits else 0.0
+        out.append(item)
+    return out
+
+
+def _analytics_totals(rows):
+    keys = [
+        "visits", "session_views", "drawer_opens", "slot_selections", "form_starts",
+        "reserve_attempts", "bookings", "confirmed_bookings", "expired_bookings",
+        "abandoned_followups",
+    ]
+    totals = {key: sum(int(row.get(key) or 0) for row in rows) for key in keys}
+    visits = totals["visits"]
+    totals["booking_conversion_rate"] = round(totals["bookings"] / visits * 100, 2) if visits else 0.0
+    totals["confirmed_conversion_rate"] = round(totals["confirmed_bookings"] / visits * 100, 2) if visits else 0.0
+    return totals
+
+
 @app.route("/admin")
 @admin_required
 def admin():
@@ -5486,6 +6047,52 @@ def admin_export():
         output.getvalue(),
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@app.route("/admin/analytics")
+@admin_required
+def admin_analytics():
+    """Admin-only campaign/funnel report for first-party booking analytics."""
+    date_from, date_to = _analytics_report_range()
+    include_internal = _analytics_include_internal()
+    rows = _analytics_campaign_rows(date_from, date_to, include_internal=include_internal)
+    totals = _analytics_totals(rows)
+    return render_template(
+        "admin_analytics.html",
+        rows=rows,
+        totals=totals,
+        date_from=date_from,
+        date_to=date_to,
+        include_internal=include_internal,
+    )
+
+
+@app.route("/admin/analytics.csv")
+@admin_required
+def admin_analytics_csv():
+    """CSV export for Google Sheets import or lightweight reporting."""
+    import csv as _csv
+    import io as _io
+    date_from, date_to = _analytics_report_range()
+    include_internal = _analytics_include_internal()
+    rows = _analytics_campaign_rows(date_from, date_to, include_internal=include_internal)
+    fields = [
+        "campaign", "content", "visits", "session_views", "drawer_opens",
+        "slot_selections", "form_starts", "reserve_attempts", "bookings",
+        "confirmed_bookings", "expired_bookings", "abandoned_followups",
+        "booking_conversion_rate", "confirmed_conversion_rate",
+    ]
+    output = _io.StringIO()
+    writer = _csv.DictWriter(output, fieldnames=fields)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({field: row.get(field, "") for field in fields})
+    filename = f"booking-analytics-{date_from}-to-{date_to}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 def _admin_booking_row_or_404(booking_id):
@@ -6200,6 +6807,11 @@ def admin_confirm():
             calendar_event=event_url,
             event_data=ev or {},
         )
+        _record_booking_funnel_event(
+            booking,
+            "booking_confirmed",
+            {"source": "admin", "paid_amount": paid_amount},
+        )
 
     log.info(f"[admin] Booking #{booking_id} confirmed, paid ${paid_amount}")
 
@@ -6624,109 +7236,108 @@ def _allowed_file(filename):
 @app.route("/admin/events/<event_id>/update", methods=["POST"])
 @admin_required
 def admin_update_event(event_id):
-    """Update event time/schedule settings and save to events.yaml."""
+    """Update event schedule/pricing settings and save to events.yaml."""
     data = request.json or {}
 
-    with open(EVENTS_YAML_PATH) as fh:
-        yaml_data = yaml.safe_load(fh)
+    with _EVENTS_YAML_LOCK:
+        with open(EVENTS_YAML_PATH) as fh:
+            yaml_data = yaml.safe_load(fh) or {}
 
-    event = next((e for e in yaml_data.get("events", []) if e["id"] == event_id), None)
-    if not event:
-        return jsonify({"error": "Event not found"}), 404
+        event = next((e for e in yaml_data.get("events", []) if e["id"] == event_id), None)
+        if not event:
+            return jsonify({"error": "Event not found"}), 404
 
-    # Validate and apply time fields
-    try:
-        if "start_time" in data:
-            datetime.strptime(data["start_time"], "%H:%M")
-            event["start_time"] = data["start_time"]
-        if "end_time" in data:
-            datetime.strptime(data["end_time"], "%H:%M")
-            event["end_time"] = data["end_time"]
-        if "session_length" in data:
-            sl = int(data["session_length"])
-            if not (5 <= sl <= 120):
-                return jsonify({"error": "session_length must be 5–120 minutes"}), 400
-            event["session_length"] = sl
-        if "break_length" in data:
-            bl = int(data["break_length"])
-            if not (0 <= bl <= 60):
-                return jsonify({"error": "break_length must be 0–60 minutes"}), 400
-            event["break_length"] = bl
-        # slot_interval is always session_length + break_length
-        event["slot_interval"] = event.get("session_length", 20) + event.get("break_length", 10)
-        if "title" in data:
-            event["title"] = str(data["title"])[:120]
-        if "subtitle" in data:
-            event["subtitle"] = str(data["subtitle"])[:200]
-        if "deposit" in data:
-            event["deposit"] = float(data["deposit"])
-        if "full_price" in data:
-            event["full_price"] = float(data["full_price"])
-        if "status" in data and data["status"] in ("active", "upcoming", "completed"):
-            event["status"] = data["status"]
-        if "location" in data:
-            event["location"] = str(data["location"])[:300]
-        if "booking_type" in data:
-            bt = str(data["booking_type"])
-            if bt not in ("fixed_slots", "rolling_availability", "inquiry_only"):
-                return jsonify({"error": "booking_type must be fixed_slots, rolling_availability, or inquiry_only"}), 400
-            event["booking_type"] = bt
-        if "session_type" in data:
-            event["session_type"] = str(data["session_type"])[:40]
-        if "availability_horizon_days" in data:
-            horizon = int(data["availability_horizon_days"])
-            if not (1 <= horizon <= 365):
-                return jsonify({"error": "availability_horizon_days must be 1–365"}), 400
-            event["availability_horizon_days"] = horizon
-        if "blackout_dates" in data:
-            dates = data.get("blackout_dates") or []
-            if isinstance(dates, str):
-                dates = [d.strip() for d in dates.replace("\n", ",").split(",") if d.strip()]
-            cleaned = []
-            for d in dates:
-                d = str(d).strip()
-                datetime.strptime(d, "%Y-%m-%d")
-                cleaned.append(d)
-            event["blackout_dates"] = cleaned
-        if "addons" in data:
-            addons = _sanitize_event_addons(data.get("addons") or [])
-            if addons:
-                event["addons"] = addons
-            else:
-                event.pop("addons", None)
-    except ValueError as e:
-        return jsonify({"error": f"Invalid value: {e}"}), 400
+        # Validate and apply time/price fields. Keep read→modify→write under one
+        # lock so concurrent admin metadata saves cannot overwrite pricing edits
+        # with a stale YAML snapshot.
+        try:
+            if "start_time" in data:
+                datetime.strptime(data["start_time"], "%H:%M")
+                event["start_time"] = data["start_time"]
+            if "end_time" in data:
+                datetime.strptime(data["end_time"], "%H:%M")
+                event["end_time"] = data["end_time"]
+            if "session_length" in data:
+                sl = int(data["session_length"])
+                if not (5 <= sl <= 120):
+                    return jsonify({"error": "session_length must be 5–120 minutes"}), 400
+                event["session_length"] = sl
+            if "break_length" in data:
+                bl = int(data["break_length"])
+                if not (0 <= bl <= 60):
+                    return jsonify({"error": "break_length must be 0–60 minutes"}), 400
+                event["break_length"] = bl
+            event["slot_interval"] = event.get("session_length", 20) + event.get("break_length", 10)
+            if "title" in data:
+                event["title"] = str(data["title"])[:120]
+            if "subtitle" in data:
+                event["subtitle"] = str(data["subtitle"])[:200]
+            if "deposit" in data:
+                event["deposit"] = float(data["deposit"])
+            if "full_price" in data:
+                event["full_price"] = float(data["full_price"])
+            if "status" in data and data["status"] in ("active", "upcoming", "completed"):
+                event["status"] = data["status"]
+            if "location" in data:
+                event["location"] = str(data["location"])[:300]
+            if "booking_type" in data:
+                bt = str(data["booking_type"])
+                if bt not in ("fixed_slots", "rolling_availability", "inquiry_only"):
+                    return jsonify({"error": "booking_type must be fixed_slots, rolling_availability, or inquiry_only"}), 400
+                event["booking_type"] = bt
+            if "session_type" in data:
+                event["session_type"] = str(data["session_type"])[:40]
+            if "availability_horizon_days" in data:
+                horizon = int(data["availability_horizon_days"])
+                if not (1 <= horizon <= 365):
+                    return jsonify({"error": "availability_horizon_days must be 1–365"}), 400
+                event["availability_horizon_days"] = horizon
+            if "blackout_dates" in data:
+                dates = data.get("blackout_dates") or []
+                if isinstance(dates, str):
+                    dates = [d.strip() for d in dates.replace("\n", ",").split(",") if d.strip()]
+                cleaned = []
+                for d in dates:
+                    d = str(d).strip()
+                    datetime.strptime(d, "%Y-%m-%d")
+                    cleaned.append(d)
+                event["blackout_dates"] = cleaned
+            if "addons" in data:
+                addons = _sanitize_event_addons(data.get("addons") or [])
+                if addons:
+                    event["addons"] = addons
+                else:
+                    event.pop("addons", None)
+            if "agreement" in data:
+                agreement = data.get("agreement") or {}
+                if isinstance(agreement, dict) and agreement.get("enabled"):
+                    event["agreement"] = {
+                        "enabled": True,
+                        "require_terms": bool(agreement.get("require_terms", True)),
+                        "require_marketing_choice": bool(agreement.get("require_marketing_choice", True)),
+                        "terms_version": str(agreement.get("terms_version") or agreement.get("version") or DEFAULT_MINI_AGREEMENT["terms_version"])[:80],
+                    }
+                else:
+                    event.pop("agreement", None)
+            elif _is_instant_mini_event(event) and not event.get("agreement"):
+                event["agreement"] = dict(DEFAULT_MINI_AGREEMENT)
+        except ValueError as e:
+            return jsonify({"error": f"Invalid value: {e}"}), 400
 
-    # Validate that start < end
-    try:
-        s = datetime.strptime(event["start_time"], "%H:%M")
-        e_ = datetime.strptime(event["end_time"], "%H:%M")
-        if s >= e_:
-            return jsonify({"error": "start_time must be before end_time"}), 400
-    except Exception:
-        pass
+        try:
+            s = datetime.strptime(event["start_time"], "%H:%M")
+            e_ = datetime.strptime(event["end_time"], "%H:%M")
+            if s >= e_:
+                return jsonify({"error": "start_time must be before end_time"}), 400
+        except Exception:
+            pass
 
-    with open(EVENTS_YAML_PATH, "w") as fh:
-        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+        with open(EVENTS_YAML_PATH, "w") as fh:
+            yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
 
-    # Reload events in memory
-    global EVENTS, SETTINGS, _active, EVENT_TITLE, SESSION_LENGTH, BREAK_LENGTH, SLOT_INTERVAL, SESSION_PRICE, SESSION_TOTAL, DATE, START_TIME, END_TIME, SLOTS
-    EVENTS, SETTINGS = _load_events()
-    _active = get_active_event() or {}
-    EVENT_TITLE = _active.get("title", "Mini Sessions")
-    SESSION_LENGTH = _active.get("session_length", 20)
-    BREAK_LENGTH = _active.get("break_length", 10)
-    SLOT_INTERVAL = _active.get("slot_interval", 30)
-    SESSION_PRICE = _active.get("deposit", 95)
-    SESSION_TOTAL = _active.get("full_price", 190)
-    DATE = _active.get("date", "")
-    START_TIME = _active.get("start_time", "10:00")
-    END_TIME = _active.get("end_time", "16:00")
-    SLOTS = generate_slots()
-
-    # Compute slot preview for the response
-    updated_event = next((e for e in EVENTS if e["id"] == event_id), event)
-    slots_preview = generate_slots(updated_event)
+        _reload_events_globals()
+        updated_event = next((e for e in EVENTS if e["id"] == event_id), event)
+        slots_preview = generate_slots(updated_event)
 
     log.info(f"[admin] Event {event_id} settings updated: {data}")
     return jsonify({"success": True, "slots_count": len(slots_preview), "event": {
@@ -6736,6 +7347,8 @@ def admin_update_event(event_id):
         "session_length": updated_event.get("session_length"),
         "break_length": updated_event.get("break_length"),
         "slot_interval": updated_event.get("slot_interval"),
+        "deposit": updated_event.get("deposit"),
+        "full_price": updated_event.get("full_price"),
     }})
 
 
@@ -6954,6 +7567,20 @@ def admin_create_event():
     addons = _sanitize_event_addons(data.get("addons") or [])
     if addons:
         new_event["addons"] = addons
+    elif _is_instant_mini_event(new_event):
+        new_event["addons"] = _default_mini_addons()
+
+    agreement = data.get("agreement") if isinstance(data.get("agreement"), dict) else None
+    if agreement is not None:
+        if agreement.get("enabled"):
+            new_event["agreement"] = {
+                "enabled": True,
+                "require_terms": bool(agreement.get("require_terms", True)),
+                "require_marketing_choice": bool(agreement.get("require_marketing_choice", True)),
+                "terms_version": str(agreement.get("terms_version") or agreement.get("version") or DEFAULT_MINI_AGREEMENT["terms_version"])[:80],
+            }
+    elif _is_instant_mini_event(new_event):
+        new_event["agreement"] = dict(DEFAULT_MINI_AGREEMENT)
 
     events_list.append(new_event)
     yaml_data["events"] = events_list
@@ -7050,33 +7677,35 @@ def admin_update_event_meta(event_id):
     """Update event metadata: title, subtitle, date, featured, included items."""
     data = request.json or {}
 
-    with open(EVENTS_YAML_PATH) as fh:
-        yaml_data = yaml.safe_load(fh) or {}
+    with _EVENTS_YAML_LOCK:
+        with open(EVENTS_YAML_PATH) as fh:
+            yaml_data = yaml.safe_load(fh) or {}
 
-    events_list = yaml_data.get("events", [])
-    event = next((e for e in events_list if e["id"] == event_id), None)
-    if not event:
-        return jsonify({"error": "Event not found"}), 404
+        events_list = yaml_data.get("events", [])
+        event = next((e for e in events_list if e["id"] == event_id), None)
+        if not event:
+            return jsonify({"error": "Event not found"}), 404
 
-    if "title" in data:
-        event["title"] = str(data["title"])[:120]
-    if "subtitle" in data:
-        event["subtitle"] = str(data["subtitle"])[:200]
-    if "date" in data:
-        try:
-            datetime.strptime(str(data["date"]), "%Y-%m-%d")
-            event["date"] = str(data["date"])
-        except ValueError:
-            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
-    if "featured" in data:
-        event["featured"] = bool(data["featured"])
-    if "included" in data:
-        event["included"] = [str(i).strip() for i in data["included"] if str(i).strip()]
+        if "title" in data:
+            event["title"] = str(data["title"])[:120]
+        if "subtitle" in data:
+            event["subtitle"] = str(data["subtitle"])[:200]
+        if "date" in data:
+            try:
+                datetime.strptime(str(data["date"]), "%Y-%m-%d")
+                event["date"] = str(data["date"])
+            except ValueError:
+                return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        if "featured" in data:
+            event["featured"] = bool(data["featured"])
+        if "included" in data:
+            event["included"] = [str(i).strip() for i in data["included"] if str(i).strip()]
 
-    with open(EVENTS_YAML_PATH, "w") as fh:
-        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+        with open(EVENTS_YAML_PATH, "w") as fh:
+            yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
 
-    _reload_events_globals()
+        _reload_events_globals()
+
     log.info(f"[admin] Event meta updated: {event_id}")
     return jsonify({"success": True})
 
@@ -7229,12 +7858,14 @@ def _link_transfer_to_booking(transfer_id, booking_id):
             deposit = float((ev or {}).get("deposit") or 0)
         if deposit <= 0:
             deposit = new_paid
+        booking_for_event = dict(booking)
         if new_paid + 0.01 >= deposit:
             conn.execute("""
                 UPDATE bookings
                    SET paid_amount=?, paid=1, confirmed=1, status='confirmed'
                  WHERE id=?
             """, (new_paid, booking_id))
+            booking_for_event.update({"paid_amount": new_paid, "paid": 1, "confirmed": 1, "status": "confirmed"})
         else:
             conn.execute("""
                 UPDATE bookings
@@ -7253,10 +7884,16 @@ def _link_transfer_to_booking(transfer_id, booking_id):
         return False, str(e)
     finally:
         conn.close()
-    try:
-        sync_to_notion(booking_id)
-    except Exception:
-        pass
+        try:
+            sync_to_notion(booking_id)
+        except Exception:
+            pass
+    if booking_for_event.get("confirmed"):
+        _record_booking_funnel_event(
+            booking_for_event,
+            "booking_confirmed",
+            {"source": "admin_transfer_link", "paid_amount": booking_for_event.get("paid_amount")},
+        )
     return True, None
 
 
@@ -8314,6 +8951,11 @@ def telegram_webhook():
         conn.commit()
         conn.close()
         booking.update({"confirmed": 1, "paid": 1, "status": "confirmed", "paid_amount": deposit_amount})
+        _record_booking_funnel_event(
+            booking,
+            "booking_confirmed",
+            {"source": "telegram", "paid_amount": deposit_amount},
+        )
 
         ev = get_event_by_id(booking.get("event_id"))
         event_title = ev.get("title", "Mini Session") if ev else "Mini Session"

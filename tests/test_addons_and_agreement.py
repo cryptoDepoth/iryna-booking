@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 
 import pytest
+import yaml
 
 import app as booking_app
 
@@ -340,3 +341,56 @@ def test_success_page_shows_addons_and_amount_wording(client, monkeypatch):
     assert "10 Extra Edited Images" in html
     assert "Amount due today" in html
     assert "Remaining balance" in html
+
+
+def test_admin_create_mini_event_defaults_to_addons_and_agreement(client, monkeypatch, tmp_path):
+    c, _db_path = client
+    events_path = tmp_path / "events.yaml"
+    events_path.write_text(yaml.dump({"events": [], "settings": {}}, sort_keys=False))
+    monkeypatch.setattr(booking_app, "EVENTS_YAML_PATH", str(events_path))
+
+    res = c.post("/admin/events/create", headers={"X-Admin-Key": "test-admin-key"}, json={
+        "title": "New Summer Mini",
+        "date": "2026-08-15",
+        "start_time": "15:00",
+        "end_time": "17:00",
+        "deposit": 100,
+        "full_price": 200,
+        "location": "Test Park",
+        "session_type": "mini",
+        "booking_type": "fixed_slots",
+        "included": ["20-minute photo session"],
+    })
+
+    assert res.status_code == 200
+    stored = yaml.safe_load(events_path.read_text())["events"][0]
+    assert [a["id"] for a in stored["addons"]] == ["extra-10-edited-images", "short-vertical-reel"]
+    assert all(a["active"] is True for a in stored["addons"])
+    assert stored["agreement"] == {
+        "enabled": True,
+        "require_terms": True,
+        "require_marketing_choice": True,
+        "terms_version": "mini-session-terms-v1",
+    }
+
+
+def test_admin_update_mini_event_can_enable_agreement(client, monkeypatch, tmp_path):
+    c, _db_path = client
+    events_path = tmp_path / "events.yaml"
+    events_path.write_text(yaml.dump({"events": [_event(addons=[])], "settings": {}}, sort_keys=False))
+    monkeypatch.setattr(booking_app, "EVENTS_YAML_PATH", str(events_path))
+
+    res = c.post("/admin/events/test-mini-2026-08-01/update", headers={"X-Admin-Key": "test-admin-key"}, json={
+        "agreement": {
+            "enabled": True,
+            "require_terms": True,
+            "require_marketing_choice": True,
+            "terms_version": "mini-session-terms-v1",
+        },
+        "addons": booking_app._default_mini_addons(),
+    })
+
+    assert res.status_code == 200
+    stored = yaml.safe_load(events_path.read_text())["events"][0]
+    assert stored["agreement"]["enabled"] is True
+    assert [a["id"] for a in stored["addons"]] == ["extra-10-edited-images", "short-vertical-reel"]
