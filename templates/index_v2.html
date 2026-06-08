@@ -344,7 +344,9 @@ img,picture,video{max-width:100%;height:auto;display:block}
 @media(max-width:560px){.filters .count{display:none}}
 
 /* ── EVENT GRID ── */
-.events-wrap{max-width:1200px;margin:0 auto 24px;padding:0 20px;min-height:2800px}
+.events-wrap{max-width:1200px;margin:0 auto 24px;padding:0 20px;min-height:3600px}
+@media(min-width:560px){.events-wrap{min-height:1600px}}
+@media(min-width:900px){.events-wrap{min-height:1100px}}
 .events{display:grid;grid-template-columns:1fr;gap:18px}
 @media(min-width:560px){.events{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}}
 .event-card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.04);display:flex;flex-direction:column;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;position:relative}
@@ -799,6 +801,11 @@ src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
       <div class="skel-card"><div class="skel-img"></div><div class="skel-line" style="width:50%"></div><div class="skel-line" style="width:82%"></div><div class="skel-line" style="width:38%"></div></div>
       <div class="skel-card"><div class="skel-img"></div><div class="skel-line" style="width:50%"></div><div class="skel-line" style="width:82%"></div><div class="skel-line" style="width:38%"></div></div>
       <div class="skel-card"><div class="skel-img"></div><div class="skel-line" style="width:50%"></div><div class="skel-line" style="width:82%"></div><div class="skel-line" style="width:38%"></div></div>
+      <div class="skel-card"><div class="skel-img"></div><div class="skel-line" style="width:50%"></div><div class="skel-line" style="width:82%"></div><div class="skel-line" style="width:38%"></div></div>
+      <div class="skel-card"><div class="skel-img"></div><div class="skel-line" style="width:50%"></div><div class="skel-line" style="width:82%"></div><div class="skel-line" style="width:38%"></div></div>
+      <div class="skel-card"><div class="skel-img"></div><div class="skel-line" style="width:50%"></div><div class="skel-line" style="width:82%"></div><div class="skel-line" style="width:38%"></div></div>
+      <div class="skel-card"><div class="skel-img"></div><div class="skel-line" style="width:50%"></div><div class="skel-line" style="width:82%"></div><div class="skel-line" style="width:38%"></div></div>
+      <div class="skel-card"><div class="skel-img"></div><div class="skel-line" style="width:50%"></div><div class="skel-line" style="width:82%"></div><div class="skel-line" style="width:38%"></div></div>
     </div>
     <!-- Events grid -->
     <div class="events" id="grid" style="display:none"></div>
@@ -918,6 +925,31 @@ src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
 const BOOKING_FLOW_VARIANT = {{ booking_flow_variant|default('control')|tojson }};
 const INITIAL_EVENTS = {{ initial_events|default([], true)|tojson }};
 const INITIAL_PAST_EVENTS = {{ initial_past_events|default([], true)|tojson }};
+
+// Early translation fallback. The full SITE_I18N dictionary is declared later,
+// but initial rendering can run before that second script has parsed.
+// This prevents ReferenceError crashes during Lighthouse/mobile first paint.
+function T(key, vars) {
+  const fallback = {
+    today: 'Today', tomorrow: 'Tomorrow', in_days: 'in {n} days', in_days_short: '{n}d',
+    toast_error_events: 'Could not load sessions. Please try again.',
+    status_past: 'Past', status_sold: 'Sold out', status_low: '{n} left', status_open: '{n} of {total} open',
+    spots_left: '{n} spots left', featured_tag: '★ Featured', hf_duration: '{n} min session',
+    hf_currency: 'CAD · e-Transfer', hf_status: 'Status', hf_spots: 'Spots',
+    status_confirmed: 'Confirmed', hf_location_prefix: '@ {loc}', join_waitlist_btn: 'Join waitlist',
+    view_slots_btn: 'View time slots →', sessions_count_one: '{n} session', sessions_count_many: '{n} sessions',
+    session_type_fallback: 'Session', deposit_caption: 'Deposit · ${total} total', view_dates_btn: 'View dates →',
+    no_sessions_title: 'No sessions available right now', no_sessions_desc: 'Check back soon — new dates are added weekly.',
+    sessions_load_error_title: 'Sessions are temporarily unavailable', sessions_load_error_desc: 'Please refresh or message Iryna on Instagram.',
+    toast_loading_session: 'Loading session…'
+  };
+  let dict = null;
+  try { if (typeof SITE_I18N !== 'undefined') dict = (SITE_I18N[CURRENT_LANG] || SITE_I18N.en); } catch (_) {}
+  let s = (dict && dict[key] !== undefined) ? dict[key] : (fallback[key] || key || '');
+  if (vars) Object.keys(vars).forEach(k => { s = String(s).split('{' + k + '}').join(vars[k]); });
+  return s;
+}
+
 const API = {
   events: async () => {
     const r = await fetch('/events');
