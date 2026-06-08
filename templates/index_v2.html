@@ -344,7 +344,7 @@ img,picture,video{max-width:100%;height:auto;display:block}
 @media(max-width:560px){.filters .count{display:none}}
 
 /* ── EVENT GRID ── */
-.events-wrap{max-width:1200px;margin:0 auto 24px;padding:0 20px}
+.events-wrap{max-width:1200px;margin:0 auto 24px;padding:0 20px;min-height:2800px}
 .events{display:grid;grid-template-columns:1fr;gap:18px}
 @media(min-width:560px){.events{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}}
 .event-card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.04);display:flex;flex-direction:column;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;position:relative}
@@ -1306,9 +1306,13 @@ function daysUntil(iso) {
 // Countdown text used on cards and featured banner
 function countdownText(iso, short) {
   const days = daysUntil(iso);
-  if (days <= 0) return T('today');
-  if (days === 1) return T('tomorrow');
-  return T(short ? 'in_days_short' : 'in_days', {n: days});
+  const t = (typeof T === 'function') ? T : (k, v) => {
+    const en = {today:'Today',tomorrow:'Tomorrow',in_days:`in ${v?.n||days} days`,in_days_short:`${v?.n||days}d`};
+    return en[k] || '';
+  };
+  if (days <= 0) return t('today');
+  if (days === 1) return t('tomorrow');
+  return t(short ? 'in_days_short' : 'in_days', {n: days});
 }
 
 // ── LOAD EVENTS FROM API ──
@@ -1550,6 +1554,9 @@ function renderGrid() {
   const empty = document.getElementById('gridEmpty');
 
   loading.style.display = 'none';
+  /* Release CSS min-height so the container fits actual content */
+  const wrap = loading.closest('.events-wrap');
+  if (wrap) wrap.style.minHeight = '';
   clearGridPhotoSlideshows();
 
   const list = applyFilter(visibleEvents()).sort((a, b) => a.date.localeCompare(b.date));
@@ -3462,12 +3469,19 @@ function initTestimonialCarousel(){
 // Init from stored preference
 document.addEventListener('DOMContentLoaded', () => {
   captureAttribution();
-  trackBookingEvent('page_view', '', {});
+  trackBookingEvent('page_view', {}, {});
   applyStaticI18n();
   initTestimonialCarousel();
   // Active button highlight
   setLang(CURRENT_LANG);
 });
+
+/* Synchronous initial render: if INITIAL_EVENTS were embedded server-side,
+   render hero + grid immediately without waiting for the API call.
+   This eliminates CLS from empty→populated layout shift. */
+if (typeof eventsData !== 'undefined' && eventsData.length && typeof renderAll === 'function') {
+  try { renderAll(); } catch(e) { console.warn('Initial sync render skipped:', e); }
+}
 </script>
 <script>
 const ASSISTANT_I18N = {
