@@ -679,8 +679,6 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-glass.css') }}?v=glass-1">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
-  <!-- reCAPTCHA v3 (invisible anti-bot) -->
-  <script src="https://www.google.com/recaptcha/api.js?render=6Ld98uosAAAAALZYp2NkeESIBAvL8BrUlgsMs1IG"></script>
 {% if initial_events %}
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
@@ -1967,6 +1965,23 @@ function validateBookingForm() {
 }
 
 // ── RESERVE SLOT ──
+const RECAPTCHA_SITE_KEY = '6Ld98uosAAAAALZYp2NkeESIBAvL8BrUlgsMs1IG';
+let recaptchaLoadPromise = null;
+function loadRecaptcha() {
+  if (typeof grecaptcha !== 'undefined' && grecaptcha.ready) return Promise.resolve(grecaptcha);
+  if (recaptchaLoadPromise) return recaptchaLoadPromise;
+  recaptchaLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`;
+    s.async = true;
+    s.defer = true;
+    s.onload = () => resolve(window.grecaptcha);
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return recaptchaLoadPromise;
+}
+
 async function reserveSlot(eventId, eventDate) {
   const selBtn = document.querySelector('#slotsBox .slot.sel');
   if (!selBtn) { toast(T('pick_slot')); return; }
@@ -1994,9 +2009,10 @@ async function reserveSlot(eventId, eventDate) {
   if (HONEYPOT) { console.warn('[bot] Honeypot filled'); toast('Sorry, something went wrong.'); return; }
 
   try {
-    if (typeof grecaptcha !== 'undefined' && grecaptcha.ready) {
-      await grecaptcha.ready();
-      recaptchaToken = await grecaptcha.execute('6Ld98uosAAAAALZYp2NkeESIBAvL8BrUlgsMs1IG', { action: 'reserve' });
+    const captcha = await loadRecaptcha();
+    if (captcha && captcha.ready) {
+      await captcha.ready();
+      recaptchaToken = await captcha.execute(RECAPTCHA_SITE_KEY, { action: 'reserve' });
     }
   } catch (recaptchaErr) {
     console.warn('[recaptcha] Failed to get token:', recaptchaErr);
