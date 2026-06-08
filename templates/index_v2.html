@@ -365,31 +365,39 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .event-card .price-bar .cta:hover{background:var(--ink-2)}
 .event-card.sold .price-bar .cta{background:var(--ink-5);color:var(--ink-2)}
 
-/* ── TESTIMONIALS (homepage social proof, Wfolio-sourced quotes + photos) ── */
-.tmt{max-width:1160px;margin:18px auto 0;padding:0 0 4px;overflow:hidden}
+/* ── TESTIMONIALS (homepage social proof, real client quotes + photos) ── */
+.tmt{max-width:1160px;margin:18px auto 0;padding:0 0 4px;overflow:hidden;position:relative}
 .tmt-head{text-align:center;margin-bottom:18px;padding:0 20px}
 .tmt-head h3{font-family:var(--font-d);font-size:1.6rem;font-weight:400;color:var(--ink)}
 .tmt-head .sub{font-size:.82rem;color:var(--ink-3)}
-.tmt-marquee{position:relative;overflow:hidden;padding:4px 0 14px;cursor:grab;touch-action:pan-y;user-select:none}
+.tmt-marquee{position:relative;overflow-x:auto;overflow-y:visible;padding:34px max(32px,calc((100vw - 1120px)/2)) 38px;cursor:grab;touch-action:pan-y;user-select:none;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tmt-marquee::-webkit-scrollbar{display:none}
 .tmt-marquee:active{cursor:grabbing}
-.tmt-marquee::before,.tmt-marquee::after{content:"";position:absolute;top:0;bottom:0;width:62px;z-index:2;pointer-events:none}
-.tmt-marquee::before{left:0;background:linear-gradient(90deg,var(--bg),rgba(250,247,245,0))}
-.tmt-marquee::after{right:0;background:linear-gradient(270deg,var(--bg),rgba(250,247,245,0))}
-.tmt-track{display:flex;gap:14px;width:max-content;animation:tmt-scroll 360s linear infinite;will-change:transform}
-.tmt-marquee:hover .tmt-track,.tmt-marquee.is-dragging .tmt-track,.tmt-marquee.is-paused .tmt-track{animation-play-state:paused}
-.tmt-card{width:318px;min-height:236px;background:rgba(255,255,255,.78);border:1px solid rgba(93,55,47,.11);border-radius:20px;padding:18px 18px 17px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(46,25,20,.03),0 12px 30px rgba(93,55,47,.07);white-space:normal}
-.tmt-top{display:flex;align-items:center;gap:12px}
-.tmt-avatar{width:58px;height:58px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:3px solid #fff;box-shadow:0 4px 14px rgba(93,55,47,.14);background:#eaded9}
+.tmt-marquee::before,.tmt-marquee::after{content:"";position:sticky;top:0;bottom:0;width:74px;min-width:74px;z-index:6;pointer-events:none}
+.tmt-marquee::before{left:0;background:linear-gradient(90deg,var(--bg) 8%,rgba(250,247,245,0));margin-right:-74px}
+.tmt-marquee::after{right:0;background:linear-gradient(270deg,var(--bg) 8%,rgba(250,247,245,0));margin-left:-74px}
+.tmt-track{display:flex;align-items:center;gap:32px;width:max-content;will-change:transform;perspective:900px}
+.tmt-card{width:286px;height:206px;background:rgba(255,255,255,.72);border:1px solid rgba(93,55,47,.10);border-radius:22px;padding:15px 16px 14px;display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 2px rgba(46,25,20,.03),0 10px 24px rgba(93,55,47,.06);white-space:normal;scroll-snap-align:center;transform:translateY(28px) scale(.78) rotateY(3deg);transform-origin:center center;opacity:0;filter:saturate(.78) blur(.15px);transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .34s ease,filter .34s ease,box-shadow .34s ease,border-color .34s ease,background-color .34s ease;position:relative;pointer-events:none}
+.tmt-card.is-active{z-index:5;transform:translateY(-18px) scale(1.12) rotateY(0);opacity:1;filter:saturate(1.06);background:rgba(255,255,255,.97);border-color:rgba(176,93,111,.28);box-shadow:0 14px 34px rgba(93,55,47,.14),0 34px 72px rgba(176,93,111,.18);pointer-events:auto}
+.tmt-card.is-near{z-index:2;transform:translateY(12px) scale(.9) rotateY(0);opacity:.66;filter:saturate(.94);pointer-events:auto}
+.tmt-top{display:flex;align-items:center;gap:11px;min-height:50px}
+.tmt-avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:3px solid #fff;box-shadow:0 4px 14px rgba(93,55,47,.14);background:#eaded9}
 .tmt-who{min-width:0}
-.tmt-name{font-weight:800;font-size:.92rem;color:var(--ink);line-height:1.15}
-.tmt-source{font-size:.68rem;color:var(--ink-3);margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
-.tmt-stars{color:var(--rose);letter-spacing:.12em;font-size:.82rem;line-height:1}
-.tmt-quote{font-family:var(--font-d);font-style:italic;font-size:1rem;color:var(--ink-2);line-height:1.46;margin:0}
+.tmt-name{font-weight:800;font-size:.88rem;color:var(--ink);line-height:1.12}
+.tmt-source{font-size:.62rem;color:var(--ink-3);margin-top:2px;letter-spacing:.06em;text-transform:uppercase}
+.tmt-stars{color:var(--rose);letter-spacing:.12em;font-size:.76rem;line-height:1}
+.tmt-quote{font-family:var(--font-d);font-style:italic;font-size:.93rem;color:var(--ink-2);line-height:1.34;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-height:4.1em;min-height:4.1em}
+.tmt-card.is-expanded{height:auto;min-height:206px;z-index:7}
+.tmt-card.is-expanded .tmt-quote{-webkit-line-clamp:unset;display:block;max-height:none;min-height:0;overflow:visible}
+.tmt-more{border:0;background:transparent;color:var(--rose-deep);font-weight:800;font-size:.74rem;letter-spacing:.02em;padding:0;margin-top:2px;align-self:flex-start;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.tmt-more:hover{color:var(--ink)}
 .tmt-link{display:inline-flex;align-items:center;gap:6px;align-self:center;margin-top:4px;color:var(--rose-deep);font-size:.82rem;font-weight:700;text-decoration:none}
 .tmt-link:hover{text-decoration:underline}
-@keyframes tmt-scroll{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 7px))}}
-@media(max-width:760px){.tmt{margin-top:16px}.tmt-card{width:282px;min-height:250px}.tmt-marquee::before,.tmt-marquee::after{width:28px}.tmt-track{animation-duration:420s}.tmt-avatar{width:52px;height:52px}.tmt-quote{font-size:.96rem}}
-@media(prefers-reduced-motion:reduce){.tmt-track{animation:none}.tmt-marquee{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-left:20px}.tmt-marquee::before,.tmt-marquee::after{display:none}}
+.tmt-nav{position:absolute;top:50%;z-index:8;width:44px;height:44px;border:1px solid rgba(176,93,111,.20);border-radius:999px;background:rgba(255,255,255,.88);color:var(--rose-deep);box-shadow:0 10px 28px rgba(93,55,47,.12);font:300 1.7rem/1 var(--font-b);display:flex;align-items:center;justify-content:center;cursor:pointer;transform:translateY(-6px);backdrop-filter:blur(8px);transition:transform .2s ease,box-shadow .2s ease,background .2s ease,color .2s ease}
+.tmt-nav:hover{transform:translateY(-8px) scale(1.04);background:#fff;box-shadow:0 14px 34px rgba(93,55,47,.16);color:var(--ink)}
+.tmt-prev{left:14px}.tmt-next{right:14px}
+@media(max-width:760px){.tmt{margin-top:16px}.tmt-marquee{padding:30px 42px 34px}.tmt-card{width:min(70vw,260px);height:198px;transform:translateY(22px) scale(.8)}.tmt-card.is-active{transform:translateY(-14px) scale(1.1)}.tmt-card.is-near{transform:translateY(10px) scale(.88)}.tmt-marquee::before,.tmt-marquee::after{width:34px;min-width:34px}.tmt-marquee::before{margin-right:-34px}.tmt-marquee::after{margin-left:-34px}.tmt-avatar{width:44px;height:44px}.tmt-quote{font-size:.9rem;-webkit-line-clamp:3}.tmt-nav{width:44px;height:44px;font-size:1.45rem;top:52%}.tmt-prev{left:4px}.tmt-next{right:4px}}
+@media(prefers-reduced-motion:reduce){.tmt-marquee{scroll-behavior:auto}.tmt-card{transition:none;transform:none;opacity:1;filter:none}.tmt-card.is-active,.tmt-card.is-near{transform:none}}
 
 /* ── PAST SESSIONS ARCHIVE (display-only thumbnail strip, bottom of page) ── */
 .past-wrap{max-width:1180px;margin:14px auto 0;padding:32px 20px 0;border-top:1px solid var(--ink-5)}
@@ -794,28 +802,30 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
     <div class="step reveal"><div class="num">3</div><div><h4 data-i18n="how_step3_title">Pay deposit by e-Transfer</h4><p data-i18n="how_step3_desc">Send the deposit. It usually auto-confirms in a few minutes; Iryna confirms manually if needed. Final balance is paid on session day.</p></div></div>
   </div>
 
-  <!-- TESTIMONIALS (real Wfolio reviews with client/session photos) -->
+  <!-- TESTIMONIALS (real Client reviews with client/session photos) -->
   <div class="tmt" aria-labelledby="tmtTitle">
     <div class="tmt-head reveal">
-      <h3 id="tmtTitle" data-i18n="tmt_heading">What Calgary clients say</h3>
-      <span class="sub" data-i18n="tmt_subhead">Real words and moments from Wfolio reviews</span>
+      <h3 id="tmtTitle" data-i18n="tmt_heading">What my clients say</h3>
+      <span class="sub" data-i18n="tmt_subhead">Real feedback from families, couples, and sessions I’ve photographed</span>
     </div>
+    <button class="tmt-nav tmt-prev" type="button" aria-label="Previous review">‹</button>
     <div class="tmt-marquee reveal" id="tmtMarquee" aria-label="Client reviews carousel. Swipe horizontally to browse.">
       <div class="tmt-track" id="tmtTrack">
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/2HpWvZCv3dvFezuJS3XKy0KuFQKtAW8Z/bM6ws7PK-daz1Ke_k4oE3xoV8j-NBov8/GfUkCKWIe8wxEg64R7ES9Q.jpg" alt="Richelle review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Richelle</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We had a wonderful Mother's Day photo shoot experience. The studio set up was beautiful, the photographer was patient and professional, and the photos turned out absolutely stunning!”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHg4edDvF2Abrp/Q34bUnvTd3Z-T86m_iiYecPa-MZoQYfq/-uWVCSaLKnU3O3AYxv_5XQ.jpg" alt="Jaskaran Kaur review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Jaskaran Kaur</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Great photos and easy to download.”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/Ltna6LrpZ05NI6FzXn6yOY5C_w4tjnLn/KqIQ_5AUqtWbClEqh3snKKhOcCjcmGAd/ZL6zLwVrNzoiId8TDi_JdQ.jpg" alt="Darian Roberts review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Darian Roberts</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Absolutely wonderful shots! Thank you so much!”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/NUDtjTKkURkUeITimhUzorjV-AUnsnwM/Qb0qxsnwqsdpoDlf1cucHbpXf05oaUc0/wZb-BwR9PVYmucrYIffSfA.jpg" alt="Kateryna review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Kateryna</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We needed a photographer for our wedding ceremony, and Irina took wonderful photos for us. It was a pleasure working with her. Highly recommend!”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/cV26pRnTDzctIkYi68Uuy9M75Sh2-Y9l/YRW1L5rASoeVZHUtfbsvYsX7Utr3SkZ7/Vv--TkZc0NR7t_d6zwP91Q.jpg" alt="Yasmin review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Yasmin</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“She's amazing! We always love her around our family because she makes it so comfortable for us even with the chaos of all the kids!”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/JQCNrqI0_2ucGU37zWGdV-M2dFgtfcc4/LEewC1ezR1O9JROtgkaTD6DHctLHoP2n/OjwlCJcm3ivsQ9vP7FuTDA.jpg" alt="Nazanin Alibhai review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Nazanin Alibhai</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Thank you Iryna! This was such a special shoot for us.”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHg7eNSB4KjSBe/WgLx8Sfve6obhgRxBMhf7QMzqx733Bk4/Nu7GDgnlfpnw9vBkc27ylg.jpg" alt="Nazanin Alibhai review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Nazanin Alibhai</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We always have the best photo sessions with Iryna!”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHgwE3JifRLhiD/KcUgeTEUmwVM1yRMUAz46jYGPhZkTwUk/9fji68ypOHE45css1YWUMA.jpg" alt="Amarpreet Kaur review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Amarpreet Kaur</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Iryna is so talented and professional, she’s become our favourite! We have had two sessions with her already and can’t wait to get more.”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/g1OAyRpGxXbeu6Z4zNJzLiBPO10VeMI5/6x1guwkSatx0OPuUp2qGUSnVEzQ6Bhr_/uB_egkRtPHh1XvJubrmYoQ.jpg" alt="P Kumar review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">P Kumar</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“All pics have been clicked artistically and look very beautiful.”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/QxdUhj8-ZIKZ281n7rwTApUqtEM7Tg3B/jX_sOG0uIvZwb3FMJ_5Ul98EeUz6Mxdo/GFWExadhhvc1kHLk-9j_5g.jpg" alt="Alexandria review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Alexandria</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Wonderful photographer to work with. We were instantly comfortable with her.”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/Jv5PiAQdo1ZrLWaygQrKa9BBBLwutdbq/BJGcpdB0PpgG9eMbPotVnYEKcNsVaqpm/VmfStCjUjZDVuw4f3gXg9w.jpg" alt="Andrea Jerez review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Andrea Jerez</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Wonderful experience, great studio and we will be returning for more photos in the future.”</p></article>
-        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/QxdUhj8-ZIKZ281n7rwTAm67jn43DtWb/1yJSFglWmcU9MlQAghp5nUajs4-mUoZU/ArO5qnVHNlmM7vDkP_u2iw.jpg" alt="Daneza review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Daneza</div><div class="tmt-source">Wfolio review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Thank you for doing our wedding photos.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/2HpWvZCv3dvFezuJS3XKy0KuFQKtAW8Z/bM6ws7PK-daz1Ke_k4oE3xoV8j-NBov8/GfUkCKWIe8wxEg64R7ES9Q.jpg" alt="Richelle review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Richelle</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We had a wonderful Mother's Day photo shoot experience. The studio set up was beautiful, the photographer was patient and professional, and the photos turned out absolutely stunning!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHg4edDvF2Abrp/Q34bUnvTd3Z-T86m_iiYecPa-MZoQYfq/-uWVCSaLKnU3O3AYxv_5XQ.jpg" alt="Jaskaran Kaur review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Jaskaran Kaur</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Great photos and easy to download.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/Ltna6LrpZ05NI6FzXn6yOY5C_w4tjnLn/KqIQ_5AUqtWbClEqh3snKKhOcCjcmGAd/ZL6zLwVrNzoiId8TDi_JdQ.jpg" alt="Darian Roberts review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Darian Roberts</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Absolutely wonderful shots! Thank you so much!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/NUDtjTKkURkUeITimhUzorjV-AUnsnwM/Qb0qxsnwqsdpoDlf1cucHbpXf05oaUc0/wZb-BwR9PVYmucrYIffSfA.jpg" alt="Kateryna review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Kateryna</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We needed a photographer for our wedding ceremony, and Irina took wonderful photos for us. It was a pleasure working with her. Highly recommend!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/cV26pRnTDzctIkYi68Uuy9M75Sh2-Y9l/YRW1L5rASoeVZHUtfbsvYsX7Utr3SkZ7/Vv--TkZc0NR7t_d6zwP91Q.jpg" alt="Yasmin review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Yasmin</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“She's amazing! We always love her around our family because she makes it so comfortable for us even with the chaos of all the kids!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/JQCNrqI0_2ucGU37zWGdV-M2dFgtfcc4/LEewC1ezR1O9JROtgkaTD6DHctLHoP2n/OjwlCJcm3ivsQ9vP7FuTDA.jpg" alt="Nazanin Alibhai review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Nazanin Alibhai</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Thank you Iryna! This was such a special shoot for us.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHg7eNSB4KjSBe/WgLx8Sfve6obhgRxBMhf7QMzqx733Bk4/Nu7GDgnlfpnw9vBkc27ylg.jpg" alt="Nazanin Alibhai review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Nazanin Alibhai</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We always have the best photo sessions with Iryna!”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHgwE3JifRLhiD/KcUgeTEUmwVM1yRMUAz46jYGPhZkTwUk/9fji68ypOHE45css1YWUMA.jpg" alt="Amarpreet Kaur review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Amarpreet Kaur</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Iryna is so talented and professional, she’s become our favourite! We have had two sessions with her already and can’t wait to get more.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/g1OAyRpGxXbeu6Z4zNJzLiBPO10VeMI5/6x1guwkSatx0OPuUp2qGUSnVEzQ6Bhr_/uB_egkRtPHh1XvJubrmYoQ.jpg" alt="P Kumar review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">P Kumar</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“All pics have been clicked artistically and look very beautiful.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/QxdUhj8-ZIKZ281n7rwTApUqtEM7Tg3B/jX_sOG0uIvZwb3FMJ_5Ul98EeUz6Mxdo/GFWExadhhvc1kHLk-9j_5g.jpg" alt="Alexandria review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Alexandria</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Wonderful photographer to work with. We were instantly comfortable with her.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/Jv5PiAQdo1ZrLWaygQrKa9BBBLwutdbq/BJGcpdB0PpgG9eMbPotVnYEKcNsVaqpm/VmfStCjUjZDVuw4f3gXg9w.jpg" alt="Andrea Jerez review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Andrea Jerez</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Wonderful experience, great studio and we will be returning for more photos in the future.”</p></article>
+        <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/QxdUhj8-ZIKZ281n7rwTAm67jn43DtWb/1yJSFglWmcU9MlQAghp5nUajs4-mUoZU/ArO5qnVHNlmM7vDkP_u2iw.jpg" alt="Daneza review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Daneza</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Thank you for doing our wedding photos.”</p></article>
       </div>
     </div>
+    <button class="tmt-nav tmt-next" type="button" aria-label="Next review">›</button>
     <a class="tmt-link" href="https://pashynskaphoto.com/reviews" target="_blank" rel="noopener">Read more reviews →</a>
   </div>
 
@@ -2439,8 +2449,8 @@ const SITE_I18N = {
     status_low: 'Only {n} left',
     status_open: '{n} of {total} open',
     status_past: 'Past session',
-    tmt_heading: 'What Calgary clients say',
-    tmt_subhead: 'Real words and moments from Wfolio reviews',
+    tmt_heading: 'What my clients say',
+    tmt_subhead: 'Real feedback from families, couples, and sessions I’ve photographed',
     past_heading: 'Past sessions',
     past_subhead: 'A look at recent shoots — these dates have wrapped',
     past_portfolio: 'See the full portfolio ↗',
@@ -2610,8 +2620,8 @@ const SITE_I18N = {
     status_low: 'Осталось всего {n}',
     status_open: '{n} из {total} свободны',
     status_past: 'Прошедшая сессия',
-    tmt_heading: 'Отзывы клиентов в Калгари',
-    tmt_subhead: 'Настоящие отзывы и фотографии с Wfolio',
+    tmt_heading: 'Что говорят мои клиенты',
+    tmt_subhead: 'Реальные отзывы семей, пар и людей, которых я фотографировала',
     past_heading: 'Прошедшие съёмки',
     past_subhead: 'Недавние съёмки — эти даты уже прошли',
     past_portfolio: 'Смотреть всё портфолио ↗',
@@ -2774,8 +2784,8 @@ const SITE_I18N = {
     status_low: 'सिर्फ़ {n} बचे',
     status_open: '{n}/{total} उपलब्ध',
     status_past: 'पिछला सेशन',
-    tmt_heading: 'कैलगरी क्लाइंट्स की राय',
-    tmt_subhead: 'Wfolio समीक्षाओं से असली शब्द और फ़ोटो',
+    tmt_heading: 'मेरे क्लाइंट क्या कहते हैं',
+    tmt_subhead: 'परिवारों, कपल्स और मेरे फोटो सेशन्स से वास्तविक प्रतिक्रिया',
     past_heading: 'पिछले सेशन',
     past_subhead: 'हाल की शूट्स — ये तारीखें पूरी हो चुकी हैं',
     past_portfolio: 'पूरा पोर्टफोलियो देखें ↗',
@@ -2938,8 +2948,8 @@ const SITE_I18N = {
     status_low: 'Залишилось {n}',
     status_open: '{n} з {total} вільні',
     status_past: 'Минула сесія',
-    tmt_heading: 'Що кажуть клієнти з Калгарі',
-    tmt_subhead: 'Справжні відгуки та фото з Wfolio',
+    tmt_heading: 'Що кажуть мої клієнти',
+    tmt_subhead: 'Реальні відгуки сімей, пар і людей, яких я фотографувала',
     past_heading: 'Минулі зйомки',
     past_subhead: 'Нещодавні зйомки — ці дати вже минули',
     past_portfolio: 'Переглянути все портфоліо ↗',
@@ -3106,7 +3116,7 @@ function initTestimonialCarousel(){
     const parts = name.trim().split(/\s+/);
     const init = parts.length > 1 ? (parts[0][0] + parts[1][0]) : name.slice(0,2);
     const color = AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
-    return '<div class="tmt-avatar tmt-initials" style="background:'+color+';display:flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:50%;font-size:22px;font-weight:700;color:#5d372f;flex-shrink:0;text-transform:uppercase">'+init+'</div>';
+    return '<div class="tmt-avatar tmt-initials" style="background:'+color+';display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:18px;font-weight:700;color:#5d372f;flex-shrink:0;text-transform:uppercase">'+init+'</div>';
   }
 
   function escapeHtml(value){
@@ -3120,7 +3130,20 @@ function initTestimonialCarousel(){
     const safeText = escapeHtml(r.text || '');
     const safeAvatar = escapeHtml(r.avatar || '');
     const avatarHTML = safeAvatar ? '<img class="tmt-avatar" src="'+safeAvatar+'" alt="'+safeName+' review photo" loading="lazy">' : initialsAvatar(safeName);
-    return '<article class="tmt-card"><div class="tmt-top">'+avatarHTML+'<div class="tmt-who"><div class="tmt-name">'+safeName+'</div><div class="tmt-source">Wfolio review</div></div></div>'+STAR+'<p class="tmt-quote">&ldquo;'+safeText+'&rdquo;</p></article>';
+    const more = String(r.text || '').length > 150 ? '<button class="tmt-more" type="button" aria-expanded="false">Read more</button>' : '';
+    return '<article class="tmt-card"><div class="tmt-top">'+avatarHTML+'<div class="tmt-who"><div class="tmt-name">'+safeName+'</div><div class="tmt-source">Client review</div></div></div>'+STAR+'<p class="tmt-quote">&ldquo;'+safeText+'&rdquo;</p>'+more+'</article>';
+  }
+
+  function normalizeReviewKeyPart(value){
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[“”"'’‘]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function reviewKey(name, text){
+    return normalizeReviewKeyPart(name)+'|'+normalizeReviewKeyPart(text).slice(0,40);
   }
 
   // Collect names already on the page (from hardcoded cards)
@@ -3128,65 +3151,150 @@ function initTestimonialCarousel(){
   Array.from(track.querySelectorAll('.tmt-card')).forEach(function(c){
     var n = (c.querySelector('.tmt-name')||{}).textContent || '';
     var t = (c.querySelector('.tmt-quote')||{}).textContent || '';
-    existingKeys.add(n.trim().toLowerCase()+'|'+t.trim().toLowerCase().slice(0,40));
+    existingKeys.add(reviewKey(n, t));
   });
 
   // Fetch additional reviews and render
   fetch('/static/reviews.json').then(function(r){return r.json();}).then(function(reviews){
     reviews.forEach(function(r){
-      var key = r.name.trim().toLowerCase()+'|'+r.text.trim().toLowerCase().slice(0,40);
+      var key = reviewKey(r.name, r.text);
       if(!existingKeys.has(key)){
         track.insertAdjacentHTML('beforeend', makeCard(r));
         existingKeys.add(key);
       }
     });
 
-    // Duplicate once for seamless CSS marquee. Clones are hidden from screen readers.
-    Array.from(track.children).forEach(function(card){
-      var clone = card.cloneNode(true);
-      clone.setAttribute('aria-hidden', 'true');
-      track.appendChild(clone);
-    });
-
-    setupMarqueeDrag();
+    setupCarousel();
   }).catch(function(){
-    // If fetch fails, still set up marquee with existing cards
-    Array.from(track.children).forEach(function(card){
-      var clone = card.cloneNode(true);
-      clone.setAttribute('aria-hidden', 'true');
-      track.appendChild(clone);
-    });
-    setupMarqueeDrag();
+    // If fetch fails, still set up carousel with existing hardcoded cards.
+    setupCarousel();
   });
 
-  function setupMarqueeDrag(){
+  function setupCarousel(){
     var dragging = false;
     var startX = 0;
     var startScroll = 0;
-    const pause = () => marquee.classList.add('is-paused');
-    const resume = () => {
-      if (!dragging) window.setTimeout(() => marquee.classList.remove('is-paused'), 900);
-    };
-    marquee.addEventListener('pointerdown', ev => {
+    var lastActiveIndex = -1;
+    var raf = 0;
+    var prevBtn = document.querySelector('.tmt-prev');
+    var nextBtn = document.querySelector('.tmt-next');
+
+    function cards(){ return Array.from(track.querySelectorAll('.tmt-card')); }
+
+    function centerActiveCard(){
+      const list = cards();
+      if (!list.length) return;
+      const marqueeRect = marquee.getBoundingClientRect();
+      const center = marqueeRect.left + marqueeRect.width / 2;
+      let activeIndex = 0;
+      let best = Infinity;
+      list.forEach(function(card, idx){
+        const rect = card.getBoundingClientRect();
+        const cardCenter = rect.left + rect.width / 2;
+        const dist = Math.abs(center - cardCenter);
+        if (dist < best) { best = dist; activeIndex = idx; }
+      });
+      list.forEach(function(card, idx){
+        card.classList.toggle('is-active', idx === activeIndex);
+        card.classList.toggle('is-near', Math.abs(idx - activeIndex) === 1);
+      });
+      if (activeIndex !== lastActiveIndex) {
+        lastActiveIndex = activeIndex;
+        if (navigator.vibrate && dragging) navigator.vibrate(8);
+      }
+    }
+
+    function scheduleActiveUpdate(){
+      if (raf) return;
+      raf = requestAnimationFrame(function(){
+        raf = 0;
+        centerActiveCard();
+      });
+    }
+
+    function snapToNearest(){
+      const active = track.querySelector('.tmt-card.is-active') || cards()[0];
+      if (!active) return;
+      const target = active.offsetLeft - (marquee.clientWidth - active.clientWidth) / 2;
+      marquee.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+    }
+
+    function goToCard(delta){
+      const list = cards();
+      if (!list.length) return;
+      const current = Math.max(0, lastActiveIndex);
+      const next = Math.max(0, Math.min(list.length - 1, current + delta));
+      const card = list[next];
+      const target = card.offsetLeft - (marquee.clientWidth - card.clientWidth) / 2;
+      marquee.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+      if (navigator.vibrate) navigator.vibrate(8);
+      window.setTimeout(scheduleActiveUpdate, 80);
+    }
+
+    function ensureReadMoreButtons(){
+      cards().forEach(function(card){
+        const quote = card.querySelector('.tmt-quote');
+        if (!quote || card.querySelector('.tmt-more')) return;
+        if ((quote.textContent || '').trim().length > 150) {
+          card.insertAdjacentHTML('beforeend', '<button class="tmt-more" type="button" aria-expanded="false">Read more</button>');
+        }
+      });
+    }
+
+    function wireReadMore(){
+      ensureReadMoreButtons();
+      track.querySelectorAll('.tmt-more').forEach(function(btn){
+        if (btn.dataset.ready === '1') return;
+        btn.dataset.ready = '1';
+        btn.addEventListener('click', function(ev){
+          ev.stopPropagation();
+          const card = btn.closest('.tmt-card');
+          const open = !card.classList.contains('is-expanded');
+          card.classList.toggle('is-expanded', open);
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.textContent = open ? 'Show less' : 'Read more';
+          if (open) card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        });
+      });
+    }
+
+    wireReadMore();
+    if (prevBtn) prevBtn.addEventListener('click', function(){ goToCard(-1); });
+    if (nextBtn) nextBtn.addEventListener('click', function(){ goToCard(1); });
+    window.setTimeout(function(){
+      const first = cards()[0];
+      if (first) {
+        marquee.scrollLeft = Math.max(0, first.offsetLeft - (marquee.clientWidth - first.clientWidth) / 2);
+      }
+      centerActiveCard();
+    }, 80);
+
+    marquee.addEventListener('scroll', scheduleActiveUpdate, { passive: true });
+    window.addEventListener('resize', scheduleActiveUpdate, { passive: true });
+
+    marquee.addEventListener('pointerdown', function(ev){
       dragging = true;
       startX = ev.clientX;
       startScroll = marquee.scrollLeft;
-      marquee.classList.add('is-dragging', 'is-paused');
+      marquee.classList.add('is-dragging');
       marquee.setPointerCapture?.(ev.pointerId);
     });
-    marquee.addEventListener('pointermove', ev => {
+    marquee.addEventListener('pointermove', function(ev){
       if (!dragging) return;
+      ev.preventDefault();
       marquee.scrollLeft = startScroll - (ev.clientX - startX);
+      scheduleActiveUpdate();
     });
-    ['pointerup','pointercancel','pointerleave'].forEach(type => marquee.addEventListener(type, ev => {
-      if (!dragging) return;
-      dragging = false;
-      marquee.classList.remove('is-dragging');
-      marquee.releasePointerCapture?.(ev.pointerId);
-      resume();
-    }));
-    marquee.addEventListener('mouseenter', pause);
-    marquee.addEventListener('mouseleave', resume);
+    ['pointerup','pointercancel','pointerleave'].forEach(function(type){
+      marquee.addEventListener(type, function(ev){
+        if (!dragging) return;
+        dragging = false;
+        marquee.classList.remove('is-dragging');
+        marquee.releasePointerCapture?.(ev.pointerId);
+        scheduleActiveUpdate();
+        window.setTimeout(snapToNearest, 40);
+      });
+    });
   }
 }
 
