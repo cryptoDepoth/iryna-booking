@@ -375,7 +375,7 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .tmt-marquee::before,.tmt-marquee::after{content:"";position:absolute;top:0;bottom:0;width:62px;z-index:2;pointer-events:none}
 .tmt-marquee::before{left:0;background:linear-gradient(90deg,var(--bg),rgba(250,247,245,0))}
 .tmt-marquee::after{right:0;background:linear-gradient(270deg,var(--bg),rgba(250,247,245,0))}
-.tmt-track{display:flex;gap:14px;width:max-content;animation:tmt-scroll 64s linear infinite;will-change:transform}
+.tmt-track{display:flex;gap:14px;width:max-content;animation:tmt-scroll 360s linear infinite;will-change:transform}
 .tmt-marquee:hover .tmt-track,.tmt-marquee.is-dragging .tmt-track,.tmt-marquee.is-paused .tmt-track{animation-play-state:paused}
 .tmt-card{width:318px;min-height:236px;background:rgba(255,255,255,.78);border:1px solid rgba(93,55,47,.11);border-radius:20px;padding:18px 18px 17px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(46,25,20,.03),0 12px 30px rgba(93,55,47,.07);white-space:normal}
 .tmt-top{display:flex;align-items:center;gap:12px}
@@ -388,7 +388,7 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .tmt-link{display:inline-flex;align-items:center;gap:6px;align-self:center;margin-top:4px;color:var(--rose-deep);font-size:.82rem;font-weight:700;text-decoration:none}
 .tmt-link:hover{text-decoration:underline}
 @keyframes tmt-scroll{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 7px))}}
-@media(max-width:760px){.tmt{margin-top:16px}.tmt-card{width:282px;min-height:250px}.tmt-marquee::before,.tmt-marquee::after{width:28px}.tmt-track{animation-duration:72s}.tmt-avatar{width:52px;height:52px}.tmt-quote{font-size:.96rem}}
+@media(max-width:760px){.tmt{margin-top:16px}.tmt-card{width:282px;min-height:250px}.tmt-marquee::before,.tmt-marquee::after{width:28px}.tmt-track{animation-duration:420s}.tmt-avatar{width:52px;height:52px}.tmt-quote{font-size:.96rem}}
 @media(prefers-reduced-motion:reduce){.tmt-track{animation:none}.tmt-marquee{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-left:20px}.tmt-marquee::before,.tmt-marquee::after{display:none}}
 
 /* ── PAST SESSIONS ARCHIVE (display-only thumbnail strip, bottom of page) ── */
@@ -725,7 +725,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
   <!-- SOCIAL PROOF STRIP -->
   <div class="proof reveal" id="proofBar">
-    <span><strong>★ <span class="cu" data-cu="4.9" data-dec="1">4.9</span></strong> · <strong class="cu" data-cu="80" data-suf="+">80+</strong> <span data-i18n="proof_reviews_label">reviews</span></span>
+    <span><strong>★ <span class="cu" data-cu="4.9" data-dec="1">4.9</span></strong> · <strong class="cu" data-cu="145" data-suf="+">145+</strong> <span data-i18n="proof_reviews_label">reviews</span></span>
     <span class="sep">·</span>
     <span><strong class="cu" data-cu="120" data-suf="+">120+</strong> <span data-i18n="proof_sessions_label">sessions delivered</span></span>
     <span class="sep">·</span>
@@ -3097,40 +3097,97 @@ function initTestimonialCarousel(){
   const track = document.getElementById('tmtTrack');
   if (!marquee || !track || track.dataset.ready === '1') return;
   track.dataset.ready = '1';
-  // Duplicate once for seamless CSS marquee. Clones are hidden from screen readers.
-  Array.from(track.children).forEach(card => {
-    const clone = card.cloneNode(true);
-    clone.setAttribute('aria-hidden', 'true');
-    track.appendChild(clone);
+
+  // Pastel palette for initials avatars
+  const AVATAR_COLORS = ['#f9a8d4','#fbcfe8','#fecaca','#fed7aa','#fde68a','#fef3c7','#d9f99d','#bbf7d0','#a7f3d0','#bae6fd','#bfdbfe','#ddd6fe','#e9d5ff','#f5d0fe'];
+  const STAR = '<span class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</span>';
+
+  function initialsAvatar(name){
+    const parts = name.trim().split(/\s+/);
+    const init = parts.length > 1 ? (parts[0][0] + parts[1][0]) : name.slice(0,2);
+    const color = AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+    return '<div class="tmt-avatar tmt-initials" style="background:'+color+';display:flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:50%;font-size:22px;font-weight:700;color:#5d372f;flex-shrink:0;text-transform:uppercase">'+init+'</div>';
+  }
+
+  function escapeHtml(value){
+    return String(value || '').replace(/[&<>"]/g, function(ch){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[ch];
+    });
+  }
+
+  function makeCard(r){
+    const safeName = escapeHtml(r.name || 'Client');
+    const safeText = escapeHtml(r.text || '');
+    const safeAvatar = escapeHtml(r.avatar || '');
+    const avatarHTML = safeAvatar ? '<img class="tmt-avatar" src="'+safeAvatar+'" alt="'+safeName+' review photo" loading="lazy">' : initialsAvatar(safeName);
+    return '<article class="tmt-card"><div class="tmt-top">'+avatarHTML+'<div class="tmt-who"><div class="tmt-name">'+safeName+'</div><div class="tmt-source">Wfolio review</div></div></div>'+STAR+'<p class="tmt-quote">&ldquo;'+safeText+'&rdquo;</p></article>';
+  }
+
+  // Collect names already on the page (from hardcoded cards)
+  var existingKeys = new Set();
+  Array.from(track.querySelectorAll('.tmt-card')).forEach(function(c){
+    var n = (c.querySelector('.tmt-name')||{}).textContent || '';
+    var t = (c.querySelector('.tmt-quote')||{}).textContent || '';
+    existingKeys.add(n.trim().toLowerCase()+'|'+t.trim().toLowerCase().slice(0,40));
   });
 
-  let dragging = false;
-  let startX = 0;
-  let startScroll = 0;
-  const pause = () => marquee.classList.add('is-paused');
-  const resume = () => {
-    if (!dragging) window.setTimeout(() => marquee.classList.remove('is-paused'), 900);
-  };
-  marquee.addEventListener('pointerdown', ev => {
-    dragging = true;
-    startX = ev.clientX;
-    startScroll = marquee.scrollLeft;
-    marquee.classList.add('is-dragging', 'is-paused');
-    marquee.setPointerCapture?.(ev.pointerId);
+  // Fetch additional reviews and render
+  fetch('/static/reviews.json').then(function(r){return r.json();}).then(function(reviews){
+    reviews.forEach(function(r){
+      var key = r.name.trim().toLowerCase()+'|'+r.text.trim().toLowerCase().slice(0,40);
+      if(!existingKeys.has(key)){
+        track.insertAdjacentHTML('beforeend', makeCard(r));
+        existingKeys.add(key);
+      }
+    });
+
+    // Duplicate once for seamless CSS marquee. Clones are hidden from screen readers.
+    Array.from(track.children).forEach(function(card){
+      var clone = card.cloneNode(true);
+      clone.setAttribute('aria-hidden', 'true');
+      track.appendChild(clone);
+    });
+
+    setupMarqueeDrag();
+  }).catch(function(){
+    // If fetch fails, still set up marquee with existing cards
+    Array.from(track.children).forEach(function(card){
+      var clone = card.cloneNode(true);
+      clone.setAttribute('aria-hidden', 'true');
+      track.appendChild(clone);
+    });
+    setupMarqueeDrag();
   });
-  marquee.addEventListener('pointermove', ev => {
-    if (!dragging) return;
-    marquee.scrollLeft = startScroll - (ev.clientX - startX);
-  });
-  ['pointerup','pointercancel','pointerleave'].forEach(type => marquee.addEventListener(type, ev => {
-    if (!dragging) return;
-    dragging = false;
-    marquee.classList.remove('is-dragging');
-    marquee.releasePointerCapture?.(ev.pointerId);
-    resume();
-  }));
-  marquee.addEventListener('mouseenter', pause);
-  marquee.addEventListener('mouseleave', resume);
+
+  function setupMarqueeDrag(){
+    var dragging = false;
+    var startX = 0;
+    var startScroll = 0;
+    const pause = () => marquee.classList.add('is-paused');
+    const resume = () => {
+      if (!dragging) window.setTimeout(() => marquee.classList.remove('is-paused'), 900);
+    };
+    marquee.addEventListener('pointerdown', ev => {
+      dragging = true;
+      startX = ev.clientX;
+      startScroll = marquee.scrollLeft;
+      marquee.classList.add('is-dragging', 'is-paused');
+      marquee.setPointerCapture?.(ev.pointerId);
+    });
+    marquee.addEventListener('pointermove', ev => {
+      if (!dragging) return;
+      marquee.scrollLeft = startScroll - (ev.clientX - startX);
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(type => marquee.addEventListener(type, ev => {
+      if (!dragging) return;
+      dragging = false;
+      marquee.classList.remove('is-dragging');
+      marquee.releasePointerCapture?.(ev.pointerId);
+      resume();
+    }));
+    marquee.addEventListener('mouseenter', pause);
+    marquee.addEventListener('mouseleave', resume);
+  }
 }
 
 // Init from stored preference
