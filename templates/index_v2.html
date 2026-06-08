@@ -791,7 +791,7 @@ src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
     {% set hero_left = hero_event.spots_left|default(hero_event.total_spots|default(0))|int %}
     {% set hero_total = hero_event.total_spots|default(hero_left, true)|int %}
     {% set hero_sold = hero_left == 0 %}
-    <div class="hero-grid ssr-hero">
+    <div class="hero-grid ssr-hero" data-ssr-hero-id="{{ hero_event.id }}">
       <div class="hero-stage">
         <div class="kb-host">
           <div class="kb-slide kb-active" style="background-image:url('{{ hero_preload_image }}')"></div>
@@ -810,7 +810,7 @@ src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
         <h1 class="hero-title">{{ hero_event.title }}</h1>
         {% if hero_event.subtitle %}<div class="hero-sub">{{ hero_event.subtitle }}</div>{% endif %}
         <div class="hero-facts">
-          <div class="f"><div class="k" data-i18n="hf_date">Date</div><div class="v">{{ hero_event.date }}{% if hero_event.session_length %}<small>{{ hero_event.session_length }} min session</small>{% endif %}</div></div>
+          <div class="f"><div class="k" data-i18n="hf_date">Date</div><div class="v">{{ hero_event.date_pretty|default(hero_event.date) }}{% if hero_event.session_length %}<small>{{ hero_event.session_length }} min session</small>{% endif %}</div></div>
           <div class="f"><div class="k" data-i18n="hf_deposit">Deposit today</div><div class="v">${{ hero_event.deposit|default(hero_event.price|default(0)) }}<small data-i18n="hf_currency"><span>CAD · e-Transfer</span></small></div></div>
           <div class="f"><div class="k" data-i18n="hf_total">Total</div><div class="v">${{ hero_event.full_price|default(hero_event.price|default(0)) }}<small data-i18n="hf_total_sub">balance on session day</small></div></div>
           <div class="f"><div class="k" data-i18n="hf_spots">{{ 'Status' if hero_sold else 'Spots' }}</div><div class="v">{{ '—' if hero_sold else hero_left ~ '/' ~ hero_total }}<small>{{ 'Sold out' if hero_sold else '@ ' ~ (hero_event.location|default('Calgary')).split(',')[0] }}</small></div></div>
@@ -1467,6 +1467,16 @@ function renderFeatured() {
   if (!host) return;
   const featured = pickHeroEvent();
   if (!featured) { host.innerHTML = ''; return; }
+
+  const ssrHero = host.querySelector('.ssr-hero');
+  if (ssrHero && ssrHero.dataset.ssrHeroId === String(featured.id || '')) {
+    const kb = ssrHero.querySelector('.kb-host');
+    const slides = kb ? kb.querySelectorAll('.kb-slide').length : 0;
+    if (slides > 1) startKenBurns(kb, slides);
+    trackSessionView(featured.id, {placement: 'featured', title: featured.title || '', hydrated: 'ssr'});
+    return;
+  }
+
   const cdText = countdownText(featured.date, false);
 
   // Build photos list — use photos array if available, fallback to single photo

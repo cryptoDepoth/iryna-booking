@@ -3831,6 +3831,13 @@ def _public_events_payload():
             photo_url = photos[0] if photos else "/static/images/placeholder.jpg"
             active_addons = _event_active_addons(ev)
             agreement_cfg = _event_agreement_config(ev)
+            try:
+                event_date_obj = datetime.strptime(ev["date"], "%Y-%m-%d").date()
+                date_pretty = event_date_obj.strftime("%a, %B %-d, %Y")
+                days_until = (event_date_obj - now.date()).days
+            except Exception:
+                date_pretty = ev.get("date", "")
+                days_until = None
 
             payload = {
                 "id": ev["id"],
@@ -3838,6 +3845,8 @@ def _public_events_payload():
                 "subtitle": ev.get("subtitle", ""),
                 "description": ev.get("subtitle", ""),
                 "date": ev["date"],
+                "date_pretty": date_pretty,
+                "days_until": days_until,
                 "start_time": ev.get("start_time", ""),
                 "end_time": ev.get("end_time", ""),
                 "session_length": ev.get("session_length", 20),
