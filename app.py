@@ -235,9 +235,10 @@ app = Flask(__name__)
 from werkzeug.middleware.proxy_fix import ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-# Cap upload body to 10 MB to defuse DoS via giant photo uploads (admin route
-# only accepts photos but Flask defaults to unlimited).
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+# Cap upload body to 30 MB. Admin photo uploads are optimized server-side, but
+# Flask defaults to unlimited request bodies and a batch can contain up to five
+# phone photos.
+app.config["MAX_CONTENT_LENGTH"] = 30 * 1024 * 1024
 
 # ── Stable secret key ──────────────────────────────────────────────────────────
 # Priority: FLASK_SECRET_KEY env var → /data/.flask_secret (auto-generated once)
@@ -2171,6 +2172,14 @@ def _not_found(_e):
                             "We couldn't find that page. The booking calendar is here:"), 404
 
 
+@app.errorhandler(413)
+def _request_too_large(_e):
+    message = "Upload is too large. Choose up to 5 photos and keep the batch under 30 MB."
+    if _wants_json() or request.path.startswith("/admin/photos/"):
+        return jsonify({"error": message}), 413
+    return _safe_error_html(413, "Upload too large", message), 413
+
+
 @app.errorhandler(500)
 def _server_error(e):
     # Log full exception (Flask already logs, but be explicit and grep-friendly).
@@ -2200,8 +2209,11 @@ def _uncaught(e):
 def serve_image(filename):
     persistent_path = os.path.join(PHOTOS_DIR, filename)
     if os.path.isfile(persistent_path):
-        return send_from_directory(PHOTOS_DIR, filename)
-    return send_from_directory(_BUNDLED_IMAGES_DIR, filename)
+        response = send_from_directory(PHOTOS_DIR, filename)
+    else:
+        response = send_from_directory(_BUNDLED_IMAGES_DIR, filename)
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 
 # ===== NOTION CONFIG =====
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY", "")
@@ -2404,7 +2416,7 @@ _EVENTS_YAML_LOCK = threading.RLock()
 def _load_events():
     """Load events from YAML, return list of event dicts."""
     with open(_EVENTS_PATH, "r") as f:
-        data = yaml.safe_load(f)
+        data = yaml.safe_load(f) or {}
     return data.get("events", []), data.get("settings", {})
 
 EVENTS, SETTINGS = _load_events()
@@ -7229,9 +7241,103 @@ def admin_reschedule():
 
 EVENTS_YAML_PATH = _EVENTS_PATH  # same path used for reads
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+MAX_PHOTO_BATCH_COUNT = 5
+MAX_ADMIN_PHOTO_ORIGINAL_BYTES = 12 * 1024 * 1024
+PHOTO_MAX_DIMENSION = 1600
+PHOTO_WEBP_QUALITY = 82
 
 def _allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def _photo_upload_size(file_storage):
+    """Return uploaded file size without consuming the stream."""
+    try:
+        stream = file_storage.stream
+        pos = stream.tell()
+        stream.seek(0, os.SEEK_END)
+        size = stream.tell()
+        stream.seek(pos)
+        return size
+    except Exception:
+        return None
+
+def _safe_photo_prefix(event_id):
+    prefix = re.sub(r"[^A-Za-z0-9_-]+", "-", str(event_id or "")).strip("-")
+    return prefix or "event"
+
+def _load_events_yaml_doc():
+    with open(EVENTS_YAML_PATH) as fh:
+        return yaml.safe_load(fh) or {"events": [], "settings": {}}
+
+def _write_events_yaml_doc(data):
+    with open(EVENTS_YAML_PATH, "w") as fh:
+        yaml.dump(data, fh, allow_unicode=True, sort_keys=False)
+
+def _event_yaml_record(data, event_id):
+    for ev_data in data.get("events", []):
+        if ev_data.get("id") == event_id:
+            return ev_data
+    return None
+
+def _delete_photo_file(photo_url, keep_path=None):
+    basename = os.path.basename(str(photo_url or "").lstrip("/"))
+    if not basename:
+        return
+    keep_abs = os.path.abspath(keep_path) if keep_path else None
+    for candidate in (
+        os.path.join(PHOTOS_DIR, basename),
+        os.path.join(_BUNDLED_IMAGES_DIR, basename),
+    ):
+        try:
+            if os.path.exists(candidate) and os.path.abspath(candidate) != keep_abs:
+                os.remove(candidate)
+        except Exception:
+            pass
+
+def _save_optimized_admin_photo(event_id, file_storage):
+    """Convert admin uploads into a mobile-friendly WebP under /images."""
+    if not file_storage or not _allowed_file(file_storage.filename):
+        raise ValueError("Invalid file. Allowed: jpg, jpeg, png, webp")
+
+    size = _photo_upload_size(file_storage)
+    if size and size > MAX_ADMIN_PHOTO_ORIGINAL_BYTES:
+        mb = MAX_ADMIN_PHOTO_ORIGINAL_BYTES // (1024 * 1024)
+        raise ValueError(f"Photo is too large. Upload images up to {mb} MB each.")
+
+    try:
+        from PIL import Image, ImageOps, UnidentifiedImageError
+    except Exception as exc:
+        raise RuntimeError("Image optimizer is not installed") from exc
+
+    Image.MAX_IMAGE_PIXELS = 36_000_000
+    try:
+        file_storage.stream.seek(0)
+        image = Image.open(file_storage.stream)
+        image = ImageOps.exif_transpose(image)
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ValueError("Invalid image file") from exc
+
+    resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+    image.thumbnail((PHOTO_MAX_DIMENSION, PHOTO_MAX_DIMENSION), resampling)
+
+    if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+        rgba = image.convert("RGBA")
+        flattened = Image.new("RGB", rgba.size, (255, 255, 255))
+        flattened.paste(rgba, mask=rgba.getchannel("A"))
+        image = flattened
+    else:
+        image = image.convert("RGB")
+
+    import uuid
+    filename = f"{_safe_photo_prefix(event_id)}_{uuid.uuid4().hex[:8]}.webp"
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    save_path = os.path.join(PHOTOS_DIR, filename)
+    image.save(save_path, "WEBP", quality=PHOTO_WEBP_QUALITY, method=6)
+    return f"/images/{filename}", save_path, {
+        "width": image.width,
+        "height": image.height,
+        "bytes": os.path.getsize(save_path),
+    }
 
 @app.route("/admin/events/<event_id>/update", methods=["POST"])
 @admin_required
@@ -7369,63 +7475,105 @@ def admin_upload_photo(event_id):
         return jsonify({"error": "Event not found"}), 404
 
     f = request.files.get("photo")
-    if not f or not _allowed_file(f.filename):
-        return jsonify({"error": "Invalid file. Allowed: jpg, jpeg, png, webp"}), 400
+    if not f or not f.filename:
+        return jsonify({"error": "photo file is required"}), 400
 
-    slot_index = request.form.get("slot_index")  # optional — which photo slot to replace
+    slot_index_raw = request.form.get("slot_index")  # optional — which photo slot to replace
+    slot_index = None
+    if slot_index_raw is not None:
+        try:
+            slot_index = int(slot_index_raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "slot_index must be a number"}), 400
+        if slot_index < 0:
+            return jsonify({"error": "slot_index must be zero or greater"}), 400
 
-    import uuid
-    ext = f.filename.rsplit(".", 1)[1].lower()
-    filename = f"{event_id}_{uuid.uuid4().hex[:8]}.{ext}"
-    # Save to PHOTOS_DIR (persistent volume on Fly.io). Files in the bundled
-    # /app/static/images directory are LOST on every redeploy — this directory
-    # survives them.
-    os.makedirs(PHOTOS_DIR, exist_ok=True)
-    save_path = os.path.join(PHOTOS_DIR, filename)
-    f.save(save_path)
-    url = f"/images/{filename}"
+    saved_path = None
+    old_url = None
+    try:
+        with _EVENTS_YAML_LOCK:
+            data = _load_events_yaml_doc()
+            ev_data = _event_yaml_record(data, event_id)
+            if not ev_data:
+                return jsonify({"error": "Event not found"}), 404
+            photos = list(ev_data.get("photos") or [])
+            if slot_index is not None and slot_index >= len(photos):
+                return jsonify({"error": "Photo slot not found"}), 400
 
-    # Update events.yaml
-    with open(EVENTS_YAML_PATH) as fh:
-        data = yaml.safe_load(fh)
-
-    for ev_data in data.get("events", []):
-        if ev_data["id"] == event_id:
-            photos = ev_data.get("photos") or []
-            if slot_index is not None:
-                idx = int(slot_index)
-                if 0 <= idx < len(photos):
-                    # Delete the previous file. It may live in PHOTOS_DIR (newer
-                    # uploads) OR in the bundled /app/static/images (legacy).
-                    # Try both, ignore failures.
-                    old_url = photos[idx].lstrip("/")  # e.g. "images/foo.jpg"
-                    old_basename = os.path.basename(old_url)
-                    for candidate in (
-                        os.path.join(PHOTOS_DIR, old_basename),
-                        os.path.join(_BUNDLED_IMAGES_DIR, old_basename),
-                    ):
-                        if os.path.exists(candidate) and candidate != save_path:
-                            try: os.remove(candidate)
-                            except Exception: pass
-                    photos[idx] = url
-                else:
-                    photos.append(url)
-            else:
+            url, saved_path, meta = _save_optimized_admin_photo(event_id, f)
+            if slot_index is None:
                 photos.append(url)
+            else:
+                old_url = photos[slot_index]
+                photos[slot_index] = url
             ev_data["photos"] = photos
-            break
+            _write_events_yaml_doc(data)
+            _reload_events_globals()
+    except ValueError as exc:
+        if saved_path:
+            _delete_photo_file(f"/images/{os.path.basename(saved_path)}")
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        if saved_path:
+            _delete_photo_file(f"/images/{os.path.basename(saved_path)}")
+        log.exception(f"[admin] Photo upload failed for {event_id}: {exc}")
+        return jsonify({"error": "Photo upload failed"}), 500
 
-    with open(EVENTS_YAML_PATH, "w") as fh:
-        yaml.dump(data, fh, allow_unicode=True, sort_keys=False)
-
-    # Reload events in memory
-    global EVENTS, SETTINGS
-    _cfg = yaml.safe_load(open(EVENTS_YAML_PATH))
-    EVENTS = _cfg.get("events", [])
-    SETTINGS = _cfg.get("settings", {})
+    if old_url:
+        _delete_photo_file(old_url, keep_path=saved_path)
 
     log.info(f"[admin] Photo uploaded for {event_id}: {url}")
-    return jsonify({"success": True, "url": url})
+    return jsonify({"success": True, "url": url, "optimized": meta})
+
+@app.route("/admin/photos/<event_id>/upload-batch", methods=["POST"])
+@admin_required
+def admin_upload_photos_batch(event_id):
+    """Upload up to five optimized photos and append them atomically."""
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"error": "Event not found"}), 404
+
+    files = [f for f in request.files.getlist("photos") if f and f.filename]
+    if not files:
+        files = [f for f in request.files.getlist("photo") if f and f.filename]
+    if not files:
+        return jsonify({"error": "Choose at least one photo"}), 400
+    if len(files) > MAX_PHOTO_BATCH_COUNT:
+        return jsonify({"error": f"Upload up to {MAX_PHOTO_BATCH_COUNT} photos at a time"}), 400
+
+    saved = []
+    try:
+        with _EVENTS_YAML_LOCK:
+            data = _load_events_yaml_doc()
+            ev_data = _event_yaml_record(data, event_id)
+            if not ev_data:
+                return jsonify({"error": "Event not found"}), 404
+
+            urls = []
+            optimized = []
+            for f in files:
+                url, saved_path, meta = _save_optimized_admin_photo(event_id, f)
+                saved.append((url, saved_path))
+                urls.append(url)
+                optimized.append({"url": url, **meta})
+
+            photos = list(ev_data.get("photos") or [])
+            photos.extend(urls)
+            ev_data["photos"] = photos
+            _write_events_yaml_doc(data)
+            _reload_events_globals()
+    except ValueError as exc:
+        for url, _saved_path in saved:
+            _delete_photo_file(url)
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        for url, _saved_path in saved:
+            _delete_photo_file(url)
+        log.exception(f"[admin] Batch photo upload failed for {event_id}: {exc}")
+        return jsonify({"error": "Photo upload failed"}), 500
+
+    log.info(f"[admin] {len(saved)} photos uploaded for {event_id}")
+    return jsonify({"success": True, "count": len(saved), "urls": [url for url, _ in saved], "optimized": optimized})
 
 @app.route("/admin/photos/<event_id>/delete", methods=["POST"])
 @admin_required
@@ -7434,38 +7582,29 @@ def admin_delete_photo(event_id):
     slot_index = (request.json or {}).get("slot_index")
     if slot_index is None:
         return jsonify({"error": "slot_index required"}), 400
-
-    with open(EVENTS_YAML_PATH) as fh:
-        data = yaml.safe_load(fh)
+    try:
+        slot_index = int(slot_index)
+    except (TypeError, ValueError):
+        return jsonify({"error": "slot_index must be a number"}), 400
+    if slot_index < 0:
+        return jsonify({"error": "slot_index must be zero or greater"}), 400
 
     deleted_url = None
-    for ev_data in data.get("events", []):
-        if ev_data["id"] == event_id:
-            photos = ev_data.get("photos") or []
-            idx = int(slot_index)
-            if 0 <= idx < len(photos):
-                deleted_url = photos.pop(idx)
-            ev_data["photos"] = photos
-            break
+    with _EVENTS_YAML_LOCK:
+        data = _load_events_yaml_doc()
+        ev_data = _event_yaml_record(data, event_id)
+        if not ev_data:
+            return jsonify({"error": "Event not found"}), 404
+        photos = list(ev_data.get("photos") or [])
+        if slot_index >= len(photos):
+            return jsonify({"error": "Photo slot not found"}), 400
+        deleted_url = photos.pop(slot_index)
+        ev_data["photos"] = photos
+        _write_events_yaml_doc(data)
+        _reload_events_globals()
 
-    with open(EVENTS_YAML_PATH, "w") as fh:
-        yaml.dump(data, fh, allow_unicode=True, sort_keys=False)
-
-    # Delete file from disk — try both PHOTOS_DIR (new) and bundled (legacy).
     if deleted_url:
-        basename = os.path.basename(deleted_url.lstrip("/"))
-        for candidate in (
-            os.path.join(PHOTOS_DIR, basename),
-            os.path.join(_BUNDLED_IMAGES_DIR, basename),
-        ):
-            if os.path.exists(candidate):
-                try: os.remove(candidate)
-                except Exception: pass
-
-    global EVENTS, SETTINGS
-    _cfg = yaml.safe_load(open(EVENTS_YAML_PATH))
-    EVENTS = _cfg.get("events", [])
-    SETTINGS = _cfg.get("settings", {})
+        _delete_photo_file(deleted_url)
 
     return jsonify({"success": True})
 

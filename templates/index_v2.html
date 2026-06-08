@@ -345,13 +345,14 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .event-card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.04);display:flex;flex-direction:column;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;position:relative}
 .event-card:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,.08)}
 .event-card .photo{aspect-ratio:4/3;background:#dbcfca center/cover;position:relative}
-.event-card .photo .status{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:5px 11px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.event-card .photo .status{position:absolute;z-index:2;top:12px;left:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:5px 11px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
 .event-card .photo .status.open{color:var(--green)}
 .event-card .photo .status.low{color:var(--amber)}
 .event-card .photo .status.sold{color:var(--red)}
 .event-card .photo .status .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
-.event-card .photo .countdown{position:absolute;top:12px;right:12px;background:rgba(28,25,23,.78);color:#fff;padding:5px 11px;border-radius:20px;font:600 .7rem var(--font-b);backdrop-filter:blur(8px)}
-.event-card .photo .featured-mark{position:absolute;bottom:12px;left:12px;background:var(--rose);color:#fff;padding:4px 10px;border-radius:6px;font:600 .65rem var(--font-b);text-transform:uppercase;letter-spacing:.08em}
+.event-card .photo .countdown{position:absolute;z-index:2;top:12px;right:12px;background:rgba(28,25,23,.78);color:#fff;padding:5px 11px;border-radius:20px;font:600 .7rem var(--font-b);backdrop-filter:blur(8px)}
+.event-card .photo .featured-mark{position:absolute;z-index:2;bottom:12px;left:12px;background:var(--rose);color:#fff;padding:4px 10px;border-radius:6px;font:600 .65rem var(--font-b);text-transform:uppercase;letter-spacing:.08em}
+.event-card .photo .photo-count{position:absolute;z-index:2;bottom:12px;right:12px;background:rgba(255,255,255,.9);color:var(--ink-2);padding:4px 9px;border-radius:16px;font:600 .68rem var(--font-b);backdrop-filter:blur(8px)}
 .event-card .body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
 .event-card .type-tag{font:400 .65rem var(--font-h);letter-spacing:.24em;text-transform:uppercase;color:var(--rose)}
 .event-card h3{font-family:var(--font-d);font-size:1.45rem;font-weight:400;line-height:1.18;letter-spacing:-.005em;color:var(--ink)}
@@ -642,6 +643,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
 /* ── CARD PHOTO HOVER ZOOM ── */
 .event-card .photo{overflow:hidden}
+.event-card .photo .card-kb{position:absolute;inset:0;border-radius:0}
 .event-card .photo .photo-bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .55s ease;will-change:transform}
 .event-card:hover .photo .photo-bg{transform:scale(1.07)}
 
@@ -1141,6 +1143,22 @@ function addDaysISO(days) {
 function escapeHtml(text) {
   return String(text ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
+function escapeAttr(text) {
+  return escapeHtml(text);
+}
+const GRID_PHOTO_SLIDE_LIMIT = 5;
+function eventPhotoList(eventObj, limit) {
+  const raw = Array.isArray(eventObj?.photos) && eventObj.photos.length
+    ? eventObj.photos
+    : [eventObj?.photo_url || eventObj?.photo || '/static/images/placeholder.jpg'];
+  const out = [];
+  raw.forEach(src => {
+    const clean = String(src || '').trim();
+    if (clean && !out.includes(clean)) out.push(clean);
+  });
+  const fallback = out.length ? out : ['/static/images/placeholder.jpg'];
+  return limit ? fallback.slice(0, limit) : fallback;
+}
 function money(value) {
   const n = Number(value || 0);
   return Number.isFinite(n) ? n.toFixed(2) : '0.00';
@@ -1282,6 +1300,8 @@ function statusBadge(spots, total, status) {
 }
 
 let _kbTimers = [];
+let _cardKbTimers = [];
+let _cardKbObserver = null;
 function renderFeatured() {
   const host = document.getElementById('heroPhoto');
   if (!host) return;
@@ -1290,13 +1310,11 @@ function renderFeatured() {
   const cdText = countdownText(featured.date, false);
 
   // Build photos list — use photos array if available, fallback to single photo
-  const photos = (featured.photos && featured.photos.length)
-    ? featured.photos
-    : [featured.photo_url || featured.photo || '/static/images/placeholder.jpg'];
+  const photos = eventPhotoList(featured);
 
   // Build KB slides HTML
   const slidesHtml = photos.map((src, i) =>
-    `<div class="kb-slide${i === 0 ? ' kb-active' : ''}" style="background-image:url('${src}')"></div>`
+    `<div class="kb-slide${i === 0 ? ' kb-active' : ''}" style="background-image:url('${escapeAttr(src)}')"></div>`
   ).join('');
 
   const deposit = featured.deposit || featured.price || 0;
@@ -1351,12 +1369,25 @@ function renderFeatured() {
 	  trackSessionView(featured.id, {placement: 'featured', title: featured.title || ''});
 	}
 
-function startKenBurns(host, count) {
-  // Clear any previous timers
-  _kbTimers.forEach(clearTimeout);
-  _kbTimers = [];
+function startKenBurns(host, count, options = {}) {
+  if (!host || count <= 1) return;
+  (host.__kbTimers || []).forEach(clearTimeout);
+  host.__kbTimers = [];
+  if (options.clearGlobal !== false) {
+    _kbTimers.forEach(clearTimeout);
+    _kbTimers = [];
+  }
   let current = 0;
   const INTERVAL = 5500; // ms per slide
+  const initialDelay = Number(options.initialDelay || INTERVAL);
+  const bucket = Array.isArray(options.timerBucket)
+    ? options.timerBucket
+    : (options.trackGlobal === false ? null : _kbTimers);
+
+  function remember(timer) {
+    host.__kbTimers.push(timer);
+    if (bucket) bucket.push(timer);
+  }
 
   function cycle() {
     const slides = host.querySelectorAll('.kb-slide');
@@ -1372,10 +1403,74 @@ function startKenBurns(host, count) {
     // Remove 'out' after transition
     const prev = (current - 1 + count) % count;
     const t = setTimeout(() => slides[prev].classList.remove('kb-out'), 1200);
-    _kbTimers.push(t);
-    _kbTimers.push(setTimeout(cycle, INTERVAL));
+    remember(t);
+    remember(setTimeout(cycle, INTERVAL));
   }
-  _kbTimers.push(setTimeout(cycle, INTERVAL));
+  remember(setTimeout(cycle, initialDelay));
+}
+
+function clearGridPhotoSlideshows() {
+  if (_cardKbObserver) {
+    _cardKbObserver.disconnect();
+    _cardKbObserver = null;
+  }
+  _cardKbTimers.forEach(clearTimeout);
+  _cardKbTimers = [];
+}
+
+function hydrateCardSlides(host) {
+  if (!host || host.dataset.loaded === '1') return;
+  let rest = [];
+  try {
+    rest = JSON.parse(host.dataset.photos || '[]');
+  } catch (err) {
+    rest = [];
+  }
+  rest.forEach(src => {
+    const slide = document.createElement('div');
+    slide.className = 'kb-slide';
+    slide.style.backgroundImage = `url(${JSON.stringify(String(src || ''))})`;
+    host.appendChild(slide);
+  });
+  host.dataset.loaded = '1';
+}
+
+function startGridPhotoSlideshows() {
+  clearGridPhotoSlideshows();
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const hosts = Array.from(document.querySelectorAll('.event-card .card-kb[data-count]'))
+    .filter(host => Number(host.dataset.count || 1) > 1);
+  if (!hosts.length) return;
+
+  const begin = (host, idx = 0) => {
+    if (!host || host.dataset.started === '1') return;
+    hydrateCardSlides(host);
+    const count = host.querySelectorAll('.kb-slide').length;
+    if (count > 1) {
+      host.dataset.started = '1';
+      startKenBurns(host, count, {
+        clearGlobal: false,
+        trackGlobal: false,
+        timerBucket: _cardKbTimers,
+        initialDelay: 2400 + (idx % 4) * 350,
+      });
+    }
+  };
+
+  if (!('IntersectionObserver' in window)) {
+    hosts.slice(0, 6).forEach(begin);
+    return;
+  }
+
+  _cardKbObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const idx = hosts.indexOf(entry.target);
+      begin(entry.target, idx);
+      _cardKbObserver.unobserve(entry.target);
+    });
+  }, {threshold: 0.18, rootMargin: '160px 0px'});
+  hosts.forEach(host => _cardKbObserver.observe(host));
 }
 
 function renderGrid() {
@@ -1384,6 +1479,7 @@ function renderGrid() {
   const empty = document.getElementById('gridEmpty');
 
   loading.style.display = 'none';
+  clearGridPhotoSlideshows();
 
   const list = applyFilter(visibleEvents()).sort((a, b) => a.date.localeCompare(b.date));
   document.getElementById('count').textContent = T(list.length === 1 ? 'sessions_count_one' : 'sessions_count_many', {n: list.length});
@@ -1405,16 +1501,22 @@ function renderGrid() {
     const b = statusBadge(e.spots_left, e.total_spots, e.status);
     const cd = countdownText(e.date, true);
     const isSold = e.spots_left === 0;
-    const photo = e.photo_url || e.photo || '/static/images/placeholder.jpg';
+    const cardPhotos = eventPhotoList(e, GRID_PHOTO_SLIDE_LIMIT);
+    const firstPhoto = cardPhotos[0];
+    const lazyPhotos = cardPhotos.slice(1);
+    const allPhotoCount = Array.isArray(e.photos) && e.photos.length ? e.photos.length : cardPhotos.length;
     const totalPrice = e.full_price || e.price || 0;
     const revDelay = Math.min(i * 65, 390);
     return `
 	    <article class="event-card card-reveal ${isSold ? 'sold' : ''}" data-event-id="${e.id}" style="animation-delay:${revDelay}ms" onclick="openDrawer('${e.id}')">
       <div class="photo">
-        <div class="photo-bg" style="background-image:url('${photo}')"></div>
+        <div class="card-kb kb-host" data-count="${cardPhotos.length}" data-photos="${escapeAttr(JSON.stringify(lazyPhotos))}">
+          <div class="kb-slide kb-active" style="background-image:url('${escapeAttr(firstPhoto)}')"></div>
+        </div>
         <div class="status ${b.cls}"><span class="dot"></span>${b.txt}</div>
         <div class="countdown">${cd}</div>
         ${e.featured ? `<div class="featured-mark">${T('featured_tag')}</div>` : ''}
+        ${allPhotoCount > 1 ? `<div class="photo-count">${allPhotoCount} photos</div>` : ''}
       </div>
       <div class="body">
         <div class="type-tag">${e.session_type || e.type || T('session_type_fallback')}</div>
@@ -1431,6 +1533,7 @@ function renderGrid() {
       </div>
     </article>`;
 	  }).join('');
+	  startGridPhotoSlideshows();
 	  observeSessionCards();
 	  if (window.__wowScan) window.__wowScan();
 	}
@@ -1495,7 +1598,7 @@ async function openDrawer(id) {
   }
   // Drawer photo — Ken Burns if multiple photos available
   const dphotoEl = document.getElementById('dphoto');
-  const drawerPhotos = (e.photos && e.photos.length) ? e.photos : [e.photo_url || e.photo || '/static/images/placeholder.jpg'];
+  const drawerPhotos = eventPhotoList(e);
   // Clear old KB host if any
   const oldKb = dphotoEl.querySelector('.kb-host');
   if (oldKb) oldKb.remove();
@@ -1503,7 +1606,7 @@ async function openDrawer(id) {
   dphotoEl.style.backgroundSize = '';
   dphotoEl.style.backgroundPosition = '';
   if (drawerPhotos.length === 1) {
-    dphotoEl.style.backgroundImage = `linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.4)),url('${drawerPhotos[0]}')`;
+    dphotoEl.style.backgroundImage = `linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.4)),url(${JSON.stringify(String(drawerPhotos[0] || ''))})`;
     dphotoEl.style.backgroundSize = 'cover';
     dphotoEl.style.backgroundPosition = 'center';
   } else {
@@ -1513,7 +1616,7 @@ async function openDrawer(id) {
     drawerPhotos.forEach((src, i) => {
       const slide = document.createElement('div');
       slide.className = 'kb-slide' + (i === 0 ? ' kb-active' : '');
-      slide.style.backgroundImage = `url('${src}')`;
+      slide.style.backgroundImage = `url(${JSON.stringify(String(src || ''))})`;
       kbHost.appendChild(slide);
     });
     // Overlay gradient
@@ -1521,7 +1624,7 @@ async function openDrawer(id) {
     overlay.style.cssText = 'position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.45));z-index:1;pointer-events:none';
     kbHost.appendChild(overlay);
     dphotoEl.insertBefore(kbHost, dphotoEl.firstChild);
-    startKenBurns(kbHost, drawerPhotos.length);
+    startKenBurns(kbHost, drawerPhotos.length, {clearGlobal: false, trackGlobal: false});
   }
   document.getElementById('dTitle').textContent = e.title;
   const dbody = document.getElementById('dbody');

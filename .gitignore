@@ -17,6 +17,7 @@ logs/
 *backup*.html
 *.bak*
 .timed_cron_state.json
+.flask_secret
 
 # Google Calendar OAuth secrets
 credentials.json
