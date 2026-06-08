@@ -7,12 +7,17 @@
 <meta name="description" content="Professional photographer in Calgary. Family, maternity, wedding & mini sessions. Natural, sunlit photography with all original photos included. Book online in 2 minutes.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
 <link rel="canonical" href="https://book.pashynskaphoto.com/">
-<meta property="og:title" content="Calgary Family, Maternity & Wedding Photographer — Pashynska Photography">
-<meta property="og:description" content="Professional photographer in Calgary. Family, maternity, wedding & mini sessions. Natural, sunlit photography. Book online in 2 minutes.">
+<meta property="og:title" content="{{ og_title|default('Calgary Family, Maternity & Wedding Photographer — Pashynska Photography') }}">
+<meta property="og:description" content="{{ og_description|default('Professional photographer in Calgary. Family, maternity, wedding & mini sessions. Natural, sunlit photography with all original photos included. Book online in 2 minutes.') }}">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://book.pashynskaphoto.com/">
-<meta property="og:image" content="https://book.pashynskaphoto.com/static/og-image.jpg">
+<meta property="og:url" content="{{ og_url|default('https://book.pashynskaphoto.com/') }}">
+<meta property="og:image" content="{{ og_image|default('https://book.pashynskaphoto.com/static/og-image.jpg') }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ og_title|default('Calgary Family, Maternity & Wedding Photographer — Pashynska Photography') }}">
+<meta name="twitter:description" content="{{ og_description|default('Professional photographer in Calgary. Book online in 2 minutes.') }}">
+<meta name="twitter:image" content="{{ og_image|default('https://book.pashynskaphoto.com/static/og-image.jpg') }}">
 <script>
     !function(t,e){var o,n,p,r;e.__SV||(window.posthog&&window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="$i capture register register_once unregister getFeatureFlag isFeatureEnabled reloadFeatureFlags onFeatureFlags identify setPersonProperties group resetGroups reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
     posthog.init('phc_nn3FMVLs4ifQNunBai46VzpFDJDbiM9Kfo34psVansW4', {
@@ -674,6 +679,25 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
   <!-- reCAPTCHA v3 (invisible anti-bot) -->
   <script src="https://www.google.com/recaptcha/api.js?render=6Ld98uosAAAAALZYp2NkeESIBAvL8BrUlgsMs1IG"></script>
+{% if initial_events %}
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+{% for e in initial_events %}
+{"@type":"Event","@id":"https://book.pashynskaphoto.com/#event-{{ e.id }}",
+"name":"{{ e.title|e }}",
+"description":"{{ (e.subtitle or e.description or '')|e }}",
+"startDate":"{{ e.date }}T{{ e.start_time or '09:00' }}:00",
+"eventStatus":"https://schema.org/EventScheduled",
+"eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode",
+"location":{"@type":"Place","name":"{{ (e.location or 'Calgary')|e }}","address":{"@type":"PostalAddress","addressLocality":"Calgary","addressRegion":"AB","addressCountry":"CA"}},
+"image":"https://book.pashynskaphoto.com{{ (e.photos[0] if e.photos else '/static/og-image.jpg') }}",
+"organizer":{"@id":"https://book.pashynskaphoto.com/#organization"},
+"offers":{"@type":"Offer","price":"{{ e.deposit or e.price or 0 }}","priceCurrency":"CAD","availability":"{% if e.spots_left and e.spots_left > 0 %}https://schema.org/InStock{% else %}https://schema.org/SoldOut{% endif %}","url":"https://book.pashynskaphoto.com/?event={{ e.id }}","validFrom":"{{ e.date }}"}}
+{% if not loop.last %},{% endif %}
+{% endfor %}
+]}
+</script>
+{% endif %}
 </head>
 <body data-ab-booking-flow="{{ booking_flow_variant|default('control') }}">
 

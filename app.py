@@ -3501,6 +3501,17 @@ def index():
 
     # ── Direct event / GBP product links: render v2 and auto-open the matching drawer ──
     if direct_event:
+        # Pass per-event OG data so social shares show the right preview
+        _ev_photos = direct_event.get("photos", [])
+        _og_image = _ev_photos[0] if _ev_photos else "/static/og-image.jpg"
+        if not _og_image.startswith("http"):
+            _og_image = f"https://book.pashynskaphoto.com{_og_image}"
+        template_context.update(
+            og_title=f"{direct_event.get('title', 'Calgary Photography')} — Book Online | Pashynska Photography",
+            og_description=direct_event.get("subtitle") or f"Book your {direct_event.get('title', 'photo session')} in Calgary. Easy online booking, secure deposit.",
+            og_image=_og_image,
+            og_url=f"https://book.pashynskaphoto.com/?event={direct_event['id']}",
+        )
         return render_template("index_v2.html", direct_event_id=direct_event["id"], **template_context)
     if explicit_event_requested:
         return "Event not found", 404
