@@ -370,13 +370,16 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .tmt-head{text-align:center;margin-bottom:18px;padding:0 20px}
 .tmt-head h3{font-family:var(--font-d);font-size:1.6rem;font-weight:400;color:var(--ink)}
 .tmt-head .sub{font-size:.82rem;color:var(--ink-3)}
-.tmt-marquee{position:relative;overflow-x:auto;overflow-y:visible;padding:34px max(32px,calc((100vw - 1120px)/2)) 38px;cursor:grab;touch-action:pan-y;user-select:none;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tmt-marquee{position:relative;overflow-x:auto;overflow-y:visible;padding:34px max(32px,calc((100vw - 1120px)/2)) 38px;cursor:grab;touch-action:pan-y;user-select:none;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-x:contain}
 .tmt-marquee::-webkit-scrollbar{display:none}
-.tmt-marquee:active{cursor:grabbing}
+.tmt-marquee:active,.tmt-marquee.is-dragging{cursor:grabbing;scroll-snap-type:none;scroll-behavior:auto}
 .tmt-marquee::before,.tmt-marquee::after{content:"";position:sticky;top:0;bottom:0;width:74px;min-width:74px;z-index:6;pointer-events:none}
 .tmt-marquee::before{left:0;background:linear-gradient(90deg,var(--bg) 8%,rgba(250,247,245,0));margin-right:-74px}
 .tmt-marquee::after{right:0;background:linear-gradient(270deg,var(--bg) 8%,rgba(250,247,245,0));margin-left:-74px}
 .tmt-track{display:flex;align-items:center;gap:32px;width:max-content;will-change:transform;perspective:900px}
+.tmt-swipe-hint{display:flex;align-items:center;justify-content:center;gap:7px;margin:-4px 20px 0;color:var(--ink-3);font-size:.76rem;letter-spacing:.03em}
+.tmt-swipe-hint .hand{display:inline-block;font-size:1rem;animation:tmt-hand-swipe 1.8s ease-in-out infinite;transform-origin:70% 80%}
+@keyframes tmt-hand-swipe{0%,100%{transform:translateX(-5px) rotate(-8deg);opacity:.72}45%{transform:translateX(7px) rotate(8deg);opacity:1}}
 .tmt-card{width:286px;height:206px;background:rgba(255,255,255,.72);border:1px solid rgba(93,55,47,.10);border-radius:22px;padding:15px 16px 14px;display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 2px rgba(46,25,20,.03),0 10px 24px rgba(93,55,47,.06);white-space:normal;scroll-snap-align:center;transform:translateY(28px) scale(.78) rotateY(3deg);transform-origin:center center;opacity:0;filter:saturate(.78) blur(.15px);transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .34s ease,filter .34s ease,box-shadow .34s ease,border-color .34s ease,background-color .34s ease;position:relative;pointer-events:none}
 .tmt-card.is-active{z-index:5;transform:translateY(-18px) scale(1.12) rotateY(0);opacity:1;filter:saturate(1.06);background:rgba(255,255,255,.97);border-color:rgba(176,93,111,.28);box-shadow:0 14px 34px rgba(93,55,47,.14),0 34px 72px rgba(176,93,111,.18);pointer-events:auto}
 .tmt-card.is-near{z-index:2;transform:translateY(12px) scale(.9) rotateY(0);opacity:.66;filter:saturate(.94);pointer-events:auto}
@@ -393,11 +396,8 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .tmt-more:hover{color:var(--ink)}
 .tmt-link{display:inline-flex;align-items:center;gap:6px;align-self:center;margin-top:4px;color:var(--rose-deep);font-size:.82rem;font-weight:700;text-decoration:none}
 .tmt-link:hover{text-decoration:underline}
-.tmt-nav{position:absolute;top:50%;z-index:8;width:44px;height:44px;border:1px solid rgba(176,93,111,.20);border-radius:999px;background:rgba(255,255,255,.88);color:var(--rose-deep);box-shadow:0 10px 28px rgba(93,55,47,.12);font:300 1.7rem/1 var(--font-b);display:flex;align-items:center;justify-content:center;cursor:pointer;transform:translateY(-6px);backdrop-filter:blur(8px);transition:transform .2s ease,box-shadow .2s ease,background .2s ease,color .2s ease}
-.tmt-nav:hover{transform:translateY(-8px) scale(1.04);background:#fff;box-shadow:0 14px 34px rgba(93,55,47,.16);color:var(--ink)}
-.tmt-prev{left:14px}.tmt-next{right:14px}
-@media(max-width:760px){.tmt{margin-top:16px}.tmt-marquee{padding:30px 42px 34px}.tmt-card{width:min(70vw,260px);height:198px;transform:translateY(22px) scale(.8)}.tmt-card.is-active{transform:translateY(-14px) scale(1.1)}.tmt-card.is-near{transform:translateY(10px) scale(.88)}.tmt-marquee::before,.tmt-marquee::after{width:34px;min-width:34px}.tmt-marquee::before{margin-right:-34px}.tmt-marquee::after{margin-left:-34px}.tmt-avatar{width:44px;height:44px}.tmt-quote{font-size:.9rem;-webkit-line-clamp:3}.tmt-nav{width:44px;height:44px;font-size:1.45rem;top:52%}.tmt-prev{left:4px}.tmt-next{right:4px}}
-@media(prefers-reduced-motion:reduce){.tmt-marquee{scroll-behavior:auto}.tmt-card{transition:none;transform:none;opacity:1;filter:none}.tmt-card.is-active,.tmt-card.is-near{transform:none}}
+@media(max-width:760px){.tmt{margin-top:16px}.tmt-marquee{padding:30px 42px 34px}.tmt-card{width:min(70vw,260px);height:198px;transform:translateY(22px) scale(.8)}.tmt-card.is-active{transform:translateY(-14px) scale(1.1)}.tmt-card.is-near{transform:translateY(10px) scale(.88)}.tmt-marquee::before,.tmt-marquee::after{width:34px;min-width:34px}.tmt-marquee::before{margin-right:-34px}.tmt-marquee::after{margin-left:-34px}.tmt-avatar{width:44px;height:44px}.tmt-quote{font-size:.9rem;-webkit-line-clamp:3}.tmt-swipe-hint{font-size:.72rem;margin-top:-2px}}
+@media(prefers-reduced-motion:reduce){.tmt-marquee{scroll-behavior:auto}.tmt-card{transition:none;transform:none;opacity:1;filter:none}.tmt-card.is-active,.tmt-card.is-near{transform:none}.tmt-swipe-hint .hand{animation:none}}
 
 /* ── PAST SESSIONS ARCHIVE (display-only thumbnail strip, bottom of page) ── */
 .past-wrap{max-width:1180px;margin:14px auto 0;padding:32px 20px 0;border-top:1px solid var(--ink-5)}
@@ -808,8 +808,8 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
       <h3 id="tmtTitle" data-i18n="tmt_heading">What my clients say</h3>
       <span class="sub" data-i18n="tmt_subhead">Real feedback from families, couples, and sessions I’ve photographed</span>
     </div>
-    <button class="tmt-nav tmt-prev" type="button" aria-label="Previous review">‹</button>
-    <div class="tmt-marquee reveal" id="tmtMarquee" aria-label="Client reviews carousel. Swipe horizontally to browse.">
+    <div class="tmt-swipe-hint" aria-hidden="true"><span class="hand">👆</span><span>Swipe reviews left or right</span></div>
+    <div class="tmt-marquee reveal" id="tmtMarquee" aria-label="Client reviews carousel. Swipe horizontally to browse with your finger or mouse.">
       <div class="tmt-track" id="tmtTrack">
         <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/2HpWvZCv3dvFezuJS3XKy0KuFQKtAW8Z/bM6ws7PK-daz1Ke_k4oE3xoV8j-NBov8/GfUkCKWIe8wxEg64R7ES9Q.jpg" alt="Richelle review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Richelle</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We had a wonderful Mother's Day photo shoot experience. The studio set up was beautiful, the photographer was patient and professional, and the photos turned out absolutely stunning!”</p></article>
         <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/ylqmlDz6mfRJEucR9SsHg4edDvF2Abrp/Q34bUnvTd3Z-T86m_iiYecPa-MZoQYfq/-uWVCSaLKnU3O3AYxv_5XQ.jpg" alt="Jaskaran Kaur review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Jaskaran Kaur</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Great photos and easy to download.”</p></article>
@@ -825,7 +825,6 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
         <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="https://i.wfolio.com/x/eWKcaDXAcHRGGm33mrHfxQZ8d7XvsMi8/psph-bMIX3rIgS7AQ5NCze_WHtBYrfSn/QxdUhj8-ZIKZ281n7rwTAm67jn43DtWb/1yJSFglWmcU9MlQAghp5nUajs4-mUoZU/ArO5qnVHNlmM7vDkP_u2iw.jpg" alt="Daneza review photo" loading="lazy"><div class="tmt-who"><div class="tmt-name">Daneza</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Thank you for doing our wedding photos.”</p></article>
       </div>
     </div>
-    <button class="tmt-nav tmt-next" type="button" aria-label="Next review">›</button>
     <a class="tmt-link" href="https://pashynskaphoto.com/reviews" target="_blank" rel="noopener">Read more reviews →</a>
   </div>
 
@@ -3176,10 +3175,23 @@ function initTestimonialCarousel(){
     var startScroll = 0;
     var lastActiveIndex = -1;
     var raf = 0;
-    var prevBtn = document.querySelector('.tmt-prev');
-    var nextBtn = document.querySelector('.tmt-next');
+    var inertiaRaf = 0;
+    var velocity = 0;
+    var lastMoveX = 0;
+    var lastMoveTime = 0;
+    var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function cards(){ return Array.from(track.querySelectorAll('.tmt-card')); }
+
+    function stopInertia(){
+      if (inertiaRaf) cancelAnimationFrame(inertiaRaf);
+      inertiaRaf = 0;
+      velocity = 0;
+    }
+
+    function haptic(ms){
+      if (navigator.vibrate && !prefersReducedMotion) navigator.vibrate(ms || 8);
+    }
 
     function centerActiveCard(){
       const list = cards();
@@ -3200,7 +3212,7 @@ function initTestimonialCarousel(){
       });
       if (activeIndex !== lastActiveIndex) {
         lastActiveIndex = activeIndex;
-        if (navigator.vibrate && dragging) navigator.vibrate(8);
+        if (dragging || inertiaRaf) haptic(7);
       }
     }
 
@@ -3212,23 +3224,44 @@ function initTestimonialCarousel(){
       });
     }
 
-    function snapToNearest(){
+    function nearestCardTarget(){
       const active = track.querySelector('.tmt-card.is-active') || cards()[0];
-      if (!active) return;
-      const target = active.offsetLeft - (marquee.clientWidth - active.clientWidth) / 2;
-      marquee.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+      if (!active) return 0;
+      return Math.max(0, active.offsetLeft - (marquee.clientWidth - active.clientWidth) / 2);
     }
 
-    function goToCard(delta){
-      const list = cards();
-      if (!list.length) return;
-      const current = Math.max(0, lastActiveIndex);
-      const next = Math.max(0, Math.min(list.length - 1, current + delta));
-      const card = list[next];
-      const target = card.offsetLeft - (marquee.clientWidth - card.clientWidth) / 2;
-      marquee.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
-      if (navigator.vibrate) navigator.vibrate(8);
-      window.setTimeout(scheduleActiveUpdate, 80);
+    function snapToNearest(behavior){
+      marquee.scrollTo({ left: nearestCardTarget(), behavior: behavior || 'smooth' });
+    }
+
+    function animateInertia(initialVelocity){
+      if (prefersReducedMotion || Math.abs(initialVelocity) < 0.08) {
+        marquee.classList.remove('is-dragging');
+        snapToNearest('smooth');
+        return;
+      }
+      stopInertia();
+      velocity = Math.max(-2.8, Math.min(2.8, initialVelocity));
+      var friction = 0.935;
+      var last = performance.now();
+      marquee.classList.add('is-dragging');
+      function step(now){
+        var dt = Math.min(32, now - last);
+        last = now;
+        marquee.scrollLeft -= velocity * dt;
+        velocity *= Math.pow(friction, dt / 16);
+        scheduleActiveUpdate();
+        var atEdge = marquee.scrollLeft <= 0 || marquee.scrollLeft >= (marquee.scrollWidth - marquee.clientWidth - 1);
+        if (Math.abs(velocity) > 0.035 && !atEdge) {
+          inertiaRaf = requestAnimationFrame(step);
+        } else {
+          inertiaRaf = 0;
+          velocity = 0;
+          marquee.classList.remove('is-dragging');
+          snapToNearest('smooth');
+        }
+      }
+      inertiaRaf = requestAnimationFrame(step);
     }
 
     function ensureReadMoreButtons(){
@@ -3259,8 +3292,6 @@ function initTestimonialCarousel(){
     }
 
     wireReadMore();
-    if (prevBtn) prevBtn.addEventListener('click', function(){ goToCard(-1); });
-    if (nextBtn) nextBtn.addEventListener('click', function(){ goToCard(1); });
     window.setTimeout(function(){
       const first = cards()[0];
       if (first) {
@@ -3273,15 +3304,25 @@ function initTestimonialCarousel(){
     window.addEventListener('resize', scheduleActiveUpdate, { passive: true });
 
     marquee.addEventListener('pointerdown', function(ev){
+      if (ev.button !== undefined && ev.button !== 0) return;
       dragging = true;
       startX = ev.clientX;
+      lastMoveX = ev.clientX;
+      lastMoveTime = performance.now();
       startScroll = marquee.scrollLeft;
+      stopInertia();
       marquee.classList.add('is-dragging');
       marquee.setPointerCapture?.(ev.pointerId);
     });
     marquee.addEventListener('pointermove', function(ev){
       if (!dragging) return;
       ev.preventDefault();
+      var now = performance.now();
+      var dx = ev.clientX - lastMoveX;
+      var dt = Math.max(1, now - lastMoveTime);
+      velocity = dx / dt;
+      lastMoveX = ev.clientX;
+      lastMoveTime = now;
       marquee.scrollLeft = startScroll - (ev.clientX - startX);
       scheduleActiveUpdate();
     });
@@ -3289,10 +3330,9 @@ function initTestimonialCarousel(){
       marquee.addEventListener(type, function(ev){
         if (!dragging) return;
         dragging = false;
-        marquee.classList.remove('is-dragging');
         marquee.releasePointerCapture?.(ev.pointerId);
         scheduleActiveUpdate();
-        window.setTimeout(snapToNearest, 40);
+        animateInertia(velocity);
       });
     });
   }
