@@ -3545,11 +3545,17 @@ def index():
         request.args.get("flow"),
         request.cookies.get("booking_flow"),
     )
+    initial_events = _public_events_payload()
+    today = datetime.now().strftime("%Y-%m-%d")
+    raw_visible_events = [ev for ev in EVENTS if not ev.get("hidden") and ev.get("photos")]
+    raw_upcoming_events = [ev for ev in raw_visible_events if str(ev.get("date", "")) >= today]
+    hero_source_events = initial_events or raw_upcoming_events or raw_visible_events
     template_context = {
         "stripe_enabled": bool(STRIPE_SECRET_KEY),
         "booking_flow_variant": booking_flow_variant,
-        "initial_events": _public_events_payload(),
+        "initial_events": initial_events,
         "initial_past_events": _past_events_payload(),
+        "hero_preload_image": _select_hero_preload_image(hero_source_events),
     }
 
     # ── Direct event / GBP product links: render v2 and auto-open the matching drawer ──
@@ -3867,6 +3873,37 @@ def _public_events_payload():
             result.append(payload)
     conn.close()
     return result
+
+
+def _select_hero_preload_image(events):
+    """Return the image URL that the frontend is most likely to use as the hero/LCP background.
+
+    Mirrors the default frontend pickHeroEvent() path for non-campaign traffic:
+    featured + bookable, then nearest bookable, then first visible event.
+    Campaign-specific hero selection still happens client-side, but this gives the browser
+    an early fetch for the normal homepage LCP image.
+    """
+    if not events:
+        return ""
+    ordered = sorted(events, key=lambda e: str(e.get("date") or ""))
+
+    def bookable(e):
+        if not e or e.get("status") == "completed":
+            return False
+        if "spots_left" not in e:
+            return e.get("status") in ("active", "upcoming", "")
+        return int(e.get("spots_left") or 0) > 0
+
+    hero = (
+        next((e for e in ordered if e.get("featured") and bookable(e)), None)
+        or next((e for e in ordered if bookable(e)), None)
+        or ordered[0]
+    )
+    photos = hero.get("photos") or []
+    src = photos[0] if photos else (hero.get("photo_url") or hero.get("photo") or "")
+    if not src:
+        return ""
+    return src if str(src).startswith("http") else str(src)
 
 
 def _past_events_payload(limit=12):

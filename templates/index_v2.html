@@ -18,6 +18,9 @@
 <meta name="twitter:title" content="{{ og_title|default('Calgary Family, Maternity & Wedding Photographer — Pashynska Photography') }}">
 <meta name="twitter:description" content="{{ og_description|default('Professional photographer in Calgary. Book online in 2 minutes.') }}">
 <meta name="twitter:image" content="{{ og_image|default('https://book.pashynskaphoto.com/static/og-image.jpg') }}">
+{% if hero_preload_image %}
+<link rel="preload" as="image" href="{{ hero_preload_image }}" type="image/webp" fetchpriority="high">
+{% endif %}
 <script>
   // PostHog is important for funnel/session replay, but it is not needed for first paint.
   // Queue early events, then load the real SDK during browser idle time.
