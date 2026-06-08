@@ -698,6 +698,24 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 ]}
 </script>
 {% endif %}
+
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1806486840358828');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 </head>
 <body data-ab-booking-flow="{{ booking_flow_variant|default('control') }}">
 
@@ -1096,6 +1114,30 @@ function trackBookingEvent(eventName, eventId, metadata) {
     };
     window.posthog.capture(`pp_${eventName}`, posthogProps);
   }
+
+  /* ── Meta Pixel event mapping ── */
+  if (typeof window.fbq === 'function') {
+    const pixelMap = {
+      'drawer_open':    ['ViewContent', {content_type: 'session'}],
+      'slot_selected':  ['ViewContent', {content_type: 'time_slot'}],
+      'form_started':   ['Lead'],
+      'reserve_attempt':['Lead', {content_name: payload.event_id}],
+      'payment_view':   ['InitiateCheckout', {content_name: payload.event_id}],
+      'payment_sent_clicked': ['AddPaymentInfo', {content_name: payload.event_id}],
+      'booking_confirmed': ['Purchase', {content_name: payload.event_id, currency: 'CAD'}]
+    };
+    const px = pixelMap[eventName];
+    if (px) {
+      const pxEvent = px[0];
+      const pxData = Object.assign({}, px[1] || {});
+      if (metadata && metadata.price) pxData.value = parseFloat(metadata.price) || 0;
+      else if (metadata && metadata.deposit) pxData.value = parseFloat(metadata.deposit) || 0;
+      if (pxData.value) pxData.currency = 'CAD';
+      window.fbq('track', pxEvent, pxData);
+    }
+  }
+  /* ── End Meta Pixel ── */
+
   API.track(payload);
 }
 
