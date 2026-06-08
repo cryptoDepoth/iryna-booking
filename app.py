@@ -3550,12 +3550,14 @@ def index():
     raw_visible_events = [ev for ev in EVENTS if not ev.get("hidden") and ev.get("photos")]
     raw_upcoming_events = [ev for ev in raw_visible_events if str(ev.get("date", "")) >= today]
     hero_source_events = initial_events or raw_upcoming_events or raw_visible_events
+    hero_event = _select_hero_event(hero_source_events)
     template_context = {
         "stripe_enabled": bool(STRIPE_SECRET_KEY),
         "booking_flow_variant": booking_flow_variant,
         "initial_events": initial_events,
         "initial_past_events": _past_events_payload(),
-        "hero_preload_image": _select_hero_preload_image(hero_source_events),
+        "hero_event": hero_event,
+        "hero_preload_image": _select_hero_preload_image([hero_event] if hero_event else []),
     }
 
     # ── Direct event / GBP product links: render v2 and auto-open the matching drawer ──
@@ -3875,16 +3877,15 @@ def _public_events_payload():
     return result
 
 
-def _select_hero_preload_image(events):
-    """Return the image URL that the frontend is most likely to use as the hero/LCP background.
+def _select_hero_event(events):
+    """Return the event that the frontend is most likely to use as the default hero.
 
     Mirrors the default frontend pickHeroEvent() path for non-campaign traffic:
     featured + bookable, then nearest bookable, then first visible event.
-    Campaign-specific hero selection still happens client-side, but this gives the browser
-    an early fetch for the normal homepage LCP image.
+    Campaign-specific hero selection still happens client-side.
     """
     if not events:
-        return ""
+        return None
     ordered = sorted(events, key=lambda e: str(e.get("date") or ""))
 
     def bookable(e):
@@ -3894,11 +3895,18 @@ def _select_hero_preload_image(events):
             return e.get("status") in ("active", "upcoming", "")
         return int(e.get("spots_left") or 0) > 0
 
-    hero = (
+    return (
         next((e for e in ordered if e.get("featured") and bookable(e)), None)
         or next((e for e in ordered if bookable(e)), None)
         or ordered[0]
     )
+
+
+def _select_hero_preload_image(events):
+    """Return the first image URL for the default hero/LCP event."""
+    hero = _select_hero_event(events)
+    if not hero:
+        return ""
     photos = hero.get("photos") or []
     src = photos[0] if photos else (hero.get("photo_url") or hero.get("photo") or "")
     if not src:
