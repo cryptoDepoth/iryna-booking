@@ -19,7 +19,7 @@ if _os.path.exists(_env_path):
                     _os.environ[_key] = _val
     print(f"[env] Loaded {_env_path}")
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, Response, has_request_context
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, send_file, Response, has_request_context
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 import json
@@ -1688,6 +1688,10 @@ try:
 except Exception as _e:
     log.warning(f"[photos] Could not ensure PHOTOS_DIR={PHOTOS_DIR}: {_e}")
 _BUNDLED_IMAGES_DIR = os.path.join(app.root_path, 'static', 'images')
+_IMAGE_CACHE_DIR = os.environ.get("IMAGE_CACHE_DIR", os.path.join(PHOTOS_DIR, ".cache"))
+_IMAGE_CACHE_MAX_DIMENSION = int(os.environ.get("IMAGE_CACHE_MAX_DIMENSION", "1400"))
+_IMAGE_CACHE_WEBP_QUALITY = int(os.environ.get("IMAGE_CACHE_WEBP_QUALITY", "78"))
+_IMAGE_CACHE_MIN_BYTES = int(os.environ.get("IMAGE_CACHE_MIN_BYTES", str(320 * 1024)))
 
 # ── Basic security headers ────────────────────────────────────────────────────
 # CSP is intentionally permissive (allows inline + Google Fonts + Stripe + Telegram
@@ -1699,11 +1703,11 @@ _CSP = (
     # (api.js → recaptcha__en.js); without them grecaptcha never loads and
     # every booking POST fails server-side verification.
     "script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdnjs.cloudflare.com "
-    "https://www.google.com https://www.gstatic.com; "
+    "https://www.google.com https://www.gstatic.com https://connect.facebook.net; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "font-src 'self' https://fonts.gstatic.com data:; "
-    "img-src 'self' data: https:; "
-    "connect-src 'self' https://api.stripe.com; "
+    "img-src 'self' data: https: https://www.facebook.com; "
+    "connect-src 'self' https://api.stripe.com https://www.facebook.com https://connect.facebook.net; "
     # frame-src: Stripe iframes + reCAPTCHA challenge iframe (when score is low)
     "frame-src https://js.stripe.com https://hooks.stripe.com https://www.google.com; "
     "frame-ancestors 'self' https://*.wfolio.com https://pashynska.agency https://www.pashynska.agency https://book.pashynskaphoto.com; "
@@ -2205,10 +2209,59 @@ def _uncaught(e):
 
 
 # Serve uploaded photos: try persistent volume first, then bundled static.
+def _optimized_image_cache_path(source_path):
+    """Return a cached WebP for legacy large jpg/png/webp images, or None.
+
+    Existing admin uploads are already optimized. This keeps public /images URLs
+    stable while fixing old heavy files on the persistent Fly volume.
+    """
+    try:
+        if not os.path.isfile(source_path):
+            return None
+        ext = os.path.splitext(source_path)[1].lower()
+        if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+            return None
+        source_size = os.path.getsize(source_path)
+        if source_size < _IMAGE_CACHE_MIN_BYTES:
+            return None
+
+        mtime = int(os.path.getmtime(source_path))
+        basename = os.path.basename(source_path)
+        cache_name = f"{basename}.{source_size}.{mtime}.webp"
+        os.makedirs(_IMAGE_CACHE_DIR, exist_ok=True)
+        cache_path = os.path.join(_IMAGE_CACHE_DIR, cache_name)
+        if os.path.isfile(cache_path):
+            return cache_path
+
+        from PIL import Image, ImageOps
+        Image.MAX_IMAGE_PIXELS = 36_000_000
+        resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+        with Image.open(source_path) as image:
+            image = ImageOps.exif_transpose(image)
+            image.thumbnail((_IMAGE_CACHE_MAX_DIMENSION, _IMAGE_CACHE_MAX_DIMENSION), resampling)
+            if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+                rgba = image.convert("RGBA")
+                flattened = Image.new("RGB", rgba.size, (255, 255, 255))
+                flattened.paste(rgba, mask=rgba.getchannel("A"))
+                image = flattened
+            else:
+                image = image.convert("RGB")
+            tmp_path = f"{cache_path}.tmp"
+            image.save(tmp_path, "WEBP", quality=_IMAGE_CACHE_WEBP_QUALITY, method=6)
+            os.replace(tmp_path, cache_path)
+        return cache_path
+    except Exception as exc:
+        log.warning(f"[images] optimized cache skipped for {source_path}: {exc}")
+        return None
+
 @app.route('/images/<path:filename>')
 def serve_image(filename):
     persistent_path = os.path.join(PHOTOS_DIR, filename)
-    if os.path.isfile(persistent_path):
+    source_path = persistent_path if os.path.isfile(persistent_path) else os.path.join(_BUNDLED_IMAGES_DIR, filename)
+    cached_path = _optimized_image_cache_path(source_path)
+    if cached_path:
+        response = send_file(cached_path, mimetype="image/webp", conditional=True)
+    elif os.path.isfile(persistent_path):
         response = send_from_directory(PHOTOS_DIR, filename)
     else:
         response = send_from_directory(_BUNDLED_IMAGES_DIR, filename)
