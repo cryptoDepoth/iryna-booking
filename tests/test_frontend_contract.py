@@ -95,10 +95,12 @@ def test_grid_cards_lazy_load_photo_slideshow_slides():
     """Grid cards should show multi-photo sessions without eagerly loading every slide on mobile."""
     html = TEMPLATE.read_text()
 
-    assert "GRID_PHOTO_SLIDE_LIMIT = 5" in html
+    assert "GRID_PHOTO_SLIDE_LIMIT = 3" in html
     assert "eventPhotoList(e, GRID_PHOTO_SLIDE_LIMIT)" in html
+    assert "const eagerFirstPhoto = i < 3" in html
     assert 'class="card-kb kb-host"' in html
     assert 'data-photos="${escapeAttr(JSON.stringify(lazyPhotos))}"' in html
+    assert 'data-bg="${escapeAttr(firstPhoto)}"' in html
     assert "hydrateCardSlides" in html
     assert "IntersectionObserver" in html
     assert "startGridPhotoSlideshows();" in html

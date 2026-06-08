@@ -1212,7 +1212,7 @@ function escapeHtml(text) {
 function escapeAttr(text) {
   return escapeHtml(text);
 }
-const GRID_PHOTO_SLIDE_LIMIT = 5;
+const GRID_PHOTO_SLIDE_LIMIT = 3;
 function eventPhotoList(eventObj, limit) {
   const raw = Array.isArray(eventObj?.photos) && eventObj.photos.length
     ? eventObj.photos
@@ -1486,6 +1486,11 @@ function clearGridPhotoSlideshows() {
 
 function hydrateCardSlides(host) {
   if (!host || host.dataset.loaded === '1') return;
+  const first = host.querySelector('.kb-slide[data-bg]');
+  if (first && !first.style.backgroundImage) {
+    first.style.backgroundImage = `url(${JSON.stringify(String(first.dataset.bg || ''))})`;
+    delete first.dataset.bg;
+  }
   let rest = [];
   try {
     rest = JSON.parse(host.dataset.photos || '[]');
@@ -1503,14 +1508,14 @@ function hydrateCardSlides(host) {
 
 function startGridPhotoSlideshows() {
   clearGridPhotoSlideshows();
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const hosts = Array.from(document.querySelectorAll('.event-card .card-kb[data-count]'))
-    .filter(host => Number(host.dataset.count || 1) > 1);
+  const hosts = Array.from(document.querySelectorAll('.event-card .card-kb[data-count]'));
   if (!hosts.length) return;
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const begin = (host, idx = 0) => {
-    if (!host || host.dataset.started === '1') return;
+    if (!host) return;
     hydrateCardSlides(host);
+    if (reduceMotion || host.dataset.started === '1') return;
     const count = host.querySelectorAll('.kb-slide').length;
     if (count > 1) {
       host.dataset.started = '1';
@@ -1535,7 +1540,7 @@ function startGridPhotoSlideshows() {
       begin(entry.target, idx);
       _cardKbObserver.unobserve(entry.target);
     });
-  }, {threshold: 0.18, rootMargin: '160px 0px'});
+  }, {threshold: 0.18, rootMargin: '220px 0px'});
   hosts.forEach(host => _cardKbObserver.observe(host));
 }
 
@@ -1569,6 +1574,7 @@ function renderGrid() {
     const isSold = e.spots_left === 0;
     const cardPhotos = eventPhotoList(e, GRID_PHOTO_SLIDE_LIMIT);
     const firstPhoto = cardPhotos[0];
+    const eagerFirstPhoto = i < 3;
     const lazyPhotos = cardPhotos.slice(1);
     const allPhotoCount = Array.isArray(e.photos) && e.photos.length ? e.photos.length : cardPhotos.length;
     const totalPrice = e.full_price || e.price || 0;
@@ -1577,7 +1583,7 @@ function renderGrid() {
 	    <article class="event-card card-reveal ${isSold ? 'sold' : ''}" data-event-id="${e.id}" style="animation-delay:${revDelay}ms" onclick="openDrawer('${e.id}')">
       <div class="photo">
         <div class="card-kb kb-host" data-count="${cardPhotos.length}" data-photos="${escapeAttr(JSON.stringify(lazyPhotos))}">
-          <div class="kb-slide kb-active" style="background-image:url('${escapeAttr(firstPhoto)}')"></div>
+          <div class="kb-slide kb-active" ${eagerFirstPhoto ? `style="background-image:url('${escapeAttr(firstPhoto)}')"` : `data-bg="${escapeAttr(firstPhoto)}"`}></div>
         </div>
         <div class="status ${b.cls}"><span class="dot"></span>${b.txt}</div>
         <div class="countdown">${cd}</div>
