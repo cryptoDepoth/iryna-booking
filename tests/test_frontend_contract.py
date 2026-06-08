@@ -61,20 +61,20 @@ def test_drawer_contains_addons_agreement_and_amount_summary_hooks():
     assert "questionnaire" not in html.lower() or "after_confirmed_payment" in html
 
 
-def test_meta_campaign_landing_cue_guides_ad_clicks_to_booking_drawer():
-    """Meta ad traffic should see a booking-site cue, not be pushed back to DM."""
+def test_meta_campaign_traffic_uses_photo_first_hero_not_extra_text_cue():
+    """Meta ad traffic should route the photo hero to the matching session without adding a duplicate text-only cue."""
     html = TEMPLATE.read_text()
 
-    assert 'id="campaignCue"' in html
+    assert 'id="campaignCue"' not in html
+    assert "renderCampaignLandingCue" not in html
+    assert "openCampaignCueSession" not in html
+    assert "campaign_cue_view" not in html
+    assert "campaign_cue_cta_click" not in html
     assert "getCampaignLandingCue" in html
-    assert "renderCampaignLandingCue" in html
-    assert "openCampaignCueSession" in html
-    assert "campaign_cue_view" in html
-    assert "campaign_cue_cta_click" in html
+    assert "pickHeroEvent" in html
     assert "utm_campaign" in html
     assert "fbclid" in html
-    assert "openDrawer(event.id)" in html
-    assert "Mountain photos near Calgary" in html
+    assert "openDrawer('${featured.id}')" in html
     assert "What’s included" in html
     assert "renderIncludedSection" in html
 

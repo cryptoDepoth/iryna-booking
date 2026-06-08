@@ -434,17 +434,6 @@ img,picture,video{max-width:100%;height:auto;display:block}
 @keyframes cta-sheen{0%{transform:translateX(-130%)}55%,100%{transform:translateX(130%)}}
 @keyframes slot-pop{0%{transform:translateY(-1px) scale(1)}45%{transform:translateY(-1px) scale(1.11)}100%{transform:translateY(-1px) scale(1)}}
 
-/* Campaign landing cue: shown only for Meta/UTM ad traffic. */
-.campaign-cue{display:none;margin:14px auto 24px;max-width:1120px;background:linear-gradient(135deg,#fffaf8 0%,#f5e8e3 100%);border:1px solid rgba(196,133,122,.24);border-radius:18px;padding:16px 18px;box-shadow:0 10px 28px rgba(120,80,70,.08)}
-.campaign-cue.show{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
-.campaign-cue .eyebrow{font:700 .66rem var(--font-b);letter-spacing:.16em;text-transform:uppercase;color:var(--rose-deep);margin-bottom:4px}
-.campaign-cue h3{font-family:var(--font-d);font-size:1.32rem;font-weight:500;color:var(--ink);line-height:1.15;margin-bottom:4px}
-.campaign-cue p{font-size:.88rem;color:var(--ink-2);line-height:1.45}
-.campaign-cue .mini-proof{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
-.campaign-cue .mini-proof span{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:999px;padding:6px 10px;font-size:.74rem;color:var(--ink-2);white-space:nowrap}
-.campaign-cue button{background:var(--rose-deep);color:#fff;border:0;border-radius:12px;padding:12px 18px;font:800 .86rem var(--font-b);cursor:pointer;box-shadow:0 10px 22px rgba(163,104,94,.22)}
-.campaign-cue button:hover{filter:brightness(.96)}
-@media(max-width:680px){.campaign-cue.show{grid-template-columns:1fr}.campaign-cue button{width:100%;padding:14px 18px}.campaign-cue{margin-top:10px}}
 .skel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
 .skel-card{border:1px solid var(--ink-5);border-radius:16px;overflow:hidden;background:#fff;padding-bottom:16px}
 .skel-img{height:200px}
@@ -740,20 +729,6 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
     <span data-i18n="proof_award"><strong>Calgary</strong> local pick 2024 & 2025</span>
   </div>
 
-  <div class="campaign-cue" id="campaignCue" aria-live="polite">
-    <div>
-      <div class="eyebrow" id="campaignCueEyebrow">Calgary mini session</div>
-      <h3 id="campaignCueTitle">Saw this on Instagram? Pick a real available time here.</h3>
-      <p id="campaignCueBody">No DM back-and-forth: choose a slot, reserve it for 15 minutes, then send the deposit by e-Transfer.</p>
-      <div class="mini-proof">
-        <span>✓ Real available slots</span>
-        <span>✓ Deposit shown before checkout</span>
-        <span>✓ Style/location details after booking</span>
-      </div>
-    </div>
-    <button type="button" onclick="openCampaignCueSession()">Choose a time</button>
-  </div>
-
   <!-- legacy featured-wrap kept hidden so JS that targets it still works -->
   <div class="featured-wrap" id="featuredWrap"></div>
 
@@ -1015,29 +990,11 @@ function getCampaignLandingCue() {
   if (!isMetaTraffic) return null;
 
   if (/mountain|mountains|quarry|bragg|kananaskis|outdoor/.test(haystack)) {
-    return {
-      eyebrow: 'Mountain mini session · Quarry Lake',
-      title: 'Mountain photos near Calgary — choose your real available time.',
-      body: '20-minute outdoor mini session with 20 edited photos, all originals included, posing help, and the exact spot/details after booking. Reserve a slot first; deposit holds it for 15 minutes.'
-    };
+    return {type: 'mountain'};
   }
-  return {
-    eyebrow: 'Calgary photography booking',
-    title: 'Ready to book? Pick a real available time here.',
-    body: 'The available sessions below connect directly to Iryna’s booking flow — choose a slot, reserve it, and finish the deposit step.'
-  };
+  return {type: 'booking'};
 }
 
-function renderCampaignLandingCue() {
-  const cue = getCampaignLandingCue();
-  const el = document.getElementById('campaignCue');
-  if (!el || !cue) return;
-  document.getElementById('campaignCueEyebrow').textContent = cue.eyebrow;
-  document.getElementById('campaignCueTitle').textContent = cue.title;
-  document.getElementById('campaignCueBody').textContent = cue.body;
-  el.classList.add('show');
-  trackBookingEvent('campaign_cue_view', '', {eyebrow: cue.eyebrow});
-}
 
 function campaignHintText() {
   const params = new URLSearchParams(window.location.search || '');
@@ -1087,15 +1044,6 @@ function pickHeroEvent() {
     || null;
 }
 
-function openCampaignCueSession() {
-  const event = pickCampaignCueEvent();
-  if (event) {
-    trackBookingEvent('campaign_cue_cta_click', event.id, {title: event.title || ''});
-    openDrawer(event.id);
-    return;
-  }
-  document.getElementById('filters')?.scrollIntoView({behavior: 'smooth', block: 'start'});
-}
 
 function trackBookingEvent(eventName, eventId, metadata) {
   const attribution = captureAttribution();
@@ -1339,7 +1287,6 @@ function renderFeatured() {
   if (!host) return;
   const featured = pickHeroEvent();
   if (!featured) { host.innerHTML = ''; return; }
-  const campaignCue = getCampaignLandingCue();
   const cdText = countdownText(featured.date, false);
 
   // Build photos list — use photos array if available, fallback to single photo
@@ -2354,7 +2301,6 @@ function renderAll() {
   renderFeatured();
   renderGrid();
   renderPast();
-  renderCampaignLandingCue();
 }
 
 // ── INIT ──
