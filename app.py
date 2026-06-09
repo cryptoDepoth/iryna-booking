@@ -8938,6 +8938,211 @@ def api_client_edit(client_id):
     return jsonify({"success": True})
 
 
+@app.route("/admin/api/private-session", methods=["POST"])
+@app.route("/admin/api/generate-invoice", methods=["POST"])
+@admin_required
+def api_generate_invoice():
+    """Generate Stripe payment link for private session invoice."""
+    import stripe
+    from flask import jsonify
+    import os
+
+    data = request.get_json()
+    firstname = data.get('firstname')
+    lastname = data.get('lastname')
+    email = data.get('email')
+    price = float(data.get('price', 300))
+    date = data.get('date')
+    start_time = data.get('start_time')
+    end_time = data.get('end_time')
+    description = data.get('description', 'Индивидуальная фотосессия')
+
+    if not all([firstname, lastname, email, price, date, start_time, end_time]):
+        return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+
+    try:
+        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+        if not stripe.api_key:
+            return jsonify({'success': False, 'error': 'Stripe not configured'}), 500
+
+        # Create Stripe payment link
+        payment_link = stripe.PaymentLink.create(
+            line_items=[{
+                'price_data': {
+                    'currency': 'cad',
+                    'product_data': {
+                        'name': f"{description} ({date} {start_time}-{end_time})",
+                        'description': f"Индивидуальная фотосессия с {firstname} {lastname}"
+                    },
+                    'unit_amount': int(price * 100)
+                },
+                'quantity': 1
+            }],
+            customer_email=email,
+            metadata={
+                'client_name': f"{firstname} {lastname}",
+                'date': date,
+                'start_time': start_time,
+                'end_time': end_time,
+                'type': 'private_session'
+            }
+        )
+
+        return jsonify({
+            'success': True,
+            'payment_link': payment_link.url,
+            'invoice_id': payment_link.id
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route("/admin/api/private-session", methods=["POST"])
+@admin_required
+def api_private_session():
+    """Create a hidden event and book a client into it."""
+    from datetime import datetime, timedelta
+    import secrets
+    import yaml
+    import os
+
+    def generate_slots(event=None):
+        """Generate time slots based on event config."""
+        ev = event or {}
+        start = datetime.strptime(ev.get("start_time", "09:00"), "%H:%M")
+        end = datetime.strptime(ev.get("end_time", "18:00"), "%H:%M")
+        interval = ev.get("slot_interval", 45)
+        sl = ev.get("session_length", 30)
+        slots = []
+        current = start
+        while current < end:
+            slot_str = current.strftime("%H:%M")
+            session_end = current + timedelta(minutes=sl)
+            slots.append({
+                "time": slot_str,
+                "label": f"{slot_str} – {session_end.strftime('%H:%M')}",
+                "reserved_until": None
+            })
+            current += timedelta(minutes=interval)
+        return slots
+
+    def create_manual_booking(event_id, slot_time, name, email, phone, instagram, mark_paid, admin_id):
+        """Manually create a booking (copied from /admin/api/event/<event_id>/manual-book)."""
+        conn = db_conn()
+        try:
+            # Check slot availability
+            existing = conn.execute(
+                "SELECT id FROM bookings WHERE event_id=? AND time=? AND status NOT IN ('cancelled', 'expired')",
+                (event_id, slot_time)
+            ).fetchone()
+            if existing:
+                return None  # Slot taken
+
+            # Create client record
+            client_id = None
+            if email or phone or instagram:
+                conn.execute(
+                    "INSERT INTO clients (name, email, phone, instagram, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
+                    (name, email, phone, instagram)
+                )
+                client_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+            # Create booking
+            full_price = 300.0  # Default for private sessions
+            paid_amount = full_price if mark_paid else 0.0
+            status = "confirmed" if mark_paid else "reserved"
+            conn.execute(
+                "INSERT INTO bookings (event_id, time, name, email, phone, instagram, client_id, "+ 
+                "status, confirmed, paid_amount, full_price, created_at, admin_id) "+
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)",
+                (event_id, slot_time, name, email, phone, instagram, client_id,
+                 status, 1 if mark_paid else 0, paid_amount, full_price, admin_id)
+            )
+            booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.commit()
+            return booking_id
+        except Exception as e:
+            conn.rollback()
+            log.error(f"[manual-book] Failed: {e}")
+            return None
+        finally:
+            conn.close()
+
+    data = request.json or {}
+    date = data.get("date")
+    start_time = data.get("start_time")
+    end_time = data.get("end_time")
+    client_name = data.get("client_name")
+    
+    if not (date and start_time and end_time and client_name):
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Generate a unique ID for the hidden event
+    event_id = f"private-{secrets.token_hex(4)}"
+    
+    # Create a hidden event
+    event = {
+        "id": event_id,
+        "title": f"Private Session for {client_name}",
+        "subtitle": "Individual photoshoot (not visible on website)",
+        "date": date,
+        "start_time": start_time,
+        "end_time": end_time,
+        "session_length": 30,
+        "break_length": 15,
+        "slot_interval": 45,
+        "deposit": 0.0,
+        "full_price": 300.0,
+        "location": "Calgary — exact spot sent after booking",
+        "session_type": "private",
+        "featured": False,
+        "hidden": True,
+        "included": [
+            "30 minutes private session",
+            "20 professionally edited photos",
+            "All original photos included"
+        ],
+        "photos": ["/images/placeholder.jpg"]
+    }
+    
+    # Add to global EVENTS (in-memory)
+    global EVENTS
+    EVENTS.append(event)
+    
+    # Save to events.yaml
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "events.yaml"), "r") as f:
+            events_data = yaml.safe_load(f) or {"events": []}
+        events_data["events"].append(event)
+        with open(os.path.join(os.path.dirname(__file__), "events.yaml"), "w") as f:
+            yaml.safe_dump(events_data, f, default_flow_style=False, sort_keys=False)
+    except Exception as e:
+        log.error(f"[private-session] Failed to save events.yaml: {e}")
+        return jsonify({"error": "Failed to save event"}), 500
+    
+    # Create a booking for the first slot
+    slots = generate_slots(event)
+    if not slots:
+        return jsonify({"error": "No slots available"}), 400
+    
+    first_slot = slots[0]
+    booking_id = create_manual_booking(
+        event_id=event_id,
+        slot_time=first_slot["time"],
+        name=client_name,
+        email="",
+        phone="",
+        instagram="",
+        mark_paid=True,
+        admin_id=session.get("admin_id")
+    )
+    
+    if not booking_id:
+        return jsonify({"error": "Failed to create booking"}), 500
+    
+    return jsonify({"success": True, "event_id": event_id, "booking_id": booking_id})
+
+
 @app.route("/admin/backup", methods=["POST"])
 @admin_required
 def admin_manual_backup():

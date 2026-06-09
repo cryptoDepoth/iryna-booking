@@ -2899,9 +2899,9 @@
 
 <!-- ── PRIVATE SESSION MODAL ─────────────────────────────────────────────────── -->
 <div class="resched-modal" id="private-session-modal" onclick="closePrivateSessionModalOutside(event)">
-    <div class="resched-box">
+    <div class="resched-box" style="max-width: 600px;">
         <h3>🔒 Приватная фотосессия</h3>
-        <p style="color:var(--text-2);margin-bottom:16px;">Создать скрытое событие для индивидуальной фотосессии (не видно на сайте).</p>
+        <p style="color:var(--text-2);margin-bottom:20px;">Создать индивидуальную фотосессию (не видно на сайте).</p>
 
         <div class="resched-field">
             <label for="private-date">Дата</label>
@@ -2909,32 +2909,151 @@
         </div>
 
         <div class="resched-field">
-            <label for="private-start">Начало (например, 10:00)</label>
-            <input type="text" id="private-start" placeholder="10:00" required>
+            <label>Время</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="private-start-hour" style="flex: 1;">
+                    <option value="">Час</option>
+                    <option value="08">08</option>
+                    <option value="09">09</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                    <option value="17">17</option>
+                    <option value="18">18</option>
+                    <option value="19">19</option>
+                    <option value="20">20</option>
+                </select>
+                <select id="private-start-minute" style="flex: 1;">
+                    <option value="">Минуты</option>
+                    <option value="00">00</option>
+                    <option value="30">30</option>
+                </select>
+                <span style="line-height: 38px;">—</span>
+                <select id="private-end-hour" style="flex: 1;">
+                    <option value="">Час</option>
+                    <option value="09">09</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                    <option value="17">17</option>
+                    <option value="18">18</option>
+                    <option value="19">19</option>
+                    <option value="20">20</option>
+                    <option value="21">21</option>
+                </select>
+                <select id="private-end-minute" style="flex: 1;">
+                    <option value="">Минуты</option>
+                    <option value="00">00</option>
+                    <option value="30">30</option>
+                </select>
+            </div>
         </div>
 
         <div class="resched-field">
-            <label for="private-end">Конец (например, 18:00)</label>
-            <input type="text" id="private-end" placeholder="18:00" required>
+            <label for="private-firstname">Имя</label>
+            <input type="text" id="private-firstname" placeholder="Иван" required>
         </div>
 
         <div class="resched-field">
-            <label for="private-name">Имя клиента</label>
-            <input type="text" id="private-name" placeholder="Иван Иванов" required>
+            <label for="private-lastname">Фамилия</label>
+            <input type="text" id="private-lastname" placeholder="Иванов" required>
+        </div>
+
+        <div class="resched-field">
+            <label for="private-email">Email</label>
+            <input type="email" id="private-email" placeholder="ivan@example.com" required>
+        </div>
+
+        <div class="resched-field">
+            <label for="private-price">Цена (CAD)</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="number" id="private-price" placeholder="300" min="0" step="5" style="flex: 1;">
+                <button type="button" class="btn-outline" onclick="generateInvoice()" style="white-space: nowrap;">Сгенерировать инвойс</button>
+            </div>
+        </div>
+
+        <div class="resched-field">
+            <label>Ссылка на оплату</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="text" id="private-payment-link" readonly style="flex: 1; background: #f5f5f5;">
+                <button type="button" class="btn-outline" onclick="copyPaymentLink()" style="white-space: nowrap;">Копировать</button>
+            </div>
         </div>
 
         <div class="resched-actions">
             <button type="button" class="cancel" onclick="closePrivateSessionModal()">Отмена</button>
-            <button type="button" class="submit" onclick="submitPrivateSession()">Создать</button>
+            <button type="button" class="submit" onclick="submitPrivateSession()" id="private-create-btn">Создать</button>
         </div>
     </div>
 </div>
 
 <script>
+    function generateInvoice() {
+        const firstname = document.getElementById('private-firstname').value;
+        const lastname = document.getElementById('private-lastname').value;
+        const email = document.getElementById('private-email').value;
+        const price = document.getElementById('private-price').value;
+        const date = document.getElementById('private-date').value;
+        const startHour = document.getElementById('private-start-hour').value;
+        const startMinute = document.getElementById('private-start-minute').value;
+        const endHour = document.getElementById('private-end-hour').value;
+        const endMinute = document.getElementById('private-end-minute').value;
+
+        if (!firstname || !lastname || !email || !price || !date || !startHour || !startMinute || !endHour || !endMinute) {
+            alert('Заполните все поля перед генерацией инвойса');
+            return;
+        }
+
+        const startTime = `${startHour}:${startMinute}`;
+        const endTime = `${endHour}:${endMinute}`;
+
+        fetch('/admin/api/generate-invoice', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                firstname,
+                lastname,
+                email,
+                price,
+                date,
+                start_time: startTime,
+                end_time: endTime,
+                description: `Индивидуальная фотосессия ${date} ${startTime}-${endTime}`
+            })
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                document.getElementById('private-payment-link').value = data.payment_link;
+                alert('Инвойс сгенерирован! Ссылка на оплату скопирована в поле.');
+            } else {
+                alert(data.error || 'Ошибка генерации инвойса');
+            }
+        }).catch(e => alert('Ошибка: ' + e));
+    }
+
+    function copyPaymentLink() {
+        const link = document.getElementById('private-payment-link');
+        link.select();
+        document.execCommand('copy');
+        alert('Ссылка скопирована в буфер обмена!');
+    }
+
     function openPrivateSessionModal() {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('private-date').value = today;
         document.getElementById('private-date').min = today;
+        document.getElementById('private-firstname').value = '';
+        document.getElementById('private-lastname').value = '';
+        document.getElementById('private-email').value = '';
+        document.getElementById('private-price').value = '300';
+        document.getElementById('private-payment-link').value = '';
         document.getElementById('private-session-modal').style.display = 'flex';
     }
 
@@ -2947,21 +3066,46 @@
     }
 
     function submitPrivateSession() {
+        const firstname = document.getElementById('private-firstname').value;
+        const lastname = document.getElementById('private-lastname').value;
+        const email = document.getElementById('private-email').value;
+        const price = document.getElementById('private-price').value;
         const date = document.getElementById('private-date').value;
-        const start = document.getElementById('private-start').value;
-        const end = document.getElementById('private-end').value;
-        const name = document.getElementById('private-name').value;
+        const startHour = document.getElementById('private-start-hour').value;
+        const startMinute = document.getElementById('private-start-minute').value;
+        const endHour = document.getElementById('private-end-hour').value;
+        const endMinute = document.getElementById('private-end-minute').value;
 
-        if (!date || !start || !end || !name) {
+        if (!firstname || !lastname || !email || !price || !date || !startHour || !startMinute || !endHour || !endMinute) {
             alert('Заполните все поля');
             return;
         }
 
+        const startTime = `${startHour}:${startMinute}`;
+        const endTime = `${endHour}:${endMinute}`;
+
         fetch('/admin/api/private-session', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({date, start_time: start, end_time: end, client_name: name})
+            body: JSON.stringify({
+                date,
+                start_time: startTime,
+                end_time: endTime,
+                client_name: `${firstname} ${lastname}`,
+                email,
+                price,
+                payment_link: document.getElementById('private-payment-link').value
+            })
         }).then(r => r.json()).then(data => {
+            if (data.success) {
+                alert('Приватная фотосессия создана! ID: ' + data.event_id);
+                location.reload();
+            } else {
+                alert(data.error || 'Ошибка создания');
+            }
+        }).catch(e => alert('Ошибка: ' + e));
+    }
+</script>
             if (data.success) {
                 alert('Приватная фотосессия создана! ID: ' + data.event_id);
                 location.reload();
