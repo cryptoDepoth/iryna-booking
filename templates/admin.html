@@ -1080,6 +1080,7 @@
         </div>
         <div class="page-actions">
             <button class="btn-outline" type="button" onclick="openStripeModal()">💳 Stripe link</button>
+            <button class="btn-outline" type="button" onclick="openPrivateSessionModal()">🔒 Приватная фотосессия</button>
             <a href="#events-section" class="btn-outline" style="text-decoration:none;">✦ Edit session setup</a>
             <button class="btn-outline" onclick="location.reload()">↻ Refresh</button>
         </div>
@@ -2895,6 +2896,81 @@
         </div>
     </div>
 </div>
+
+<!-- ── PRIVATE SESSION MODAL ─────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="private-session-modal" onclick="closePrivateSessionModalOutside(event)">
+    <div class="modal-box" style="max-width:480px;">
+        <h3>🔒 Приватная фотосессия</h3>
+        <p style="color:var(--text-2);margin-bottom:16px;">Создать скрытое событие для индивидуальной фотосессии (не видно на сайте).</p>
+
+        <div class="resched-field">
+            <label for="private-date">Дата</label>
+            <input type="date" id="private-date" required>
+        </div>
+
+        <div class="resched-field">
+            <label for="private-start">Начало (например, 10:00)</label>
+            <input type="text" id="private-start" placeholder="10:00" required>
+        </div>
+
+        <div class="resched-field">
+            <label for="private-end">Конец (например, 18:00)</label>
+            <input type="text" id="private-end" placeholder="18:00" required>
+        </div>
+
+        <div class="resched-field">
+            <label for="private-name">Имя клиента</label>
+            <input type="text" id="private-name" placeholder="Иван Иванов" required>
+        </div>
+
+        <div class="resched-actions">
+            <button type="button" class="cancel" onclick="closePrivateSessionModal()">Отмена</button>
+            <button type="button" class="submit" onclick="submitPrivateSession()">Создать</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openPrivateSessionModal() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('private-date').value = today;
+        document.getElementById('private-date').min = today;
+        document.getElementById('private-session-modal').style.display = 'flex';
+    }
+
+    function closePrivateSessionModal() {
+        document.getElementById('private-session-modal').style.display = 'none';
+    }
+
+    function closePrivateSessionModalOutside(e) {
+        if (e.target === document.getElementById('private-session-modal')) closePrivateSessionModal();
+    }
+
+    function submitPrivateSession() {
+        const date = document.getElementById('private-date').value;
+        const start = document.getElementById('private-start').value;
+        const end = document.getElementById('private-end').value;
+        const name = document.getElementById('private-name').value;
+
+        if (!date || !start || !end || !name) {
+            alert('Заполните все поля');
+            return;
+        }
+
+        fetch('/admin/api/private-session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({date, start_time: start, end_time: end, client_name: name})
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                alert('Приватная фотосессия создана! ID: ' + data.event_id);
+                location.reload();
+            } else {
+                alert(data.error || 'Ошибка создания');
+            }
+        }).catch(e => alert('Ошибка: ' + e));
+    }
+</script>
 
 </body>
 </html>
