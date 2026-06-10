@@ -9527,4 +9527,7 @@ _start_global_watcher()
 
 # ===== RUN =====
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    # Werkzeug debugger = remote code execution if ever exposed (this binds
+    # to 0.0.0.0 for LAN/tunnel testing!). Debug is opt-in via FLASK_DEBUG=1.
+    _debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=5001, debug=_debug)
