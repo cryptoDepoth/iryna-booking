@@ -1,4 +1,10 @@
 .env
+# All .env variants are secret; only sanitized *.example templates are committed.
+# (.env.qa with a real admin password was tracked until 2026-06-10 — rotate that password.)
+.env.*
+!.env.example
+!.env.qa.example
+!.env.*.example
 __pycache__/
 *.pyc
 .pytest_cache/
