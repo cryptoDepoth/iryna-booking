@@ -46,6 +46,27 @@ events:
   - /images/blossom-may3_646dd709.png
   status: completed
   hidden: true
+- id: private-session
+  title: Private Session
+  subtitle: Individual photoshoot (not visible on website)
+  date: '2026-06-10'
+  start_time: '10:00'
+  end_time: '18:00'
+  session_length: 30
+  break_length: 15
+  slot_interval: 45
+  deposit: 0.0
+  full_price: 300.0
+  location: Calgary — exact spot sent after booking
+  session_type: private
+  featured: false
+  hidden: true
+  included:
+  - 30 minutes private session
+  - 20 professionally edited photos
+  - All original photos included
+  photos:
+  - /images/placeholder.jpg
 settings:
   photographer_email: iryna.pashynska@gmail.com
   photographer_name: Iryna

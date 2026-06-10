@@ -826,7 +826,7 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
                        location=None, location_url=None, selected_addons=None,
                        addons_total=0.0, total_price=None, amount_due_today=None,
                        remaining_balance=None, marketing_consent=None,
-                       questionnaire_url=None):
+                       questionnaire_url=None, balance_url=None, balance_due=None):
     """Send premium HTML confirmation email to client via Himalaya CLI.
 
     Returns True only when SMTP/Himalaya accepts the message. This is used by
@@ -861,6 +861,10 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         safe_time = _html_escape(str(slot_time or ""))
         safe_booking = _html_escape(str(booking_id))
         safe_questionnaire_url = _html_escape(str(questionnaire_url or ""))
+
+        # Initialize balance_url and balance_due (passed from admin_confirm)
+        balance_url = balance_url or None
+        balance_due = balance_due or 0.0
 
         amount_lines_plain = []
         amount_rows_html = []
@@ -923,6 +927,14 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
             )
         amount_plain = ("\n" + "\n".join(amount_lines_plain) + "\n") if amount_lines_plain else ""
         amount_html = "".join(amount_rows_html)
+        
+        # Balance payment button (if balance is due)
+        balance_button_html = ""
+        if balance_url and balance_due is not None and balance_due > 0:
+            balance_button_html = f"""<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0 0;">
+<tr><td style="text-align:center;"><a href="{_html_escape(balance_url)}" style="display:inline-block;background:#4b2f38;color:#ffffff;text-decoration:none;border-radius:12px;padding:11px 18px;font-size:13px;font-weight:700;">💳 Pay Remaining Balance (${_money(balance_due):.2f} CAD)</a></td></tr>
+<tr><td style="text-align:center;padding:8px 0 0;font-size:12px;color:#9a756d;">or pay later by Interac e-Transfer to iryna.pashynska@gmail.com</td></tr>
+</table>"""
 
         subject = f"Booking Confirmed — {event_text} on {date_nice}"
         location_line = f"Location: {location_text}\n" if location_text else "Location details will be sent closer to the session date.\n"
@@ -1043,7 +1055,7 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
       <h2 style=\"margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;font-weight:400;color:#4b2f38;\">What happens next</h2>
       <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#c4857a;color:#fff;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">1</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">We meet for your session.</strong><br>{safe_date} at {safe_time}. {('Location: ' + safe_location + '.') if location_text else 'Exact location will be sent closer to the session date.'}</td></tr>
-        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#d9aaa0;color:#fff;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">2</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">After the photo session, the remaining balance is requested.</strong><br>You can pay by Interac e-Transfer or securely by Stripe card, Apple Pay, or Google Pay.</td></tr>
+        <tr class="timeline-step"><td width="34" valign="top" style="padding:0 0 18px;"><span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:#d9aaa0;color:#fff;text-align:center;line-height:26px;font-size:13px;font-weight:700;">2</span></td><td style="padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;"><strong style="color:#4b2f38;">Pay the remaining balance.</strong><br>You can pay now or after the session. Payment is required to receive all photos.<br><br>{balance_button_html}</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#e7c7bf;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">3</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">We review and confirm the images for editing.</strong><br>I prepare the photos and confirm with you which images will be professionally edited.</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#f0ded7;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">4</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">You receive all original photos from the session.</strong><br>Unedited, full-resolution images delivered as-is — no retouching, no filters, every frame I captured.</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#fff1ec;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">5</span></td><td style=\"padding:0;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">You receive your private Wfolio gallery link.</strong><br>Please download your photos when the link arrives. Galleries are normally kept online for 1–2 months.</td></tr>
@@ -6889,6 +6901,14 @@ def admin_confirm():
     email_sent = False
     ev = get_event_by_id(booking.get("event_id"))
     if ev and booking:
+        # Calculate balance due and generate Stripe URL
+        full_price = booking.get("full_price", SESSION_PRICE)
+        paid_amount = booking.get("paid_amount", 0)
+        balance_due = max(0, full_price - paid_amount)
+        balance_url = None
+        if balance_due > 0:
+            balance_url = _create_balance_checkout_url(booking, ev, balance_due)
+        
         email_sent = _send_client_email(
             to_email=booking.get("email", ""),
             client_name=booking.get("name", "Client"),
@@ -6898,6 +6918,8 @@ def admin_confirm():
             booking_id=booking_id,
             location=ev.get("location"),
             location_url=ev.get("location_url"),
+            balance_url=balance_url,
+            balance_due=balance_due,
             **_client_email_context(booking, ev),
         )
 
