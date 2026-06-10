@@ -6901,14 +6901,18 @@ def admin_confirm():
     email_sent = False
     ev = get_event_by_id(booking.get("event_id"))
     if ev and booking:
-        # Calculate balance due and generate Stripe URL
-        full_price = booking.get("full_price", SESSION_PRICE)
-        paid_amount = booking.get("paid_amount", 0)
-        balance_due = max(0, full_price - paid_amount)
+        # Balance due + Stripe link — same helpers as the request-balance API
+        # (None-safe, addon-aware). A Stripe outage must never block the
+        # confirmation email, so the link is strictly best-effort.
+        paid_amount = _booking_paid_amount(booking, ev)
+        balance_due = _booking_balance_due(booking, ev)
         balance_url = None
         if balance_due > 0:
-            balance_url = _create_balance_checkout_url(booking, ev, balance_due)
-        
+            try:
+                balance_url = _create_balance_checkout_url(booking, ev, balance_due)
+            except Exception as e:
+                log.error(f"[admin-confirm] Stripe balance link failed for #{booking_id}: {e}")
+
         email_sent = _send_client_email(
             to_email=booking.get("email", ""),
             client_name=booking.get("name", "Client"),
