@@ -3159,7 +3159,7 @@
             <label for="private-price">Цена (CAD)</label>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <input type="number" id="private-price" placeholder="300" min="0" step="5" style="flex: 1;">
-                <button type="button" class="btn-outline" onclick="generateInvoice()" style="white-space: nowrap;">Сгенерировать инвойс</button>
+                <button type="button" class="btn-outline" id="private-invoice-btn" onclick="generateInvoice()" style="white-space: nowrap;">Сгенерировать инвойс</button>
             </div>
         </div>
 
@@ -3171,6 +3171,8 @@
             </div>
         </div>
 
+        <div id="private-status" role="status" aria-live="polite" style="display:none;margin:14px 0 0;padding:10px 14px;border-radius:10px;font-size:14px;line-height:1.5;"></div>
+
         <div class="resched-actions">
             <button type="button" class="cancel" onclick="closePrivateSessionModal()">Отмена</button>
             <button type="button" class="submit" onclick="submitPrivateSession()" id="private-create-btn">Создать</button>
@@ -3179,53 +3181,116 @@
 </div>
 
 <script>
-    function generateInvoice() {
-        const firstname = document.getElementById('private-firstname').value;
-        const lastname = document.getElementById('private-lastname').value;
-        const email = document.getElementById('private-email').value;
-        const price = document.getElementById('private-price').value;
-        const date = document.getElementById('private-date').value;
-        const startHour = document.getElementById('private-start-hour').value;
-        const startMinute = document.getElementById('private-start-minute').value;
-        const endHour = document.getElementById('private-end-hour').value;
-        const endMinute = document.getElementById('private-end-minute').value;
-
-        if (!firstname || !lastname || !email || !price || !date || !startHour || !startMinute || !endHour || !endMinute) {
-            alert('Заполните все поля перед генерацией инвойса');
-            return;
-        }
-
-        const startTime = `${startHour}:${startMinute}`;
-        const endTime = `${endHour}:${endMinute}`;
-
-        fetch('/admin/api/generate-invoice', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                firstname,
-                lastname,
-                email,
-                price,
-                date,
-                start_time: startTime,
-                end_time: endTime,
-                description: `Индивидуальная фотосессия ${date} ${startTime}-${endTime}`
-            })
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                document.getElementById('private-payment-link').value = data.payment_link;
-                alert('Инвойс сгенерирован! Ссылка на оплату скопирована в поле.');
-            } else {
-                alert(data.error || 'Ошибка генерации инвойса');
-            }
-        }).catch(e => alert('Ошибка: ' + e));
+    // ── helpers ──────────────────────────────────────────────────────────
+    function _pvStatus(msg, kind) {
+        const el = document.getElementById('private-status');
+        if (!el) return;
+        if (!msg) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        const palette = {
+            error:   ['#fdecec', '#b3261e'],
+            success: ['#e9f6ec', '#1e7a34'],
+            info:    ['#eef2fb', '#2a4b8d'],
+        }[kind || 'info'];
+        el.style.background = palette[0];
+        el.style.color = palette[1];
+        el.innerHTML = msg;
+        el.style.display = 'block';
     }
 
-    function copyPaymentLink() {
-        const link = document.getElementById('private-payment-link');
-        link.select();
-        document.execCommand('copy');
-        alert('Ссылка скопирована в буфер обмена!');
+    function _pvBusy(btnId, busyText) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return () => {};
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.dataset.busy = '1';
+        btn.textContent = busyText;
+        return () => { btn.disabled = false; btn.textContent = original; delete btn.dataset.busy; };
+    }
+
+    // Read the four time selects → "HH:MM" strings, or null if incomplete.
+    function _pvTimes() {
+        const sh = document.getElementById('private-start-hour').value;
+        const sm = document.getElementById('private-start-minute').value;
+        const eh = document.getElementById('private-end-hour').value;
+        const em = document.getElementById('private-end-minute').value;
+        if (!sh || !sm || !eh || !em) return null;
+        return { start: `${sh}:${sm}`, end: `${eh}:${em}` };
+    }
+
+    // Shared field collection + validation for both buttons.
+    function _pvCollect() {
+        const firstname = document.getElementById('private-firstname').value.trim();
+        const lastname = document.getElementById('private-lastname').value.trim();
+        const email = document.getElementById('private-email').value.trim();
+        const price = document.getElementById('private-price').value;
+        const date = document.getElementById('private-date').value;
+        const t = _pvTimes();
+
+        if (!firstname || !lastname || !email || !price || !date || !t) {
+            _pvStatus('Заполните все поля (имя, фамилия, email, дата, время, цена).', 'error');
+            return null;
+        }
+        if (t.end <= t.start) {
+            _pvStatus('Время окончания должно быть позже начала.', 'error');
+            return null;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+            _pvStatus('Проверьте email — формат выглядит некорректным.', 'error');
+            return null;
+        }
+        if (parseFloat(price) < 0) {
+            _pvStatus('Цена не может быть отрицательной.', 'error');
+            return null;
+        }
+        return { firstname, lastname, email, price, date, startTime: t.start, endTime: t.end };
+    }
+
+    async function _pvCopy(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (e) {
+            const ta = document.getElementById('private-payment-link');
+            if (ta) { ta.focus(); ta.select(); try { return document.execCommand('copy'); } catch (_) {} }
+            return false;
+        }
+    }
+
+    // ── actions ──────────────────────────────────────────────────────────
+    async function generateInvoice() {
+        const f = _pvCollect();
+        if (!f) return;
+        const done = _pvBusy('private-invoice-btn', 'Генерация…');
+        _pvStatus('Создаём ссылку на оплату в Stripe…', 'info');
+        try {
+            const r = await fetch('/admin/api/generate-invoice', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    firstname: f.firstname, lastname: f.lastname, email: f.email,
+                    price: f.price, date: f.date, start_time: f.startTime, end_time: f.endTime,
+                    description: `Индивидуальная фотосессия ${f.date} ${f.startTime}-${f.endTime}`
+                })
+            });
+            const data = await r.json();
+            if (r.ok && data.success) {
+                document.getElementById('private-payment-link').value = data.payment_link;
+                _pvStatus('✅ Ссылка на оплату готова — скопируйте её или сразу создайте бронь.', 'success');
+            } else {
+                _pvStatus(data.error || 'Ошибка генерации инвойса.', 'error');
+            }
+        } catch (e) {
+            _pvStatus('Сеть недоступна: ' + e.message, 'error');
+        } finally {
+            done();
+        }
+    }
+
+    async function copyPaymentLink() {
+        const link = document.getElementById('private-payment-link').value;
+        if (!link) { _pvStatus('Сначала сгенерируйте ссылку на оплату.', 'error'); return; }
+        const ok = await _pvCopy(link);
+        _pvStatus(ok ? '📋 Ссылка скопирована в буфер обмена.' : 'Не удалось скопировать — выделите и скопируйте вручную.', ok ? 'success' : 'error');
     }
 
     function openPrivateSessionModal() {
@@ -3237,6 +3302,7 @@
         document.getElementById('private-email').value = '';
         document.getElementById('private-price').value = '300';
         document.getElementById('private-payment-link').value = '';
+        _pvStatus('');
         document.getElementById('private-session-modal').style.display = 'flex';
     }
 
@@ -3248,54 +3314,35 @@
         if (e.target === document.getElementById('private-session-modal')) closePrivateSessionModal();
     }
 
-    function submitPrivateSession() {
-        const firstname = document.getElementById('private-firstname').value;
-        const lastname = document.getElementById('private-lastname').value;
-        const email = document.getElementById('private-email').value;
-        const price = document.getElementById('private-price').value;
-        const date = document.getElementById('private-date').value;
-        const startHour = document.getElementById('private-start-hour').value;
-        const startMinute = document.getElementById('private-start-minute').value;
-        const endHour = document.getElementById('private-end-hour').value;
-        const endMinute = document.getElementById('private-end-minute').value;
-
-        if (!firstname || !lastname || !email || !price || !date || !startHour || !startMinute || !endHour || !endMinute) {
-            alert('Заполните все поля');
-            return;
+    async function submitPrivateSession() {
+        const f = _pvCollect();
+        if (!f) return;
+        const paymentLink = document.getElementById('private-payment-link').value.trim();
+        const done = _pvBusy('private-create-btn', 'Создаём…');
+        _pvStatus('Создаём приватную сессию…', 'info');
+        try {
+            const r = await fetch('/admin/api/private-session', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    date: f.date, start_time: f.startTime, end_time: f.endTime,
+                    client_name: `${f.firstname} ${f.lastname}`,
+                    email: f.email, price: f.price, payment_link: paymentLink
+                })
+            });
+            const data = await r.json();
+            if (r.ok && data.success) {
+                const paidNote = data.paid ? 'отмечена как оплаченная' : 'ожидает оплаты по ссылке';
+                _pvStatus(`✅ Сессия создана (${paidNote}). <a href="${data.booking_url}" style="color:inherit;text-decoration:underline;">Открыть бронь #${data.booking_id} →</a>`, 'success');
+                setTimeout(() => { window.location.href = data.booking_url || '/admin'; }, 1400);
+            } else {
+                _pvStatus(data.error || 'Ошибка создания.', 'error');
+                done();
+            }
+        } catch (e) {
+            _pvStatus('Сеть недоступна: ' + e.message, 'error');
+            done();
         }
-
-        const startTime = `${startHour}:${startMinute}`;
-        const endTime = `${endHour}:${endMinute}`;
-
-        fetch('/admin/api/private-session', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                date,
-                start_time: startTime,
-                end_time: endTime,
-                client_name: `${firstname} ${lastname}`,
-                email,
-                price,
-                payment_link: document.getElementById('private-payment-link').value
-            })
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                alert('Приватная фотосессия создана! ID: ' + data.event_id);
-                location.reload();
-            } else {
-                alert(data.error || 'Ошибка создания');
-            }
-        }).catch(e => alert('Ошибка: ' + e));
-    }
-</script>
-            if (data.success) {
-                alert('Приватная фотосессия создана! ID: ' + data.event_id);
-                location.reload();
-            } else {
-                alert(data.error || 'Ошибка создания');
-            }
-        }).catch(e => alert('Ошибка: ' + e));
     }
 </script>
 

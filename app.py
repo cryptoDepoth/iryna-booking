@@ -3024,6 +3024,8 @@ def init_db():
         ("bookings",  "gclid",             "ALTER TABLE bookings ADD COLUMN gclid TEXT"),
         ("bookings",  "referrer",          "ALTER TABLE bookings ADD COLUMN referrer TEXT"),
         ("bookings",  "landing_url",       "ALTER TABLE bookings ADD COLUMN landing_url TEXT"),
+        # Stripe payment-link URL for manually-created private sessions
+        ("bookings",  "payment_link",      "ALTER TABLE bookings ADD COLUMN payment_link TEXT"),
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
@@ -8964,11 +8966,16 @@ def api_client_edit(client_id):
     return jsonify({"success": True})
 
 
-@app.route("/admin/api/private-session", methods=["POST"])
 @app.route("/admin/api/generate-invoice", methods=["POST"])
 @admin_required
 def api_generate_invoice():
-    """Generate Stripe payment link for private session invoice."""
+    """Generate Stripe payment link for private session invoice.
+
+    NOTE: this route used to ALSO answer /admin/api/private-session, which
+    silently shadowed api_private_session() (the handler that actually creates
+    the hidden event + booking). Clicking "Создать" therefore only ever made a
+    second invoice and returned event_id=undefined. The duplicate path is
+    removed — generate-invoice and private-session are now distinct."""
     import stripe
     from flask import jsonify
     import os
@@ -9023,150 +9030,150 @@ def api_generate_invoice():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+_TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
+
+
 @app.route("/admin/api/private-session", methods=["POST"])
 @admin_required
 def api_private_session():
-    """Create a hidden event and book a client into it."""
-    from datetime import datetime, timedelta
+    """Create a hidden event and book one client into it.
+
+    Used by the admin "🔒 Приватная фотосессия" modal. Persists the client's
+    email, the admin-entered price and (if generated first) the Stripe payment
+    link. If a payment link is supplied the booking is left 'reserved' / unpaid
+    (the client still has to pay it); otherwise it is recorded as confirmed/paid
+    — the admin is logging an already-settled session."""
     import secrets
     import yaml
-    import os
-
-    def generate_slots(event=None):
-        """Generate time slots based on event config."""
-        ev = event or {}
-        start = datetime.strptime(ev.get("start_time", "09:00"), "%H:%M")
-        end = datetime.strptime(ev.get("end_time", "18:00"), "%H:%M")
-        interval = ev.get("slot_interval", 45)
-        sl = ev.get("session_length", 30)
-        slots = []
-        current = start
-        while current < end:
-            slot_str = current.strftime("%H:%M")
-            session_end = current + timedelta(minutes=sl)
-            slots.append({
-                "time": slot_str,
-                "label": f"{slot_str} – {session_end.strftime('%H:%M')}",
-                "reserved_until": None
-            })
-            current += timedelta(minutes=interval)
-        return slots
-
-    def create_manual_booking(event_id, slot_time, name, email, phone, instagram, mark_paid, admin_id):
-        """Manually create a booking (copied from /admin/api/event/<event_id>/manual-book)."""
-        conn = db_conn()
-        try:
-            # Check slot availability
-            existing = conn.execute(
-                "SELECT id FROM bookings WHERE event_id=? AND time=? AND status NOT IN ('cancelled', 'expired')",
-                (event_id, slot_time)
-            ).fetchone()
-            if existing:
-                return None  # Slot taken
-
-            # Create client record
-            client_id = None
-            if email or phone or instagram:
-                conn.execute(
-                    "INSERT INTO clients (name, email, phone, instagram, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
-                    (name, email, phone, instagram)
-                )
-                client_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-
-            # Create booking
-            full_price = 300.0  # Default for private sessions
-            paid_amount = full_price if mark_paid else 0.0
-            status = "confirmed" if mark_paid else "reserved"
-            conn.execute(
-                "INSERT INTO bookings (event_id, time, name, email, phone, instagram, client_id, "+ 
-                "status, confirmed, paid_amount, full_price, created_at, admin_id) "+
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)",
-                (event_id, slot_time, name, email, phone, instagram, client_id,
-                 status, 1 if mark_paid else 0, paid_amount, full_price, admin_id)
-            )
-            booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-            conn.commit()
-            return booking_id
-        except Exception as e:
-            conn.rollback()
-            log.error(f"[manual-book] Failed: {e}")
-            return None
-        finally:
-            conn.close()
 
     data = request.json or {}
-    date = data.get("date")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
-    client_name = data.get("client_name")
-    
+    date = (data.get("date") or "").strip()
+    start_time = (data.get("start_time") or "").strip()
+    end_time = (data.get("end_time") or "").strip()
+    client_name = (data.get("client_name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    payment_link = (data.get("payment_link") or "").strip()
+
+    # ── Validation ──
     if not (date and start_time and end_time and client_name):
-        return jsonify({"error": "Missing required fields"}), 400
-    
-    # Generate a unique ID for the hidden event
+        return jsonify({"error": "Заполните дату, время и имя клиента"}), 400
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        return jsonify({"error": "Дата должна быть в формате YYYY-MM-DD"}), 400
+    if not (_TIME_RE.match(start_time) and _TIME_RE.match(end_time)):
+        return jsonify({"error": "Некорректное время"}), 400
+    if end_time <= start_time:
+        return jsonify({"error": "Время окончания должно быть позже начала"}), 400
+    if email and (len(email) > 254 or not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$", email)):
+        return jsonify({"error": "Некорректный email"}), 400
+    try:
+        price = round(float(data.get("price") or 300), 2)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Некорректная цена"}), 400
+    if price < 0:
+        return jsonify({"error": "Цена не может быть отрицательной"}), 400
+
+    session_minutes = max(
+        15,
+        int((datetime.strptime(end_time, "%H:%M") - datetime.strptime(start_time, "%H:%M")).total_seconds() // 60),
+    )
+
+    # ── Hidden event (not shown on the public site) ──
     event_id = f"private-{secrets.token_hex(4)}"
-    
-    # Create a hidden event
     event = {
         "id": event_id,
-        "title": f"Private Session for {client_name}",
+        "title": f"Private Session — {client_name}",
         "subtitle": "Individual photoshoot (not visible on website)",
         "date": date,
         "start_time": start_time,
         "end_time": end_time,
-        "session_length": 30,
-        "break_length": 15,
-        "slot_interval": 45,
+        "session_length": session_minutes,
+        "break_length": 0,
+        "slot_interval": session_minutes,
         "deposit": 0.0,
-        "full_price": 300.0,
+        "full_price": price,
         "location": "Calgary — exact spot sent after booking",
         "session_type": "private",
         "featured": False,
         "hidden": True,
         "included": [
-            "30 minutes private session",
-            "20 professionally edited photos",
-            "All original photos included"
+            f"{session_minutes} min private session",
+            "Professionally edited photos",
+            "All original photos included",
         ],
-        "photos": ["/images/placeholder.jpg"]
+        "photos": ["/images/placeholder.jpg"],
     }
-    
-    # Add to global EVENTS (in-memory)
-    global EVENTS
-    EVENTS.append(event)
-    
-    # Save to events.yaml
+
+    # ── Book the client atomically (mirrors /admin/api/event/<id>/manual-book) ──
+    paid = not payment_link  # link sent => still awaiting payment
+    status_val = "confirmed" if paid else "reserved"
+    paid_amount = price if paid else 0.0
+    token = secrets.token_urlsafe(16)
+    conn = db_conn()
     try:
-        with open(os.path.join(os.path.dirname(__file__), "events.yaml"), "r") as f:
-            events_data = yaml.safe_load(f) or {"events": []}
-        events_data["events"].append(event)
-        with open(os.path.join(os.path.dirname(__file__), "events.yaml"), "w") as f:
-            yaml.safe_dump(events_data, f, default_flow_style=False, sort_keys=False)
+        c = conn.cursor()
+        c.execute("BEGIN IMMEDIATE")
+        # UNIQUE(date,time) guards against a real double-book on the same slot.
+        taken = c.execute(
+            "SELECT id FROM bookings WHERE date=? AND time=? "
+            "AND status NOT IN ('cancelled','expired')",
+            (date, start_time),
+        ).fetchone()
+        if taken:
+            conn.rollback()
+            return jsonify({"error": "На эту дату и время уже есть бронь"}), 409
+        c.execute(
+            """INSERT INTO bookings
+                 (date, time, name, email, phone, instagram, session_type, status,
+                  event_id, confirmation_token, deposit_amount, full_price,
+                  confirmed, paid, paid_amount, payment_link, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, 0, ?, ?, ?, ?, ?, datetime('now'))""",
+            (date, start_time, client_name, email, "", "",
+             status_val, event_id, token, price,
+             1 if paid else 0, 1 if paid else 0, paid_amount, payment_link or None),
+        )
+        booking_id = c.lastrowid
+        conn.commit()
     except Exception as e:
-        log.error(f"[private-session] Failed to save events.yaml: {e}")
-        return jsonify({"error": "Failed to save event"}), 500
-    
-    # Create a booking for the first slot
-    slots = generate_slots(event)
-    if not slots:
-        return jsonify({"error": "No slots available"}), 400
-    
-    first_slot = slots[0]
-    booking_id = create_manual_booking(
-        event_id=event_id,
-        slot_time=first_slot["time"],
-        name=client_name,
-        email="",
-        phone="",
-        instagram="",
-        mark_paid=True,
-        admin_id=session.get("admin_id")
-    )
-    
-    if not booking_id:
-        return jsonify({"error": "Failed to create booking"}), 500
-    
-    return jsonify({"success": True, "event_id": event_id, "booking_id": booking_id})
+        conn.rollback()
+        log.exception(f"[private-session] booking insert failed: {e}")
+        return jsonify({"error": "Не удалось создать бронь"}), 500
+    finally:
+        conn.close()
+
+    # Persist the hidden event (atomic temp-file swap so a crash can't truncate
+    # events.yaml). Uses the canonical path + shared lock so it can't race the
+    # other events.yaml writers. In-memory EVENTS is updated after the file wins.
+    try:
+        with _EVENTS_YAML_LOCK:
+            with open(_EVENTS_PATH, "r") as f:
+                events_data = yaml.safe_load(f) or {"events": []}
+            events_data.setdefault("events", []).append(event)
+            tmp_path = _EVENTS_PATH + ".tmp"
+            with open(tmp_path, "w") as f:
+                yaml.safe_dump(events_data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            os.replace(tmp_path, _EVENTS_PATH)
+            global EVENTS
+            EVENTS.append(event)
+    except Exception as e:
+        log.error(f"[private-session] events.yaml save failed (booking #{booking_id} still created): {e}")
+
+    # Best-effort: keep the clients table in sync
+    if email:
+        try:
+            sync_client(email, client_name, "", "")
+        except Exception as _e:
+            log.warning(f"[private-session] sync_client failed: {_e}")
+
+    log.info(f"[private-session] event={event_id} booking={booking_id} "
+             f"{date} {start_time}-{end_time} price={price} paid={paid} name={client_name!r}")
+    return jsonify({
+        "success": True,
+        "event_id": event_id,
+        "booking_id": booking_id,
+        "status": status_val,
+        "paid": paid,
+        "booking_url": f"/admin/booking/{booking_id}",
+    })
 
 
 @app.route("/admin/backup", methods=["POST"])
