@@ -29,6 +29,33 @@ Each release follows this pattern:
 
 ---
 
+## [2026-06-10] — Security audit + lost-feature restore (not yet deployed)
+
+### What's new
+- [Feature] (WIP, committed) "Pay Remaining Balance" Stripe button in confirmation email
+
+### Fixed
+- [Bugfix] /admin/confirm no longer 500s when Stripe is unreachable; None-safe balance math
+- [Bugfix] admin.html: restored add-ons editor, batch photo upload, photo carousel lost in 8f87f8e rollback
+- [Bugfix] saveAllEventSettings: sequential writes (Promise.all race could revert price edits)
+- [Bugfix] pytest is hermetic — no more live Stripe/Telegram/n8n calls from tests
+
+### Security
+- [Security] .env.qa with real ADMIN_PASSWORD untracked (** rotate password + ADMIN_KEY — see AUDIT_REPORT_2026-06-10.md §4 **)
+- [Security] Dependencies: flask 3.1.3, requests 2.33.0, python-dotenv 1.2.2, Pillow 12.2.0 (pip-audit: 10 → 0 vulns)
+- [Security] Werkzeug debug opt-in via FLASK_DEBUG=1 (was hardcoded debug=True on 0.0.0.0)
+- [Security] Local .env: real SECRET_KEY generated (placeholder before), duplicate ADMIN_PASSWORD removed
+
+### Data / Config changes
+- .gitignore: all .env.* ignored except *.example; booking.db/qa/booking.db untracked
+- requirements.txt versions bumped (run pip install -r requirements.txt)
+
+### Rollback info
+- Pre-audit state: commit 2272e93 (+ WIP preserved as 8ab645d)
+- Full audit: AUDIT_REPORT_2026-06-10.md · Tests: 326 passed, 1 skipped
+
+---
+
 ## [2026-05-16] — Booking detail card + reCAPTCHA fix + email improvements
 
 ### What's new
