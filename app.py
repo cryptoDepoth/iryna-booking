@@ -6133,8 +6133,48 @@ def _analytics_is_internal_campaign(campaign, content):
         "smoke_",
         "test_",
         "qa_",
+        "claude_code",
     )
     return any(blob.startswith(prefix) or f" {prefix}" in blob for prefix in internal_prefixes) or "_smoke" in blob
+
+
+def _analytics_campaign_group(campaign):
+    """Canonical display group for campaigns split across historical UTM names.
+
+    Mountain Mini traffic is spread over `mountain_mini_jun20`,
+    `mountain_mini_booking_ab_202606`, and future clean UTM campaigns; report
+    them under one label. Raw campaign/content columns are always preserved —
+    this only adds a display grouping, it never rewrites stored rows.
+    """
+    key = re.sub(r"[^a-z0-9]+", "", str(campaign or "").lower())
+    if "mountainmini" in key:
+        return "Mountain Mini"
+    return ""
+
+
+def _analytics_group_rows(rows):
+    """Aggregate campaign rows that share a canonical display group."""
+    sum_keys = [
+        "visits", "session_views", "drawer_opens", "slot_selections", "form_starts",
+        "reserve_attempts", "bookings", "confirmed_bookings", "expired_bookings",
+        "abandoned_followups",
+    ]
+    groups = {}
+    for row in rows:
+        group = row.get("campaign_group")
+        if not group:
+            continue
+        agg = groups.setdefault(group, {key: 0 for key in sum_keys})
+        for key in sum_keys:
+            agg[key] += int(row.get(key) or 0)
+    out = []
+    for group, agg in sorted(groups.items()):
+        visits = agg["visits"]
+        agg["campaign_group"] = group
+        agg["booking_conversion_rate"] = round(agg["bookings"] / visits * 100, 2) if visits else 0.0
+        agg["confirmed_conversion_rate"] = round(agg["confirmed_bookings"] / visits * 100, 2) if visits else 0.0
+        out.append(agg)
+    return out
 
 
 def _analytics_campaign_rows(date_from, date_to, include_internal=False):
@@ -6206,6 +6246,7 @@ def _analytics_campaign_rows(date_from, date_to, include_internal=False):
         confirmed = int(item.get("confirmed_bookings") or 0)
         item["booking_conversion_rate"] = round((bookings / visits * 100), 2) if visits else 0.0
         item["confirmed_conversion_rate"] = round((confirmed / visits * 100), 2) if visits else 0.0
+        item["campaign_group"] = _analytics_campaign_group(item.get("campaign"))
         out.append(item)
     return out
 
@@ -6432,10 +6473,12 @@ def admin_analytics():
     include_internal = _analytics_include_internal()
     rows = _analytics_campaign_rows(date_from, date_to, include_internal=include_internal)
     totals = _analytics_totals(rows)
+    group_rows = _analytics_group_rows(rows)
     return render_template(
         "admin_analytics.html",
         rows=rows,
         totals=totals,
+        group_rows=group_rows,
         date_from=date_from,
         date_to=date_to,
         include_internal=include_internal,
@@ -6456,6 +6499,8 @@ def admin_analytics_csv():
         "slot_selections", "form_starts", "reserve_attempts", "bookings",
         "confirmed_bookings", "expired_bookings", "abandoned_followups",
         "booking_conversion_rate", "confirmed_conversion_rate",
+        # appended last so existing imports/sheets keep their column order
+        "campaign_group",
     ]
     output = _io.StringIO()
     writer = _csv.DictWriter(output, fieldnames=fields)

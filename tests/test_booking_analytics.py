@@ -222,6 +222,66 @@ def test_admin_analytics_report_and_csv_include_confirmed_campaign_booking(clien
     assert confirmed_event is not None
 
 
+def test_admin_analytics_groups_mountain_mini_campaigns(client):
+    c, _ = client
+
+    for visitor, campaign in (
+        ("v_mm_legacy", "mountain_mini_booking_ab_202606"),
+        ("v_mm_jun20", "mountain_mini_jun20"),
+        ("v_other", "dm_vs_site"),
+    ):
+        c.post("/track", json={
+            "visitor_id": visitor,
+            "event_name": "page_view",
+            "utm": {"source": "meta", "medium": "paid", "campaign": campaign, "content": "creative_a"},
+        })
+
+    html = c.get(
+        "/admin/analytics?date_from=2020-01-01&date_to=2035-01-01",
+        headers=_admin_headers(),
+    ).get_data(as_text=True)
+    # Both mountain campaigns roll up under one display group...
+    assert "Mountain Mini" in html
+    # ...while raw campaign rows stay visible untouched.
+    assert "mountain_mini_booking_ab_202606" in html
+    assert "mountain_mini_jun20" in html
+
+    csv_text = c.get(
+        "/admin/analytics.csv?date_from=2020-01-01&date_to=2035-01-01",
+        headers=_admin_headers(),
+    ).get_data(as_text=True)
+    # Existing column order is preserved; campaign_group is appended last.
+    assert csv_text.startswith("campaign,content,visits")
+    header = csv_text.splitlines()[0]
+    assert header.endswith("campaign_group")
+    for line in csv_text.splitlines()[1:]:
+        if line.startswith("mountain_mini_"):
+            assert line.endswith("Mountain Mini")
+        elif line.startswith("dm_vs_site"):
+            assert not line.endswith("Mountain Mini")
+
+
+def test_mountain_mini_qa_campaign_hidden_from_default_report(client):
+    c, _ = client
+
+    c.post("/track", json={
+        "visitor_id": "v_mm_qa",
+        "event_name": "page_view",
+        "utm": {"source": "qa", "medium": "manual", "campaign": "mountain_mini_qa", "content": "claude_code_verify"},
+    })
+
+    default_csv = c.get(
+        "/admin/analytics.csv?date_from=2020-01-01&date_to=2035-01-01",
+        headers=_admin_headers(),
+    ).get_data(as_text=True)
+    debug_csv = c.get(
+        "/admin/analytics.csv?date_from=2020-01-01&date_to=2035-01-01&include_internal=1",
+        headers=_admin_headers(),
+    ).get_data(as_text=True)
+    assert "claude_code_verify" not in default_csv
+    assert "claude_code_verify" in debug_csv
+
+
 def test_expired_booking_records_funnel_event(client):
     c, db_path = client
     ev, slot = _first_event_and_slot(c)

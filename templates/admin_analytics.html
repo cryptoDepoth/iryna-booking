@@ -77,6 +77,33 @@
       <div class="stat"><div class="k">Confirmed rate</div><div class="v green">{{ "%.2f"|format(totals.confirmed_conversion_rate) }}%</div></div>
     </section>
 
+    {% if group_rows %}
+    <div class="table-wrap" style="margin-bottom:18px">
+      <table>
+        <thead>
+          <tr>
+            <th>Campaign group (all matching campaigns combined)</th><th>Visits</th><th>Drawers</th><th>Slots</th>
+            <th>Attempts</th><th>Bookings</th><th>Confirmed</th><th>Confirmed CR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in group_rows %}
+          <tr>
+            <td class="campaign">{{ g.campaign_group }}</td>
+            <td>{{ g.visits }}</td>
+            <td>{{ g.drawer_opens }}</td>
+            <td>{{ g.slot_selections }}</td>
+            <td>{{ g.reserve_attempts }}</td>
+            <td>{{ g.bookings }}</td>
+            <td>{{ g.confirmed_bookings }}</td>
+            <td class="rate">{{ "%.2f"|format(g.confirmed_conversion_rate) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
     <div class="table-wrap">
       <table>
         <thead>
