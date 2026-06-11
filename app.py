@@ -5237,12 +5237,12 @@ def _send_private_payment_email(to_email, client_name, event_title, event_date,
     if not to_email:
         return False
     interac_email = interac_email or EMAIL or "iryna.pashynska@gmail.com"
-    subject = f"Your Private Photo Session — {event_date} · Booking & Payment"
+    subject = f"Your Individual Photoshoot — {event_date} · Booking & Payment"
     safe_name = _html_escape(client_name or "Client")
     time_range = f"{start_time}–{end_time}"
     plain = (
         f"Hi {client_name},\n\n"
-        f"Your private photo session with Iryna Pashynska is reserved!\n\n"
+        f"Your individual photoshoot with Iryna Pashynska is reserved!\n\n"
         f"Date: {event_date}\n"
         f"Time: {time_range} ({session_minutes} min)\n"
         f"Price: ${price:.2f} CAD\n"
@@ -5261,14 +5261,14 @@ def _send_private_payment_email(to_email, client_name, event_title, event_date,
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 18px;"><tr><td align="center">
 <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 8px 32px rgba(70,40,35,.10);">
 <tr><td style="background:linear-gradient(135deg,#c4857a,#a3685e);padding:34px;text-align:center;color:#fff;">
-<h1 style="margin:0;font-size:25px;font-weight:400;">Your Private Session</h1><p style="margin:8px 0 0;opacity:.9;">Pashynska Photography</p>
+<h1 style="margin:0;font-size:25px;font-weight:400;">Your Individual Photoshoot</h1><p style="margin:8px 0 0;opacity:.9;">Pashynska Photography</p>
 </td></tr>
 <tr><td style="padding:34px 38px;color:#5a3d4a;">
 <p style="font-size:16px;line-height:1.65;margin:0 0 18px;">Hi <strong>{safe_name}</strong>,</p>
-<p style="font-size:15px;line-height:1.7;margin:0 0 22px;color:#7a5a6a;">Your private photo session is reserved! Complete the payment below to confirm it.</p>
+<p style="font-size:15px;line-height:1.7;margin:0 0 22px;color:#7a5a6a;">Your individual photoshoot is reserved! Complete the payment below to confirm it.</p>
 <div style="background:#fdf6f0;border-radius:14px;padding:20px;margin:0 0 22px;">
 <p style="margin:0 0 8px;font-size:13px;color:#a8918e;text-transform:uppercase;letter-spacing:.08em;">Session details</p>
-<p style="margin:0;font-size:15px;line-height:1.8;color:#5a3d4a;"><strong>{_html_escape(event_title or "Private Session")}</strong><br>
+<p style="margin:0;font-size:15px;line-height:1.8;color:#5a3d4a;"><strong>{_html_escape(event_title or "Individual Photoshoot")}</strong><br>
 📅 {_html_escape(event_date)} · 🕐 {_html_escape(time_range)} ({session_minutes} min)<br>
 💰 <strong style="font-size:22px;color:#c4857a;">${price:.2f} CAD</strong> · Booking #{booking_id}</p>
 </div>
@@ -9139,6 +9139,10 @@ def api_private_session():
     end_time = (data.get("end_time") or "").strip()
     client_name = (data.get("client_name") or "").strip()
     email = (data.get("email") or "").strip().lower()
+    instagram = str(data.get("instagram") or "").strip()
+    if "instagram.com/" in instagram:
+        instagram = instagram.split("instagram.com/", 1)[1].split("?", 1)[0].split("#", 1)[0]
+    instagram = instagram.strip().strip("/").lstrip("@")[:80]
     payment_link = (data.get("payment_link") or "").strip()
     send_email = bool(data.get("send_email"))
     already_paid = data.get("already_paid")  # None => legacy: paid when no payment_link
@@ -9172,8 +9176,8 @@ def api_private_session():
     event_id = f"private-{secrets.token_hex(4)}"
     event = {
         "id": event_id,
-        "title": f"Private Session — {client_name}",
-        "subtitle": "Individual photoshoot (not visible on website)",
+        "title": f"Individual Photoshoot — {client_name}",
+        "subtitle": "Individual photoshoot (hidden from public website)",
         "date": date,
         "start_time": start_time,
         "end_time": end_time,
@@ -9189,7 +9193,7 @@ def api_private_session():
         "featured": False,
         "hidden": True,
         "included": [
-            f"{session_minutes} min private session",
+            f"{session_minutes} min individual photoshoot",
             "Professionally edited photos",
             "All original photos included",
         ],
@@ -9223,7 +9227,7 @@ def api_private_session():
                   event_id, confirmation_token, deposit_amount, full_price,
                   confirmed, paid, paid_amount, payment_link, created_at)
                VALUES (?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
-            (date, start_time, client_name, email, "", "",
+            (date, start_time, client_name, email, "", instagram,
              status_val, event_id, token, price, price,
              1 if paid else 0, 1 if paid else 0, paid_amount, payment_link or None),
         )
@@ -9256,7 +9260,7 @@ def api_private_session():
     # Best-effort: keep the clients table in sync
     if email:
         try:
-            sync_client(email, client_name, "", "")
+            sync_client(email, client_name, "", instagram)
         except Exception as _e:
             log.warning(f"[private-session] sync_client failed: {_e}")
 
@@ -9284,10 +9288,11 @@ def api_private_session():
 
     try:
         _notify_admin(
-            f"🔒 <b>Private session created</b>\n\n"
+            f"📸 <b>Individual photoshoot created</b>\n\n"
             f"👤 {_tg_escape(client_name)}\n"
-            f"📅 {date} · {start_time}–{end_time}\n"
-            f"💰 ${price:.2f} CAD · "
+            + (f"📸 @{_tg_escape(instagram)}\n" if instagram else "")
+            + f"📅 {date} · {start_time}–{end_time}\n"
+            + f"💰 ${price:.2f} CAD · "
             + ("✅ already paid" if paid else ("✉️ payment link emailed to client" if email_sent else "🔗 link ready (email not sent)"))
             + f"\n🆔 Booking #{booking_id}"
         )

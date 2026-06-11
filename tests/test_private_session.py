@@ -15,8 +15,10 @@ These tests pin down:
 """
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
+import yaml
 
 import app as booking_app  # noqa: E402
 
@@ -36,11 +38,18 @@ def admin_client(monkeypatch, tmp_path):
     monkeypatch.setattr(booking_app, "_EVENTS_PATH", str(events_file))
     monkeypatch.setattr(booking_app, "EVENTS_YAML_PATH", str(events_file), raising=False)
     monkeypatch.setattr(booking_app, "sync_to_notion", lambda booking_id: None, raising=False)
-    monkeypatch.setattr(booking_app, "sync_client", lambda *a, **k: None, raising=False)
+    sync_client_calls = []
+
+    def _sync_client(*args, **kwargs):
+        sync_client_calls.append((args, kwargs))
+
+    monkeypatch.setattr(booking_app, "sync_client", _sync_client, raising=False)
     booking_app._rate_limits.clear()
     booking_app.init_db()
     booking_app.app.config["TESTING"] = True
     with booking_app.app.test_client() as c:
+        c.sync_client_calls = sync_client_calls
+        c.events_file = events_file
         yield c
     try:
         os.unlink(db_path)
@@ -66,10 +75,11 @@ def test_private_session_and_generate_invoice_are_distinct_endpoints():
 def test_private_session_creates_booking(admin_client):
     payload = {
         "date": "2026-08-15",
-        "start_time": "14:00",
-        "end_time": "15:00",
+        "start_time": "08:20",
+        "end_time": "09:20",
         "client_name": "Jane Doe",
         "email": "jane@example.com",
+        "instagram": "@jane.doe",
         "price": "275",
         "payment_link": "",  # no link => recorded as paid/confirmed
     }
@@ -83,16 +93,24 @@ def test_private_session_creates_booking(admin_client):
 
     conn = booking_app.db_conn()
     row = conn.execute(
-        "SELECT date, time, name, email, full_price, paid, status, session_type "
+        "SELECT date, time, name, email, instagram, full_price, paid, status, session_type "
         "FROM bookings WHERE id=?", (data["booking_id"],)
     ).fetchone()
     conn.close()
     assert row["date"] == "2026-08-15"
-    assert row["time"] == "14:00"
+    assert row["time"] == "08:20"
     assert row["email"] == "jane@example.com"
+    assert row["instagram"] == "jane.doe"
     assert row["full_price"] == 275.0
     assert row["session_type"] == "private"
     assert row["paid"] == 1 and row["status"] == "confirmed"
+    assert admin_client.sync_client_calls[-1][0] == ("jane@example.com", "Jane Doe", "", "jane.doe")
+
+    events_data = yaml.safe_load(Path(admin_client.events_file).read_text()) or {}
+    private_event = [e for e in events_data["events"] if e["id"] == data["event_id"]][0]
+    assert private_event["title"] == "Individual Photoshoot — Jane Doe"
+    assert "individual photoshoot" in private_event["included"][0]
+    assert "private session" not in private_event["included"][0].lower()
 
 
 def test_private_session_with_payment_link_is_unpaid(admin_client):
@@ -151,3 +169,13 @@ def test_private_session_blocks_double_book(admin_client):
                            json={**base, "client_name": "Second Client",
                                  "email": "second@example.com"}, headers=_hdrs())
     assert r2.status_code == 409
+
+
+def test_admin_private_session_modal_is_individual_and_minute_precise():
+    html = Path(__file__).resolve().parents[1].joinpath("templates", "admin.html").read_text()
+    assert "Индивидуальная фотосессия" in html
+    assert "Приватная фотосессия" not in html
+    assert 'id="private-start-time" step="60"' in html
+    assert 'id="private-end-time" step="60"' in html
+    assert 'id="private-instagram"' in html
+    assert "private-start-hour" not in html

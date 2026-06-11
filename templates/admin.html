@@ -749,6 +749,151 @@
             padding: 12px 0;
         }
 
+        /* ── INDIVIDUAL PHOTOSHOOT MODAL ── */
+        .private-session-modal {
+            z-index: 2000;
+            align-items: flex-start;
+            padding: 48px 20px;
+            overflow-y: auto;
+        }
+        .private-session-box {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 0;
+            overflow: hidden;
+            border: 1px solid rgba(249,115,22,.14);
+            box-shadow: 0 28px 70px rgba(28,25,23,.24);
+        }
+        .private-modal-head {
+            padding: 24px 26px 20px;
+            background: linear-gradient(135deg,#fff7ed 0%,#fff 62%);
+            border-bottom: 1px solid var(--border);
+        }
+        .private-modal-head h3 {
+            margin: 0 0 6px;
+            font-size: 20px;
+            color: var(--text);
+        }
+        .private-modal-head p {
+            margin: 0;
+            color: var(--text-2);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+        .private-modal-body {
+            padding: 22px 26px 24px;
+        }
+        .private-section {
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 14px;
+            background: #fff;
+        }
+        .private-section-title {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 12px;
+        }
+        .private-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 13px;
+        }
+        .private-field label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--text-3);
+            margin-bottom: 6px;
+        }
+        .private-field input {
+            width: 100%;
+            min-height: 44px;
+            padding: 11px 12px;
+            border: 1.8px solid var(--border-strong);
+            border-radius: 10px;
+            font: inherit;
+            font-size: 14px;
+            color: var(--text);
+            background: #fff;
+            outline: none;
+            transition: border-color .15s, box-shadow .15s, background .15s;
+        }
+        .private-field input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(249,115,22,.14);
+        }
+        .private-field input::placeholder { color: #a8a29e; }
+        .private-field.full { grid-column: 1 / -1; }
+        .private-time-row {
+            display: grid;
+            grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+            gap: 10px;
+            align-items: end;
+        }
+        .private-time-dash {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            color: var(--text-3);
+            font-weight: 700;
+        }
+        .private-help {
+            margin-top: 7px;
+            color: var(--text-3);
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .private-checks {
+            display: grid;
+            gap: 10px;
+        }
+        .private-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 13px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            background: #fafafa;
+            cursor: pointer;
+            color: var(--text-2);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.45;
+        }
+        .private-check input {
+            width: 17px;
+            height: 17px;
+            margin-top: 1px;
+            accent-color: var(--accent);
+            flex: 0 0 auto;
+        }
+        .private-link-wrap {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: center;
+        }
+        .private-link-wrap input {
+            background: #f8fafc;
+            color: var(--text-2);
+        }
+        #private-status {
+            display: none;
+            margin: 14px 0 0;
+            padding: 11px 14px;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
         /* ── EMPTY STATE ── */
         .empty {
             padding: 60px 24px;
@@ -989,6 +1134,10 @@
             table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
             thead th, tbody td { padding: 10px 12px; }
             .event-settings-grid { grid-template-columns: repeat(2, 1fr); }
+            .private-session-modal { padding: 16px 10px; }
+            .private-modal-head, .private-modal-body { padding-left: 16px; padding-right: 16px; }
+            .private-grid, .private-time-row, .private-link-wrap { grid-template-columns: 1fr; }
+            .private-time-dash { min-height: 10px; justify-content: center; }
         }
         /* ── PAGINATION ── */
         .pagination {
@@ -1082,7 +1231,7 @@
         </div>
         <div class="page-actions">
             <button class="btn-outline" type="button" onclick="openStripeModal()">💳 Stripe link</button>
-            <button class="btn-outline" type="button" onclick="openPrivateSessionModal()">🔒 Приватная фотосессия</button>
+            <button class="btn-outline" type="button" onclick="openPrivateSessionModal()">✦ Индивидуальная фотосессия</button>
             <a href="#events-section" class="btn-outline" style="text-decoration:none;">✦ Edit session setup</a>
             <button class="btn-outline" onclick="location.reload()">↻ Refresh</button>
         </div>
@@ -3080,110 +3229,92 @@
     </div>
 </div>
 
-<!-- ── PRIVATE SESSION MODAL ─────────────────────────────────────────────────── -->
-<div class="resched-modal" id="private-session-modal" onclick="closePrivateSessionModalOutside(event)" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: flex-start; justify-content: center; padding: 50px 20px; overflow-y: auto;">
-    <div class="resched-box" style="max-width: 600px; margin: 0 auto;">
-        <h3>🔒 Приватная фотосессия</h3>
-        <p style="color:var(--text-2);margin-bottom:20px;">Создать индивидуальную фотосессию (не видно на сайте).</p>
-
-        <div class="resched-field">
-            <label for="private-date">Дата</label>
-            <input type="date" id="private-date" required>
+<!-- ── INDIVIDUAL PHOTOSHOOT MODAL ─────────────────────────────────────────── -->
+<div class="resched-modal private-session-modal" id="private-session-modal" onclick="closePrivateSessionModalOutside(event)">
+    <div class="resched-box private-session-box" role="dialog" aria-modal="true" aria-labelledby="private-modal-title">
+        <div class="private-modal-head">
+            <h3 id="private-modal-title">Индивидуальная фотосессия</h3>
+            <p>Создать отдельную запись для клиента. На публичном сайте эта фотосессия не отображается.</p>
         </div>
 
-        <div class="resched-field">
-            <label>Время</label>
-            <div style="display: flex; gap: 10px;">
-                <select id="private-start-hour" style="flex: 1;">
-                    <option value="">Час</option>
-                    <option value="08">08</option>
-                    <option value="09">09</option>
-                    <option value="10">10</option>
-                    <option value="11">11</option>
-                    <option value="12">12</option>
-                    <option value="13">13</option>
-                    <option value="14">14</option>
-                    <option value="15">15</option>
-                    <option value="16">16</option>
-                    <option value="17">17</option>
-                    <option value="18">18</option>
-                    <option value="19">19</option>
-                    <option value="20">20</option>
-                </select>
-                <select id="private-start-minute" style="flex: 1;">
-                    <option value="">Минуты</option>
-                    <option value="00">00</option>
-                    <option value="30">30</option>
-                </select>
-                <span style="line-height: 38px;">—</span>
-                <select id="private-end-hour" style="flex: 1;">
-                    <option value="">Час</option>
-                    <option value="09">09</option>
-                    <option value="10">10</option>
-                    <option value="11">11</option>
-                    <option value="12">12</option>
-                    <option value="13">13</option>
-                    <option value="14">14</option>
-                    <option value="15">15</option>
-                    <option value="16">16</option>
-                    <option value="17">17</option>
-                    <option value="18">18</option>
-                    <option value="19">19</option>
-                    <option value="20">20</option>
-                    <option value="21">21</option>
-                </select>
-                <select id="private-end-minute" style="flex: 1;">
-                    <option value="">Минуты</option>
-                    <option value="00">00</option>
-                    <option value="30">30</option>
-                </select>
+        <div class="private-modal-body">
+            <div class="private-section">
+                <div class="private-section-title">Session</div>
+                <div class="private-grid">
+                    <div class="private-field">
+                        <label for="private-date">Дата</label>
+                        <input type="date" id="private-date" required>
+                    </div>
+                    <div class="private-field">
+                        <label for="private-price">Цена (CAD)</label>
+                        <input type="number" id="private-price" placeholder="300" min="0" step="0.01">
+                    </div>
+                    <div class="private-field full">
+                        <label>Время</label>
+                        <div class="private-time-row">
+                            <div>
+                                <input type="time" id="private-start-time" step="60" required>
+                            </div>
+                            <span class="private-time-dash">—</span>
+                            <div>
+                                <input type="time" id="private-end-time" step="60" required>
+                            </div>
+                        </div>
+                        <div class="private-help">Можно выбрать любое точное время, например 08:20–09:20.</div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="resched-field">
-            <label for="private-firstname">Имя</label>
-            <input type="text" id="private-firstname" placeholder="Иван" required>
-        </div>
-
-        <div class="resched-field">
-            <label for="private-lastname">Фамилия</label>
-            <input type="text" id="private-lastname" placeholder="Иванов" required>
-        </div>
-
-        <div class="resched-field">
-            <label for="private-email">Email</label>
-            <input type="email" id="private-email" placeholder="ivan@example.com" required>
-        </div>
-
-        <div class="resched-field">
-            <label for="private-price">Цена (CAD)</label>
-            <input type="number" id="private-price" placeholder="300" min="0" step="5">
-        </div>
-
-        <div class="resched-field">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;">
-                <input type="checkbox" id="private-send-email" checked style="width:auto;">
-                ✉️ Отправить клиенту письмо со ссылкой на оплату
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;margin-top:8px;">
-                <input type="checkbox" id="private-already-paid" onchange="togglePrivatePaid()" style="width:auto;">
-                ✅ Уже оплачено — просто записать сессию
-            </label>
-        </div>
-
-        <div class="resched-field" id="private-link-row" style="display:none;">
-            <label>Ссылка для клиента (страница оплаты — e-Transfer или карта)</label>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="text" id="private-payment-link" readonly style="flex: 1; background: #f5f5f5;">
-                <button type="button" class="btn-outline" onclick="copyPaymentLink()" style="white-space: nowrap;">Копировать</button>
+            <div class="private-section">
+                <div class="private-section-title">Client</div>
+                <div class="private-grid">
+                    <div class="private-field">
+                        <label for="private-firstname">Имя</label>
+                        <input type="text" id="private-firstname" placeholder="Иван" required>
+                    </div>
+                    <div class="private-field">
+                        <label for="private-lastname">Фамилия</label>
+                        <input type="text" id="private-lastname" placeholder="Иванов" required>
+                    </div>
+                    <div class="private-field">
+                        <label for="private-email">Email</label>
+                        <input type="email" id="private-email" placeholder="ivan@example.com" required>
+                    </div>
+                    <div class="private-field">
+                        <label for="private-instagram">Instagram</label>
+                        <input type="text" id="private-instagram" placeholder="@handle">
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div id="private-status" role="status" aria-live="polite" style="display:none;margin:14px 0 0;padding:10px 14px;border-radius:10px;font-size:14px;line-height:1.5;"></div>
+            <div class="private-section">
+                <div class="private-section-title">Payment</div>
+                <div class="private-checks">
+                    <label class="private-check">
+                        <input type="checkbox" id="private-send-email" checked>
+                        <span>Отправить клиенту письмо со ссылкой на оплату</span>
+                    </label>
+                    <label class="private-check">
+                        <input type="checkbox" id="private-already-paid" onchange="togglePrivatePaid()">
+                        <span>Уже оплачено — просто записать сессию</span>
+                    </label>
+                </div>
+            </div>
 
-        <div class="resched-actions">
-            <button type="button" class="cancel" onclick="closePrivateSessionModal()">Отмена</button>
-            <button type="button" class="submit" onclick="submitPrivateSession()" id="private-create-btn">Создать</button>
+            <div class="private-field" id="private-link-row" style="display:none;">
+                <label>Ссылка для клиента (e-Transfer или карта)</label>
+                <div class="private-link-wrap">
+                    <input type="text" id="private-payment-link" readonly>
+                    <button type="button" class="btn-outline" onclick="copyPaymentLink()" style="white-space: nowrap;">Копировать</button>
+                </div>
+            </div>
+
+            <div id="private-status" role="status" aria-live="polite"></div>
+
+            <div class="resched-actions">
+                <button type="button" class="cancel" onclick="closePrivateSessionModal()">Отмена</button>
+                <button type="button" class="submit" onclick="submitPrivateSession()" id="private-create-btn">Создать</button>
+            </div>
         </div>
     </div>
 </div>
@@ -3215,14 +3346,13 @@
         return () => { btn.disabled = false; btn.textContent = original; delete btn.dataset.busy; };
     }
 
-    // Read the four time selects → "HH:MM" strings, or null if incomplete.
+    // Read native time inputs -> "HH:MM" strings, or null if incomplete.
     function _pvTimes() {
-        const sh = document.getElementById('private-start-hour').value;
-        const sm = document.getElementById('private-start-minute').value;
-        const eh = document.getElementById('private-end-hour').value;
-        const em = document.getElementById('private-end-minute').value;
-        if (!sh || !sm || !eh || !em) return null;
-        return { start: `${sh}:${sm}`, end: `${eh}:${em}` };
+        const start = document.getElementById('private-start-time').value;
+        const end = document.getElementById('private-end-time').value;
+        if (!start || !end) return null;
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end)) return null;
+        return { start, end };
     }
 
     // Shared field collection + validation.
@@ -3230,6 +3360,7 @@
         const firstname = document.getElementById('private-firstname').value.trim();
         const lastname = document.getElementById('private-lastname').value.trim();
         const email = document.getElementById('private-email').value.trim();
+        const instagram = document.getElementById('private-instagram').value.trim();
         const price = document.getElementById('private-price').value;
         const date = document.getElementById('private-date').value;
         const alreadyPaid = document.getElementById('private-already-paid').checked;
@@ -3257,7 +3388,7 @@
             return null;
         }
         return { firstname, lastname, email, price, date, startTime: t.start, endTime: t.end,
-                 alreadyPaid, sendEmail };
+                 instagram, alreadyPaid, sendEmail };
     }
 
     function togglePrivatePaid() {
@@ -3294,6 +3425,9 @@
         document.getElementById('private-firstname').value = '';
         document.getElementById('private-lastname').value = '';
         document.getElementById('private-email').value = '';
+        document.getElementById('private-instagram').value = '';
+        document.getElementById('private-start-time').value = '10:00';
+        document.getElementById('private-end-time').value = '11:00';
         document.getElementById('private-price').value = '300';
         document.getElementById('private-payment-link').value = '';
         document.getElementById('private-link-row').style.display = 'none';
@@ -3320,7 +3454,7 @@
         const f = _pvCollect();
         if (!f) return;
         const done = _pvBusy('private-create-btn', 'Создаём…');
-        _pvStatus(f.sendEmail ? 'Создаём сессию и отправляем письмо клиенту…' : 'Создаём приватную сессию…', 'info');
+        _pvStatus(f.sendEmail ? 'Создаём сессию и отправляем письмо клиенту…' : 'Создаём индивидуальную сессию…', 'info');
         try {
             const r = await fetch('/admin/api/private-session', {
                 method: 'POST',
@@ -3328,7 +3462,7 @@
                 body: JSON.stringify({
                     date: f.date, start_time: f.startTime, end_time: f.endTime,
                     client_name: `${f.firstname} ${f.lastname}`,
-                    email: f.email, price: f.price,
+                    email: f.email, instagram: f.instagram, price: f.price,
                     send_email: f.sendEmail, already_paid: f.alreadyPaid
                 })
             });

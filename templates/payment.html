@@ -318,7 +318,7 @@
       <div class="summary">
         <div class="summary-row">
           <span class="key" data-i18n="summary_session">Session</span>
-          <span data-i18n="summary_session_value">Mini Photo Session ({{ session_length }} min)</span>
+          <span>{{ event_title }} ({{ session_length }} min)</span>
         </div>
         <div class="summary-row">
           <span class="key" data-i18n="summary_date">Date</span>
@@ -334,7 +334,7 @@
         </div>
         {% if selected_addons %}
         <div class="summary-row">
-          <span class="key">Selected add-ons</span>
+          <span class="key" data-i18n="summary_selected_addons">Selected add-ons</span>
           <span>
             {% for addon in selected_addons %}
               {{ addon.title|e }}{% if not loop.last %}<br>{% endif %}
@@ -342,16 +342,16 @@
           </span>
         </div>
         <div class="summary-row">
-          <span class="key">Selected add-ons total</span>
+          <span class="key" data-i18n="summary_addons_total">Selected add-ons total</span>
           <span>${{ "%.2f"|format(addons_total or 0) }} CAD</span>
         </div>
         {% endif %}
         <div class="summary-row">
-          <span class="key">Remaining balance</span>
+          <span class="key" data-i18n="summary_balance">Remaining balance</span>
           <span>${{ "%.2f"|format(remaining_balance or 0) }} CAD</span>
         </div>
         <div class="summary-row">
-          <span class="key">Amount due today</span>
+          <span class="key" data-i18n="summary_deposit">Amount due today</span>
           <span class="val-rose">${{ "%.2f"|format(amount_due_today or price) }} CAD</span>
         </div>
       </div>
@@ -657,8 +657,10 @@
       summary_time:      'Time',
       summary_includes:  'Includes',
       summary_includes_value: '15 edited photos + all originals',
-      summary_balance:   'Balance at session',
-      summary_deposit:   'Deposit due now',
+      summary_selected_addons: 'Selected add-ons',
+      summary_addons_total: 'Selected add-ons total',
+      summary_balance:   'Remaining balance',
+      summary_deposit:   'Amount due today',
       currency_label:    'CAD — Canadian dollars',
       bank_msg_title:    'Ready-to-use bank message',
       bank_msg_desc:     'Paste this in the "Message" field when sending',
@@ -705,8 +707,10 @@
       summary_time:      'Время',
       summary_includes:  'Включено',
       summary_includes_value: '15 отредактированных фото + все оригиналы',
-      summary_balance:   'Остаток на съёмке',
-      summary_deposit:   'Депозит сейчас',
+      summary_selected_addons: 'Выбранные дополнения',
+      summary_addons_total: 'Сумма дополнений',
+      summary_balance:   'Остаток к оплате',
+      summary_deposit:   'К оплате сегодня',
       currency_label:    'CAD — канадские доллары',
       bank_msg_title:    'Готовое сообщение для банка',
       bank_msg_desc:     'Вставьте это в поле “Message” при отправке',
@@ -753,8 +757,10 @@
       summary_time:      'समय',
       summary_includes:  'शामिल है',
       summary_includes_value: '15 एडिटेड फोटो + सभी ओरिजिनल',
-      summary_balance:   'सेशन के दिन बाकी',
-      summary_deposit:   'अभी डिपॉज़िट',
+      summary_selected_addons: 'चुने गए add-ons',
+      summary_addons_total: 'Add-ons कुल',
+      summary_balance:   'बाकी भुगतान',
+      summary_deposit:   'आज देय राशि',
       currency_label:    'CAD — कैनेडियन डॉलर',
       bank_msg_title:    'बैंक के लिए तैयार संदेश',
       bank_msg_desc:     'भेजते समय इसे “Message” फ़ील्ड में पेस्ट करें',
@@ -801,8 +807,10 @@
       summary_time:      'Час',
       summary_includes:  'Включено',
       summary_includes_value: '15 відредагованих фото + усі оригінали',
-      summary_balance:   'Залишок на сесії',
-      summary_deposit:   'Депозит зараз',
+      summary_selected_addons: 'Обрані додатки',
+      summary_addons_total: 'Сума додатків',
+      summary_balance:   'Залишок до оплати',
+      summary_deposit:   'До оплати сьогодні',
       currency_label:    'CAD — канадські долари',
       bank_msg_title:    'Готове повідомлення для банку',
       bank_msg_desc:     'Вставте це у поле “Message” під час відправлення',

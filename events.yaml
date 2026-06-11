@@ -47,8 +47,8 @@ events:
   status: completed
   hidden: true
 - id: private-session
-  title: Private Session
-  subtitle: Individual photoshoot (not visible on website)
+  title: Individual Photoshoot
+  subtitle: Individual photoshoot (hidden from public website)
   date: '2026-06-10'
   start_time: '10:00'
   end_time: '18:00'
@@ -62,7 +62,7 @@ events:
   featured: false
   hidden: true
   included:
-  - 30 minutes private session
+  - 30 minutes individual photoshoot
   - 20 professionally edited photos
   - All original photos included
   photos:

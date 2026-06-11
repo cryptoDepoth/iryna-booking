@@ -99,6 +99,9 @@ def test_create_unpaid_emails_payment_link(env):
 
     assert len(sent) == 1
     assert sent[0]["to"] == "jane.privat@example.com"
+    assert sent[0]["subject"] == "Your Individual Photoshoot — 2026-09-20 · Booking & Payment"
+    assert "Your individual photoshoot with Iryna Pashynska is reserved!" in sent[0]["plain"]
+    assert "private photo session" not in sent[0]["plain"].lower()
     assert data["payment_url"] in sent[0]["plain"]
     assert "350.00" in sent[0]["plain"]
 
@@ -155,6 +158,7 @@ def test_payment_page_private_no_timer_full_price(env):
     assert 'id="timer-box"' not in body     # no countdown div for private sessions
     assert "350.00" in body                  # full price due today
     assert "TIMER_SECONDS = null" in body
+    assert "Individual Photoshoot — Jane Privat" in body
 
 
 def test_payment_page_normal_booking_has_timer(env):
