@@ -5,7 +5,7 @@ Uses a temp SQLite database and mocks external services.
 """
 import os
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytest
 
 import app as booking_app  # noqa: E402
@@ -209,7 +209,7 @@ def test_payment_submitted_extends_slot_protection_for_interac_delay(client):
     booking_id = reserve.get_json()["booking_id"]
     token = reserve.get_json()["confirmation_token"]
 
-    before = datetime.now()
+    before = datetime.now(timezone.utc)
     response = c.post("/confirm", json={
         "booking_id": booking_id,
         "confirmation_token": token,

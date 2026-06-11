@@ -38,6 +38,26 @@ import time
 import yaml
 from html import escape as html_escape
 
+# ===== TIMEZONE HELPERS =====
+# Container runs UTC; clients are in America/Edmonton (UTC-6/UTC-7).
+# All user-visible dates must use local time to avoid evening drift.
+try:
+    from zoneinfo import ZoneInfo as _ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo as _ZoneInfo  # type: ignore
+
+_tz = _ZoneInfo('America/Edmonton')
+
+
+def _local_now():
+    """Return timezone-aware datetime in America/Edmonton."""
+    return datetime.now(timezone.utc).astimezone(_tz)
+
+
+def _local_today():
+    """Return date() in America/Edmonton."""
+    return _local_now().date()
+
 # ===== LOGGING =====
 # Write log to persistent volume when available, else next to app
 _log_dir = os.environ.get("BACKUP_DIR", "").replace("/backups", "") or os.path.dirname(__file__)
@@ -2559,7 +2579,7 @@ def resolve_event_deeplink(value):
         # Also allow ids/titles typed as loose slugs with underscores/hyphens.
         terms = [key]
 
-    today = datetime.now().date()
+    today = _local_today()
     candidates = []
     for ev in EVENTS:
         haystack = _deeplink_key(" ".join(str(ev.get(field, "")) for field in (
@@ -2816,7 +2836,7 @@ def _rolling_date_unavailable_reason(ev, date_str):
         requested = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         return "invalid_date"
-    today = datetime.now().date()
+    today = _local_today()
     if requested < today:
         return "past"
     if (requested - today).days > _rolling_horizon_days(ev):
@@ -3103,7 +3123,7 @@ def _run_email_scheduler():
 
 def _process_abandoned_emails():
     """Send recovery emails to clients who reserved but never paid (2h cooldown)."""
-    now = datetime.now()
+    now = _local_now()
     cutoff = (now - timedelta(hours=2)).isoformat()
     conn = db_conn()
     rows = conn.execute("""
@@ -3154,7 +3174,7 @@ def _process_abandoned_emails():
 
 def _process_reminder_emails():
     """Send 48h pre-session reminders to confirmed bookings."""
-    now = datetime.now()
+    now = _local_now()
     # Window: sessions happening between 46h and 50h from now (4h window to avoid duplicates)
     date_from = (now + timedelta(hours=46)).strftime("%Y-%m-%d")
     date_to   = (now + timedelta(hours=50)).strftime("%Y-%m-%d")
@@ -3186,7 +3206,7 @@ def _process_reminder_emails():
 
 def _process_24h_reminder_emails():
     """Send 24-hour pre-session reminders to confirmed bookings."""
-    now = datetime.now()
+    now = _local_now()
     # Window: sessions happening between 22h and 26h from now (4h window to avoid duplicates)
     date_from = (now + timedelta(hours=22)).strftime("%Y-%m-%d")
     date_to   = (now + timedelta(hours=26)).strftime("%Y-%m-%d")
@@ -3218,7 +3238,7 @@ def _process_24h_reminder_emails():
 
 def _process_review_emails():
     """Send review request emails 5 days after a confirmed session."""
-    now = datetime.now()
+    now = _local_now()
     # Sessions that happened between 4 and 6 days ago
     date_from = (now - timedelta(days=6)).strftime("%Y-%m-%d")
     date_to   = (now - timedelta(days=4)).strftime("%Y-%m-%d")
@@ -3269,7 +3289,7 @@ def sync_client(email: str, name: str, phone: str = "", instagram: str = ""):
         return
     conn = db_conn()
     c = conn.cursor()
-    now = datetime.now().isoformat()
+    now = _local_now().isoformat()
 
     # Insert or update basic info (keep latest name/phone/ig)
     c.execute("""
@@ -3390,7 +3410,7 @@ def expire_reservations():
     Returns count of expired bookings."""
     conn = db_conn()
     c = conn.cursor()
-    now = datetime.now().isoformat()
+    now = _local_now().isoformat()
     c.execute("""
         SELECT * FROM bookings
         WHERE confirmed = 0
@@ -3560,7 +3580,7 @@ def index():
         request.cookies.get("booking_flow"),
     )
     initial_events = _public_events_payload()
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _local_today().strftime("%Y-%m-%d")
     raw_visible_events = [ev for ev in EVENTS if not ev.get("hidden") and ev.get("photos")]
     raw_upcoming_events = [ev for ev in raw_visible_events if str(ev.get("date", "")) >= today]
     hero_source_events = initial_events or raw_upcoming_events or raw_visible_events
@@ -3712,7 +3732,7 @@ def landing_maternity():
 @app.route("/book")
 def booking_page():
     """Public booking page — shows upcoming sessions with real-time spot counts."""
-    now = datetime.now()
+    now = _local_now()
     today = now.strftime("%Y-%m-%d")
     requested_type = (request.args.get("type") or "").strip().lower()
     allowed_types = {"mini", "individual", "family", "maternity", "wedding", "custom"}
@@ -3790,7 +3810,7 @@ def _public_events_payload():
     depend entirely on a second client-side request succeeding.
     """
     result = []
-    now = datetime.now()
+    now = _local_now()
     conn = db_conn()
     c = conn.cursor()
 
@@ -3945,7 +3965,7 @@ def _past_events_payload(limit=12):
     feels alive between upcoming dates and showcases Iryna's range. Hidden events and
     drafts/cancelled events are never exposed here.
     """
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _local_today().strftime("%Y-%m-%d")
     out = []
     for ev in EVENTS:
         if ev.get("hidden"):
@@ -3996,7 +4016,7 @@ def get_slots(date_str):
 
     booking_type = _booking_type(ev)
     slots = generate_slots(ev)
-    now = datetime.now()
+    now = _local_now()
     instagram_url = SETTINGS.get("photographer_instagram_url", "https://instagram.com/pashynska.photo")
     instagram_handle = SETTINGS.get("photographer_instagram", "@pashynska.photo")
 
@@ -4442,7 +4462,7 @@ def reserve_slot():
         return jsonify({"success": False, "error": "Too many requests. Please wait 10 minutes."}), 429
     record_request(ip)
 
-    now = datetime.now()
+    now = _local_now()
     expires = now + timedelta(minutes=RESERVATION_MINUTES)
 
     conn = db_conn()
@@ -4606,7 +4626,9 @@ def payment():
     if status_now == "reserved" and booking.get("reserved_until"):
         try:
             _ru = datetime.fromisoformat(str(booking["reserved_until"]))
-            timer_seconds_left = max(0, int((_ru - datetime.now()).total_seconds()))
+            if _ru.tzinfo is None:
+                _ru = _ru.replace(tzinfo=timezone.utc)
+            timer_seconds_left = max(0, int((_ru - _local_now()).total_seconds()))
         except (TypeError, ValueError):
             timer_seconds_left = None
 
@@ -4729,7 +4751,7 @@ def confirm_payment():
     # A client who says payment was sent must not lose the slot while Interac
     # or Gmail is delayed. Keep it protected long enough for automation/admin
     # review, then let the normal expiry sweep release it.
-    new_expires = (datetime.now() + timedelta(hours=PENDING_PAYMENT_HOURS)).isoformat()
+    new_expires = (_local_now() + timedelta(hours=PENDING_PAYMENT_HOURS)).isoformat()
     # Private sessions occupy a dedicated slot the admin created on purpose —
     # the expiry sweep must never release them while an e-Transfer is in flight.
     if (row.get("session_type") or "") == "private":
@@ -5866,7 +5888,7 @@ def _admin_event_summary(ev, conn=None, today=None):
     if conn is None:
         conn = db_conn()
         close_conn = True
-    today = today or datetime.now().date()
+    today = today or _local_today()
     event_id = ev.get("id") or ""
     event_date = ev.get("date") or ""
     slots = generate_slots(ev)
@@ -5943,7 +5965,7 @@ def _admin_event_summary(ev, conn=None, today=None):
 
 
 def _admin_event_summaries():
-    today = datetime.now().date()
+    today = _local_today()
     current_events = [ev for ev in EVENTS if _admin_event_is_current(ev)]
     current_events.sort(key=lambda ev: (_admin_event_date_key(ev) < today, _admin_event_date_key(ev)))
     conn = db_conn()
@@ -5954,7 +5976,7 @@ def _admin_event_summaries():
 
 
 def _analytics_report_range():
-    today = datetime.now().date()
+    today = _local_today()
     default_from = (today - timedelta(days=30)).isoformat()
     default_to = today.isoformat()
     date_from = request.args.get("date_from") or default_from
@@ -6195,7 +6217,7 @@ def admin():
                            events=EVENTS,
                            event_summaries=event_summaries,
                            next_event=next_event,
-                           now=datetime.now(),
+                           now=_local_now(),
                            session_types=session_types,
                            filters={
                                "date_from": date_from,
@@ -7329,7 +7351,7 @@ def admin_reschedule():
     elif new_date != new_ev.get("date"):
         return jsonify({"error": "Target date does not match the event's date"}), 400
 
-    now = datetime.now()
+    now = _local_now()
     conn = db_conn()
     c = conn.cursor()
     try:
@@ -8550,7 +8572,7 @@ def admin_event_block_slot(event_id):
     if not event_date:
         return jsonify({"success": False, "error": "Event has no date"}), 400
 
-    now = datetime.now()
+    now = _local_now()
     expires = (now + timedelta(days=365)).isoformat()
     deposit_amt = float(ev.get("deposit") or 0)
     full_price = float(ev.get("full_price") or 0) or (deposit_amt * 2)
@@ -8694,7 +8716,7 @@ def admin_event_block_day(event_id):
     if not event_date:
         return jsonify({"success": False, "error": "Event has no date"}), 400
 
-    now = datetime.now()
+    now = _local_now()
     expires = (now + timedelta(days=365)).isoformat()
     deposit_amt = float(ev.get("deposit") or 0)
     full_price = float(ev.get("full_price") or 0) or (deposit_amt * 2)
@@ -8801,7 +8823,7 @@ def admin_event_manual_book(event_id):
     if not event_date:
         return jsonify({"success": False, "error": "Event has no date"}), 400
 
-    now = datetime.now()
+    now = _local_now()
     deposit_amt = float(ev.get("deposit") or 0)
     full_price = float(ev.get("full_price") or 0) or (deposit_amt * 2)
 
