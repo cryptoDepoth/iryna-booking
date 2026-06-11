@@ -3680,6 +3680,15 @@ def _select_booking_flow_variant(query_value=None, cookie_value=None):
     return "control"
 
 
+@app.template_filter("display_date")
+def _display_date_filter(value):
+    """Render ISO dates (2026-07-11) as 'July 11, 2026' for human-facing copy."""
+    try:
+        return datetime.strptime(str(value), "%Y-%m-%d").strftime("%B %-d, %Y")
+    except (ValueError, TypeError):
+        return str(value or "")
+
+
 @app.route("/index.html")
 @app.route("/book-a-session")
 @app.route("/book-a-session/")

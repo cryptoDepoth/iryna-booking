@@ -69,18 +69,38 @@ def test_mountain_mini_deeplink_returns_200(client_with_mountain_mini):
 
 
 def test_mountain_mini_page_shows_price(client_with_mountain_mini):
-    """Page must display the session price above the fold."""
+    """Page must display the session price above the fold (exact $ amount, not a stray '250')."""
     r = client_with_mountain_mini.get("/?event=mountain_mini")
     html = r.data.decode("utf-8")
-    assert "250" in html, "Price not found in mountain mini landing page"
+    assert "$250" in html, "Price not found in mountain mini landing page"
+    assert "+ GST" in html
 
 
 def test_mountain_mini_page_shows_session_duration(client_with_mountain_mini):
     """Page must display session duration."""
     r = client_with_mountain_mini.get("/?event=mountain_mini")
     html = r.data.decode("utf-8")
-    assert "30" in html, "Session duration not found"
-    assert "min" in html.lower()
+    assert "30 min" in html, "Session duration not found"
+
+
+def test_mountain_mini_page_shows_human_readable_date(client_with_mountain_mini):
+    """Callout must show 'July 11, 2026', not the raw ISO date."""
+    r = client_with_mountain_mini.get("/?event=mountain_mini")
+    html = r.data.decode("utf-8")
+    assert "July 11, 2026" in html
+
+
+def test_callout_hidden_for_event_without_price(monkeypatch):
+    """Events with no price must not render a broken offer block."""
+    no_price_event = {k: v for k, v in _MOUNTAIN_MINI_EVENT.items()
+                      if k not in ("full_price", "deposit")}
+    monkeypatch.setattr(booking_app, "EVENTS", [no_price_event])
+    booking_app.app.config["TESTING"] = True
+    with booking_app.app.test_client() as c:
+        r = c.get("/?event=mountain_mini")
+        assert r.status_code == 200
+        html = r.data.decode("utf-8")
+        assert 'id="directCallout"' not in html
 
 
 def test_mountain_mini_page_shows_included_deliverables(client_with_mountain_mini):

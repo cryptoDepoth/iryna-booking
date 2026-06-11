@@ -857,8 +857,11 @@ src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
   <!-- legacy featured-wrap kept hidden so JS that targets it still works -->
   <div class="featured-wrap" id="featuredWrap"></div>
 
-  {% if direct_event %}
-  <!-- DIRECT-EVENT CALLOUT: shown when landing via event deeplink (e.g. ?event=mountain_mini) -->
+  {% set _dc_price = (direct_event.full_price or direct_event.price) if direct_event else None %}
+  {% if direct_event and _dc_price %}
+  <!-- DIRECT-EVENT CALLOUT: above-fold offer summary when landing via event deeplink
+       (e.g. ?event=mountain_mini). Only rendered when the event has a price, so
+       sparse/placeholder events never show a broken offer block. -->
   <div class="direct-callout" id="directCallout">
     <div class="direct-callout-inner">
       <div class="direct-callout-badge">Reserve your spot — limited spots</div>
@@ -867,13 +870,13 @@ src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
       {% set _dc_loc_short = _dc_loc.split('—')[0].strip() if '—' in _dc_loc else (_dc_loc.split(',')[0].strip() if ',' in _dc_loc else _dc_loc) %}
       {% if direct_event.date or _dc_loc_short %}
       <div class="direct-callout-meta">
-        {%- if direct_event.date -%}{{ direct_event.date }}{%- endif -%}
+        {%- if direct_event.date -%}{{ direct_event.date | display_date }}{%- endif -%}
         {%- if direct_event.date and _dc_loc_short %} · {% endif -%}
         {%- if _dc_loc_short -%}{{ _dc_loc_short }}{%- endif -%}
       </div>
       {% endif %}
       <div class="direct-callout-price">
-        ${{ (direct_event.full_price | int) if direct_event.full_price else ((direct_event.price | int) if direct_event.price else '') }}
+        ${{ _dc_price | int }}
         <span class="dc-sub">+ GST</span>
         {%- if direct_event.session_length %} <span class="dc-sub">· {{ direct_event.session_length }} min</span>{% endif %}
       </div>
@@ -884,7 +887,7 @@ src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
         {% endfor %}
       </ul>
       {% endif %}
-      <button class="direct-callout-cta" onclick="openDrawer({{ direct_event.id | tojson }})">
+      <button class="direct-callout-cta" onclick="window.openDrawer && openDrawer({{ direct_event.id | tojson }})">
         Choose a time →
       </button>
       <p class="direct-callout-hint">Your spot is held for 15 minutes after booking · deposit by Interac e-Transfer · questions? DM <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener" style="color:var(--rose)">@pashynska.photo</a></p>
@@ -2939,7 +2942,7 @@ const SITE_I18N = {
     ig_ph:        '@instagram (необязательно)',
     continue_btn: 'Перейти к оплате →',
     pick_slot:    'Сначала выберите время',
-    pay_note: 'Депозит через e-Transfer · остаток в день съёмки',
+    pay_note: 'Чтобы закрепить время, завершите оплату на следующем шаге. Слот временно удерживается до получения оплаты.',
     available_slots_lbl: 'Доступное время',
     waitlist_msg: 'Эта сессия полностью забронирована. Запишитесь в лист ожидания — я напишу вам в Direct, как только освободится место.',
     no_slots_msg: 'Нет доступных слотов для этой сессии.',
@@ -2997,10 +3000,10 @@ const SITE_I18N = {
     pay_no_etransfer: 'Не можете сделать e-Transfer?',
     pay_card_secure: 'Безопасная оплата · Stripe',
     pay_deposit_for: 'Депозит за {name}',
-    succ_pending_title: 'Платёж в обработке',
-    succ_pending_desc: 'Спасибо{name}! <strong>Ваш платёж проверяется.</strong>',
-    succ_pending_hint: 'Я увижу e-Transfer в течение нескольких минут — страница обновится автоматически.',
-    succ_status_pending: 'В обработке ⏳',
+    succ_pending_title: 'Зарезервировано — ждём подтверждения оплаты',
+    succ_pending_desc: 'Спасибо{name}! <strong>Ваше место зарезервировано, но не подтверждено до получения оплаты.</strong>',
+    succ_pending_hint: 'Я увижу e-Transfer в течение нескольких минут — страница обновится автоматически после подтверждения. Вопросы? Direct: <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener" style="color:var(--rose)">@pashynska.photo</a>',
+    succ_status_pending: 'Зарезервировано — ожидает оплаты ⏳',
     succ_booking_id_lbl: 'Номер брони',
     succ_status_lbl: 'Статус',
     succ_done_btn: 'Готово',
@@ -3103,7 +3106,7 @@ const SITE_I18N = {
     ig_ph:        '@इंस्टाग्राम (वैकल्पिक)',
     continue_btn: 'भुगतान की ओर जारी रखें →',
     pick_slot:    'पहले समय चुनें',
-    pay_note: 'e-Transfer से डिपॉज़िट · बाकी सेशन के दिन',
+    pay_note: 'अपना समय सुरक्षित करने के लिए अगले चरण में भुगतान पूरा करें। भुगतान मिलने तक आपका स्लॉट अस्थायी रूप से होल्ड रहता है।',
     available_slots_lbl: 'उपलब्ध समय',
     waitlist_msg: 'यह सेशन पूरी तरह बुक है। वेटलिस्ट में शामिल हों — जगह खुलते ही मैं DM करूँगी।',
     no_slots_msg: 'इस सेशन के लिए कोई स्लॉट उपलब्ध नहीं।',
@@ -3161,10 +3164,10 @@ const SITE_I18N = {
     pay_no_etransfer: 'e-Transfer नहीं कर सकते?',
     pay_card_secure: 'सुरक्षित भुगतान · Stripe',
     pay_deposit_for: '{name} के लिए डिपॉज़िट',
-    succ_pending_title: 'भुगतान विचाराधीन',
-    succ_pending_desc: 'धन्यवाद{name}! <strong>आपके भुगतान की समीक्षा हो रही है।</strong>',
-    succ_pending_hint: 'मैं कुछ मिनटों में आपका e-Transfer देख लूँगी — यह पेज अपने आप अपडेट हो जाएगा।',
-    succ_status_pending: 'विचाराधीन ⏳',
+    succ_pending_title: 'रिज़र्व — भुगतान की पुष्टि बाकी',
+    succ_pending_desc: 'धन्यवाद{name}! <strong>आपकी जगह रिज़र्व है, लेकिन भुगतान मिलने तक कन्फ़र्म नहीं है।</strong>',
+    succ_pending_hint: 'मैं कुछ मिनटों में आपका e-Transfer देख लूँगी — पुष्टि होते ही यह पेज अपने आप अपडेट हो जाएगा। सवाल? DM करें <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener" style="color:var(--rose)">@pashynska.photo</a>',
+    succ_status_pending: 'रिज़र्व — भुगतान बाकी ⏳',
     succ_booking_id_lbl: 'बुकिंग ID',
     succ_status_lbl: 'स्थिति',
     succ_done_btn: 'पूर्ण',
@@ -3267,7 +3270,7 @@ const SITE_I18N = {
     ig_ph:        '@instagram (необов\'язково)',
     continue_btn: 'Перейти до оплати →',
     pick_slot:    'Спочатку оберіть час',
-    pay_note: 'Депозит через e-Transfer · залишок у день зйомки',
+    pay_note: 'Щоб закріпити час, завершіть оплату на наступному кроці. Слот тимчасово утримується до отримання оплати.',
     available_slots_lbl: 'Доступний час',
     waitlist_msg: 'Ця сесія повністю заброньована. Запишіться у лист очікування — напишу в Direct, як з\'явиться місце.',
     no_slots_msg: 'Немає доступних слотів для цієї сесії.',
@@ -3325,10 +3328,10 @@ const SITE_I18N = {
     pay_no_etransfer: 'Не можете зробити e-Transfer?',
     pay_card_secure: 'Безпечна оплата · Stripe',
     pay_deposit_for: 'Депозит за {name}',
-    succ_pending_title: 'Платіж в обробці',
-    succ_pending_desc: 'Дякую, {name}! <strong>Ваш платіж перевіряється.</strong>',
-    succ_pending_hint: 'Я побачу e-Transfer за кілька хвилин — сторінка оновиться автоматично.',
-    succ_status_pending: 'В обробці ⏳',
+    succ_pending_title: 'Зарезервовано — чекаємо підтвердження оплати',
+    succ_pending_desc: 'Дякую, {name}! <strong>Ваше місце зарезервоване, але не підтверджене до отримання оплати.</strong>',
+    succ_pending_hint: 'Я побачу e-Transfer за кілька хвилин — сторінка оновиться автоматично після підтвердження. Питання? Напишіть у Direct <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener" style="color:var(--rose)">@pashynska.photo</a>',
+    succ_status_pending: 'Зарезервовано — очікує оплати ⏳',
     succ_booking_id_lbl: 'Номер броні',
     succ_status_lbl: 'Статус',
     succ_done_btn: 'Готово',
