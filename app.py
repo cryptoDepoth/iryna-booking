@@ -4584,6 +4584,14 @@ def payment():
         return redirect(url_for("index"))
 
     booking = dict(row)
+
+    # Finished bookings should never show a payment form.
+    status_now = booking.get("status")
+    if status_now in ("expired", "cancelled"):
+        return redirect(url_for("index"))
+    if booking.get("confirmed") or status_now == "confirmed":
+        return redirect(_booking_success_url(booking["id"], booking.get("confirmation_token"), absolute_base=""))
+
     ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
     if not ev:
         ev = {}
@@ -4591,7 +4599,19 @@ def payment():
     amount_due_today = _money(booking.get("deposit_amount") or ev.get("deposit") or SESSION_PRICE)
     remaining_balance = _booking_balance_due(booking, ev)
 
+    # Server-computed countdown (client clocks/timezones can't be trusted).
+    # None => no timer: private sessions and pending_payment have no short
+    # reservation window to count down.
+    timer_seconds_left = None
+    if status_now == "reserved" and booking.get("reserved_until"):
+        try:
+            _ru = datetime.fromisoformat(str(booking["reserved_until"]))
+            timer_seconds_left = max(0, int((_ru - datetime.now()).total_seconds()))
+        except (TypeError, ValueError):
+            timer_seconds_left = None
+
     return render_template("payment.html",
+        timer_seconds_left=timer_seconds_left,
         booking=booking,
         date=ev.get("date", DATE),
         time=booking.get("time", ""),
@@ -4710,6 +4730,10 @@ def confirm_payment():
     # or Gmail is delayed. Keep it protected long enough for automation/admin
     # review, then let the normal expiry sweep release it.
     new_expires = (datetime.now() + timedelta(hours=PENDING_PAYMENT_HOURS)).isoformat()
+    # Private sessions occupy a dedicated slot the admin created on purpose —
+    # the expiry sweep must never release them while an e-Transfer is in flight.
+    if (row.get("session_type") or "") == "private":
+        new_expires = None
     c.execute("""
         UPDATE bookings
         SET status='pending_payment', reserved_until=?, confirmed=0, paid=0
@@ -5205,6 +5229,56 @@ def _send_balance_request_email(to_email, client_name, event_title, event_date, 
     return _send_email_raw(to_email, client_name or "Client", subject, plain, html)
 
 
+def _send_private_payment_email(to_email, client_name, event_title, event_date,
+                                start_time, end_time, session_minutes, price,
+                                booking_id, payment_url, interac_email=None):
+    """Email the client a private-session payment link (same /payment page as
+    the deposit flow: Interac e-Transfer with auto-confirmation OR Stripe)."""
+    if not to_email:
+        return False
+    interac_email = interac_email or EMAIL or "iryna.pashynska@gmail.com"
+    subject = f"Your Private Photo Session — {event_date} · Booking & Payment"
+    safe_name = _html_escape(client_name or "Client")
+    time_range = f"{start_time}–{end_time}"
+    plain = (
+        f"Hi {client_name},\n\n"
+        f"Your private photo session with Iryna Pashynska is reserved!\n\n"
+        f"Date: {event_date}\n"
+        f"Time: {time_range} ({session_minutes} min)\n"
+        f"Price: ${price:.2f} CAD\n"
+        f"Booking ID: #{booking_id}\n\n"
+        f"To secure your session, please complete the payment here:\n"
+        f"{payment_url}\n\n"
+        f"On that page you can pay either way:\n"
+        f"1) Interac e-Transfer to {interac_email} — confirms automatically within minutes\n"
+        f"2) Card / Apple Pay / Google Pay (Stripe)\n\n"
+        f"The page updates live as soon as your payment is received, and you'll\n"
+        f"get a confirmation email right away.\n\n"
+        f"Questions? Just reply to this email or DM @pashynska.photo.\n\n"
+        f"Warmly,\nIryna Pashynska\n@pashynska.photo"
+    )
+    html = f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 18px;"><tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 8px 32px rgba(70,40,35,.10);">
+<tr><td style="background:linear-gradient(135deg,#c4857a,#a3685e);padding:34px;text-align:center;color:#fff;">
+<h1 style="margin:0;font-size:25px;font-weight:400;">Your Private Session</h1><p style="margin:8px 0 0;opacity:.9;">Pashynska Photography</p>
+</td></tr>
+<tr><td style="padding:34px 38px;color:#5a3d4a;">
+<p style="font-size:16px;line-height:1.65;margin:0 0 18px;">Hi <strong>{safe_name}</strong>,</p>
+<p style="font-size:15px;line-height:1.7;margin:0 0 22px;color:#7a5a6a;">Your private photo session is reserved! Complete the payment below to confirm it.</p>
+<div style="background:#fdf6f0;border-radius:14px;padding:20px;margin:0 0 22px;">
+<p style="margin:0 0 8px;font-size:13px;color:#a8918e;text-transform:uppercase;letter-spacing:.08em;">Session details</p>
+<p style="margin:0;font-size:15px;line-height:1.8;color:#5a3d4a;"><strong>{_html_escape(event_title or "Private Session")}</strong><br>
+📅 {_html_escape(event_date)} · 🕐 {_html_escape(time_range)} ({session_minutes} min)<br>
+💰 <strong style="font-size:22px;color:#c4857a;">${price:.2f} CAD</strong> · Booking #{booking_id}</p>
+</div>
+<p style="margin:0;"><a href="{payment_url}" style="display:inline-block;background:#c4857a;color:#fff;text-decoration:none;padding:15px 28px;border-radius:999px;font-weight:600;font-size:16px;">Complete Payment — ${price:.2f} CAD</a></p>
+<p style="font-size:14px;line-height:1.7;color:#7a5a6a;margin:22px 0 0;">On the payment page you can choose <strong>Interac e-Transfer</strong> (confirms automatically within minutes) or <strong>card / Apple Pay / Google Pay</strong>. The page updates live once your payment arrives, and a confirmation email follows right away.</p>
+<p style="font-size:13px;line-height:1.6;color:#a8918e;margin:26px 0 0;">Questions? Reply to this email or DM <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;">@pashynska.photo</a>.</p>
+</td></tr></table></td></tr></table></body></html>"""
+    return _send_email_raw(to_email, client_name or "Client", subject, plain, html)
+
+
 @app.route("/stripe/create-checkout", methods=["POST"])
 def stripe_create_checkout():
     """Create a Stripe Checkout Session for the deposit payment.
@@ -5246,7 +5320,12 @@ def stripe_create_checkout():
     if not ev:
         return jsonify({"error": "Event not found"}), 404
 
-    deposit_cents = int(round(ev.get("deposit", SESSION_PRICE) * 100))
+    # Amount due now: booking-level deposit_amount wins (private sessions store
+    # their full price there); falls back to the event deposit for mini sessions.
+    amount_due = _money(booking.get("deposit_amount") or ev.get("deposit", SESSION_PRICE))
+    deposit_cents = int(round(amount_due * 100))
+    if deposit_cents <= 0:
+        return jsonify({"error": "Nothing to charge for this booking"}), 400
     event_title   = ev.get("title", "Mini Photo Session")
     event_date    = ev.get("date", booking.get("date", ""))
     try:
@@ -5282,7 +5361,10 @@ def stripe_create_checkout():
                 "price_data": {
                     "currency": "cad",
                     "product_data": {
-                        "name": f"Deposit — {event_title}",
+                        # Private events already carry a descriptive title;
+                        # prefixing "Deposit" there would be wrong (full price).
+                        "name": (event_title if booking.get("session_type") == "private"
+                                 else f"Deposit — {event_title}"),
                         "description": f"{date_nice} · {booking.get('time', '')} · {description}",
                         "images": images,
                     },
@@ -9038,11 +9120,16 @@ _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 def api_private_session():
     """Create a hidden event and book one client into it.
 
-    Used by the admin "🔒 Приватная фотосессия" modal. Persists the client's
-    email, the admin-entered price and (if generated first) the Stripe payment
-    link. If a payment link is supplied the booking is left 'reserved' / unpaid
-    (the client still has to pay it); otherwise it is recorded as confirmed/paid
-    — the admin is logging an already-settled session."""
+    Used by the admin "🔒 Приватная фотосессия" modal. The booking reuses the
+    full deposit machinery: the client gets a /payment page link (emailed when
+    send_email=true) where they choose Interac e-Transfer (auto-confirmed by
+    the Gmail watcher) or Stripe Checkout (auto-confirmed by the webhook); the
+    page live-polls /booking-status and the client receives a confirmation
+    email — identical mechanics to the public deposit flow.
+
+    already_paid=true records an already-settled session (confirmed/paid, no
+    email). Legacy compat: when already_paid is omitted, an empty payment_link
+    means "settled offline" (old modal semantics, pinned by tests)."""
     import secrets
     import yaml
 
@@ -9053,6 +9140,8 @@ def api_private_session():
     client_name = (data.get("client_name") or "").strip()
     email = (data.get("email") or "").strip().lower()
     payment_link = (data.get("payment_link") or "").strip()
+    send_email = bool(data.get("send_email"))
+    already_paid = data.get("already_paid")  # None => legacy: paid when no payment_link
 
     # ── Validation ──
     if not (date and start_time and end_time and client_name):
@@ -9065,6 +9154,8 @@ def api_private_session():
         return jsonify({"error": "Время окончания должно быть позже начала"}), 400
     if email and (len(email) > 254 or not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$", email)):
         return jsonify({"error": "Некорректный email"}), 400
+    if send_email and not email:
+        return jsonify({"error": "Email обязателен для отправки ссылки на оплату"}), 400
     try:
         price = round(float(data.get("price") or 300), 2)
     except (TypeError, ValueError):
@@ -9089,7 +9180,9 @@ def api_private_session():
         "session_length": session_minutes,
         "break_length": 0,
         "slot_interval": session_minutes,
-        "deposit": 0.0,
+        # Amount due now == full price: drives the /payment page, the Stripe
+        # checkout amount and the e-Transfer expected-amount matching.
+        "deposit": price,
         "full_price": price,
         "location": "Calgary — exact spot sent after booking",
         "session_type": "private",
@@ -9104,7 +9197,10 @@ def api_private_session():
     }
 
     # ── Book the client atomically (mirrors /admin/api/event/<id>/manual-book) ──
-    paid = not payment_link  # link sent => still awaiting payment
+    if already_paid is None:
+        paid = not payment_link  # legacy semantics: no link => settled offline
+    else:
+        paid = bool(already_paid)
     status_val = "confirmed" if paid else "reserved"
     paid_amount = price if paid else 0.0
     token = secrets.token_urlsafe(16)
@@ -9126,9 +9222,9 @@ def api_private_session():
                  (date, time, name, email, phone, instagram, session_type, status,
                   event_id, confirmation_token, deposit_amount, full_price,
                   confirmed, paid, paid_amount, payment_link, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, 0, ?, ?, ?, ?, ?, datetime('now'))""",
+               VALUES (?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
             (date, start_time, client_name, email, "", "",
-             status_val, event_id, token, price,
+             status_val, event_id, token, price, price,
              1 if paid else 0, 1 if paid else 0, paid_amount, payment_link or None),
         )
         booking_id = c.lastrowid
@@ -9164,14 +9260,51 @@ def api_private_session():
         except Exception as _e:
             log.warning(f"[private-session] sync_client failed: {_e}")
 
+    # ── Client payment link — same /payment page as the deposit flow ──
+    base_url = (BASE_URL or CANONICAL_SITE_URL).rstrip("/")
+    payment_url = f"{base_url}/payment?booking_id={booking_id}&token={token}"
+
+    email_sent = False
+    if not paid and send_email and email:
+        try:
+            email_sent = bool(_send_private_payment_email(
+                to_email=email,
+                client_name=client_name,
+                event_title=event["title"],
+                event_date=date,
+                start_time=start_time,
+                end_time=end_time,
+                session_minutes=session_minutes,
+                price=price,
+                booking_id=booking_id,
+                payment_url=payment_url,
+            ))
+        except Exception as e:
+            log.error(f"[private-session] payment email failed for #{booking_id}: {e}")
+
+    try:
+        _notify_admin(
+            f"🔒 <b>Private session created</b>\n\n"
+            f"👤 {_tg_escape(client_name)}\n"
+            f"📅 {date} · {start_time}–{end_time}\n"
+            f"💰 ${price:.2f} CAD · "
+            + ("✅ already paid" if paid else ("✉️ payment link emailed to client" if email_sent else "🔗 link ready (email not sent)"))
+            + f"\n🆔 Booking #{booking_id}"
+        )
+    except Exception as e:
+        log.warning(f"[private-session] admin notify failed: {e}")
+
     log.info(f"[private-session] event={event_id} booking={booking_id} "
-             f"{date} {start_time}-{end_time} price={price} paid={paid} name={client_name!r}")
+             f"{date} {start_time}-{end_time} price={price} paid={paid} "
+             f"email_sent={email_sent} name={client_name!r}")
     return jsonify({
         "success": True,
         "event_id": event_id,
         "booking_id": booking_id,
         "status": status_val,
         "paid": paid,
+        "payment_url": None if paid else payment_url,
+        "email_sent": email_sent,
         "booking_url": f"/admin/booking/{booking_id}",
     })
 

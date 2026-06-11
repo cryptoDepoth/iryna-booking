@@ -29,6 +29,44 @@ Each release follows this pattern:
 
 ---
 
+## [2026-06-11] — Private sessions: full deposit-style payment flow (not yet deployed)
+
+### What's new
+- [Feature] Private session booking now reuses the complete deposit machinery:
+  client receives an email with a /payment page link where they choose Interac
+  e-Transfer (auto-confirmed by the Gmail watcher) or Stripe Checkout
+  (auto-confirmed by webhook); the page live-polls /booking-status and a
+  confirmation email is sent automatically.
+- [Feature] Admin modal: «Отправить письмо со ссылкой» + «Уже оплачено»
+  checkboxes; payment link with Copy button shown after creation
+  («Сгенерировать инвойс» removed — superseded by the booking-bound link).
+- [Feature] e-Transfer matcher keeps private bookings matchable for 45 days
+  (reserved or pending_payment) — clients pay emailed links days later.
+
+### Fixed
+- [Bugfix] /payment timer is now server-computed (TIMER_SECONDS) instead of a
+  fake client-side 15:00 sessionStorage countdown; hidden entirely for private
+  sessions and pending_payment (private bookings no longer get kicked off the
+  page after 15 minutes).
+- [Bugfix] /payment redirects finished bookings: confirmed → /success,
+  expired/cancelled → landing (no payment form for dead bookings).
+- [Bugfix] Stripe checkout amount comes from booking.deposit_amount (private =
+  full price); 0-amount checkouts rejected; private product label no longer
+  says "Deposit".
+- [Bugfix] /confirm keeps reserved_until NULL for private sessions so the
+  expiry sweep can never release an admin-created dedicated slot.
+
+### Data / Config changes
+- bookings.deposit_amount now stores the full price for private sessions
+  (drives /payment, Stripe amount and e-Transfer expected-amount matching).
+- ADMIN_PASSWORD rotated in local .env (2026-06-11); mirror to Fly:
+  `flyctl secrets set ADMIN_PASSWORD=... -a iryna-booking`.
+
+### Tests
+- +11 tests (tests/test_private_session_flow.py): 345 passed, 1 skipped.
+
+---
+
 ## [2026-06-10] — Security audit + lost-feature restore (not yet deployed)
 
 ### What's new

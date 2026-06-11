@@ -304,11 +304,13 @@
 
   <div class="container">
 
-    <!-- Timer -->
+    <!-- Timer (server-driven; absent for private sessions / pending payment) -->
+    {% if timer_seconds_left is not none %}
     <div class="timer-box" id="timer-box">
       <span class="timer-label" data-i18n="slot_reserved_for">Slot reserved for</span>
       <span class="timer-count" id="timer-count">15:00</span>
     </div>
+    {% endif %}
 
     <!-- Summary -->
     <div class="card">
@@ -497,10 +499,17 @@
     setInterval(pollBookingStatus, 3000);
     pollBookingStatus();
 
+    // Server-computed seconds remaining. null => no countdown for this booking
+    // (private sessions and pending_payment never auto-expire from this page).
+    const TIMER_SECONDS = {{ timer_seconds_left | tojson }};
+
     function initTimer() {
-      const saved = sessionStorage.getItem('reservationExpiry');
-      expiresAt = saved ? new Date(saved) : new Date(Date.now() + 15 * 60 * 1000);
-      if (!saved) sessionStorage.setItem('reservationExpiry', expiresAt.toISOString());
+      const box = document.getElementById('timer-box');
+      if (TIMER_SECONDS === null || TIMER_SECONDS === undefined || !box) {
+        sessionStorage.removeItem('reservationExpiry');
+        return;
+      }
+      expiresAt = new Date(Date.now() + TIMER_SECONDS * 1000);
       runTimer();
     }
 
@@ -511,8 +520,10 @@
 
       timerInterval = setInterval(() => {
         const diff = Math.max(0, Math.floor((expiresAt - new Date()) / 1000));
-        const m = Math.floor(diff / 60), s = diff % 60;
-        countEl.textContent = `${m}:${String(s).padStart(2,'0')}`;
+        const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
+        countEl.textContent = h > 0
+          ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+          : `${m}:${String(s).padStart(2,'0')}`;
         if (diff <= 300) box.classList.add('warning');
         if (diff <= 0) {
           clearInterval(timerInterval);

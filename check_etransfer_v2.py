@@ -383,13 +383,20 @@ def get_expected_amount_for_booking(booking_id):
     return 95.0
 
 
-def get_pending_bookings(within_minutes=30, grace_minutes=60, pending_payment_hours=24):
+def get_pending_bookings(within_minutes=30, grace_minutes=60, pending_payment_hours=24,
+                         private_days=45):
     """Get bookings awaiting payment, created within recent window.
 
     grace_minutes: also include bookings whose reservation expired up to
     this many minutes ago.  Interac e-Transfer emails can arrive 10-40 min
     after the client sends the payment, so we must not cut off the search the
     moment reserved_until passes.
+
+    private_days: admin-created private sessions have no short reservation
+    window (reserved_until is NULL) and the payment link is emailed — the
+    client may pay days later. Keep them matchable for this many days in
+    either reserved or pending_payment state. Exact-amount matching plus the
+    ambiguity guard keep this safe despite the long window.
     """
     conn = get_db()
     c = conn.cursor()
@@ -399,6 +406,7 @@ def get_pending_bookings(within_minutes=30, grace_minutes=60, pending_payment_ho
     grace_cutoff = (now - timedelta(minutes=grace_minutes)).strftime('%Y-%m-%d %H:%M:%S')
     created_cutoff = (now - timedelta(minutes=within_minutes + grace_minutes)).strftime('%Y-%m-%d %H:%M:%S')
     pending_cutoff = (now - timedelta(hours=pending_payment_hours)).strftime('%Y-%m-%d %H:%M:%S')
+    private_cutoff = (now - timedelta(days=private_days)).strftime('%Y-%m-%d %H:%M:%S')
     c.execute("""
         SELECT * FROM bookings
         WHERE confirmed = 0
@@ -407,9 +415,13 @@ def get_pending_bookings(within_minutes=30, grace_minutes=60, pending_payment_ho
             (status = 'reserved' AND reserved_until > ? AND created_at > ?)
             OR
             (status = 'pending_payment' AND created_at > ?)
+            OR
+            (session_type = 'private'
+             AND status IN ('reserved', 'pending_payment')
+             AND created_at > ?)
         )
         ORDER BY created_at DESC
-    """, (grace_cutoff, created_cutoff, pending_cutoff))
+    """, (grace_cutoff, created_cutoff, pending_cutoff, private_cutoff))
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return rows
