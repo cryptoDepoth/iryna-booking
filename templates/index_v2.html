@@ -692,6 +692,27 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   .event-card .photo .status,.event-card .photo .countdown{font-weight:500}
   .assistant-send{width:46px;height:46px}
 }
+
+/* ── DIRECT-EVENT CALLOUT (above-fold offer summary for deeplinked sessions) ── */
+.direct-callout{max-width:1200px;margin:18px auto 0;padding:0 20px}
+.direct-callout-inner{background:linear-gradient(135deg,#fdf8f6,#fff);border:1.5px solid rgba(196,133,122,.28);border-radius:18px;padding:20px 22px;display:flex;flex-direction:column;gap:10px}
+.direct-callout-badge{display:inline-flex;align-items:center;gap:7px;background:var(--rose);color:#fff;padding:5px 13px;border-radius:20px;font:700 .68rem var(--font-b);letter-spacing:.1em;text-transform:uppercase;align-self:flex-start}
+.direct-callout-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.8);flex-shrink:0}
+.direct-callout-title{font-family:var(--font-d);font-size:clamp(1.4rem,4vw,2rem);font-weight:400;color:var(--ink);line-height:1.1}
+.direct-callout-meta{font-size:.88rem;color:var(--ink-3);line-height:1.4}
+.direct-callout-price{font-family:var(--font-d);font-size:1.6rem;font-weight:500;color:var(--rose);line-height:1.1}
+.direct-callout-price .dc-sub{font-family:var(--font-b);font-size:.78rem;color:var(--ink-3);font-weight:400}
+.direct-callout-includes{list-style:none;display:grid;gap:5px;font-size:.86rem;color:var(--ink-2)}
+.direct-callout-includes li{display:flex;align-items:baseline;gap:7px}
+.direct-callout-includes li::before{content:"✓";color:var(--green);font-weight:700;flex-shrink:0}
+.direct-callout-cta{background:var(--ink);color:#fff;border:0;border-radius:12px;padding:14px 24px;font:600 .88rem var(--font-b);cursor:pointer;letter-spacing:.02em;transition:transform .15s,background .15s;align-self:flex-start}
+.direct-callout-cta:hover{transform:translateY(-1px);background:#000}
+.direct-callout-hint{font-size:.76rem;color:var(--ink-3);margin-top:-2px}
+@media(max-width:640px){
+  .direct-callout{padding:0 14px}
+  .direct-callout-inner{padding:16px 18px}
+  .direct-callout-cta{align-self:stretch;text-align:center}
+}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-glass.css') }}?v=glass-1">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
@@ -835,6 +856,41 @@ src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
 
   <!-- legacy featured-wrap kept hidden so JS that targets it still works -->
   <div class="featured-wrap" id="featuredWrap"></div>
+
+  {% if direct_event %}
+  <!-- DIRECT-EVENT CALLOUT: shown when landing via event deeplink (e.g. ?event=mountain_mini) -->
+  <div class="direct-callout" id="directCallout">
+    <div class="direct-callout-inner">
+      <div class="direct-callout-badge">Reserve your spot — limited spots</div>
+      <h2 class="direct-callout-title">{{ direct_event.title }}</h2>
+      {% set _dc_loc = direct_event.location | default('') %}
+      {% set _dc_loc_short = _dc_loc.split('—')[0].strip() if '—' in _dc_loc else (_dc_loc.split(',')[0].strip() if ',' in _dc_loc else _dc_loc) %}
+      {% if direct_event.date or _dc_loc_short %}
+      <div class="direct-callout-meta">
+        {%- if direct_event.date -%}{{ direct_event.date }}{%- endif -%}
+        {%- if direct_event.date and _dc_loc_short %} · {% endif -%}
+        {%- if _dc_loc_short -%}{{ _dc_loc_short }}{%- endif -%}
+      </div>
+      {% endif %}
+      <div class="direct-callout-price">
+        ${{ (direct_event.full_price | int) if direct_event.full_price else ((direct_event.price | int) if direct_event.price else '') }}
+        <span class="dc-sub">+ GST</span>
+        {%- if direct_event.session_length %} <span class="dc-sub">· {{ direct_event.session_length }} min</span>{% endif %}
+      </div>
+      {% if direct_event.included %}
+      <ul class="direct-callout-includes">
+        {% for item in direct_event.included[:4] %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <button class="direct-callout-cta" onclick="openDrawer({{ direct_event.id | tojson }})">
+        Choose a time →
+      </button>
+      <p class="direct-callout-hint">Your spot is held for 15 minutes after booking · deposit by Interac e-Transfer · questions? DM <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener" style="color:var(--rose)">@pashynska.photo</a></p>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- SECTION HEAD -->
   <div class="sec-head reveal">
@@ -1913,7 +1969,8 @@ async function openDrawer(id) {
       </div>
       ${renderAgreementSection(e)}
       <button class="btn" id="reserve-btn" onclick="reserveSlot('${e.id}', document.getElementById('bookingDate')?.value || '${selectedDate}')">${T('continue_btn')}</button>
-      <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">${T('pay_note')}</p>`;
+      <p style="font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:10px">${T('pay_note')}</p>
+      <p style="font-size:.76rem;color:var(--ink-4);text-align:center;margin-top:6px">Questions? Message Iryna on Instagram <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener" style="color:var(--rose);font-weight:600">@pashynska.photo</a></p>`;
 	    showDrawer();
 	    updateBookingSummary();
 	    attachFormStartTracking(e.id, selectedDate);
@@ -2712,7 +2769,7 @@ const SITE_I18N = {
     ig_ph:        '@instagram (optional)',
     continue_btn: 'Continue to Payment →',
     pick_slot:    'Pick a time slot first',
-    pay_note: 'Pay deposit via e-Transfer · remaining due on session day',
+    pay_note: 'To secure your time, complete the payment on the next step. Your spot is held temporarily until payment is received.',
     available_slots_lbl: 'Available time slots',
     waitlist_msg: 'This session is fully booked. Join the waitlist — I\'ll DM you the moment a spot opens.',
     no_slots_msg: 'No slots available for this session.',
@@ -2775,10 +2832,10 @@ const SITE_I18N = {
     pay_card_secure: 'Secure payment · Powered by Stripe',
     pay_deposit_for: 'Deposit for {name}',
     /* success */
-    succ_pending_title: 'Payment Pending',
-    succ_pending_desc: 'Thanks{name}! <strong>Your payment is being reviewed.</strong>',
-    succ_pending_hint: 'I\'ll see your e-Transfer within minutes — this page will update automatically.',
-    succ_status_pending: 'Pending ⏳',
+    succ_pending_title: 'Reserved — awaiting payment confirmation',
+    succ_pending_desc: 'Thanks{name}! <strong>Your spot is reserved but not confirmed until payment is received.</strong>',
+    succ_pending_hint: 'I\'ll see your e-Transfer within minutes — this page updates automatically when confirmed. Questions? DM <a href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener" style="color:var(--rose)">@pashynska.photo</a>',
+    succ_status_pending: 'Reserved — payment pending ⏳',
     succ_booking_id_lbl: 'Booking ID',
     succ_status_lbl: 'Status',
     succ_done_btn: 'Done',

@@ -3733,7 +3733,7 @@ def index():
             og_image=_og_image,
             og_url=f"https://book.pashynskaphoto.com/?event={direct_event['id']}",
         )
-        return render_template("index_v2.html", direct_event_id=direct_event["id"], **template_context)
+        return render_template("index_v2.html", direct_event_id=direct_event["id"], direct_event=direct_event, **template_context)
     if explicit_event_requested:
         return "Event not found", 404
 
