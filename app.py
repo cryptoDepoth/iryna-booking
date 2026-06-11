@@ -117,7 +117,7 @@ ANALYTICS_EVENT_ALLOWLIST = {
     "page_view", "session_view", "event_card_view", "drawer_open", "slot_selected", "form_started",
     "reserve_attempt", "booking_reserved", "payment_view", "payment_sent_clicked",
     "booking_confirmed", "booking_expired", "booking_cancelled", "waitlist_joined",
-    "abandoned_followup_sent",
+    "abandoned_followup_sent", "abandoned_second_followup_sent",
 }
 
 
@@ -1377,6 +1377,117 @@ def _send_abandoned_email(booking):
 </table></td></tr></table></body></html>"""
 
     return _send_email_raw(email, name, subject, plain, html)
+
+
+def _send_abandoned_second_email(booking):
+    """Send a gentle final recovery email ~48h after the first abandoned follow-up."""
+    name = booking.get("name", "there")
+    email = booking.get("email", "")
+    event_id = booking.get("event_id")
+    slot_time = booking.get("time", "")
+    ev = get_event_by_id(event_id) if event_id else get_active_event()
+    if not ev or not email:
+        return False
+
+    date_nice = ""
+    try:
+        date_nice = datetime.strptime(ev["date"], "%Y-%m-%d").strftime("%B %d, %Y")
+    except Exception:
+        date_nice = ev.get("date", "")
+
+    booking_url = f"https://{os.environ.get('SITE_HOST', CANONICAL_SITE_HOST)}"
+    subject = "A quick note about your photo session spot 🌿"
+
+    plain = (
+        f"Hi {name},\n\n"
+        f"Just one last little note — you had started booking {ev.get('title', 'a photo session')} "
+        f"for {date_nice} at {slot_time}.\n\n"
+        f"If the timing still works for you, you can check the remaining availability here:\n"
+        f"{booking_url}\n\n"
+        f"If not, no worries at all. You can always message me on Instagram @pashynska.photo "
+        f"and I'll help you find another option.\n\n"
+        f"Warmly,\nIryna"
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:40px 20px;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.12);">
+  <tr><td style="background:linear-gradient(135deg,#f1d8cf 0%,#b98a80 100%);padding:34px 40px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:34px;">🌿</p>
+    <h1 style="margin:0;color:#fff;font-size:23px;font-weight:400;letter-spacing:-.01em;">A little final note</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.04em;">Pashynska Photography · Calgary</p>
+  </td></tr>
+  <tr><td style="padding:36px 40px 28px;">
+    <p style="margin:0 0 20px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{name}</strong>,</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#7a5a6a;line-height:1.7;">
+      Just one last little note — you had started booking
+      <strong>{ev.get('title', 'your photo session')}</strong> on <strong>{date_nice} at {slot_time}</strong>.
+    </p>
+    <p style="margin:0 0 26px;font-size:15px;color:#7a5a6a;line-height:1.7;">
+      If the timing still works for you, you can check the remaining availability below.
+      If not, no worries at all — message me on Instagram and I’ll help you find another option.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:26px;">
+      <tr><td align="center">
+        <a href="{booking_url}" style="display:inline-block;background:linear-gradient(135deg,#c4857a,#a3685e);color:#fff;text-decoration:none;padding:14px 34px;border-radius:50px;font-size:15px;letter-spacing:.5px;">
+          Check remaining spots →
+        </a>
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:13px;color:#b0938b;text-align:center;line-height:1.6;">
+      Thank you for considering me for your memories ♡
+    </p>
+  </td></tr>
+  <tr><td style="background:#fff8f4;padding:20px 40px;text-align:center;border-top:1px solid #f2e3dd;">
+    <p style="margin:0;font-size:12px;color:#b0938b;">Pashynska Photography · Calgary, AB · Canada<br>
+    <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a></p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+
+    return _send_email_raw(email, name, subject, plain, html)
+
+
+def _parse_iso_datetime(value):
+    """Parse an ISO datetime string; return None for invalid/empty values."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_due_for_second_abandoned_followup(booking, now=None):
+    """Second abandoned follow-up is due 48h after the first one, once only."""
+    if booking.get("status") != "expired":
+        return False
+    if booking.get("abandoned_second_email_sent"):
+        return False
+    first_sent = _parse_iso_datetime(booking.get("abandoned_email_sent"))
+    if not first_sent:
+        return False
+    now = now or _local_now()
+    if first_sent.tzinfo is None and getattr(now, "tzinfo", None) is not None:
+        first_sent = first_sent.replace(tzinfo=now.tzinfo)
+    return first_sent <= now - timedelta(hours=48)
+
+
+def _is_due_for_first_abandoned_followup(booking, now=None):
+    """First abandoned follow-up is due 2h after booking creation, once only."""
+    if booking.get("status") != "expired":
+        return False
+    if booking.get("abandoned_email_sent"):
+        return False
+    created = _parse_iso_datetime(booking.get("created_at"))
+    if not created:
+        return False
+    now = now or _local_now()
+    if created.tzinfo is None and getattr(now, "tzinfo", None) is not None:
+        created = created.replace(tzinfo=now.tzinfo)
+    return created <= now - timedelta(hours=2)
 
 
 def _send_reminder_email(booking):
@@ -3013,6 +3124,7 @@ def init_db():
         ("clients",   "notes",             "ALTER TABLE clients ADD COLUMN notes TEXT DEFAULT ''"),
         # Automated email tracking
         ("bookings",  "abandoned_email_sent",  "ALTER TABLE bookings ADD COLUMN abandoned_email_sent TEXT"),
+        ("bookings",  "abandoned_second_email_sent", "ALTER TABLE bookings ADD COLUMN abandoned_second_email_sent TEXT"),
         ("bookings",  "reminder_email_sent",   "ALTER TABLE bookings ADD COLUMN reminder_email_sent TEXT"),
         ("bookings",  "reminder_24h_email_sent","ALTER TABLE bookings ADD COLUMN reminder_24h_email_sent TEXT"),
         ("bookings",  "review_email_sent",     "ALTER TABLE bookings ADD COLUMN review_email_sent TEXT"),
@@ -3122,37 +3234,51 @@ def _run_email_scheduler():
 
 
 def _process_abandoned_emails():
-    """Send recovery emails to clients who reserved but never paid (2h cooldown)."""
+    """Send abandoned recovery emails: first after 2h, gentle final after 48h."""
     now = _local_now()
-    cutoff = (now - timedelta(hours=2)).isoformat()
     conn = db_conn()
     rows = conn.execute("""
         SELECT * FROM bookings
         WHERE status = 'expired'
-          AND abandoned_email_sent IS NULL
-          AND created_at <= ?
           AND email IS NOT NULL AND email != ''
-    """, (cutoff,)).fetchall()
+          AND (
+            abandoned_email_sent IS NULL
+            OR (abandoned_email_sent IS NOT NULL AND abandoned_second_email_sent IS NULL)
+          )
+    """).fetchall()
     conn.close()
+
     for row in rows:
         b = dict(row)
         try:
-            ok = _send_abandoned_email(b)
-            conn2 = db_conn()
-            conn2.execute(
-                "UPDATE bookings SET abandoned_email_sent=? WHERE id=?",
-                (now.isoformat(), b["id"])
-            )
-            conn2.commit()
-            conn2.close()
+            if _is_due_for_first_abandoned_followup(b, now):
+                ok = _send_abandoned_email(b)
+                sent_column = "abandoned_email_sent"
+                event_name = "abandoned_followup_sent"
+                log_label = "Abandoned email sent"
+            elif _is_due_for_second_abandoned_followup(b, now):
+                ok = _send_abandoned_second_email(b)
+                sent_column = "abandoned_second_email_sent"
+                event_name = "abandoned_second_followup_sent"
+                log_label = "Second abandoned email sent"
+            else:
+                continue
+
             if ok:
+                conn2 = db_conn()
+                conn2.execute(
+                    f"UPDATE bookings SET {sent_column}=? WHERE id=?",
+                    (now.isoformat(), b["id"])
+                )
+                conn2.commit()
+                conn2.close()
                 _record_booking_funnel_event(
                     b,
-                    "abandoned_followup_sent",
+                    event_name,
                     {"channel": "email", "sent_at": now.isoformat()},
                 )
                 _emit_n8n_event(
-                    "booking.abandoned_followup_sent",
+                    f"booking.{event_name}",
                     booking={
                         "id": b.get("id"),
                         "name": b.get("name"),
@@ -3167,7 +3293,7 @@ def _process_abandoned_emails():
                     },
                     channel="email",
                 )
-                log.info(f"[scheduler] Abandoned email sent → booking #{b['id']} ({b.get('email')})")
+                log.info(f"[scheduler] {log_label} → booking #{b['id']} ({b.get('email')})")
         except Exception as e:
             log.error(f"[scheduler] Abandoned email failed for #{b['id']}: {e}")
 
