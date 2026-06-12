@@ -760,7 +760,6 @@
             max-width: 680px;
             margin: 0 auto;
             padding: 0;
-            overflow: hidden;
             border: 1px solid rgba(249,115,22,.14);
             box-shadow: 0 28px 70px rgba(28,25,23,.24);
         }
@@ -1129,7 +1128,20 @@
         @media (max-width: 768px) {
             .page { padding: 20px 16px; }
             .stats { grid-template-columns: repeat(2, 1fr); }
-            .topbar { padding: 0 16px; }
+            /* The topbar links and action buttons must wrap: if any row keeps its
+               desktop width, the phone layout viewport grows past the screen and
+               every position:fixed modal (private session, Stripe, reschedule)
+               anchors to that oversized viewport — its lower half becomes
+               unreachable because the modal itself has nothing to scroll. */
+            .topbar { padding: 8px 16px; height: auto; min-height: 56px; flex-wrap: wrap; row-gap: 4px; }
+            .topbar-right { flex-wrap: wrap; row-gap: 4px; }
+            .page-actions { flex-wrap: wrap; }
+            /* Event-card button rows carry inline flex-shrink:0 — override it so
+               the row can shrink and wrap instead of widening the page. */
+            .event-settings-header > div { flex-shrink: 1 !important; min-width: 0; }
+            .ev-tabbar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .ev-tabbar .ev-tab { flex-shrink: 0; }
+            .private-session-box, .resched-box, .modal { max-width: 100%; }
             .search-input { width: 180px; }
             table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
             thead th, tbody td { padding: 10px 12px; }
@@ -1213,6 +1225,7 @@
         <a href="#bookings-section" class="topbar-link" style="font-size:13px;">All bookings</a>
         <a href="#events-section" class="topbar-link" style="font-size:13px;">Events & slots</a>
         <a href="/admin/analytics" class="topbar-link" style="font-size:13px;">📊 Analytics</a>
+        <a href="/admin/link-generator" class="topbar-link" style="font-size:13px;">🔗 Links</a>
         <a href="/admin/clients" class="topbar-link" style="font-size:13px;">👥 Clients</a>
         <a href="/admin/transfers" class="topbar-link" style="font-size:13px;">💸 Interac</a>
         <a href="/admin/health" class="topbar-link" style="font-size:13px;">Health</a>
@@ -1638,7 +1651,7 @@
             </div>
 
             <!-- ── TAB BAR ── -->
-            <div style="display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:20px;">
+            <div class="ev-tabbar" style="display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:20px;">
                 <button class="ev-tab active" data-ev="{{ ev.id }}" data-tab="schedule" onclick="switchTab('{{ ev.id }}','schedule')">📅 Schedule</button>
                 <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="info" onclick="switchTab('{{ ev.id }}','info')">✏️ Info</button>
                 <button class="ev-tab" data-ev="{{ ev.id }}" data-tab="included" onclick="switchTab('{{ ev.id }}','included')">✅ What's included</button>
@@ -3440,10 +3453,12 @@
         btn.textContent = 'Создать';
         _pvStatus('');
         document.getElementById('private-session-modal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
     }
 
     function closePrivateSessionModal() {
         document.getElementById('private-session-modal').style.display = 'none';
+        document.body.style.overflow = '';
     }
 
     function closePrivateSessionModalOutside(e) {

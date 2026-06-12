@@ -48,6 +48,21 @@ except ImportError:
 
 _tz = _ZoneInfo('America/Edmonton')
 
+# ===== CONFIG =====
+# Load from .env or use defaults
+META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '902493111302920')  # Default: Pashynska Photography Pixel
+GOOGLE_ANALYTICS_ID = os.environ.get('GOOGLE_ANALYTICS_ID', '')
+
+# Email Settings (Zoho Mail)
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.zoho.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME', 'info@pashynskafoto.com')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() == 'true'
+
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'info@pashynskafoto.com')
+DEFAULT_FROM_NAME = os.environ.get('DEFAULT_FROM_NAME', 'Pashynska Photography')
+
 
 def _local_now():
     """Return timezone-aware datetime in America/Edmonton."""
@@ -72,12 +87,13 @@ try:
             logging.StreamHandler()
         ]
     )
-except Exception:
+except OSError as e:
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s [%(levelname)s] %(message)s',
         handlers=[logging.StreamHandler()]
     )
+    logging.error(f"Failed to create log directory {_log_dir}: {e}")
 log = logging.getLogger(__name__)
 
 # Optional local automation bridge: when N8N_WEBHOOK_URL is configured, the booking
@@ -103,11 +119,14 @@ def _emit_n8n_event(action, booking=None, **payload):
 
     def _post():
         try:
+            if not N8N_WEBHOOK_URL:
+                logging.warning("N8N_WEBHOOK_URL not configured")
+                return False
             r = requests.post(N8N_WEBHOOK_URL, json=body, headers=headers, timeout=5)
-            if r.status_code >= 400:
-                log.warning(f"[n8n] {action} returned HTTP {r.status_code}: {r.text[:300]}")
-        except Exception as e:
-            log.warning(f"[n8n] {action} emit failed: {e}")
+            r.raise_for_status()  # Raises HTTPError for 4XX/5XX responses
+            return True
+        except requests.exceptions.RequestException as e:
+            logging.error(f"[n8n] {action} emit failed: {e}")
 
     threading.Thread(target=_post, name=f"n8n-{action}", daemon=True).start()
     return True
@@ -209,9 +228,9 @@ def _record_analytics_event(event_name, *, visitor_id="", booking_id=None, event
         ))
         conn.commit()
         return True
-    except Exception as exc:
+    except sqlite3.Error as e:
         conn.rollback()
-        log.warning(f"[analytics] record failed: {type(exc).__name__}: {exc}")
+        logging.error(f"[analytics] record failed: {e}")
         return False
     finally:
         conn.close()
@@ -4553,11 +4572,20 @@ def reserve_slot():
             visitor_id=visitor_id,
             event_id=event_id or "",
             page=attribution.get("landing_url") or "",
-            metadata={"time": slot_time, "date": requested_date, "session_type": session_type},
+            metadata={"time": slot_time, "date": requested_date, "session_type": session_type, "name": client_name, "email": client_email},
             attribution=attribution,
         )
 
     if not slot_time:
+        if visitor_id:
+            _record_analytics_event(
+                "reserve_failed",
+                visitor_id=visitor_id,
+                event_id=event_id or "",
+                page=attribution.get("landing_url") or "",
+                metadata={"reason": "No time slot specified", "date": requested_date, "session_type": session_type},
+                attribution=attribution,
+            )
         return jsonify({"success": False, "error": "No time slot specified"}), 400
 
     # ── Field validation ──
@@ -4956,6 +4984,27 @@ def confirm_payment():
         "payment_sent_clicked",
         {"pending_until": new_expires, "payment_method": "interac"},
     )
+    
+    # Track confirmed booking (payment sent)
+    if visitor_id := row.get("visitor_id"):
+        _record_analytics_event(
+            "confirmed_booking",
+            visitor_id=visitor_id,
+            event_id=row.get("event_id") or "",
+            page=row.get("landing_url") or "",
+            metadata={
+                "booking_id": booking_id,
+                "name": client_name,
+                "email": client_email,
+                "phone": client_phone,
+                "instagram": client_ig,
+                "session_type": session_type,
+                "event_date": event_date,
+                "time": time,
+                "amount": ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,
+            },
+            attribution=json.loads(row.get("attribution", "{}")),
+        )
     
     # Sync to Notion
     sync_to_notion(booking_id)
@@ -6542,6 +6591,16 @@ def admin_analytics():
         date_from=date_from,
         date_to=date_to,
         include_internal=include_internal,
+    )
+
+
+@app.route("/admin/link-generator")
+@admin_required
+def admin_link_generator():
+    """UTM link generator for tracking individual client outreach."""
+    return render_template(
+        "admin_link_generator.html",
+        CANONICAL_SITE_URL=CANONICAL_SITE_URL,
     )
 
 

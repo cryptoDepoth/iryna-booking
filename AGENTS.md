@@ -1,107 +1,53 @@
-## Imported Claude Cowork project instructions
+# DOX: Booking System
 
-You are a senior full-stack engineer, SaaS architect, QA engineer, UX reviewer, and product strategist.
+- DOX is highly performant AGENTS.md hierarchy installed here
+- Agent must follow DOX instructions across any edits
 
-I already have a working mini-session photography booking platform.
-The system is deployed and functional.
+## Purpose
 
-Your task is NOT to rebuild it from scratch.
+Production mini-session photography booking platform for Pashynska Photography (Calgary). Handles mini-session scheduling, private session booking, e-Interac payments, Google Calendar sync, admin dashboard, automated reminders, and client communications.
 
-Your task is to audit, stress-test, and improve the system pragmatically.
+## Ownership
 
-Priorities:
-- reliability
-- simplicity
-- conversion rate
-- mobile UX
-- booking safety
-- maintainability
-- reducing hidden complexity
+- Andrzej — ops, deploy, infrastructure, QA
+- Iryna Pashynska — content, pricing, business logic
+- Claude Code / Hermes Agent — code changes, tests, deploys
 
-Important constraints:
-- avoid enterprise overengineering
-- avoid unnecessary abstractions
-- avoid rewriting working systems unless absolutely necessary
-- prioritize practical improvements with highest real-world impact
-- assume this is a small-to-medium photography business SaaS
+## Local Contracts
 
-Review the system in these areas:
+- CTAs across all properties route to `book.pashynskaphoto.com`
+- GBP prices use CAD; Products need photos
+- Interac CSV/payment history stays OUT of Git/Docker — use admin import/reconciliation UI
+- Minis stay fast/no questionnaire by default; optional post-confirmation
+- Add-ons v1: 10 edited images $50, BTS reel $50
+- Timezone: `America/Edmonton` (MT/MST) — `_local_now()` / `_local_today()` in app.py
 
-1. Architecture
-- detect fragile logic
-- detect unnecessary complexity
-- identify bottlenecks
-- identify bad patterns
-- identify scaling risks
+## Work Guidance
 
-2. Booking system
-- double booking risks
-- race conditions
-- timezone problems
-- cancellation/reschedule edge cases
-- calendar sync issues
-- concurrency problems
+- Avoid enterprise overengineering. Small-to-medium SaaS.
+- Do not rewrite working systems unless absolutely necessary.
+- Prioritize: reliability, simplicity, conversion rate, mobile UX, booking safety.
+- Private session button 🔒 is critical — if missing after rollback, patch `admin.html` + Flask routing.
+- Before deploying: `pytest` must pass 354 tests (was 352 before timezone fix).
 
-3. Payments
-- failed payment handling
-- webhook reliability
-- duplicate charges
-- refund logic
-- abandoned checkout recovery
+## Verification
 
-4. UX / conversion
-- friction during booking
-- unnecessary steps
-- poor mobile experience
-- unclear pricing
-- weak onboarding
-- trust issues
-- drop-off risks
+- Run `pytest` before any deploy (target: 354 green)
+- Run `hermes live-qa` smoke test after deploy
+- Check `book.pashynskaphoto.com` booking flow end-to-end after any templates/app.py changes
 
-5. Frontend
-- slow rendering
-- hydration issues
-- unnecessary re-renders
-- large bundle sizes
-- poor responsive behavior
+## User Preferences
 
-6. Backend
-- unsafe endpoints
-- weak validation
-- missing rate limits
-- missing retries
-- weak error handling
-- insecure API patterns
+- User says "по очереди" = execute sequentially, not parallel.
+- User says "оба" = execute ALL options in parallel.
+- User says "nie rabotaet" = immediate diagnosis + fix, not explanation.
+- User expects structured emoji-rich Russian reports with direct verification links.
+- Voice-driven interaction preferred for complex requests.
+- End-to-end verification required for email delivery — always check spam + suggest whitelisting.
+- NEVER auto-send drafts/content to Iryna's Gmail without prior explicit approval.
 
-7. Database
-- schema problems
-- indexing issues
-- data consistency risks
-- normalization vs overengineering
-- future migration risks
+## Child DOX Index
 
-8. AI automation opportunities
-Only suggest automations that:
-- reduce manual work
-- improve client experience
-- reduce no-shows
-- improve lead conversion
-- simplify admin work
-
-Do NOT suggest AI gimmicks.
-
-For every issue:
-- explain the problem
-- explain real-world impact
-- estimate severity
-- provide the simplest effective fix
-- explain whether it is worth implementing now or later
-
-Then provide:
-- Top 5 highest-impact improvements
-- Top 5 biggest risks
-- Top 5 unnecessary complexities to remove
-- What should NOT be changed because it already works well
-
-Be brutally practical.
-Optimize for a reliable business, not for impressive architecture.
+- `tests/AGENTS.md` — test conventions, running tests, regression tests
+- `templates/AGENTS.md` — template conventions, UI changes, mobile UX
+- `docs/AGENTS.md` — documentation for agents, handoff files, plans

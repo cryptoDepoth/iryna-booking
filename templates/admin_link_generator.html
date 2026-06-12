@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Generator · Admin · Pashynska Photography</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --border: #e4e7ec;
+            --text: #111827;
+            --text-2: #6b7280;
+            --text-3: #9ca3af;
+            --accent: #f97316;
+            --accent-light: #fff7ed;
+            --green: #16a34a;
+            --green-light: #dcfce7;
+            --blue: #2563eb;
+            --blue-light: #eff6ff;
+            --radius: 10px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* ── TOP BAR ── */
+        .topbar {
+            background: #111827;
+            padding: 0 24px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .topbar-brand .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .topbar-link {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: all 0.15s;
+        }
+        .topbar-link:hover { background: rgba(255,255,255,0.1); color: white; }
+        .topbar-link.active { background: rgba(249,115,22,0.15); color: var(--accent); }
+
+        /* ── MAIN LAYOUT ── */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        .page-header {
+            margin-bottom: 32px;
+        }
+        .page-header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .page-header p {
+            color: var(--text-2);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* ── CARD ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ── FORM ── */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .form-row.full {
+            grid-template-columns: 1fr;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-group input,
+        .form-group select {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.15s;
+            background: white;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(249,115,22,0.1);
+        }
+        .form-group input::placeholder { color: var(--text-3); }
+
+        .btn-generate {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-generate:hover { background: #ea580c; transform: translateY(-1px); }
+        .btn-generate:active { transform: translateY(0); }
+
+        /* ── RESULT ── */
+        .result-box {
+            display: none;
+            background: var(--surface);
+            border: 2px solid var(--green);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            animation: slideIn 0.3s ease;
+        }
+        .result-box.visible { display: block; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .result-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--green);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .result-url {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 16px;
+            word-break: break-all;
+            line-height: 1.6;
+            color: var(--text);
+            margin-bottom: 12px;
+            user-select: all;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-copy {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--green);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-copy:hover { background: #15803d; }
+        .btn-copy.copied { background: #0d9488; }
+
+        .btn-share {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+        .btn-share:hover { background: #1d4ed8; }
+
+        /* ── UTMS BREAKDOWN ── */
+        .utm-table {
+            margin-top: 16px;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+        }
+        .utm-table h4 {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+        .utm-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+        .utm-row .utm-key { color: var(--text-2); font-weight: 500; }
+        .utm-row .utm-val { color: var(--text); font-family: monospace; font-size: 12px; }
+
+        /* ── HISTORY ── */
+        .history-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .history-item:last-child { border-bottom: none; }
+        .history-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .history-name { font-weight: 600; font-size: 14px; }
+        .history-source { font-size: 12px; color: var(--text-2); }
+        .history-time { font-size: 11px; color: var(--text-3); }
+        .history-link {
+            font-family: monospace;
+            font-size: 12px;
+            color: var(--blue);
+            text-decoration: none;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .btn-mini {
+            padding: 4px 10px;
+            font-size: 11px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--text-2);
+        }
+        .btn-mini:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── QUICK PRESETS ── */
+        .presets {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .preset-btn {
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .preset-btn:hover { border-color: var(--accent); background: var(--accent-light); }
+        .preset-btn.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 600; }
+
+        .tip-box {
+            background: var(--blue-light);
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-size: 13px;
+            color: #1e40af;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 640px) {
+            .form-row { grid-template-columns: 1fr; }
+            .container { padding: 20px 16px; }
+            .result-url { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<div class="topbar">
+    <div class="topbar-brand">
+        <span class="dot"></span>
+        <span>Admin</span>
+    </div>
+    <div class="topbar-right">
+        <a href="/admin" class="topbar-link">← Dashboard</a>
+        <a href="/admin/analytics" class="topbar-link">📊 Analytics</a>
+        <a href="/admin/link-generator" class="topbar-link active">🔗 Links</a>
+        <a href="/admin/clients" class="topbar-link">👥 Clients</a>
+        <a href="/admin/transfers" class="topbar-link">💸 Interac</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <div class="page-header">
+        <h1>🔗 Link Generator</h1>
+        <p>Generate tracked booking links for each client. When they click the link, you'll see their full journey in Analytics — which page they viewed, what slot they picked, and whether they booked.</p>
+    </div>
+
+    <div class="tip-box">
+        <strong>💡 How to use:</strong> Enter the client's Instagram handle or name → select source → generate link → send it to them in DM or WhatsApp. Their entire booking funnel will be attributed to this link.
+    </div>
+
+    <!-- ── QUICK PRESETS ── -->
+    <div class="card">
+        <div class="card-title">⚡ Quick Presets</div>
+        <div class="presets">
+            <button class="preset-btn" onclick="applyPreset('ig_dm')">💬 Instagram DM</button>
+            <button class="preset-btn" onclick="applyPreset('ig_story')">📱 IG Story / Post</button>
+            <button class="preset-btn" onclick="applyPreset('whatsapp')">📲 WhatsApp</button>
+            <button class="preset-btn" onclick="applyPreset('email')">✉️ Email</button>
+            <button class="preset-btn" onclick="applyPreset('google')">🔍 Google Business</button>
+            <button class="preset-btn" onclick="applyPreset('referral')">🤝 Referral</button>
+        </div>
+    </div>
+
+    <!-- ── FORM ── -->
+    <div class="card">
+        <div class="card-title">🎯 Client Info</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Client name or @handle</label>
+                <input type="text" id="clientName" placeholder="@sarah_johnson or Sarah Johnson">
+            </div>
+            <div class="form-group">
+                <label>Source (where they came from)</label>
+                <select id="sourceSelect">
+                    <option value="ig_dm">💬 Instagram DM</option>
+                    <option value="ig_story">📱 Instagram Story / Post</option>
+                    <option value="whatsapp">📲 WhatsApp</option>
+                    <option value="email">✉️ Email</option>
+                    <option value="google">🔍 Google Business</option>
+                    <option value="referral">🤝 Referral</option>
+                    <option value="facebook">📘 Facebook</option>
+                    <option value="tiktok">🎵 TikTok</option>
+                    <option value="other">📎 Other</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Landing page (optional)</label>
+                <select id="pageSelect">
+                    <option value="">📋 Main booking page (/)</option>
+                    <option value="/wedding">💍 Wedding (/wedding)</option>
+                    <option value="/family">👨‍👩‍👧 Family (/family)</option>
+                    <option value="/maternity">🤰 Maternity (/maternity)</option>
+                    <option value="/book">📅 Book (/book)</option>
+                    <option value="/private">🔒 Private Session (/private)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Notes (optional, for your reference)</label>
+                <input type="text" id="clientNotes" placeholder="e.g. wedding in August, wants outdoor">
+            </div>
+        </div>
+        <button class="btn-generate" onclick="generateLink()">
+            🔗 Generate Tracked Link
+        </button>
+    </div>
+
+    <!-- ── RESULT ── -->
+    <div class="result-box" id="resultBox">
+        <div class="result-label">✅ Your tracked link</div>
+        <div class="result-url" id="resultUrl"></div>
+        <div class="btn-row">
+            <button class="btn-copy" id="copyBtn" onclick="copyLink()">📋 Copy Link</button>
+            <a class="btn-share" id="whatsappBtn" href="#" target="_blank">📲 WhatsApp</a>
+            <a class="btn-share" id="telegramBtn" href="#" target="_blank" style="background:#0088cc;">✈️ Telegram</a>
+        </div>
+
+        <div class="utm-table">
+            <h4>UTM Parameters</h4>
+            <div class="utm-row"><span class="utm-key">utm_source</span><span class="utm-val" id="utmSource"></span></div>
+            <div class="utm-row"><span class="utm-key">utm_medium</span><span class="utm-val" id="utmMedium"></span></div>
+            <div class="utm-row"><span class="utm-key">utm_campaign</span><span class="utm-val" id="utmCampaign"></span></div>
+            <div class="utm-row"><span class="utm-key">utm_content</span><span class="utm-val" id="utmContent"></span></div>
+        </div>
+    </div>
+
+    <!-- ── HISTORY ── -->
+    <div class="card" id="historyCard" style="display:none;">
+        <div class="card-title">📝 Recent Links</div>
+        <div id="historyList"></div>
+    </div>
+
+</div>
+
+<script>
+const BASE_URL = '{{ CANONICAL_SITE_URL }}';
+const SOURCE_MAP = {
+    ig_dm:     { source: 'instagram', medium: 'dm',      label: 'Instagram DM' },
+    ig_story:  { source: 'instagram', medium: 'social',   label: 'IG Story/Post' },
+    whatsapp:  { source: 'whatsapp',  medium: 'chat',     label: 'WhatsApp' },
+    email:     { source: 'email',     medium: 'email',    label: 'Email' },
+    google:    { source: 'google',    medium: 'organic',  label: 'Google Business' },
+    referral:  { source: 'referral',  medium: 'word_of_mouth', label: 'Referral' },
+    facebook:  { source: 'facebook',  medium: 'social',   label: 'Facebook' },
+    tiktok:    { source: 'tiktok',    medium: 'social',   label: 'TikTok' },
+    other:     { source: 'direct',    medium: 'link',     label: 'Other' },
+};
+
+let currentLink = '';
+
+function applyPreset(key) {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    event.target.closest('.preset-btn').classList.add('active');
+    document.getElementById('sourceSelect').value = key;
+}
+
+function slugify(text) {
+    return text.trim()
+        .toLowerCase()
+        .replace(/^@/, '')
+        .replace(/[^a-z0-9_]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .substring(0, 40);
+}
+
+function generateLink() {
+    const name = document.getElementById('clientName').value.trim();
+    if (!name) {
+        document.getElementById('clientName').style.borderColor = '#ef4444';
+        document.getElementById('clientName').focus();
+        return;
+    }
+    document.getElementById('clientName').style.borderColor = '';
+
+    const sourceKey = document.getElementById('sourceSelect').value;
+    const page = document.getElementById('pageSelect').value;
+    const notes = document.getElementById('clientNotes').value.trim();
+    const sm = SOURCE_MAP[sourceKey] || SOURCE_MAP.other;
+    const clientSlug = slugify(name);
+
+    const params = new URLSearchParams({
+        utm_source: sm.source,
+        utm_medium: sm.medium,
+        utm_campaign: 'direct_client',
+        utm_content: clientSlug,
+    });
+
+    currentLink = BASE_URL + page + '?' + params.toString();
+
+    // Show result
+    document.getElementById('resultUrl').textContent = currentLink;
+    document.getElementById('utmSource').textContent = sm.source;
+    document.getElementById('utmMedium').textContent = sm.medium;
+    document.getElementById('utmCampaign').textContent = 'direct_client';
+    document.getElementById('utmContent').textContent = clientSlug;
+
+    // WhatsApp share
+    const waText = encodeURIComponent('Hi! Here\'s the link to book your photo session: ' + currentLink);
+    document.getElementById('whatsappBtn').href = 'https://wa.me/?text=' + waText;
+
+    // Telegram share
+    document.getElementById('telegramBtn').href = 'https://t.me/share/url?url=' + encodeURIComponent(currentLink) + '&text=' + encodeURIComponent('Book your photo session with Pashynska Photography 📸');
+
+    const box = document.getElementById('resultBox');
+    box.classList.add('visible');
+    box.style.display = 'block';
+
+    // Save to history
+    saveToHistory(name, sm.label, currentLink, notes);
+    loadHistory();
+
+    // Reset copy button
+    const copyBtn = document.getElementById('copyBtn');
+    copyBtn.textContent = '📋 Copy Link';
+    copyBtn.classList.remove('copied');
+}
+
+function copyLink() {
+    navigator.clipboard.writeText(currentLink).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✅ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = '📋 Copy Link';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+
+function saveToHistory(name, source, link, notes) {
+    const history = JSON.parse(localStorage.getItem('linkGenHistory') || '[]');
+    history.unshift({
+        name,
+        source,
+        link,
+        notes,
+        time: new Date().toISOString()
+    });
+    // Keep last 50
+    if (history.length > 50) history.length = 50;
+    localStorage.setItem('linkGenHistory', JSON.stringify(history));
+}
+
+function loadHistory() {
+    const history = JSON.parse(localStorage.getItem('linkGenHistory') || '[]');
+    const card = document.getElementById('historyCard');
+    const list = document.getElementById('historyList');
+
+    if (history.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+    card.style.display = 'block';
+    list.innerHTML = history.slice(0, 20).map((item, i) => {
+        const timeAgo = getTimeAgo(new Date(item.time));
+        return `
+            <div class="history-item">
+                <div class="history-meta">
+                    <div class="history-name">${escapeHtml(item.name)}</div>
+                    <div class="history-source">${escapeHtml(item.source)}${item.notes ? ' · ' + escapeHtml(item.notes) : ''}</div>
+                    <div class="history-time">${timeAgo}</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <a href="${escapeHtml(item.link)}" target="_blank" class="history-link">${escapeHtml(item.link)}</a>
+                    <button class="btn-mini" onclick="reCopy(${i})">📋</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function reCopy(index) {
+    const history = JSON.parse(localStorage.getItem('linkGenHistory') || '[]');
+    if (history[index]) {
+        navigator.clipboard.writeText(history[index].link);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getTimeAgo(date) {
+    const diff = Date.now() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + 'h ago';
+    const days = Math.floor(hours / 24);
+    if (days < 7) return days + 'd ago';
+    return date.toLocaleDateString();
+}
+
+// Load history on page load
+loadHistory();
+</script>
+
+</body>
+</html>
