@@ -5488,21 +5488,46 @@ def _send_balance_request_email(to_email, client_name, event_title, event_date, 
 
 def _send_private_payment_email(to_email, client_name, event_title, event_date,
                                 start_time, end_time, session_minutes, price,
-                                booking_id, payment_url, interac_email=None):
+                                booking_id, payment_url, interac_email=None,
+                                deposit=None, balance=None):
     """Email the client a private-session payment link (same /payment page as
-    the deposit flow: Interac e-Transfer with auto-confirmation OR Stripe)."""
+    the deposit flow: Interac e-Transfer with auto-confirmation OR Stripe).
+    When deposit < price, also shows remaining balance and a balance pay link."""
     if not to_email:
         return False
     interac_email = interac_email or EMAIL or "iryna.pashynska@gmail.com"
+    deposit = deposit if deposit is not None else price
+    balance = balance if balance is not None else round(price - deposit, 2)
+    has_balance = balance > 0
     subject = f"Your Individual Photoshoot — {event_date} · Booking & Payment"
     safe_name = _html_escape(client_name or "Client")
     time_range = f"{start_time}–{end_time}"
+
+    # Build balance section for email
+    balance_section_plain = ""
+    balance_section_html = ""
+    if has_balance:
+        balance_section_plain = (
+            f"\nDeposit due now: ${deposit:.2f} CAD\n"
+            f"Remaining balance: ${balance:.2f} CAD (due before or on the session day)\n"
+        )
+        balance_section_html = (
+            f'<tr><td style="padding:6px 0;color:#a8918e;font-size:13px;">Deposit due now</td>'
+            f'<td style="padding:6px 0;text-align:right;color:#5a3d4a;font-size:14px;font-weight:700;">${deposit:.2f} CAD</td></tr>'
+            f'<tr><td style="padding:6px 0;color:#a8918e;font-size:13px;">Remaining balance</td>'
+            f'<td style="padding:6px 0;text-align:right;color:#c4857a;font-size:14px;font-weight:700;">${balance:.2f} CAD</td></tr>'
+        )
+        payment_button_label = f"Pay Deposit — ${deposit:.2f} CAD"
+    else:
+        payment_button_label = f"Complete Payment — ${price:.2f} CAD"
+
     plain = (
         f"Hi {client_name},\n\n"
         f"Your individual photoshoot with Iryna Pashynska is reserved!\n\n"
         f"Date: {event_date}\n"
         f"Time: {time_range} ({session_minutes} min)\n"
-        f"Price: ${price:.2f} CAD\n"
+        f"Total price: ${price:.2f} CAD\n"
+        f"{balance_section_plain}"
         f"Booking ID: #{booking_id}\n\n"
         f"To secure your session, please complete the payment here:\n"
         f"{payment_url}\n\n"
@@ -5526,10 +5551,14 @@ def _send_private_payment_email(to_email, client_name, event_title, event_date,
 <div style="background:#fdf6f0;border-radius:14px;padding:20px;margin:0 0 22px;">
 <p style="margin:0 0 8px;font-size:13px;color:#a8918e;text-transform:uppercase;letter-spacing:.08em;">Session details</p>
 <p style="margin:0;font-size:15px;line-height:1.8;color:#5a3d4a;"><strong>{_html_escape(event_title or "Individual Photoshoot")}</strong><br>
-📅 {_html_escape(event_date)} · 🕐 {_html_escape(time_range)} ({session_minutes} min)<br>
-💰 <strong style="font-size:22px;color:#c4857a;">${price:.2f} CAD</strong> · Booking #{booking_id}</p>
+📅 {_html_escape(event_date)} · 🕐 {_html_escape(time_range)} ({session_minutes} min)</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 0;">
+<tr><td style="padding:6px 0;color:#a8918e;font-size:13px;">Total price</td>
+<td style="padding:6px 0;text-align:right;color:#5a3d4a;font-size:14px;font-weight:700;">${price:.2f} CAD</td></tr>
+{balance_section_html}
+</table>
 </div>
-<p style="margin:0;"><a href="{payment_url}" style="display:inline-block;background:#c4857a;color:#fff;text-decoration:none;padding:15px 28px;border-radius:999px;font-weight:600;font-size:16px;">Complete Payment — ${price:.2f} CAD</a></p>
+<p style="margin:0;"><a href="{payment_url}" style="display:inline-block;background:#c4857a;color:#fff;text-decoration:none;padding:15px 28px;border-radius:999px;font-weight:600;font-size:16px;">{_html_escape(payment_button_label)}</a></p>
 <p style="font-size:14px;line-height:1.7;color:#7a5a6a;margin:22px 0 0;">On the payment page you can choose <strong>Interac e-Transfer</strong> (confirms automatically within minutes) or <strong>card / Apple Pay / Google Pay</strong>. The page updates live once your payment arrives, and a confirmation email follows right away.</p>
 <p style="font-size:13px;line-height:1.6;color:#a8918e;margin:26px 0 0;">Questions? Reply to this email or DM <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;">@pashynska.photo</a>.</p>
 </td></tr></table></td></tr></table></body></html>"""
@@ -9479,6 +9508,14 @@ def api_private_session():
     if price < 0:
         return jsonify({"error": "Цена не может быть отрицательной"}), 400
 
+    # Deposit: defaults to full price (backward compatible)
+    try:
+        deposit = round(float(data.get("deposit") or price), 2)
+    except (TypeError, ValueError):
+        deposit = price
+    deposit = min(max(deposit, 0), price)  # clamp to [0, price]
+    balance = round(price - deposit, 2)
+
     session_minutes = max(
         15,
         int((datetime.strptime(end_time, "%H:%M") - datetime.strptime(start_time, "%H:%M")).total_seconds() // 60),
@@ -9496,9 +9533,10 @@ def api_private_session():
         "session_length": session_minutes,
         "break_length": 0,
         "slot_interval": session_minutes,
-        # Amount due now == full price: drives the /payment page, the Stripe
-        # checkout amount and the e-Transfer expected-amount matching.
-        "deposit": price,
+        # Amount due now == deposit (may equal full price for full-pay):
+        # drives the /payment page, the Stripe checkout amount and the
+        # e-Transfer expected-amount matching.
+        "deposit": deposit,
         "full_price": price,
         "location": "Calgary — exact spot sent after booking",
         "session_type": "private",
@@ -9540,7 +9578,7 @@ def api_private_session():
                   confirmed, paid, paid_amount, payment_link, created_at)
                VALUES (?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
             (date, start_time, client_name, email, "", instagram,
-             status_val, event_id, token, price, price,
+             status_val, event_id, token, deposit, price,
              1 if paid else 0, 1 if paid else 0, paid_amount, payment_link or None),
         )
         booking_id = c.lastrowid
@@ -9594,6 +9632,8 @@ def api_private_session():
                 price=price,
                 booking_id=booking_id,
                 payment_url=payment_url,
+                deposit=deposit,
+                balance=balance,
             ))
         except Exception as e:
             log.error(f"[private-session] payment email failed for #{booking_id}: {e}")

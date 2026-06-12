@@ -3302,10 +3302,33 @@
 
             <div class="private-section">
                 <div class="private-section-title">Payment</div>
+                <div class="private-grid">
+                    <div class="private-field">
+                        <label for="private-price">Full Price (CAD)</label>
+                        <input type="number" id="private-price" placeholder="300" min="0" step="0.01" oninput="updateDepositCalc()">
+                    </div>
+                    <div class="private-field">
+                        <label for="private-deposit">Deposit (CAD)</label>
+                        <input type="number" id="private-deposit" placeholder="100" min="0" step="0.01" oninput="updateDepositCalc()">
+                    </div>
+                    <div class="private-field">
+                        <label>Remaining Balance</label>
+                        <div id="private-balance-display" style="padding:10px 0;font-size:18px;font-weight:700;color:#c4857a;">$200.00</div>
+                    </div>
+                    <div class="private-field">
+                        <label>Deposit preset</label>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:4px;">
+                            <button type="button" class="preset-btn" onclick="setDepositPreset(50)" style="font-size:12px;padding:5px 10px;">50%</button>
+                            <button type="button" class="preset-btn" onclick="setDepositPreset(100)" style="font-size:12px;padding:5px 10px;">$100</button>
+                            <button type="button" class="preset-btn" onclick="setDepositPreset(150)" style="font-size:12px;padding:5px 10px;">$150</button>
+                            <button type="button" class="preset-btn" onclick="setDepositFull()" style="font-size:12px;padding:5px 10px;">Full</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="private-checks">
                     <label class="private-check">
                         <input type="checkbox" id="private-send-email" checked>
-                        <span>Отправить клиенту письмо со ссылкой на оплату</span>
+                        <span>Отправить клиенту письмо со ссылкой на оплату депозита</span>
                     </label>
                     <label class="private-check">
                         <input type="checkbox" id="private-already-paid" onchange="togglePrivatePaid()">
@@ -3359,6 +3382,30 @@
         return () => { btn.disabled = false; btn.textContent = original; delete btn.dataset.busy; };
     }
 
+    // ── Deposit / Balance helpers ──
+    function updateDepositCalc() {
+        const price = parseFloat(document.getElementById('private-price').value) || 0;
+        const deposit = parseFloat(document.getElementById('private-deposit').value) || 0;
+        const balance = Math.max(price - deposit, 0);
+        document.getElementById('private-balance-display').textContent = '$' + balance.toFixed(2);
+        document.getElementById('private-balance-display').style.color = balance > 0 ? '#c4857a' : '#16a34a';
+    }
+    function setDepositPreset(val) {
+        const price = parseFloat(document.getElementById('private-price').value) || 0;
+        if (val <= 100 && price > 0) {
+            // percentage mode
+            document.getElementById('private-deposit').value = (price * val / 100).toFixed(2);
+        } else {
+            document.getElementById('private-deposit').value = val.toFixed(2);
+        }
+        updateDepositCalc();
+    }
+    function setDepositFull() {
+        const price = parseFloat(document.getElementById('private-price').value) || 0;
+        document.getElementById('private-deposit').value = price.toFixed(2);
+        updateDepositCalc();
+    }
+
     // Read native time inputs -> "HH:MM" strings, or null if incomplete.
     function _pvTimes() {
         const start = document.getElementById('private-start-time').value;
@@ -3374,7 +3421,8 @@
         const lastname = document.getElementById('private-lastname').value.trim();
         const email = document.getElementById('private-email').value.trim();
         const instagram = document.getElementById('private-instagram').value.trim();
-        const price = document.getElementById('private-price').value;
+        const price = parseFloat(document.getElementById('private-price').value) || 0;
+        const deposit = parseFloat(document.getElementById('private-deposit').value) || 0;
         const date = document.getElementById('private-date').value;
         const alreadyPaid = document.getElementById('private-already-paid').checked;
         const sendEmail = !alreadyPaid && document.getElementById('private-send-email').checked;
@@ -3382,6 +3430,14 @@
 
         if (!firstname || !lastname || !price || !date || !t) {
             _pvStatus('Заполните все поля (имя, фамилия, дата, время, цена).', 'error');
+            return null;
+        }
+        if (deposit <= 0) {
+            _pvStatus('Укажите сумму депозита (или нажмите "Full" для полной оплаты).', 'error');
+            return null;
+        }
+        if (deposit > price) {
+            _pvStatus('Депозит не может превышать полную цену.', 'error');
             return null;
         }
         if (!email && !alreadyPaid) {
@@ -3396,11 +3452,13 @@
             _pvStatus('Проверьте email — формат выглядит некорректным.', 'error');
             return null;
         }
-        if (parseFloat(price) < 0) {
+        if (price < 0) {
             _pvStatus('Цена не может быть отрицательной.', 'error');
             return null;
         }
-        return { firstname, lastname, email, price, date, startTime: t.start, endTime: t.end,
+        const balance = Math.max(price - deposit, 0);
+        return { firstname, lastname, email, price, deposit, balance, date,
+                 startTime: t.start, endTime: t.end,
                  instagram, alreadyPaid, sendEmail };
     }
 
@@ -3442,9 +3500,11 @@
         document.getElementById('private-start-time').value = '10:00';
         document.getElementById('private-end-time').value = '11:00';
         document.getElementById('private-price').value = '300';
+        document.getElementById('private-deposit').value = '300';
         document.getElementById('private-payment-link').value = '';
         document.getElementById('private-link-row').style.display = 'none';
         document.getElementById('private-already-paid').checked = false;
+        updateDepositCalc();
         const sendBox = document.getElementById('private-send-email');
         sendBox.checked = true;
         sendBox.disabled = false;
@@ -3477,7 +3537,8 @@
                 body: JSON.stringify({
                     date: f.date, start_time: f.startTime, end_time: f.endTime,
                     client_name: `${f.firstname} ${f.lastname}`,
-                    email: f.email, instagram: f.instagram, price: f.price,
+                    email: f.email, instagram: f.instagram,
+                    price: f.price, deposit: f.deposit,
                     send_email: f.sendEmail, already_paid: f.alreadyPaid
                 })
             });
