@@ -4865,6 +4865,9 @@ def payment():
         stripe_payment_link=ev.get("stripe_payment_link", ""),
         # New: dynamic Stripe Checkout — enabled when secret key is configured
         stripe_enabled=bool(STRIPE_SECRET_KEY),
+        # Private session extras: add-ons + agreement
+        show_addons=booking.get("session_type") == "private",
+        show_agreement=booking.get("session_type") == "private",
     )
 
 

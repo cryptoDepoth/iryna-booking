@@ -277,6 +277,62 @@
     .transfer-box       { animation-delay: 0.2s; }
     .how-to             { animation-delay: 0.25s; }
     .info-note          { animation-delay: 0.3s; }
+
+    /* ── ADD-ONS ── */
+    .addon-card {
+      border: 1.5px solid var(--ink-5);
+      border-radius: 14px;
+      padding: 18px 18px 14px;
+      margin-bottom: 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+    .addon-card:hover { border-color: var(--rose); }
+    .addon-card.selected {
+      border-color: var(--rose);
+      background: rgba(196,133,122,0.04);
+      box-shadow: 0 0 0 1px var(--rose);
+    }
+    .addon-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .addon-title { font-size: 0.92rem; font-weight: 600; color: var(--ink); line-height: 1.4; }
+    .addon-desc { font-size: 0.82rem; color: var(--ink-3); line-height: 1.5; margin-top: 6px; }
+    .addon-price { font-family: var(--font-d); font-size: 1.3rem; font-weight: 500; color: var(--rose); white-space: nowrap; }
+    .addon-check {
+      position: absolute; top: 14px; right: 14px;
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid var(--ink-5); background: white;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; font-size: 12px; color: white;
+    }
+    .addon-card.selected .addon-check {
+      background: var(--rose); border-color: var(--rose);
+    }
+    .addons-total-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0 0; font-size: 0.9rem;
+    }
+    .addons-total-row .label { color: var(--ink-3); }
+    .addons-total-row .value { font-weight: 600; color: var(--ink); }
+
+    /* ── AGREEMENT ── */
+    .agreement-box {
+      background: #faf8f7;
+      border: 1px solid var(--ink-5);
+      border-radius: 13px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+    .agreement-label {
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 0.85rem; color: var(--ink-3); line-height: 1.6;
+      cursor: pointer;
+    }
+    .agreement-label input[type="checkbox"] {
+      width: 18px; height: 18px; margin-top: 2px;
+      accent-color: var(--rose); flex-shrink: 0;
+    }
+    .agreement-label a { color: var(--rose); text-decoration: underline; }
   </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
 </head>
@@ -330,7 +386,7 @@
         </div>
         <div class="summary-row">
           <span class="key" data-i18n="summary_includes">Includes</span>
-          <span data-i18n="summary_includes_value">15 edited photos + all originals</span>
+          <span data-i18n="summary_includes_value">{% if booking.session_type == 'private' %}25 edited photos + all originals{% else %}{{ includes_text or '15 edited photos + all originals' }}{% endif %}</span>
         </div>
         {% if selected_addons %}
         <div class="summary-row">
@@ -356,6 +412,50 @@
         </div>
       </div>
     </div>
+
+    <!-- ── ADD-ONS ── -->
+    {% if show_addons %}
+    <div class="card" id="addons-card">
+      <div class="card-title">Add-ons</div>
+
+      <div class="addon-card" id="addon-extra-photos" onclick="toggleAddon('extra_photos')">
+        <div class="addon-check" id="addon-check-extra_photos">✓</div>
+        <div class="addon-top">
+          <div>
+            <div class="addon-title">10 Extra Edited Images</div>
+            <div class="addon-desc">Add 10 additional professionally edited images to your final gallery. Best value. Individual extra edited images can be purchased later for $10/image.</div>
+          </div>
+          <div class="addon-price">$50.00</div>
+        </div>
+      </div>
+
+      <div class="addon-card" id="addon-bts-reel" onclick="toggleAddon('bts_reel')">
+        <div class="addon-check" id="addon-check-bts_reel">✓</div>
+        <div class="addon-top">
+          <div>
+            <div class="addon-title">Short Vertical Behind-the-Scenes Reel</div>
+            <div class="addon-desc">Add a short vertical video up to 1 minute from your session, perfect for Instagram Reels, Stories, or family memories.</div>
+          </div>
+          <div class="addon-price">$50.00</div>
+        </div>
+      </div>
+
+      <div class="addons-total-row" id="addons-total-row" style="display:none;">
+        <span class="label">Add-ons total</span>
+        <span class="value" id="addons-total-display">$0.00</span>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── AGREEMENT ── -->
+    {% if show_agreement %}
+    <div class="agreement-box">
+      <label class="agreement-label">
+        <input type="checkbox" id="agreement-checkbox" onchange="updateConfirmBtn()">
+        <span>I agree to the <a href="/privacy" target="_blank">terms & conditions</a> and understand that the deposit is non-refundable. The remaining balance is due before or on the day of the session.</span>
+      </label>
+    </div>
+    {% endif %}
 
 
     <!-- Transfer instructions -->
@@ -415,6 +515,7 @@
         <input type="hidden" id="instagram"    value="{{ booking.instagram }}">
         <input type="hidden" id="session_type" value="{{ booking.session_type }}">
         <input type="hidden" id="event_id"     value="{{ booking.event_id }}">
+        <input type="hidden" id="selected_addons" value="[]">
 
         <button type="submit" class="btn-primary" id="confirm-btn" data-i18n="confirm_btn">
           ✓ Yes, I've Sent ${{ price }} — Confirm Booking
@@ -462,6 +563,65 @@
   </footer>
 
   <script>
+    // ── Add-Ons Logic ──
+    const ADDON_PRICES = { extra_photos: 50, bts_reel: 50 };
+    const ADDON_TITLES = { extra_photos: '10 Extra Edited Images', bts_reel: 'Short Vertical BTS Reel' };
+    let activeAddons = new Set();
+    const baseAmountDue = {{ amount_due_today | tojson }};
+    const showAgreement = {{ show_agreement | tojson }};
+
+    function toggleAddon(key) {
+      const card = document.getElementById('addon-' + (key === 'extra_photos' ? 'extra-photos' : 'bts-reel'));
+      const check = document.getElementById('addon-check-' + key);
+      if (activeAddons.has(key)) {
+        activeAddons.delete(key);
+        card.classList.remove('selected');
+      } else {
+        activeAddons.add(key);
+        card.classList.add('selected');
+      }
+      updateAddonTotals();
+    }
+
+    function updateAddonTotals() {
+      let total = 0;
+      activeAddons.forEach(k => total += ADDON_PRICES[k]);
+      const row = document.getElementById('addons-total-row');
+      const display = document.getElementById('addons-total-display');
+      if (total > 0) {
+        row.style.display = 'flex';
+        display.textContent = '$' + total.toFixed(2);
+      } else {
+        row.style.display = 'none';
+      }
+      // Update hidden field
+      const addonsArr = [];
+      activeAddons.forEach(k => addonsArr.push({ key: k, title: ADDON_TITLES[k], price: ADDON_PRICES[k] }));
+      document.getElementById('selected_addons').value = JSON.stringify(addonsArr);
+      // Update confirm button amount
+      const newTotal = baseAmountDue + total;
+      const btn = document.getElementById('confirm-btn');
+      if (btn) btn.textContent = '✓ Yes, I\'ve Sent $' + newTotal.toFixed(2) + ' — Confirm Booking';
+      // Update e-Transfer amount display
+      const amtEl = document.querySelector('.transfer-amount');
+      if (amtEl) amtEl.textContent = '$' + newTotal.toFixed(2);
+      // Update Stripe button
+      const stripeText = document.getElementById('stripe-btn-text');
+      if (stripeText) stripeText.textContent = 'Pay $' + newTotal.toFixed(2) + ' CAD — Card · Apple Pay · Google Pay';
+    }
+
+    function updateConfirmBtn() {
+      const btn = document.getElementById('confirm-btn');
+      const checkbox = document.getElementById('agreement-checkbox');
+      if (showAgreement && checkbox) {
+        btn.disabled = !checkbox.checked;
+        btn.style.opacity = checkbox.checked ? '1' : '0.38';
+      }
+    }
+
+    // Initialize agreement state
+    updateConfirmBtn();
+
     // ── Populate hidden fields from URL params (fallback) ──
     const urlParams = new URLSearchParams(window.location.search);
     // Identity-safe: booking data comes from server, not URL params
