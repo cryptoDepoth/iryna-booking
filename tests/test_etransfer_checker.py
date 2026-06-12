@@ -1,9 +1,14 @@
 import os
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import check_etransfer_v2 as checker
+
+
+def _utcnow():
+    """Naive UTC, matching bookings.created_at (SQLite CURRENT_TIMESTAMP)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _init_db(path):
@@ -98,7 +103,7 @@ def test_get_emails_uses_server_side_interac_filter(monkeypatch):
 def test_get_pending_bookings_includes_reserved_without_clicked_confirm(tmp_path, monkeypatch):
     db_path = tmp_path / "bookings.db"
     conn = _init_db(str(db_path))
-    now = datetime.now()
+    now = _utcnow()
     conn.execute("""
         INSERT INTO bookings(date,time,name,email,status,paid,confirmed,created_at,reserved_until,event_id)
         VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -121,7 +126,7 @@ def test_get_pending_bookings_includes_reserved_without_clicked_confirm(tmp_path
 def test_get_pending_bookings_keeps_payment_submitted_candidate_for_24_hours(tmp_path, monkeypatch):
     db_path = tmp_path / "bookings.db"
     conn = _init_db(str(db_path))
-    now = datetime.now()
+    now = _utcnow()
     conn.execute("""
         INSERT INTO bookings(date,time,name,email,status,paid,confirmed,created_at,reserved_until,event_id)
         VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -146,7 +151,7 @@ def test_get_pending_bookings_keeps_payment_submitted_candidate_for_24_hours(tmp
 def test_check_single_email_confirms_reserved_booking_by_amount(tmp_path, monkeypatch):
     db_path = tmp_path / "bookings.db"
     conn = _init_db(str(db_path))
-    now = datetime.now()
+    now = _utcnow()
     cur = conn.execute("""
         INSERT INTO bookings(date,time,name,email,status,paid,confirmed,created_at,reserved_until,event_id)
         VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -218,7 +223,7 @@ def test_check_single_email_rejects_stale_email_for_future_booking(tmp_path, mon
 def test_stale_email_does_not_create_orphan_alert_just_because_pending_booking_exists(tmp_path, monkeypatch):
     db_path = tmp_path / "bookings.db"
     conn = _init_db(str(db_path))
-    now = datetime.now()
+    now = _utcnow()
     conn.execute("""
         INSERT INTO bookings(date,time,name,email,status,paid,confirmed,created_at,reserved_until,event_id)
         VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -260,7 +265,7 @@ def test_stale_email_does_not_create_orphan_alert_just_because_pending_booking_e
 def test_check_single_email_does_not_finalize_ambiguous_same_amount_message(tmp_path, monkeypatch):
     db_path = tmp_path / "bookings.db"
     conn = _init_db(str(db_path))
-    now = datetime.now()
+    now = _utcnow()
     for name, minutes_ago in (("Older hold", 12), ("Paying client", 1)):
         conn.execute("""
             INSERT INTO bookings(date,time,name,email,status,paid,confirmed,created_at,reserved_until,event_id)
@@ -298,7 +303,7 @@ def test_check_single_email_does_not_finalize_ambiguous_same_amount_message(tmp_
 def test_check_single_email_disambiguates_same_amount_with_name_date_and_time(tmp_path, monkeypatch):
     db_path = tmp_path / "bookings.db"
     conn = _init_db(str(db_path))
-    now = datetime.now()
+    now = _utcnow()
     ids = {}
     for name, date, slot_time in (
         ("Other Client", "2026-06-20", "14:00"),
@@ -355,7 +360,7 @@ def test_check_single_email_disambiguates_same_amount_with_name_date_and_time(tm
 def test_underpayment_records_partial_but_does_not_report_auto_confirm(tmp_path, monkeypatch):
     db_path = tmp_path / "bookings.db"
     conn = _init_db(str(db_path))
-    now = datetime.now()
+    now = _utcnow()
     cur = conn.execute("""
         INSERT INTO bookings(date,time,name,email,status,paid,confirmed,created_at,reserved_until,event_id)
         VALUES (?,?,?,?,?,?,?,?,?,?)

@@ -13,7 +13,8 @@ Live date: **May 3, 2026**
 ```
 ├── app.py                 # Flask server — slots, reserve, payment, confirm, admin
 ├── bookings.db            # SQLite database (local, not in git)
-├── check_etransfer.py     # Gmail/Himalaya e-Transfer parser (runs via LaunchAgent)
+├── check_etransfer_v2.py  # Gmail/Himalaya e-Transfer parser + amount matcher (used by the in-app watcher)
+├── timed_cron.py          # Optional time-boxed payment re-check (delegates to check_etransfer_v2)
 ├── sync_notion.py         # Sync bookings → Notion database
 ├── templates/
 │   ├── index.html         # Slot picker + session types
@@ -74,7 +75,7 @@ launchctl list | grep com.pashynska.booking
 - **Auto-expire:** 15-minute reservation window (unpaid = slot freed)
 - **Rate limit:** Max 5 reserve attempts / 10 min per IP
 - **Notion sync:** On confirmation, writes `Name`, `Date`, `Time`, `Session Type`, `Instagram`, `Deposit`, `Status`
-- **Gmail check:** `check_etransfer.py` runs every 5 min via LaunchAgent, marks deposits as `paid` + confirms client
+- **Gmail check:** the in-app watcher thread polls Gmail (via `check_etransfer_v2.py`) every ~60s, marks deposits as `paid` + confirms client. The legacy `check_etransfer.py` (v1, name/email matching, $95 fallback) was removed in June 2026 — `check_etransfer_v2.py` is the only matcher; `timed_cron.py` delegates to it.
 
 ## 🤖 Website Assistant
 

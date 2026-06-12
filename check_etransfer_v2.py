@@ -20,7 +20,7 @@ import sqlite3
 import subprocess
 import threading
 import time
-from email.utils import parsedate_to_datetime
+from email.utils import parseaddr, parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "bookings.db"))
@@ -32,6 +32,49 @@ ETRANSFER_EMAIL_TIMEOUT = int(os.environ.get("ETRANSFER_EMAIL_TIMEOUT", "20"))
 _EMAIL_FETCH_LOCK = threading.Lock()
 _EMAIL_FETCH_CACHE = {"ts": 0.0, "page_size": None, "lookback_days": None, "emails": None}
 _EMAIL_FETCH_CACHE_TTL = int(os.environ.get("ETRANSFER_EMAIL_CACHE_TTL", "60"))
+
+# Admin alerts (ambiguity/orphan) are throttled: the watcher re-scans every
+# ~60s and an unresolved collision would otherwise re-fire the same Telegram
+# message on every pass.
+ETRANSFER_ALERT_THROTTLE_SECONDS = int(os.environ.get("ETRANSFER_ALERT_THROTTLE_SECONDS", "3600"))
+# A payment email with no eligible pending booking only alerts the admin while
+# it is recent; old unmatched inbox history must not page anyone.
+ETRANSFER_ORPHAN_FRESH_HOURS = int(os.environ.get("ETRANSFER_ORPHAN_FRESH_HOURS", "24"))
+_ALERT_LAST_SENT = {}
+_ALERT_LOCK = threading.Lock()
+
+
+def _utc_now():
+    """Naive UTC now.
+
+    bookings.created_at is written by SQLite CURRENT_TIMESTAMP (UTC) and
+    _parse_email_datetime/_parse_db_datetime normalize to naive UTC, so every
+    time comparison in this module happens on the same clock. Never use
+    datetime.now() here — server-local time differs between the Fly container
+    (UTC) and a dev Mac (America/Edmonton).
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _should_send_alert(key):
+    """Return True at most once per ETRANSFER_ALERT_THROTTLE_SECONDS per key."""
+    now = time.time()
+    with _ALERT_LOCK:
+        last = _ALERT_LAST_SENT.get(key)
+        if last is not None and now - last < ETRANSFER_ALERT_THROTTLE_SECONDS:
+            return False
+        if len(_ALERT_LAST_SENT) > 512:
+            cutoff = now - ETRANSFER_ALERT_THROTTLE_SECONDS
+            for stale in [k for k, ts in _ALERT_LAST_SENT.items() if ts < cutoff]:
+                _ALERT_LAST_SENT.pop(stale, None)
+        _ALERT_LAST_SENT[key] = now
+        return True
+
+
+def _send_admin_alert(text):
+    """Deliver an admin alert via the app's Telegram notifier."""
+    from app import _notify_admin
+    _notify_admin(text)
 
 
 def get_db():
@@ -181,14 +224,26 @@ def get_emails(page_size=None, lookback_days=None):
         _EMAIL_FETCH_LOCK.release()
 
 
+def _sender_domain(raw_sender):
+    """Extract the domain of the actual email address from a sender string."""
+    addr = parseaddr(str(raw_sender or ""))[1].strip().lower()
+    if "@" not in addr:
+        return ""
+    return addr.rsplit("@", 1)[1]
+
+
 def is_etransfer_email(email):
     """Check if an envelope is an incoming Interac payment notification.
 
     Interac also sends outgoing-transfer notifications. Those must never
     confirm a client booking merely because the amount happens to match.
+
+    The sender check is strict: the parsed address domain must BE interac.ca
+    or end with .interac.ca. A substring match would accept spoofed senders
+    like notify@interac.ca.evil.com or "interac.ca"@evil.com.
     """
     subject = email.get("subject", "").lower()
-    sender = email.get("from", {}).get("addr", "").lower()
+    domain = _sender_domain(email.get("from", {}).get("addr", ""))
 
     incoming_markers = [
         "you've received",
@@ -199,10 +254,9 @@ def is_etransfer_email(email):
         "transfer received",
         "deposit received",
     ]
-    sender_domains = ["interac.ca", "payments.interac.ca", "notify.interac.ca"]
 
     is_incoming = any(marker in subject for marker in incoming_markers)
-    from_interac = any(domain in sender for domain in sender_domains)
+    from_interac = domain == "interac.ca" or domain.endswith(".interac.ca")
 
     return bool(from_interac and is_incoming)
 
@@ -350,7 +404,11 @@ def get_expected_amount_for_booking(booking_id):
     Priority:
     1. bookings.deposit_amount column (stored at reserve time — most reliable)
     2. events.yaml lookup by event_id (fallback for older rows)
-    3. Hard default $95.00
+    3. None — the booking must be skipped by amount matching.
+
+    Earlier versions fell back to a hardcoded $95.00. With differently priced
+    events that default could silently confirm the wrong booking, so an
+    unknown deposit now logs a warning and excludes the booking instead.
     """
     conn = get_db()
     c = conn.cursor()
@@ -380,31 +438,47 @@ def get_expected_amount_for_booking(booking_id):
     except Exception:
         pass
 
-    return 95.0
+    print(f"   ⚠️ No deposit amount for booking #{booking_id} "
+          f"(event_id={event_id!r} not in events.yaml) — excluded from amount matching")
+    return None
 
 
-def get_pending_bookings(within_minutes=30, grace_minutes=60, pending_payment_hours=24,
-                         private_days=45):
+def get_pending_bookings(within_minutes=30, pending_payment_hours=24, private_days=45):
     """Get bookings awaiting payment, created within recent window.
 
-    grace_minutes: also include bookings whose reservation expired up to
-    this many minutes ago.  Interac e-Transfer emails can arrive 10-40 min
-    after the client sends the payment, so we must not cut off the search the
-    moment reserved_until passes.
+    Timezone contract: every cutoff is computed in UTC. created_at comes from
+    SQLite CURRENT_TIMESTAMP (UTC, naive); reserved_until is written by app.py
+    with an America/Edmonton UTC offset, so it is parsed and compared as a real
+    instant in Python instead of lexically inside SQL.
+
+    NOTE on the removed grace window: an earlier version also kept 'reserved'
+    rows matchable for 60 minutes after reserved_until passed (Interac emails
+    can lag 10-40 min behind the payment). That grace was dead code — the
+    watcher's expire_reservations() sweep flips those rows to status='expired'
+    within ~30 seconds of reserved_until passing, so they could never match
+    here. It was removed rather than made real: making it real would hold every
+    abandoned slot for an extra hour and hurt conversion. The actual
+    protections are (a) clicking "I paid" moves the booking to pending_payment
+    with a {pending_payment_hours}h window, and (b) a payment that arrives with
+    no eligible pending booking alerts the admin instead of being dropped.
 
     private_days: admin-created private sessions have no short reservation
     window (reserved_until is NULL) and the payment link is emailed — the
     client may pay days later. Keep them matchable for this many days in
     either reserved or pending_payment state. Exact-amount matching plus the
     ambiguity guard keep this safe despite the long window.
+
+    within_minutes is kept for API compatibility; live 'reserved' rows are
+    gated by reserved_until > now, with a generous created_at bound so that
+    admin manual blocks (1h reservation window) stay matchable too.
     """
     conn = get_db()
     c = conn.cursor()
-    now = datetime.now()
-    # Plain reservations are short-lived. Once the client says payment was
-    # submitted, keep the booking matchable while Interac/Gmail is delayed.
-    grace_cutoff = (now - timedelta(minutes=grace_minutes)).strftime('%Y-%m-%d %H:%M:%S')
-    created_cutoff = (now - timedelta(minutes=within_minutes + grace_minutes)).strftime('%Y-%m-%d %H:%M:%S')
+    now = _utc_now()
+    # 'reserved' rows are bounded by the live reserved_until instant below; the
+    # created_at bound only guards against pathological rows with a far-future
+    # reserved_until.
+    reserved_created_cutoff = (now - timedelta(hours=pending_payment_hours)).strftime('%Y-%m-%d %H:%M:%S')
     pending_cutoff = (now - timedelta(hours=pending_payment_hours)).strftime('%Y-%m-%d %H:%M:%S')
     private_cutoff = (now - timedelta(days=private_days)).strftime('%Y-%m-%d %H:%M:%S')
     c.execute("""
@@ -412,7 +486,7 @@ def get_pending_bookings(within_minutes=30, grace_minutes=60, pending_payment_ho
         WHERE confirmed = 0
         AND paid = 0
         AND (
-            (status = 'reserved' AND reserved_until > ? AND created_at > ?)
+            (status = 'reserved' AND reserved_until IS NOT NULL AND created_at > ?)
             OR
             (status = 'pending_payment' AND created_at > ?)
             OR
@@ -421,10 +495,19 @@ def get_pending_bookings(within_minutes=30, grace_minutes=60, pending_payment_ho
              AND created_at > ?)
         )
         ORDER BY created_at DESC
-    """, (grace_cutoff, created_cutoff, pending_cutoff, private_cutoff))
+    """, (reserved_created_cutoff, pending_cutoff, private_cutoff))
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
-    return rows
+
+    # reserved_until may carry a timezone offset — compare instants in Python.
+    eligible = []
+    for row in rows:
+        if row.get("status") == "reserved" and (row.get("session_type") or "") != "private":
+            reserved_until = _parse_db_datetime(row.get("reserved_until"))
+            if reserved_until is None or reserved_until <= now:
+                continue
+        eligible.append(row)
+    return eligible
 
 
 def get_reconciliation_bookings(within_days=45):
@@ -437,9 +520,11 @@ def get_reconciliation_bookings(within_days=45):
     """
     conn = get_db()
     c = conn.cursor()
-    today = datetime.now().date()
-    date_cutoff = (today - timedelta(days=7)).strftime("%Y-%m-%d")
-    created_cutoff = (datetime.now() - timedelta(days=within_days)).strftime("%Y-%m-%d %H:%M:%S")
+    now = _utc_now()
+    # Session dates are local-calendar dates; using the UTC date for a 7-day
+    # heuristic window is off by at most one day, which the window absorbs.
+    date_cutoff = (now.date() - timedelta(days=7)).strftime("%Y-%m-%d")
+    created_cutoff = (now - timedelta(days=within_days)).strftime("%Y-%m-%d %H:%M:%S")
     c.execute("""
         SELECT * FROM bookings
         WHERE status='confirmed'
@@ -500,6 +585,10 @@ def match_by_amount_only(amount, bookings):
     exact, overpaid, underpaid = [], [], []
     for b in bookings:
         expected = get_expected_amount_for_booking(b["id"])
+        if expected is None:
+            # Unknown deposit (no stored amount, event not in events.yaml) —
+            # never guess; the booking stays manual.
+            continue
         diff = amount - expected
         if abs(diff) < 0.01:
             exact.append(b)
@@ -511,11 +600,15 @@ def match_by_amount_only(amount, bookings):
         elif diff < 0 and amount >= expected * 0.3:
             underpaid.append((b, abs(diff)))
 
-    # 1) Exact wins
+    # 1) Exact normally wins — but when the same amount is ALSO a plausible
+    #    overpayment for another booking, the winner is not certain: the payer
+    #    may be the other client paying their full price. Cross-band collisions
+    #    go to disambiguation (body match / manual) instead of auto-confirm.
     if exact:
-        if len(exact) == 1:
+        cross_band = exact + [b for b, _ in overpaid]
+        if len(cross_band) == 1:
             return exact[0], [], 'exact'
-        return None, exact, None  # ambiguous — multiple exact matches
+        return None, cross_band, None  # ambiguous — multiple exact, or exact+overpaid collision
 
     # 2) Overpaid -> auto-confirm, but only if unambiguous
     if overpaid:
@@ -533,13 +626,19 @@ def match_by_amount_only(amount, bookings):
 
 
 def confirm_booking(booking_id, paid_amount=None):
-    """Confirm booking in DB."""
+    """Confirm booking in DB.
+
+    Only flips rows that are still unconfirmed: two same-amount Interac emails
+    in one scan batch must not both confirm (and overwrite paid_amount on) the
+    same booking. The second email then correctly falls through to the orphan
+    path instead of being silently swallowed.
+    """
     conn = get_db()
     c = conn.cursor()
     c.execute("""
         UPDATE bookings
         SET confirmed=1, paid=1, status='confirmed', paid_amount=?
-        WHERE id=?
+        WHERE id=? AND confirmed=0
     """, (paid_amount, booking_id))
     updated = c.rowcount
     conn.commit()
@@ -683,6 +782,8 @@ def match_reconciliation_payment(amount, bookings, body):
             continue
 
         expected = get_expected_amount_for_booking(b["id"])
+        if expected is None:
+            continue
         full = _get_booking_full_price(b)
         cap = full if full > expected else expected * 2
         if amount < expected * 0.3 or amount > cap + 1.0:
@@ -730,6 +831,8 @@ def match_ambiguous_pending_by_body(bookings, body):
 
 def _classify_amount_for_booking(amount, booking):
     expected = get_expected_amount_for_booking(booking["id"])
+    if expected is None:
+        return None
     diff = amount - expected
     if abs(diff) < 0.01:
         return "exact"
@@ -743,30 +846,44 @@ def _classify_amount_for_booking(amount, booking):
 
 
 def _notify_admin_ambiguity(amount, candidates):
-    """Send admin notification when amount matches multiple bookings."""
+    """Send admin notification when amount matches multiple bookings.
+
+    Deduped per (amount, candidate set): the watcher re-scans every ~60s and an
+    unresolved collision must not re-fire the same Telegram alert each pass.
+    """
+    key = ("ambiguity", f"{amount:.2f}",
+           tuple(sorted(str(b.get("id")) for b in candidates)))
+    if not _should_send_alert(key):
+        print(f"[admin] Ambiguity alert for ${amount:.2f} suppressed (sent recently)")
+        return
     try:
-        from app import _notify_admin
         lines = [f"⚠️ **Ambiguous payment: ${amount:.2f}**",
                  f"Matches {len(candidates)} bookings:", ""]
         for b in candidates:
             lines.append(f"  • #{b['id']} {b['name']} @ {b['date']} {b['time']} ({b['email']})")
         lines.append("")
         lines.append("Please manually confirm the correct booking.")
-        _notify_admin("\n".join(lines))
+        _send_admin_alert("\n".join(lines))
         print(f"[admin] Ambiguity alert sent for ${amount:.2f}")
     except Exception as e:
         print(f"[admin] Failed to send ambiguity alert: {e}")
 
 
-def _notify_admin_orphan(amount, body, msg_id):
-    """Send admin notification when e-Transfer has no matching pending booking."""
+def _notify_admin_orphan(amount, body, msg_id, reason=None):
+    """Send admin notification when e-Transfer has no matching pending booking.
+
+    Deduped per message id — an unmatched payment that stays unmatched must not
+    page the admin on every watcher pass.
+    """
+    if not _should_send_alert(("orphan", str(msg_id))):
+        print(f"[admin] Orphan alert for message {msg_id} suppressed (sent recently)")
+        return
     try:
-        from app import _notify_admin
         # Extract sender info from body for context
-        snippet = body[:500].replace('\n', ' ').strip()
+        snippet = (body or "")[:500].replace('\n', ' ').strip()
         lines = [
             f"💸 **Orphan payment: ${amount:.2f}**",
-            f"No pending booking matches this amount.",
+            reason or "No pending booking matches this amount.",
             f"",
             f"*Email snippet:*",
             f"```",
@@ -776,7 +893,7 @@ def _notify_admin_orphan(amount, body, msg_id):
             f"Message ID: `{msg_id}`",
             f"Action needed: check if client paid without booking, or booking expired."
         ]
-        _notify_admin("\n".join(lines))
+        _send_admin_alert("\n".join(lines))
         print(f"[admin] Orphan alert sent for ${amount:.2f}")
     except Exception as e:
         print(f"[admin] Failed to send orphan alert: {e}")
@@ -878,18 +995,28 @@ def _parse_email_datetime(value):
 
 
 def _parse_db_datetime(value):
-    """Parse SQLite datetime strings stored either with space or T separator."""
+    """Parse SQLite datetime strings to naive UTC.
+
+    created_at is naive UTC (SQLite CURRENT_TIMESTAMP); reserved_until is
+    written with an America/Edmonton UTC offset. Timezone-aware values are
+    converted to UTC and naive values are assumed to already be UTC, so every
+    comparison in this module happens on one clock.
+    """
     if not value:
         return None
     text = str(value).strip()
     for candidate in (text, text.replace("T", " ")):
+        dt = None
         try:
-            return datetime.fromisoformat(candidate)
+            dt = datetime.fromisoformat(candidate)
         except ValueError:
             try:
-                return datetime.strptime(candidate.split(".")[0], "%Y-%m-%d %H:%M:%S")
+                dt = datetime.strptime(candidate.split(".")[0], "%Y-%m-%d %H:%M:%S")
             except ValueError:
                 continue
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
     return None
 
 
@@ -1030,7 +1157,26 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
             return None, None
 
         if not eligible_pending_count:
-            print(f"   [skip] No eligible pending bookings for message {msg_id}; no safe reconciliation match")
+            email_dt = _parse_email_datetime(email.get("date"))
+            is_fresh = (
+                email_dt is not None
+                and _utc_now() - email_dt <= timedelta(hours=ETRANSFER_ORPHAN_FRESH_HOURS)
+            )
+            if is_fresh:
+                # A payment just arrived and nothing can absorb it (expired
+                # reservation, pay-without-booking, double payment). Silence
+                # here used to hide lost money — alert the admin instead. The
+                # message is NOT marked processed, so a booking completed
+                # shortly after the payment (pay-first flow) can still match on
+                # a later pass; the alert itself is deduped per message id.
+                print(f"   ⚠️ Payment ${amount:.2f} has NO eligible pending bookings (message {msg_id}) — alerting admin")
+                _notify_admin_orphan(
+                    amount, body, msg_id,
+                    reason=("Payment received but ZERO eligible pending bookings exist — "
+                            "likely an expired reservation or a payment without a booking."),
+                )
+            else:
+                print(f"   [skip] Stale message {msg_id}: no eligible pending bookings; no safe reconciliation match")
             return None, None
 
         print(f"   ❌ No booking matches ${amount:.2f}")

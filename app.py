@@ -366,6 +366,27 @@ _watcher_state = {
     "last_auto_confirmed_at": None,
 }
 
+def _process_etransfer_email_batch(emails, pending, reconciliation):
+    """Match a batch of Interac emails against pending bookings.
+
+    The pending list is filtered after every confirmation so a second
+    same-amount email in the same batch can never re-match the booking the
+    first one just paid for — it falls through to the orphan path instead.
+    Returns the list of confirmed booking ids.
+    """
+    from check_etransfer_v2 import is_etransfer_email, check_single_email
+    pending = list(pending or [])
+    confirmed_ids = []
+    for email in emails:
+        if not is_etransfer_email(email):
+            continue
+        confirmed_id, _ambiguous = check_single_email(email, pending, reconciliation)
+        if confirmed_id:
+            confirmed_ids.append(confirmed_id)
+            pending = [b for b in pending if b.get("id") != confirmed_id]
+    return confirmed_ids
+
+
 def _watcher_thread():
     """Daemon thread — does two periodic jobs:
        1. Check Gmail for incoming Interac e-Transfers and auto-confirm bookings
@@ -387,8 +408,7 @@ def _watcher_thread():
     log_w.info("[watcher] Global e-Transfer + slot-expiry watcher started")
 
     from check_etransfer_v2 import (
-        get_pending_bookings, get_reconciliation_bookings,
-        get_emails, is_etransfer_email, check_single_email
+        get_pending_bookings, get_reconciliation_bookings, get_emails
     )
 
     while True:
@@ -430,13 +450,10 @@ def _watcher_thread():
                 if emails is None:
                     log_w.error("[watcher] Filtered Interac Gmail scan failed")
                 elif emails:
-                    for email in emails:
-                        if is_etransfer_email(email):
-                            confirmed_id, _ambiguous = check_single_email(email, pending, reconciliation)
-                            if confirmed_id:
-                                _after_auto_payment_confirmed(confirmed_id)
-                                _watcher_state["last_auto_confirmed_booking_id"] = confirmed_id
-                                _watcher_state["last_auto_confirmed_at"] = datetime.now(timezone.utc).isoformat()
+                    for confirmed_id in _process_etransfer_email_batch(emails, pending, reconciliation):
+                        _after_auto_payment_confirmed(confirmed_id)
+                        _watcher_state["last_auto_confirmed_booking_id"] = confirmed_id
+                        _watcher_state["last_auto_confirmed_at"] = datetime.now(timezone.utc).isoformat()
             else:
                 log_w.debug("[watcher] No pending/reconciliation work or email poll throttled")
         except Exception as e:
@@ -3528,24 +3545,58 @@ try:
 except Exception as _be:
     log.warning(f"[backup] Startup backup failed: {_be}")
 
+def _parse_reserved_until_utc(value):
+    """Parse a reserved_until string to an aware UTC datetime.
+
+    Values are written with an America/Edmonton UTC offset; very old rows may
+    be naive and are treated as UTC (they are long expired either way).
+    Comparing parsed instants instead of raw strings keeps the expiry sweep
+    correct regardless of the stored offset or separator format.
+    """
+    if not value:
+        return None
+    text = str(value).strip()
+    dt = None
+    for candidate in (text, text.replace(" ", "T", 1)):
+        try:
+            dt = datetime.fromisoformat(candidate)
+            break
+        except ValueError:
+            continue
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def expire_reservations():
     """Release expired holds so abandoned slots become bookable again.
 
     Plain reservations use the short reservation window. Clicking "I paid"
     extends pending_payment until the configured review window expires.
+
+    The cutoff is evaluated in UTC on parsed datetimes (not lexically in SQL):
+    reserved_until strings carry a timezone offset, and comparing them against
+    a wall-clock string silently misfires when formats or offsets differ.
     Returns count of expired bookings."""
     conn = db_conn()
     c = conn.cursor()
-    now = _local_now().isoformat()
+    now_utc = datetime.now(timezone.utc)
+    now = now_utc.isoformat()
     c.execute("""
         SELECT * FROM bookings
         WHERE confirmed = 0
           AND paid = 0
           AND reserved_until IS NOT NULL
-          AND reserved_until <= ?
           AND status IN ('reserved', 'pending_payment')
-    """, (now,))
-    rows = [dict(row) for row in c.fetchall()]
+    """)
+    rows = []
+    for row in c.fetchall():
+        row = dict(row)
+        reserved_until = _parse_reserved_until_utc(row.get("reserved_until"))
+        if reserved_until is not None and reserved_until <= now_utc:
+            rows.append(row)
 
     for row in rows:
         booking_id = row["id"]

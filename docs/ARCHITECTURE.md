@@ -56,14 +56,15 @@
 - Launches `timed_cron.py --booking-id <id>` as background process
 - Syncs to Notion
 
-### 3. Payment Verification (`timed_cron.py`)
+### 3. Payment Verification (`check_etransfer_v2.py` + `timed_cron.py`)
 
-- Runs as subprocess for up to 20 minutes
-- Every 60 seconds: calls `check_etransfer.py` to scan emails
+- Primary path: the in-app watcher thread polls Gmail every ~60s via `check_etransfer_v2.py`
+- `timed_cron.py` is an optional time-boxed re-check (up to 20 minutes) that delegates
+  all parsing/matching to `check_etransfer_v2` (the legacy v1 `check_etransfer.py` was removed)
 - Parses Interac e-Transfer notification emails via Himalaya CLI
 - Extracts: amount, sender name, reference number
-- If amount matches `event.json.deposit` → calls `confirm_booking_paid()`
-- Underpayment: logged, not confirmed
+- Amount-only matching against the booking's stored `deposit_amount` (or events.yaml);
+  exact/overpaid → auto-confirm, underpaid → recorded only, collisions → admin alert
 - Uses file-based lock (`.timed_cron.lock`) to prevent duplicates
 
 ### 4. Booking Confirmation (`confirm_booking_paid()`)
