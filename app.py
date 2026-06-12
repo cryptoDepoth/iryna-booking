@@ -4833,6 +4833,11 @@ def payment():
     amount_due_today = _money(booking.get("deposit_amount") or ev.get("deposit") or SESSION_PRICE)
     remaining_balance = _booking_balance_due(booking, ev)
 
+    # Includes text based on session type
+    is_private = booking.get("session_type") == "private"
+    edited_photos = ev.get("edited_photos") or (25 if is_private else 15)
+    includes_text = f"{edited_photos} edited photos + all originals"
+
     # Server-computed countdown (client clocks/timezones can't be trusted).
     # None => no timer: private sessions and pending_payment have no short
     # reservation window to count down.
@@ -4861,13 +4866,15 @@ def payment():
         session_length=ev.get("session_length", SESSION_LENGTH),
         event_title=ev.get("title", "Mini Session"),
         email=EMAIL,
+        includes_text=includes_text,
+        edited_photos=edited_photos,
         # Legacy static Payment Link (kept for backward compat — ignored if stripe_enabled)
         stripe_payment_link=ev.get("stripe_payment_link", ""),
         # New: dynamic Stripe Checkout — enabled when secret key is configured
         stripe_enabled=bool(STRIPE_SECRET_KEY),
         # Private session extras: add-ons + agreement
-        show_addons=booking.get("session_type") == "private",
-        show_agreement=booking.get("session_type") == "private",
+        show_addons=is_private,
+        show_agreement=is_private,
     )
 
 
@@ -9519,6 +9526,9 @@ def api_private_session():
     deposit = min(max(deposit, 0), price)  # clamp to [0, price]
     balance = round(price - deposit, 2)
 
+    # Number of edited photos (default 25 for private sessions)
+    edited_photos = int(data.get("photos") or 25)
+
     session_minutes = max(
         15,
         int((datetime.strptime(end_time, "%H:%M") - datetime.strptime(start_time, "%H:%M")).total_seconds() // 60),
@@ -9543,11 +9553,12 @@ def api_private_session():
         "full_price": price,
         "location": "Calgary — exact spot sent after booking",
         "session_type": "private",
+        "edited_photos": edited_photos,
         "featured": False,
         "hidden": True,
         "included": [
             f"{session_minutes} min individual photoshoot",
-            "Professionally edited photos",
+            f"{edited_photos} professionally edited photos",
             "All original photos included",
         ],
         "photos": ["/images/placeholder.jpg"],

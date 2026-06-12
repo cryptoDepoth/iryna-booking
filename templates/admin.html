@@ -3262,6 +3262,10 @@
                         <label for="private-price">Цена (CAD)</label>
                         <input type="number" id="private-price" placeholder="300" min="0" step="0.01">
                     </div>
+                    <div class="private-field">
+                        <label for="private-photos">Edited photos</label>
+                        <input type="number" id="private-photos" placeholder="25" min="1" step="1" value="25">
+                    </div>
                     <div class="private-field full">
                         <label>Время</label>
                         <div class="private-time-row">
@@ -3423,6 +3427,7 @@
         const instagram = document.getElementById('private-instagram').value.trim();
         const price = parseFloat(document.getElementById('private-price').value) || 0;
         const deposit = parseFloat(document.getElementById('private-deposit').value) || 0;
+        const photos = parseInt(document.getElementById('private-photos').value) || 25;
         const date = document.getElementById('private-date').value;
         const alreadyPaid = document.getElementById('private-already-paid').checked;
         const sendEmail = !alreadyPaid && document.getElementById('private-send-email').checked;
@@ -3457,7 +3462,7 @@
             return null;
         }
         const balance = Math.max(price - deposit, 0);
-        return { firstname, lastname, email, price, deposit, balance, date,
+        return { firstname, lastname, email, price, deposit, balance, photos, date,
                  startTime: t.start, endTime: t.end,
                  instagram, alreadyPaid, sendEmail };
     }
@@ -3500,6 +3505,7 @@
         document.getElementById('private-start-time').value = '10:00';
         document.getElementById('private-end-time').value = '11:00';
         document.getElementById('private-price').value = '300';
+        document.getElementById('private-photos').value = '25';
         document.getElementById('private-deposit').value = '300';
         document.getElementById('private-payment-link').value = '';
         document.getElementById('private-link-row').style.display = 'none';
@@ -3538,7 +3544,7 @@
                     date: f.date, start_time: f.startTime, end_time: f.endTime,
                     client_name: `${f.firstname} ${f.lastname}`,
                     email: f.email, instagram: f.instagram,
-                    price: f.price, deposit: f.deposit,
+                    price: f.price, deposit: f.deposit, photos: f.photos,
                     send_email: f.sendEmail, already_paid: f.alreadyPaid
                 })
             });

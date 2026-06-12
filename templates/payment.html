@@ -386,7 +386,7 @@
         </div>
         <div class="summary-row">
           <span class="key" data-i18n="summary_includes">Includes</span>
-          <span data-i18n="summary_includes_value">{% if booking.session_type == 'private' %}25 edited photos + all originals{% else %}{{ includes_text or '15 edited photos + all originals' }}{% endif %}</span>
+          <span data-i18n="summary_includes_value">{{ includes_text or '15 edited photos + all originals' }}</span>
         </div>
         {% if selected_addons %}
         <div class="summary-row">
