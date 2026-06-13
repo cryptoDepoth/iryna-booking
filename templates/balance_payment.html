@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Pay Remaining Balance | Pashynska Photography</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Meta Pixel -->
+  <script>
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+  n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+  document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '{{ meta_pixel_id }}');
+  fbq('track', 'PageView');
+  {% if not already_paid %}fbq('track', 'InitiateCheckout', {value: {{ (balance_due or 0)|float }}, currency: 'CAD', content_name: {{ (event_title or '')|tojson }}}{% if meta_event_id %}, {eventID: {{ meta_event_id|tojson }}}{% endif %});{% endif %}
+  </script>
+  <noscript><img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"/></noscript>
+  <!-- End Meta Pixel -->
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --cream:#fdf8f6;--paper:#fff;--ink:#3a2a30;--ink-2:#6b565e;--ink-3:#94808a;--ink-4:#b7a7af;
+      --rose:#b76e79;--rose-deep:#9c5460;--rose-soft:#e9c9cf;--blush:#f5e3e1;--line:#ecdfdb;
+      --ok:#3f8f5f;--ok-bg:#eaf5ee;
+      --serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',-apple-system,sans-serif;
+    }
+    body{font-family:var(--sans);background:var(--cream);color:var(--ink);line-height:1.55;
+      min-height:100vh;padding:24px 16px;display:flex;justify-content:center}
+    .wrap{width:100%;max-width:460px}
+    .brand{text-align:center;margin-bottom:18px}
+    .brand-name{font-family:var(--serif);font-size:1.35rem;font-weight:600;color:var(--ink)}
+    .brand-sub{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--rose-deep);margin-top:3px}
+    .card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:22px;
+      margin-bottom:14px;box-shadow:0 6px 24px rgba(120,70,80,.07)}
+    .card-title{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+      font-weight:600;margin-bottom:14px}
+    .row{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:.92rem}
+    .row .k{color:var(--ink-2)}.row .v{color:var(--ink);font-weight:600;text-align:right}
+    .balance-hero{text-align:center;background:linear-gradient(135deg,var(--blush),#fbeef0);
+      border:1px solid var(--rose-soft)}
+    .balance-label{font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--rose-deep);font-weight:600}
+    .balance-amt{font-family:var(--serif);font-size:3rem;font-weight:600;color:var(--ink);line-height:1.05;margin:6px 0}
+    .balance-note{font-size:.84rem;color:var(--ink-2)}
+    .eyebrow{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--rose-deep);font-weight:700;margin-bottom:4px}
+    .copybox{display:flex;align-items:center;justify-content:space-between;gap:10px;
+      background:var(--cream);border:1px dashed var(--rose-soft);border-radius:12px;padding:12px 14px;margin:8px 0}
+    .copybox .val{font-weight:600;font-size:.95rem;word-break:break-all}
+    .copy-btn{flex:0 0 auto;border:0;background:var(--rose);color:#fff;border-radius:999px;
+      padding:8px 16px;font-weight:600;font-size:.82rem;cursor:pointer;font-family:inherit;transition:background .2s}
+    .copy-btn:hover{background:var(--rose-deep)}
+    .muted{font-size:.8rem;color:var(--ink-3);margin-top:6px}
+    .steps{margin:6px 0 0;padding-left:18px}
+    .steps li{font-size:.88rem;color:var(--ink-2);margin:6px 0}
+    .divider{display:flex;align-items:center;gap:12px;color:var(--ink-4);font-size:.72rem;
+      text-transform:uppercase;letter-spacing:.1em;margin:18px 0 12px}
+    .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+    .btn-card{display:block;width:100%;border:0;background:var(--ink);color:#fff;border-radius:14px;
+      padding:15px;font-weight:600;font-size:.95rem;cursor:pointer;font-family:inherit;transition:opacity .2s}
+    .btn-card:hover{opacity:.92}
+    .secure{text-align:center;font-size:.72rem;color:var(--ink-4);margin-top:8px}
+    .paid{text-align:center;background:var(--ok-bg);border:1px solid #bfe3cd}
+    .paid .big{font-family:var(--serif);font-size:1.8rem;color:var(--ok);font-weight:600}
+    .foot{text-align:center;font-size:.82rem;color:var(--ink-3);margin-top:10px}
+    .foot a{color:var(--rose-deep);font-weight:600;text-decoration:none}
+    .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+      background:var(--ink);color:#fff;padding:10px 20px;border-radius:999px;font-size:.85rem;
+      opacity:0;transition:all .25s;pointer-events:none}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-name">Pashynska Photography</div>
+      <div class="brand-sub">Remaining Balance</div>
+    </div>
+
+    {% if already_paid %}
+    <div class="card paid">
+      <div class="big">Paid in full ✓</div>
+      <p class="balance-note" style="margin-top:8px">Your booking is fully paid — nothing more to do. See you at the session! 🌸</p>
+    </div>
+    <p class="foot">Questions? <a href="https://instagram.com/pashynska.photo" target="_blank">DM @pashynska.photo</a></p>
+    {% else %}
+
+    <div class="card">
+      <div class="card-title">Booking</div>
+      <div class="row"><span class="k">Session</span><span class="v">{{ event_title }}</span></div>
+      {% if date %}<div class="row"><span class="k">Date</span><span class="v">{{ date }}</span></div>{% endif %}
+      {% if time %}<div class="row"><span class="k">Time</span><span class="v">{{ time }}</span></div>{% endif %}
+      {% if total_price %}<div class="row"><span class="k">Total</span><span class="v">${{ "%.2f"|format(total_price) }} CAD</span></div>{% endif %}
+    </div>
+
+    <div class="card balance-hero">
+      <div class="balance-label">Remaining balance</div>
+      <div class="balance-amt">${{ "%.2f"|format(balance_due) }}</div>
+      <div class="balance-note">CAD — due after your session</div>
+    </div>
+
+    <!-- e-Transfer -->
+    <div class="card">
+      <div class="eyebrow">Pay by Interac e-Transfer</div>
+      <div class="copybox">
+        <span class="val" id="etEmail">{{ email }}</span>
+        <button class="copy-btn" onclick="copyText('{{ email }}', this)">Copy</button>
+      </div>
+      <div class="copybox">
+        <span class="val" id="etMsg">{{ bank_msg }}</span>
+        <button class="copy-btn" onclick="copyText(document.getElementById('etMsg').textContent, this)">Copy</button>
+      </div>
+      <p class="muted">Auto-deposit enabled · no security question needed.</p>
+      <ol class="steps">
+        <li>Open your banking app → “Send Interac e-Transfer”.</li>
+        <li>Recipient: the email above. Amount: <strong>${{ "%.2f"|format(balance_due) }} CAD</strong>.</li>
+        <li>Paste the message above so we match it to your booking, then send.</li>
+      </ol>
+      <p class="muted">We confirm e-Transfers manually within a few hours.</p>
+    </div>
+
+    {% if stripe_enabled %}
+    <div class="divider">or</div>
+    <button class="btn-card" id="balance-card-btn" onclick="startBalanceCheckout()">
+      <span id="balance-card-text">Pay ${{ "%.2f"|format(balance_due) }} CAD by card · Apple Pay · Google Pay</span>
+    </button>
+    <p class="secure">🔒 Secure · Powered by Stripe</p>
+    {% endif %}
+
+    <p class="foot">Questions? <a href="https://instagram.com/pashynska.photo" target="_blank">DM @pashynska.photo</a></p>
+    {% endif %}
+  </div>
+
+  <div class="toast" id="toast">Copied ✓</div>
+
+  <script>
+    function showToast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+      setTimeout(function(){t.classList.remove('show')},1600);}
+    function copyText(text, btn){
+      navigator.clipboard.writeText(text).then(function(){
+        showToast('Copied ✓');
+        if(btn){var o=btn.textContent;btn.textContent='Copied';setTimeout(function(){btn.textContent=o},1400);}
+      }).catch(function(){showToast('Copy failed — long-press to copy');});
+    }
+    async function startBalanceCheckout(){
+      var btn=document.getElementById('balance-card-btn');
+      var txt=document.getElementById('balance-card-text');
+      var original=txt.textContent;
+      btn.disabled=true;btn.style.opacity='.7';txt.textContent='Redirecting to secure checkout…';
+      try{
+        var res=await fetch('/pay-balance/checkout',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({booking_id:'{{ booking_id }}',confirmation_token:'{{ token }}'})});
+        var data=await res.json();
+        if(data.checkout_url){ if(window.fbq){fbq('track','AddPaymentInfo',{content_name:{{ (event_title or '')|tojson }}});} window.location.href=data.checkout_url; }
+        else{ showToast(data.error||'Could not start card checkout'); btn.disabled=false;btn.style.opacity='1';txt.textContent=original; }
+      }catch(e){ showToast('Network error — please try e-Transfer'); btn.disabled=false;btn.style.opacity='1';txt.textContent=original; }
+    }
+  </script>
+</body>
+</html>

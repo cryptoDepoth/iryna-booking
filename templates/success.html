@@ -702,6 +702,21 @@
       <span style="color:var(--ink-3)" data-i18n="ig_cta">· Questions or changes? DM me</span>
     </a>
 
+    <!-- Remaining balance (after the session) — durable link, e-Transfer or card -->
+    {% if balance_url and (remaining_balance or 0) > 0 %}
+    <div class="prep-card" style="border:1px solid #e9c9cf;background:linear-gradient(135deg,#fbeef0,#ffffff)">
+      <div class="prep-title">After your session</div>
+      <div class="prep-item">
+        <span class="prep-emoji">💳</span>
+        <div class="prep-text">
+          <strong>Remaining balance: ${{ "%.2f"|format(remaining_balance) }} CAD</strong>
+          <span>Once your session is done, settle the balance here — Interac e-Transfer or card. No rush, and this link always works.</span>
+        </div>
+      </div>
+      <a href="{{ balance_url|e }}" style="display:block;text-align:center;margin-top:14px;background:var(--rose);color:#fff;padding:13px;border-radius:999px;font-weight:600;text-decoration:none">Pay remaining balance →</a>
+    </div>
+    {% endif %}
+
     <!-- Prep guide -->
     <div class="prep-card">
       <div class="prep-title" data-i18n="prep_title">How to Prepare</div>

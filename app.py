@@ -905,6 +905,19 @@ def _booking_success_url(booking_id, token=None, absolute_base=None, **extra_par
     return f"{path}?{urlencode(params)}"
 
 
+def _balance_page_url(booking, absolute_base=None):
+    """Durable link to the remaining-balance payment page. Unlike a one-time
+    Stripe Checkout URL (expires ~24h), this link never expires, so it is safe
+    to put in the confirmation email and reuse days/weeks later after the shoot."""
+    from urllib.parse import urlencode
+    booking = booking or {}
+    token = booking.get("confirmation_token")
+    if not booking.get("id") or not token:
+        return None
+    base = ((absolute_base if absolute_base is not None else (BASE_URL or CANONICAL_SITE_URL)) or "").rstrip("/")
+    return f"{base}/pay-balance?{urlencode({'booking_id': booking.get('id'), 'token': token})}"
+
+
 def _questionnaire_url_for_booking(booking, event):
     if not booking or not event or not _questionnaire_config_for_event(event):
         return None
@@ -921,14 +934,21 @@ def _questionnaire_url_for_booking(booking, event):
 def _client_email_context(booking, event):
     booking = booking or {}
     event = event or {}
+    remaining = _booking_balance_due(booking, event)
     return {
         "selected_addons": _booking_addons(booking),
         "addons_total": _booking_addons_total(booking),
         "total_price": _booking_total_price(booking, event),
         "amount_due_today": _money(booking.get("deposit_amount") or event.get("deposit") or SESSION_PRICE),
-        "remaining_balance": _booking_balance_due(booking, event),
+        "remaining_balance": remaining,
         "marketing_consent": booking.get("marketing_consent"),
         "questionnaire_url": _questionnaire_url_for_booking(booking, event),
+        # Durable balance link in the confirmation email — works whenever the
+        # client settles up after the shoot (e-Transfer or card), unlike a
+        # one-time Stripe Checkout URL. The email only renders the button when
+        # balance_due > 0, so a fully-paid booking shows nothing.
+        "balance_url": _balance_page_url(booking) if remaining and remaining > 0 else None,
+        "balance_due": remaining if remaining and remaining > 0 else None,
     }
 
 
@@ -4983,6 +5003,95 @@ def payment():
     )
 
 
+@app.route("/pay-balance")
+def pay_balance():
+    """Durable page to pay the REMAINING balance after the session.
+
+    Identity-safe via booking_id+token. Offers Interac e-Transfer and (if Stripe
+    is configured) a freshly-created card Checkout. The link never expires, so it
+    lives in the confirmation email and the success-page steps and works whenever
+    the client is ready to settle up.
+    """
+    booking_id = request.args.get("booking_id")
+    token      = request.args.get("token")
+    if not booking_id or not token:
+        return redirect(url_for("index"))
+
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM bookings WHERE id=? AND confirmation_token=?",
+                       (booking_id, token)).fetchone()
+    conn.close()
+    if not row:
+        return redirect(url_for("index"))
+
+    booking = dict(row)
+    if booking.get("status") in ("expired", "cancelled"):
+        return redirect(url_for("index"))
+
+    ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
+    ev = ev or {}
+    balance_due = _booking_balance_due(booking, ev)
+    event_title = ev.get("title", "Photo Session")
+    event_date  = ev.get("date", booking.get("date", ""))
+    bank_msg = f"Balance — {booking.get('name','')} · {event_title} · {event_date} {booking.get('time','')}".strip()
+
+    return render_template("balance_payment.html",
+        booking=booking,
+        booking_id=booking.get("id"),
+        token=booking.get("confirmation_token"),
+        event_title=event_title,
+        date=event_date,
+        time=booking.get("time", ""),
+        name=booking.get("name", ""),
+        balance_due=balance_due,
+        total_price=_booking_total_price(booking, ev),
+        email=EMAIL,
+        bank_msg=bank_msg,
+        stripe_enabled=bool(STRIPE_SECRET_KEY),
+        already_paid=(balance_due <= 0),
+        meta_event_id=("balance." + str(booking.get("id"))) if booking else "",
+    )
+
+
+@app.route("/pay-balance/checkout", methods=["POST"])
+def pay_balance_checkout():
+    """Create a FRESH Stripe Checkout Session for the remaining balance on demand,
+    so the durable /pay-balance link never hands out an expired session.
+    Identity-safe via booking_id+token. Mirrors /stripe/create-checkout → {checkout_url}.
+    """
+    data = request.get_json(silent=True) or {}
+    booking_id = str(data.get("booking_id") or "").strip()
+    token      = (data.get("confirmation_token") or data.get("token") or "").strip()
+    if not booking_id or not token:
+        return jsonify({"error": "booking_id and token required"}), 400
+
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM bookings WHERE id=? AND confirmation_token=?",
+                       (booking_id, token)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Booking not found"}), 404
+
+    booking = dict(row)
+    ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
+    ev = ev or {}
+    balance_due = _booking_balance_due(booking, ev)
+    if balance_due <= 0:
+        return jsonify({"error": "No balance due — your booking is paid in full."}), 400
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Card payments are not available — please use e-Transfer."}), 400
+    try:
+        url = _create_balance_checkout_url(booking, ev, balance_due)
+        if not url:
+            return jsonify({"error": "Could not start card checkout — please use e-Transfer."}), 502
+        return jsonify({"checkout_url": url})
+    except Exception as e:
+        log.warning(f"[balance-checkout] booking #{booking_id} failed: {e}")
+        return jsonify({"error": "Could not start card checkout — please use e-Transfer."}), 502
+
+
 @app.route("/expired", methods=["GET", "POST"])
 def expired_endpoint():
     """Manually trigger expired-reservation cleanup. Safe to call repeatedly."""
@@ -5222,6 +5331,7 @@ def success():
         total_price=total_price,
         remaining_balance=remaining_balance,
         questionnaire_url=questionnaire_url,
+        balance_url=(_balance_page_url(booking, absolute_base="") if (booking and (remaining_balance or 0) > 0) else None),
     )
 
 
@@ -7442,18 +7552,11 @@ def admin_confirm():
     email_sent = False
     ev = get_event_by_id(booking.get("event_id"))
     if ev and booking:
-        # Balance due + Stripe link — same helpers as the request-balance API
-        # (None-safe, addon-aware). A Stripe outage must never block the
-        # confirmation email, so the link is strictly best-effort.
         paid_amount = _booking_paid_amount(booking, ev)
-        balance_due = _booking_balance_due(booking, ev)
-        balance_url = None
-        if balance_due > 0:
-            try:
-                balance_url = _create_balance_checkout_url(booking, ev, balance_due)
-            except Exception as e:
-                log.error(f"[admin-confirm] Stripe balance link failed for #{booking_id}: {e}")
 
+        # balance_url + balance_due come from _client_email_context — a durable
+        # /pay-balance link (e-Transfer or card), not a one-time Stripe URL that
+        # would expire before the client pays the balance after the shoot.
         email_sent = _send_client_email(
             to_email=booking.get("email", ""),
             client_name=booking.get("name", "Client"),
@@ -7463,8 +7566,6 @@ def admin_confirm():
             booking_id=booking_id,
             location=ev.get("location"),
             location_url=ev.get("location_url"),
-            balance_url=balance_url,
-            balance_due=balance_due,
             **_client_email_context(booking, ev),
         )
 

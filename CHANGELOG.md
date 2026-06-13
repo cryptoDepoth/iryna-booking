@@ -29,6 +29,49 @@ Each release follows this pattern:
 
 ---
 
+## [2026-06-12] — Meta tracking unified, landing pages styled, durable balance page (not yet deployed)
+
+### What's new
+- [Feature] Landing pages `/wedding` `/family` `/maternity` are now fully styled —
+  added the missing `static/css/styles.css` (branded, responsive, conversion-
+  focused) + Google Fonts to `base_landing.html`. Previously rendered unstyled
+  because the referenced stylesheet did not exist.
+- [Feature] Durable balance-payment page `GET /pay-balance?booking_id=&token=`
+  (Interac e-Transfer + on-demand Stripe). Unlike the old one-time Stripe URL
+  (expires ~24h), this link never expires, so it lives in the confirmation email
+  (step 2 of "What happens next") and on the success page, and works whenever the
+  client settles up after the shoot. `POST /pay-balance/checkout` mints a fresh
+  Stripe session on click.
+- [Feature] Server-side Meta Purchase via Conversions API, gated on
+  `META_CAPI_TOKEN` (fires on confirmed payment through any path; dedup with the
+  browser pixel via `event_id=purchase.<id>`). See `META_ADS_ANALYTICS_PLAYBOOK_2026-06-12.md`.
+
+### Fixed
+- [Bugfix] Meta Pixel was inconsistent: `index_v2.html` fired `1806…` while the ad
+  account/analytics used `1335…`. Unified to one `META_PIXEL_ID` (=`1335137335347797`)
+  injected into every template via context processor — paid traffic now reports to
+  the pixel the campaign optimizes against.
+- [Bugfix] `Purchase` was never fired anywhere; `payment.html`/`success.html` had no
+  pixel (funnel broke on navigation). Pixel + mapped events added to both.
+- [Bugfix] Auto-confirmed e-Transfer clients never received a balance link; the
+  admin path emailed an expiring Stripe URL. Both now use the durable `/pay-balance`
+  link via `_client_email_context`.
+- [Bugfix] Reverted a broken WIP tracking edit in `index_v2.html` (Jinja in a JS
+  template literal + a malformed double-fire of `slot_selected`).
+
+### Data / Config changes
+- New env vars (documented in `.env.example`): `META_PIXEL_ID` (default `1335…`),
+  `META_CAPI_TOKEN` (server Purchase; no-op until set), `META_CAPI_API_VERSION`,
+  `META_TEST_EVENT_CODE`. No DB schema changes.
+- Activate server Purchase: `fly secrets set META_CAPI_TOKEN=...`.
+
+### Tests
+- +15 tests (now 405 green): `test_meta_pixel_and_capi.py` (7), `test_balance_page.py` (8).
+
+### Rollback info
+- All changes are template/route/CSS additions + one config default; revert the
+  commit and redeploy. No destructive migrations.
+
 ## [2026-06-11] — Private sessions: full deposit-style payment flow (not yet deployed)
 
 ### What's new
