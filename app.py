@@ -50,8 +50,19 @@ _tz = _ZoneInfo('America/Edmonton')
 
 # ===== CONFIG =====
 # Load from .env or use defaults
-META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '902493111302920')  # Default: Pashynska Photography Pixel
+META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '1335137335347797')  # Pashynska Photography Pixel (Events Manager canonical). Single source of truth — injected into every template via context processor. Override with env/fly secret only to switch pixels.
 GOOGLE_ANALYTICS_ID = os.environ.get('GOOGLE_ANALYTICS_ID', '')
+# ── Meta Conversions API (server-side Purchase) ───────────────────────────────
+# e-Transfer payments confirm asynchronously (the Gmail watcher matches the
+# deposit minutes later, after the client has left the page), so the browser
+# pixel can never reliably fire Purchase. CAPI fires it server-side the moment
+# a booking is confirmed — through ANY path (auto e-Transfer, Stripe, admin).
+# Browser pixel + CAPI share a stable event_id ("purchase.<booking_id>") so Meta
+# deduplicates. No-op until META_CAPI_TOKEN is set, so it is safe to deploy now:
+#   fly secrets set META_CAPI_TOKEN=<system-user token from Events Manager>
+META_CAPI_TOKEN = os.environ.get('META_CAPI_TOKEN', '')
+META_CAPI_API_VERSION = os.environ.get('META_CAPI_API_VERSION', 'v19.0')
+META_TEST_EVENT_CODE = os.environ.get('META_TEST_EVENT_CODE', '')  # set temporarily to verify in Events Manager → Test Events, then unset
 
 # Email Settings (Zoho Mail)
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.zoho.com')
@@ -254,6 +265,12 @@ def _analytics_attribution_from_booking(booking):
 def _record_booking_funnel_event(booking, event_name, metadata=None):
     """Attach downstream lifecycle events to the visitor that created a booking."""
     booking = booking or {}
+    # Server-side Meta Purchase fires on the confirmed event regardless of whether
+    # the booking carries a visitor_id (admin-created bookings have none but are
+    # still real revenue). It must therefore run BEFORE the visitor_id gate below.
+    if event_name == "booking_confirmed":
+        meta = metadata or {}
+        _meta_capi_purchase(booking, value=meta.get("paid_amount"))
     visitor_id = booking.get("visitor_id")
     if not visitor_id:
         return False
@@ -266,6 +283,90 @@ def _record_booking_funnel_event(booking, event_name, metadata=None):
         metadata=metadata or {},
         attribution=_analytics_attribution_from_booking(booking),
     )
+
+
+def _sha256_norm(value):
+    """Lowercase + strip + sha256 — Meta advanced-matching normalization."""
+    if not value:
+        return None
+    return hashlib.sha256(str(value).strip().lower().encode("utf-8")).hexdigest()
+
+
+def _meta_capi_purchase(booking, value=None, currency="CAD"):
+    """Send a server-side Purchase to the Meta Conversions API.
+
+    The reliable conversion signal for this business: the dominant payment path
+    is e-Transfer, confirmed asynchronously by the Gmail watcher long after the
+    client has closed the tab, so the browser pixel cannot be trusted to fire
+    Purchase. Uses a stable event_id ("purchase.<id>") shared with the browser
+    pixel on success.html, so Meta deduplicates and a booking counts once.
+
+    No-op (returns False) until META_CAPI_TOKEN is configured, so this is safe to
+    ship before the token exists. Hashes all PII (email/phone/name) per Meta's
+    advanced-matching spec — raw PII is never sent.
+    """
+    if not META_CAPI_TOKEN or not META_PIXEL_ID:
+        return False
+    booking = booking or {}
+    bid = booking.get("id")
+    if not bid:
+        return False
+    try:
+        attribution = _analytics_attribution_from_booking(booking)
+        user_data = {}
+        em = _sha256_norm(booking.get("email"))
+        if em:
+            user_data["em"] = [em]
+        phone_digits = re.sub(r"\D", "", str(booking.get("phone") or ""))
+        if phone_digits:
+            if len(phone_digits) == 10:  # NANP number missing its country code
+                phone_digits = "1" + phone_digits
+            user_data["ph"] = [hashlib.sha256(phone_digits.encode("utf-8")).hexdigest()]
+        name = (booking.get("name") or "").strip()
+        if name:
+            parts = name.split()
+            fn = _sha256_norm(parts[0])
+            if fn:
+                user_data["fn"] = [fn]
+            if len(parts) > 1:
+                ln = _sha256_norm(parts[-1])
+                if ln:
+                    user_data["ln"] = [ln]
+        fbclid = attribution.get("fbclid")
+        if fbclid:
+            user_data["fbc"] = f"fb.1.{int(time.time())}.{fbclid}"
+        try:
+            val = float(value) if value is not None else float(booking.get("paid_amount") or 0)
+        except (TypeError, ValueError):
+            val = 0.0
+        event = {
+            "event_name": "Purchase",
+            "event_time": int(time.time()),
+            "event_id": f"purchase.{bid}",
+            "action_source": "website",
+            "event_source_url": attribution.get("landing_url") or CANONICAL_SITE_URL,
+            "user_data": user_data,
+            "custom_data": {
+                "currency": currency,
+                "value": round(val, 2),
+                "content_name": booking.get("event_id") or "",
+                "order_id": str(bid),
+            },
+        }
+        payload = {"data": [event]}
+        if META_TEST_EVENT_CODE:
+            payload["test_event_code"] = META_TEST_EVENT_CODE
+        url = f"https://graph.facebook.com/{META_CAPI_API_VERSION}/{META_PIXEL_ID}/events"
+        resp = requests.post(url, params={"access_token": META_CAPI_TOKEN},
+                             json=payload, timeout=6)
+        if resp.status_code >= 400:
+            log.warning(f"[capi] Purchase #{bid} HTTP {resp.status_code}: {resp.text[:300]}")
+            return False
+        log.info(f"[capi] Purchase fired for booking #{bid} (value={val} {currency})")
+        return True
+    except Exception as e:
+        log.warning(f"[capi] Purchase failed for booking #{booking.get('id')}: {e}")
+        return False
 
 
 app = Flask(__name__)
@@ -342,6 +443,9 @@ def _inject_site_links():
         "PORTFOLIO_URL": PORTFOLIO_URL,
         "CANONICAL_SITE_URL": CANONICAL_SITE_URL,
         "current_year": datetime.now().year,
+        # Single source of truth for the Meta Pixel — every template renders
+        # {{ meta_pixel_id }} so the id can never drift between pages again.
+        "meta_pixel_id": META_PIXEL_ID,
     }
 
 # ── Canonical domain redirect ─────────────────────────────────────────────────
@@ -4854,6 +4958,7 @@ def payment():
     return render_template("payment.html",
         timer_seconds_left=timer_seconds_left,
         booking=booking,
+        meta_event_id=("checkout." + str(booking.get("id"))) if booking else "",
         date=ev.get("date", DATE),
         time=booking.get("time", ""),
         name=booking.get("name", ""),
@@ -5100,6 +5205,7 @@ def success():
         location_url = f"https://www.google.com/maps/search/?api=1&query={query}"
     return render_template("success.html",
         email=EMAIL,
+        meta_event_id=("purchase." + str(booking.get("id"))) if booking else "",
         date=ev["date"] if ev else DATE,
         time=booking.get("time", "15:00") if booking else "15:00",
         price=ev.get("deposit", SESSION_PRICE) if ev else SESSION_PRICE,

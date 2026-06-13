@@ -6,6 +6,24 @@
   <title data-i18n="page_title">Booking Status | Pashynska Photography</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Meta Pixel — fires a deduped browser Purchase when the booking is already
+       confirmed at render time (Stripe / revisit). The async e-Transfer case is
+       covered server-side by CAPI; both share eventID so Meta counts once. -->
+  <script>
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+  n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+  document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '{{ meta_pixel_id }}');
+  fbq('track', 'PageView');
+  {% if booking and (booking.confirmed or booking.status == 'confirmed') %}
+  fbq('track', 'Purchase', {value: {{ (amount_due_today or price or 0)|float }}, currency: 'CAD', content_name: {{ (event_title or '')|tojson }}}{% if meta_event_id %}, '{{ meta_event_id }}'{% endif %});
+  {% endif %}
+  </script>
+  <noscript><img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"/></noscript>
+  <!-- End Meta Pixel -->
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

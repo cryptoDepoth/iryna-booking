@@ -749,7 +749,7 @@ f.__loadMetaPixel=function(){
   s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s);
 };
 }(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1806486840358828');
+fbq('init', '{{ meta_pixel_id }}');
 fbq('track', 'PageView');
 function scheduleMetaPixelIdle(cb, timeout){
   if ('requestIdleCallback' in window) window.requestIdleCallback(cb, {timeout: timeout || 4500});
@@ -758,7 +758,7 @@ function scheduleMetaPixelIdle(cb, timeout){
 scheduleMetaPixelIdle(window.__loadMetaPixel, 4500);
 </script>
 <noscript><img height="1" width="1" style="display:none"
-src="https://www.facebook.com/tr?id=1806486840358828&ev=PageView&noscript=1"
+src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
 /></noscript>
 <!-- End Meta Pixel Code -->
 </head>
