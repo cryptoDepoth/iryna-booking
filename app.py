@@ -4151,8 +4151,8 @@ def _public_events_payload():
         if (
             ev.get("status") in ("active", "upcoming")
             and not ev.get("hidden")
-            and ev.get("photos")
             and str(ev.get("date", "")) >= today
+            and ev.get("photos")  # Must have at least one photo to show publicly
         ):
             # Calculate total and available spots
             booking_type = _booking_type(ev)
@@ -6450,6 +6450,9 @@ def _admin_event_summary(ev, conn=None, today=None):
         "paid_total": paid_total,
         "attention_count": pending,
         "is_future": event_day >= today,
+        "is_past": event_day < today,
+        "is_today": event_day == today,
+        "is_sold_out": total_slots > 0 and free == 0,
         "occupancy": int((occupied_slots / total_slots) * 100) if total_slots else 0,
     }
 
@@ -6457,10 +6460,16 @@ def _admin_event_summary(ev, conn=None, today=None):
 def _admin_event_summaries():
     today = _local_today()
     current_events = [ev for ev in EVENTS if _admin_event_is_current(ev)]
-    current_events.sort(key=lambda ev: (_admin_event_date_key(ev) < today, _admin_event_date_key(ev)))
+    # Sort: today first, then future by date, then past by date desc
+    current_events.sort(key=lambda ev: (
+        _admin_event_date_key(ev) < today,   # future/today first (False < True)
+        _admin_event_date_key(ev) if _admin_event_date_key(ev) >= today else -_admin_event_date_key(ev).toordinal()
+    ))
     conn = db_conn()
     try:
-        return [_admin_event_summary(ev, conn=conn, today=today) for ev in current_events]
+        summaries = [_admin_event_summary(ev, conn=conn, today=today) for ev in current_events]
+        # Only include past events if they still have pending bookings needing attention
+        return [s for s in summaries if not s["is_past"] or s["attention_count"] > 0]
     finally:
         conn.close()
 
@@ -6740,6 +6749,8 @@ def admin():
 
     event_summaries = _admin_event_summaries()
     next_event = next((ev for ev in event_summaries if ev.get("is_future")), None)
+    today_local = _local_today()
+    event_names = {ev.get("id"): ev.get("title", "") for ev in EVENTS if ev.get("id")}
 
     return render_template("admin.html",
                            bookings=rows,
@@ -6749,6 +6760,8 @@ def admin():
                            event_summaries=event_summaries,
                            next_event=next_event,
                            now=_local_now(),
+                           today_str=today_local.isoformat(),
+                           event_names=event_names,
                            session_types=session_types,
                            filters={
                                "date_from": date_from,

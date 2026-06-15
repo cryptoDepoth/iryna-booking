@@ -182,6 +182,11 @@
         }
         .status-pill.active { background: var(--green-light); color: var(--green-text); }
         .status-pill.upcoming { background: var(--blue-light); color: var(--blue-text); }
+        .status-pill.today { background: var(--accent-light); color: var(--accent); border: 1px solid #fed7aa; }
+        .status-pill.sold-out { background: var(--red-light); color: var(--red-text); border: 1px solid #fca5a5; }
+        .status-pill.past { background: var(--gray-light); color: var(--text-3); }
+        .session-card.is-today { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(249,115,22,.10); }
+        .session-card.is-sold-out { border-color: #fca5a5 !important; }
         .session-card-meta { color: var(--text-2); font-size: 12px; display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
         .session-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 12px; }
         .session-metric {
@@ -1278,10 +1283,18 @@
             {% if event_summaries %}
             <div class="session-grid">
                 {% for ev in event_summaries %}
-                <article class="session-card {% if next_event and ev.id == next_event.id %}is-next{% endif %}">
+                <article class="session-card {% if next_event and ev.id == next_event.id %}is-next{% endif %} {% if ev.is_today %}is-today{% endif %} {% if ev.is_sold_out %}is-sold-out{% endif %}">
                     <div class="session-card-head">
                         <h3>{{ ev.title }}</h3>
-                        <span class="status-pill {{ ev.status }}">{{ ev.status or 'session' }}</span>
+                        {% if ev.is_sold_out %}
+                            <span class="status-pill sold-out">SOLD OUT</span>
+                        {% elif ev.is_today %}
+                            <span class="status-pill today">TODAY</span>
+                        {% elif ev.is_past %}
+                            <span class="status-pill past">PAST</span>
+                        {% else %}
+                            <span class="status-pill {{ ev.status }}">{{ ev.status or 'session' }}</span>
+                        {% endif %}
                     </div>
                     <div class="session-card-meta">
                         <span>📅 {{ ev.date or 'No date' }}{% if ev.start_time %} · {{ ev.start_time }}–{{ ev.end_time }}{% endif %}</span>
@@ -1509,6 +1522,9 @@
                     <td class="actions-cell">
                         <div class="cell-time">{{ b.time }}</div>
                         <div style="color:var(--text-3);font-size:12px;">{{ b.date }}</div>
+                        {% if b.event_id and b.event_id in event_names %}
+                        <div style="color:var(--text-3);font-size:11px;margin-top:2px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ event_names[b.event_id] }}">{{ event_names[b.event_id] | truncate(22, True, '…') }}</div>
+                        {% endif %}
                     </td>
 
                     <td class="cell-name"><a href="/admin/booking/{{ b.id }}" style="color:#4b2f38;text-decoration:none;font-weight:600;">{{ b.name or '—' }}</a></td>
@@ -1521,7 +1537,12 @@
 
                     <td class="cell-ig">
                         {% if b.instagram %}
-                        <a href="https://instagram.com/{{ b.instagram.lstrip('@') }}" target="_blank">@{{ b.instagram.lstrip('@') }}</a>
+                            {% set ig = b.instagram %}
+                            {% if ig.startswith('http') %}
+                                <a href="{{ ig }}" target="_blank" title="{{ ig }}">🔗 Instagram</a>
+                            {% else %}
+                                <a href="https://instagram.com/{{ ig.lstrip('@') }}" target="_blank">@{{ ig.lstrip('@') }}</a>
+                            {% endif %}
                         {% else %}—{% endif %}
                     </td>
 
@@ -1613,6 +1634,8 @@
         </div>
 
         {% for ev in events %}
+        {% set ev_is_past = (ev.date < today_str) if ev.date else false %}
+        {% set ev_is_today = (ev.date == today_str) if ev.date else false %}
         <div class="event-settings-card" id="ev-card-{{ ev.id }}">
 
             <!-- ── CARD HEADER ── -->
@@ -1621,9 +1644,19 @@
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         <span style="font-weight:700; font-size:15px;" id="ev-title-display-{{ ev.id }}">{{ ev.title }}</span>
                         {% if ev.featured %}<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;border:1px solid #fde68a;">⭐ Featured</span>{% endif %}
+                        {% if ev_is_today %}
+                        <span class="badge" style="font-size:11px;background:var(--accent-light);color:var(--accent);border:1px solid #fed7aa;">
+                            <span class="badge-dot" style="background:var(--accent);"></span>today
+                        </span>
+                        {% elif ev_is_past %}
+                        <span class="badge b-expired" style="font-size:11px;">
+                            <span class="badge-dot"></span>past
+                        </span>
+                        {% else %}
                         <span class="badge {% if ev.status == 'active' %}b-confirmed{% elif ev.status == 'upcoming' %}b-reserved{% else %}b-expired{% endif %}" style="font-size:11px;">
                             <span class="badge-dot"></span>{{ ev.status }}
                         </span>
+                        {% endif %}
                     </div>
                     <div style="color:var(--text-3); font-size:12px; margin-top:4px;">
                         {{ ev.id }} · 📅 {{ ev.date }}
