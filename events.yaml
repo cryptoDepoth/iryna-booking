@@ -22,6 +22,11 @@ events:
   - /images/lilac-jun7_fc0f222e.jpg
   - /images/lilac-jun7_ee3244d9.jpeg
   status: active
+  agreement:
+    enabled: true
+    require_terms: true
+    require_marketing_choice: true
+    terms_version: mini-session-terms-v1
 - id: blossom-may3
   title: 🪻 Blossom Mini Sessions
   subtitle: Capture your family's most beautiful season

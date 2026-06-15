@@ -67,6 +67,9 @@ def _reserve(c, slot_time, event_id, *, name="Test Client", email="test@example.
         "email": email,
         "phone": "4035550000",
         "instagram": "@test",
+        "terms_accepted": True,
+        "agreement_name": name,
+        "marketing_consent": "no",
     })
 
 
@@ -427,6 +430,9 @@ def test_international_phone_accepted(client):
             "email": f"intl_{phone[-4:]}@test.com",
             "phone": phone,
             "instagram": "@test",
+            "terms_accepted": True,
+            "agreement_name": "Test User",
+            "marketing_consent": "no",
         })
         data = resp.get_json()
         assert resp.status_code == 200, f"Phone {phone} rejected: {data}"
@@ -450,6 +456,9 @@ def test_canadian_phone_formats_accepted(client):
             "email": f"ca_{phone[-4:]}@test.com",
             "phone": phone,
             "instagram": "@test",
+            "terms_accepted": True,
+            "agreement_name": "Test User",
+            "marketing_consent": "no",
         })
         data = resp.get_json()
         assert resp.status_code == 200, f"CA phone {phone} rejected: {data}"

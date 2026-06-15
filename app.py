@@ -442,7 +442,7 @@ def _inject_site_links():
     return {
         "PORTFOLIO_URL": PORTFOLIO_URL,
         "CANONICAL_SITE_URL": CANONICAL_SITE_URL,
-        "current_year": datetime.now().year,
+        "current_year": _local_now().year,
         # Single source of truth for the Meta Pixel — every template renders
         # {{ meta_pixel_id }} so the id can never drift between pages again.
         "meta_pixel_id": META_PIXEL_ID,
@@ -1651,7 +1651,7 @@ def _is_due_for_first_abandoned_followup(booking, now=None):
 
 
 def _send_reminder_email(booking):
-    """Send 48-hour pre-session reminder email."""
+    """Send 48-hour pre-session reminder email, with balance button if still owed."""
     name = booking.get("name", "there")
     email = booking.get("email", "")
     event_id = booking.get("event_id")
@@ -1667,14 +1667,22 @@ def _send_reminder_email(booking):
         date_nice = ev.get("date", "")
 
     location = ev.get("location", "Location details coming soon")
+    balance_due = _booking_balance_due(booking, ev)
+    balance_url = _balance_page_url(booking) if balance_due and balance_due > 0 else None
     subject = f"Your session is in 2 days! 🌸 — {date_nice} at {slot_time}"
+
+    balance_plain = (
+        f"\n💳 Remaining balance due: ${balance_due:.2f} CAD\n"
+        f"Pay now: {balance_url}\n"
+    ) if balance_url else ""
 
     plain = (
         f"Hi {name},\n\n"
         f"Just a friendly reminder — your mini photo session is coming up in 2 days!\n\n"
         f"📅 {date_nice}\n"
         f"⏰ {slot_time}\n"
-        f"📍 {location}\n\n"
+        f"📍 {location}\n"
+        f"{balance_plain}\n"
         f"A few tips to make the most of your session:\n"
         f"• Wear colours that complement each other (avoid busy patterns)\n"
         f"• Arrive 5 minutes early so we can start relaxed\n"
@@ -1726,6 +1734,13 @@ def _send_reminder_email(booking):
       <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">🎀 &nbsp;Bring props you love — a blanket, flowers, a favourite hat</td></tr>
       <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">😊 &nbsp;Just have fun — I'll guide you the whole time!</td></tr>
     </table>
+    {"" if not balance_url else f'''<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf5e4;border:1px solid #e8d5a3;border-radius:14px;margin-bottom:28px;">
+      <tr><td style="padding:18px 24px;">
+        <p style="margin:0 0 6px;font-size:13px;color:#92722a;font-weight:600;">💳 Remaining balance</p>
+        <p style="margin:0 0 14px;font-size:14px;color:#7a5a6a;line-height:1.5;">You have <strong style="color:#5a3d4a;">${balance_due:.2f} CAD</strong> due. You can pay now or right after the session.</p>
+        <a href="{_html_escape(balance_url)}" style="display:inline-block;background:#4b2f38;color:#ffffff;text-decoration:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;">Pay Remaining Balance</a>
+      </td></tr>
+    </table>'''}
     <p style="margin:0 0 8px;font-size:14px;color:#7a5a6a;">Questions? DM me on Instagram
       <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a>
     </p>
@@ -1744,7 +1759,7 @@ def _send_reminder_email(booking):
 
 
 def _send_24h_reminder_email(booking):
-    """Send 24-hour pre-session reminder email — short and punchy."""
+    """Send 24-hour pre-session reminder email — short and punchy, with balance link if owed."""
     name = booking.get("name", "there")
     email = booking.get("email", "")
     event_id = booking.get("event_id")
@@ -1760,14 +1775,21 @@ def _send_24h_reminder_email(booking):
         date_nice = ev.get("date", "")
 
     location = ev.get("location", "Location details coming soon")
+    balance_due = _booking_balance_due(booking, ev)
+    balance_url = _balance_page_url(booking) if balance_due and balance_due > 0 else None
     subject = f"Tomorrow: your session at {slot_time}! 🌸 — {date_nice}"
+
+    balance_plain = (
+        f"\n💳 Balance due: ${balance_due:.2f} CAD → {balance_url}\n"
+    ) if balance_url else ""
 
     plain = (
         f"Hi {name},\n\n"
-        f"Your mini photo session is **tomorrow**!\n\n"
+        f"Your mini photo session is tomorrow!\n\n"
         f"📅 {date_nice}\n"
         f"⏰ {slot_time}\n"
-        f"📍 {location}\n\n"
+        f"📍 {location}\n"
+        f"{balance_plain}\n"
         f"Quick prep checklist:\n"
         f"• Soft, coordinating colours (lilac, cream, white, pastels)\n"
         f"• Avoid neon and busy patterns\n"
@@ -1819,6 +1841,13 @@ def _send_24h_reminder_email(booking):
       <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">🎀 &nbsp;Bring a favourite prop — blanket, flowers, hat</td></tr>
       <tr><td style="padding:5px 0;color:#7a5a6a;font-size:14px;line-height:1.5;">😊 &nbsp;Most importantly — just have fun!</td></tr>
     </table>
+    {"" if not balance_url else f'''<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf5e4;border:1px solid #e8d5a3;border-radius:14px;margin-bottom:24px;">
+      <tr><td style="padding:16px 22px;">
+        <p style="margin:0 0 5px;font-size:13px;color:#92722a;font-weight:600;">💳 Balance reminder</p>
+        <p style="margin:0 0 12px;font-size:14px;color:#7a5a6a;">You still have <strong style="color:#5a3d4a;">${balance_due:.2f} CAD</strong> outstanding. Pay before the session or right after.</p>
+        <a href="{_html_escape(balance_url)}" style="display:inline-block;background:#4b2f38;color:#fff;text-decoration:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;">Pay Remaining Balance</a>
+      </td></tr>
+    </table>'''}
     <p style="margin:0 0 8px;font-size:14px;color:#7a5a6a;">Questions? DM me on Instagram
       <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;">@pashynska.photo</a>
     </p>
@@ -3659,7 +3688,7 @@ def create_backup(label: str = "auto") -> str:
     """Copy the SQLite file to BACKUP_DIR with a timestamp.
     Returns the backup file path."""
     import shutil
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    ts = _local_now().strftime("%Y-%m-%d_%H-%M-%S")
     dest = os.path.join(BACKUP_DIR, f"bookings_{ts}_{label}.db")
     shutil.copy2(DB_PATH, dest)
     # Keep only the 30 most recent backups (prevent disk bloat)
@@ -3678,7 +3707,7 @@ def create_backup(label: str = "auto") -> str:
 
 # Daily auto-backup on startup
 try:
-    _today_prefix = datetime.now().strftime("%Y-%m-%d")
+    _today_prefix = _local_now().strftime("%Y-%m-%d")
     _has_today = any(
         f.startswith(f"bookings_{_today_prefix}") and "startup" in f
         for f in os.listdir(BACKUP_DIR)
@@ -6752,7 +6781,9 @@ def admin():
     today_local = _local_today()
     event_names = {ev.get("id"): ev.get("title", "") for ev in EVENTS if ev.get("id")}
 
-    return render_template("admin.html",
+    # Classic admin remains the default (full feature set); new design is opt-in via ?v=2.
+    template_name = "admin_pro.html" if request.args.get("v") == "2" else "admin.html"
+    return render_template(template_name,
                            bookings=rows,
                            filtered_stats=filtered_stats,
                            overall_stats=overall_stats,
@@ -6834,7 +6865,7 @@ def admin_export():
 
     # Create response
     from flask import Response
-    filename = f"bookings-{datetime.now().strftime('%Y-%m-%d')}.csv"
+    filename = f"bookings-{_local_now().strftime('%Y-%m-%d')}.csv"
     return Response(
         output.getvalue(),
         mimetype="text/csv",
@@ -8997,7 +9028,9 @@ def admin_transfer_unlink(transfer_id):
 @admin_required
 def admin_clients():
     """Client database page."""
-    return render_template("admin_clients.html")
+    # Classic CRM remains the default; new design is opt-in via ?v=2.
+    template_name = "admin_clients_pro.html" if request.args.get("v") == "2" else "admin_clients.html"
+    return render_template(template_name)
 
 
 # ── Admin event page — manual slot management ────────────────────────────────
@@ -9015,7 +9048,9 @@ def admin_event(event_id):
         # depending on Accept header / path). No need for a bespoke template.
         from flask import abort
         abort(404)
-    return render_template("admin_event.html", event=ev)
+    # Classic session page remains the default; new design is opt-in via ?v=2.
+    template_name = "admin_event_pro.html" if request.args.get("v") == "2" else "admin_event.html"
+    return render_template(template_name, event=ev)
 
 
 @app.route("/admin/api/event/<event_id>/slots")

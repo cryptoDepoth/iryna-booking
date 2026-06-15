@@ -56,6 +56,9 @@ def _reserve_payload(ev, slot, **overrides):
         "phone": "4035551111",
         "instagram": "@analytics_test",
         "session_type": ev.get("session_type", "mini"),
+        "terms_accepted": True,
+        "agreement_name": "Analytics Test Client",
+        "marketing_consent": "no",
     }
     payload.update(overrides)
     return payload

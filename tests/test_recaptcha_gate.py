@@ -75,6 +75,9 @@ def _payload(slot_time, event_id, **over):
         "email": "recaptcha-test@example.com",
         "phone": "4035550000",
         "instagram": "@test",
+        "terms_accepted": True,
+        "agreement_name": "Test Client",
+        "marketing_consent": "no",
     }
     base.update(over)
     return base

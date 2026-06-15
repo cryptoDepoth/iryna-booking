@@ -83,6 +83,9 @@ def _reserve(c, slot_time, event_id, *, name="Regression Test", email="regressio
         "email": email,
         "phone": "4035550000",
         "instagram": "@test",
+        "terms_accepted": True,
+        "agreement_name": name,
+        "marketing_consent": "no",
     })
 
 
