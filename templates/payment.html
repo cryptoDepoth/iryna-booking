@@ -20,6 +20,24 @@
   <noscript><img height="1" width="1" style="display:none"
   src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"/></noscript>
   <!-- End Meta Pixel -->
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-610866068"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-610866068');
+  </script>
+  <script>
+    gtag('event', 'conversion', {
+        'send_to': 'AW-610866068/DNSFCPCKxr8cEJSnpKMC',
+        'value': {{ (price or 0)|float }},
+        'currency': 'CAD',
+        'transaction_id': '{{ booking_id or '' }}'
+    });
+  </script>
+  <!-- End Google tag -->
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

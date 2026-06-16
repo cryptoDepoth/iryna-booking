@@ -3,6 +3,11 @@
 // so it stays in lockstep with the rest of the funnel; literal is a safe fallback.
 window.trackBookingEvent = function(eventName, params = {}) {
   var pixelId = window.__META_PIXEL_ID || '1335137335347797';
+  var gtagMapping = {
+    'payment_view':   { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC' },
+    'booking_confirmed': { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC', value: params.amount || params.value || 0, currency: 'CAD' },
+    'purchase':       { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC', value: params.amount || params.value || 0, currency: 'CAD' }
+  };
   // Send to Cloudflare Worker (bypass ad blockers)
   fetch(`https://meta-pixel-proxy.andreygongalo.workers.dev/?pixelId=${pixelId}&eventName=${eventName}`, {
     method: 'POST',
@@ -20,7 +25,20 @@ window.trackBookingEvent = function(eventName, params = {}) {
     fbq('track', eventName, params);
   }
   if (window.gtag) {
-    gtag('event', eventName, params);
+    var mapping = gtagMapping[eventName];
+    if (mapping) {
+      var send = Object.assign({ event_name: mapping.event, send_to: mapping.send_to }, params);
+      if (mapping.value !== undefined) send.value = mapping.value;
+      if (mapping.currency) send.currency = mapping.currency;
+      // transaction_id helps de-duplicate real purchases
+      if (eventName === 'booking_confirmed' || eventName === 'purchase') {
+        send.transaction_id = params.booking_id || params.transaction_id || ('test_' + Date.now());
+      }
+      gtag('event', mapping.event, send);
+      console.log('[Analytics] gtag conversion:', mapping.event, send);
+    } else {
+      gtag('event', eventName, params);
+    }
   }
   console.log('[Analytics]', eventName, params);
 };

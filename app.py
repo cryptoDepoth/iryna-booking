@@ -2035,11 +2035,14 @@ _CSP = (
     # (api.js → recaptcha__en.js); without them grecaptcha never loads and
     # every booking POST fails server-side verification.
     "script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdnjs.cloudflare.com "
-    "https://www.google.com https://www.gstatic.com https://connect.facebook.net https://us-assets.i.posthog.com https://us.i.posthog.com; "
+    "https://www.google.com https://www.gstatic.com https://connect.facebook.net "
+    "https://www.googletagmanager.com https://www.googleadservices.com "
+    "https://googleads.g.doubleclick.net "
+    "https://us-assets.i.posthog.com https://us.i.posthog.com; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "font-src 'self' https://fonts.gstatic.com data:; "
-    "img-src 'self' data: https: https://www.facebook.com; "
-    "connect-src 'self' https://api.stripe.com https://www.facebook.com https://connect.facebook.net https://us.i.posthog.com; "
+    "img-src 'self' data: https: https://www.facebook.com https://www.googleadservices.com https://www.google.com https://googleads.g.doubleclick.net; "
+    "connect-src 'self' https://api.stripe.com https://www.facebook.com https://connect.facebook.net https://us.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.google.com https://googleads.g.doubleclick.net; "
     # frame-src: Stripe iframes + reCAPTCHA challenge iframe (when score is low)
     "frame-src https://js.stripe.com https://hooks.stripe.com https://www.google.com; "
     "frame-ancestors 'self' https://*.wfolio.com https://pashynska.agency https://www.pashynska.agency https://book.pashynskaphoto.com; "
