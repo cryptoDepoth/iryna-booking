@@ -330,7 +330,7 @@ def send_referral_reward_email(
       <p style="color:#555;font-size:14px;">Use your credit by entering code <strong style="font-family:monospace;">{code}</strong> on your next session at checkout.</p>
 
       <div style="display:flex;gap:12px;justify-content:center;margin:24px 0 16px;flex-wrap:wrap;">
-        <a href="{BOOKING_URL}" style="background:#C4973A;color:#fff;padding:12px 22px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;">Book a Session</a>
+        <a href="{BOOKING_URL}/referral/{code}" style="background:#C4973A;color:#fff;padding:12px 22px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;">Share another friend</a>
         <a href="{credits_url}" style="background:#FAF7F2;color:#2C2C2C;border:2px solid #E8D5A3;padding:12px 22px;border-radius:4px;text-decoration:none;font-size:14px;">View My Credits</a>
       </div>
 
@@ -438,7 +438,12 @@ def send_referral_invite_notification_email(
       <p>You invited <strong>{friend_name}</strong> to Pashynska Photography using your referral code <strong>{code}</strong>.</p>
       <p>When {friend_name} books a session, you will earn a $20 credit toward your next shoot.</p>
       <div style="text-align:center;margin:24px 0 16px;">
-        <a href="{BOOKING_URL}/my-credits?email={owner_email}" style="background:#C4973A;color:#fff;padding:14px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:bold;">View My Credits</a>
+        <div style="text-align:center;margin:24px 0 16px;">
+          <a href="{BOOKING_URL}/referral/{code}" style="background:#C4973A;color:#fff;padding:14px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:bold;">Share your code again</a>
+        </div>
+        <div style="text-align:center;">
+          <a href="{BOOKING_URL}/my-credits?email={owner_email}" style="color:#C4973A;font-weight:bold;">View My Credits →</a>
+        </div>
       </div>
     </div>
     <p style="text-align:center;color:#999;font-size:12px;margin-top:24px;">
