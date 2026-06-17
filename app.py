@@ -433,6 +433,14 @@ _FLY_INTERNAL_HOST = "iryna-booking.fly.dev"
 # Centralised so any future rebrand only touches one line.
 PORTFOLIO_URL = "https://pashynskaphoto.com"
 
+# ── Gift & Referral module ────────────────────────────────────────────────────
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gift-referral'))
+from gift_referral_routes import gift_referral_bp  # noqa: E402
+import gift_referral_db as gift_db                 # noqa: E402
+gift_db.init_db()
+app.register_blueprint(gift_referral_bp)
+
 
 @app.context_processor
 def _inject_site_links():
@@ -475,6 +483,10 @@ def _canonical_redirect():
         return redirect(new_url, code=301)
 
 PYTHON_BIN = os.environ.get("PYTHON_BIN", sys.executable)
+
+
+def _background_threads_disabled():
+    return os.environ.get("DISABLE_BACKGROUND_THREADS", "").lower() in ("1", "true", "yes", "on")
 
 # ===== GLOBAL E-TRANSFER WATCHER (replaces per-booking Popen) =====
 import threading as _threading
@@ -590,6 +602,9 @@ def _watcher_thread():
 
 def _start_global_watcher():
     global _watcher_started
+    if _background_threads_disabled():
+        log.info("[main] Background e-Transfer watcher disabled by DISABLE_BACKGROUND_THREADS")
+        return
     if _watcher_started:
         return
     t = _threading.Thread(target=_watcher_thread, daemon=True, name="etransfer-watcher")
@@ -1963,6 +1978,29 @@ def notify_payment_confirmed(booking_id, paid_amount=None):
         log.error(f"[notify_confirmed] Failed: {e}")
 
 
+def _maybe_payout_referral(booking_id):
+    """If this booking used a referral code, credit the code owner $20 and email them.
+    No-op for non-referral bookings; idempotent (confirm_referral_payment only fires once
+    per booking), so it is safe to call from every payment-confirmation path. Never raises."""
+    try:
+        use = gift_db.confirm_referral_payment(booking_id)
+        if not use:
+            return
+        from gift_referral_email import send_referral_reward_email
+        send_referral_reward_email(
+            owner_email=use["owner_email"],
+            owner_name=use["owner_name"],
+            friend_name=use.get("referee_name") or "Your friend",
+            reward=use["reward_for_owner"],
+            code=use["referral_code"],
+            new_balance=use.get("new_balance", use["reward_for_owner"]),
+            total_earned=use.get("total_earned", use["reward_for_owner"]),
+        )
+        log.info(f"[referral] Paid ${use['reward_for_owner']:.0f} credit to {use['owner_email']} for booking #{booking_id}")
+    except Exception as e:
+        log.error(f"[referral] payout failed for booking #{booking_id}: {e}")
+
+
 def _after_auto_payment_confirmed(booking_id):
     """Run the same side-effects after automatic e-Transfer confirmation
     that manual admin confirmation runs: calendar, Notion, client email,
@@ -3329,6 +3367,10 @@ def init_db():
         ("bookings",  "deposit_amount",    "ALTER TABLE bookings ADD COLUMN deposit_amount REAL"),
         # Store full_price in booking so invoice always matches what was agreed
         ("bookings",  "full_price",        "ALTER TABLE bookings ADD COLUMN full_price REAL"),
+        # Referral code applied at booking + the friend's discount (comes off the BALANCE,
+        # never the deposit, so e-Transfer amount-matching is unaffected)
+        ("bookings",  "referral_code",     "ALTER TABLE bookings ADD COLUMN referral_code TEXT"),
+        ("bookings",  "referral_discount", "ALTER TABLE bookings ADD COLUMN referral_discount REAL DEFAULT 0"),
         # Session-inspired add-ons, agreement, and optional post-confirmation questionnaire
         ("bookings",  "selected_addons_json", "ALTER TABLE bookings ADD COLUMN selected_addons_json TEXT"),
         ("bookings",  "addons_total",      "ALTER TABLE bookings ADD COLUMN addons_total REAL DEFAULT 0"),
@@ -3353,7 +3395,8 @@ def init_db():
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
-        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, matched_gift_code TEXT, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        ("etransfers", "matched_gift_code", "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT"),
     ]
     for _tbl, _col, _ddl in _migrations:
         try:
@@ -3587,10 +3630,13 @@ def _process_review_emails():
 
 
 # Start the scheduler in a background daemon thread
-import threading as _bg_thread
-_sched = _bg_thread.Thread(target=_run_email_scheduler, daemon=True, name="email-scheduler")
-_sched.start()
-log.info("[scheduler] Email scheduler started (abandoned / 48h reminder / 24h reminder / review)")
+if _background_threads_disabled():
+    log.info("[scheduler] Email scheduler disabled by DISABLE_BACKGROUND_THREADS")
+else:
+    import threading as _bg_thread
+    _sched = _bg_thread.Thread(target=_run_email_scheduler, daemon=True, name="email-scheduler")
+    _sched.start()
+    log.info("[scheduler] Email scheduler started (abandoned / 48h reminder / 24h reminder / review)")
 
 
 def db_conn():
@@ -5628,10 +5674,12 @@ def _booking_paid_amount(booking, event=None):
 
 
 def _booking_balance_due(booking, event):
-    """Return remaining balance for a booking in CAD, never below zero."""
+    """Return remaining balance for a booking in CAD, never below zero.
+    A referral discount (if any) comes off the balance — not the deposit."""
     total = _booking_total_price(booking, event)
     paid = _booking_paid_amount(booking, event)
-    return round(max(total - paid, 0.0), 2)
+    discount = float(booking.get("referral_discount") or 0)
+    return round(max(total - paid - discount, 0.0), 2)
 
 
 def _create_balance_checkout_url(booking, event, balance_due):
@@ -8703,11 +8751,19 @@ def _ensure_etransfers_table(conn=None):
             direction TEXT DEFAULT 'in',
             email_date TEXT,
             matched_booking_id INTEGER,
+            matched_gift_code TEXT,
             status TEXT DEFAULT 'unmatched',
             source TEXT DEFAULT 'email',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(etransfers)").fetchall()}
+        if "matched_gift_code" not in cols:
+            conn.execute("ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT")
+            conn.commit()
+    except Exception:
+        pass
     conn.commit()
     if own:
         conn.close()

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gift Certificate Payment Pending — Pashynska Photography</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Tenor+Sans&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('gift_referral.static', filename='gift/gift.css') }}">
+</head>
+<body>
+
+<nav class="gift-nav">
+  <div class="gift-nav-brand"><span>Pashynska</span> Photography</div>
+  <a href="/gift" class="gift-nav-back">Buy another gift</a>
+</nav>
+
+<main class="gift-success-wrap">
+  <div class="gift-success-icon">⏳</div>
+  <h1 class="gift-success-title">Gift saved — awaiting e-Transfer</h1>
+  <p class="gift-success-sub">
+    Send the exact amount below. The certificate becomes active and the PDF is emailed
+    after the Interac payment is confirmed.
+  </p>
+
+  <section class="gift-success-card gift-pending-card">
+    <p class="gift-pending-label">Amount to send</p>
+    <div class="gift-pending-amount">${{ "%.2f"|format(cert.amount_with_gst) }} CAD</div>
+
+    <div class="gift-transfer-list">
+      <div>
+        <span>Send to</span>
+        <strong id="gift-interac-email">{{ interac_email }}</strong>
+        <button type="button" class="gift-copy-mini" data-copy="#gift-interac-email">Copy</button>
+      </div>
+      <div>
+        <span>Bank message</span>
+        <strong id="gift-bank-message">{{ bank_message }}</strong>
+        <button type="button" class="gift-copy-mini" data-copy="#gift-bank-message">Copy</button>
+      </div>
+      <div>
+        <span>Certificate code</span>
+        <strong>{{ cert.code }}</strong>
+      </div>
+      <div>
+        <span>Gift</span>
+        <strong>{{ cert.package_label or (cert.session_type | capitalize ~ ' session') }}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="gift-next-card">
+    <h2>What happens next?</h2>
+    <ol>
+      <li>Send e-Transfer with the exact amount and message above.</li>
+      <li>Auto-deposit notification is checked by the payment parser.</li>
+      <li>Once matched, the certificate turns active and the PDF is emailed.</li>
+    </ol>
+  </section>
+
+  <p class="gift-pending-note">
+    Questions? Email <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a>.
+  </p>
+</main>
+
+<footer class="gift-footer">
+  <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>
+</footer>
+
+<script src="{{ url_for('gift_referral.static', filename='gift/gift.js') }}"></script>
+</body>
+</html>

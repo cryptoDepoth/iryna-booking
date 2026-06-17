@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clients · Pashynska Studio Admin</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}">
+<!-- admin_clients_pro.html — redesigned CRM (P3). Rendered by /admin/clients?v=2.
+     Pure client-side over existing JSON APIs: /admin/api/clients, /<id>, /<id>/note, /<id>/tag. Paginated in JS. -->
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot">◆</span><div>Pashynska<small>Studio Admin</small></div></div>
+    <nav class="nav">
+      <div class="nav-group">
+        <div class="lbl">Main</div>
+        <a class="nav-item" href="/admin?v=2"><span class="ic">▦</span> Dashboard</a>
+        <a class="nav-item" href="/admin?v=2#sessions"><span class="ic">📷</span> Sessions</a>
+        <a class="nav-item active" href="/admin/clients?v=2"><span class="ic">👥</span> Clients</a>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">Tools</div>
+        <a class="nav-item" href="/admin/transfers"><span class="ic">💸</span> Interac</a>
+        <a class="nav-item" href="/admin/analytics"><span class="ic">📊</span> Analytics</a>
+        <a class="nav-item" href="/admin/link-generator"><span class="ic">🔗</span> Payment links</a>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">View</div>
+        <a class="nav-item" href="/admin/clients?legacy=1"><span class="ic">↺</span> Classic clients</a>
+      </div>
+    </nav>
+    <div class="side-foot"><div class="avatar">IP</div><div class="who">Pashynska Photography<small>Admin</small></div></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <a class="btn ghost" href="/admin?v=2">← Dashboard</a>
+      <div class="top-actions">
+        <a class="btn ghost" href="/admin/api/clients/export">⬇ Export CSV</a>
+        <a class="btn ghost" href="/admin/clients?legacy=1">Classic view</a>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="page-head">
+        <div><h1>Clients</h1><div class="sub"><b id="totalCount">—</b> clients · search name, email, phone &amp; Instagram</div></div>
+      </div>
+
+      <div class="crm">
+        <div class="list">
+          <div class="top">
+            <div class="mini-search" style="margin:0 0 10px"><span class="si">⌕</span>
+              <input id="q" style="width:100%" placeholder="Search clients…" oninput="onSearch()"></div>
+            <div class="chips" id="tagChips">
+              <span class="chip active" data-tag="" onclick="setTag(this)">All</span>
+              <span class="chip" data-tag="VIP" onclick="setTag(this)">VIP</span>
+              <span class="chip" data-tag="FAMILY" onclick="setTag(this)">Family</span>
+              <span class="chip" data-tag="COUPLE" onclick="setTag(this)">Couple</span>
+              <span class="chip" data-tag="RETURNING" onclick="setTag(this)">Returning</span>
+              <span class="chip" data-tag="NEW" onclick="setTag(this)">New</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+              <span style="font-size:12px;color:var(--text-3);font-weight:600">Sort</span>
+              <select class="select" id="sort" onchange="reload()" style="flex:1">
+                <option value="last_booking_at">Last booking</option>
+                <option value="total_bookings">Most sessions</option>
+                <option value="total_paid">Top spenders</option>
+                <option value="name">Name (A–Z)</option>
+                <option value="created_at">Newest</option>
+              </select>
+            </div>
+          </div>
+          <div class="clients" id="clientList"><div class="empty" style="height:200px"><div>Loading…</div></div></div>
+          <div class="foot">
+            <span id="rangeLabel">—</span>
+            <div class="pager" id="pager"></div>
+          </div>
+        </div>
+
+        <div class="detail" id="detail">
+          <div class="empty"><div><div class="big">👤</div>Select a client to see their profile, history and notes.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="ic">✓</span><span id="toastMsg"></span></div>
+
+<script>
+const PER_PAGE=25;
+let all=[], page=1, tag='', q='', sort='last_booking_at', selId=null, searchTimer=null;
+
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ini=n=>(n||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'?';
+const money=v=>'$'+Math.round(Number(v)||0).toLocaleString();
+const tagsOf=c=>String(c.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+let tt; function toast(m){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2300)}
+
+async function reload(){
+  sort=document.getElementById('sort').value;
+  const params=new URLSearchParams({sort});
+  if(q) params.set('q',q);
+  if(tag) params.set('tag',tag);
+  document.getElementById('clientList').innerHTML='<div class="empty" style="height:200px"><div>Loading…</div></div>';
+  try{
+    const res=await fetch('/admin/api/clients?'+params.toString());
+    all=await res.json(); if(!Array.isArray(all)) all=[];
+  }catch(e){ all=[]; }
+  page=1; renderList();
+}
+function onSearch(){ q=document.getElementById('q').value.trim(); clearTimeout(searchTimer); searchTimer=setTimeout(reload,250); }
+function setTag(el){ document.querySelectorAll('#tagChips .chip').forEach(c=>c.classList.remove('active')); el.classList.add('active'); tag=el.dataset.tag; reload(); }
+
+function renderList(){
+  document.getElementById('totalCount').textContent=all.length.toLocaleString();
+  const pages=Math.max(1,Math.ceil(all.length/PER_PAGE));
+  if(page>pages) page=pages;
+  const start=(page-1)*PER_PAGE, slice=all.slice(start,start+PER_PAGE);
+  document.getElementById('clientList').innerHTML = slice.length? slice.map(c=>`
+    <div class="c-card ${c.id===selId?'sel':''}" onclick="openClient(${c.id})">
+      <div class="ava" style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;background:linear-gradient(135deg,#c4857a,#a3685e)">${esc(ini(c.name))}</div>
+      <div style="min-width:0"><div class="nm">${esc(c.name||'Unknown')}</div><div class="em">${esc(c.email||'')}</div></div>
+      <div class="st"><b>${c.total_bookings||0}</b> sess.<br>${money(c.total_paid)}</div>
+    </div>`).join('') : '<div class="empty" style="height:200px"><div>No matches.</div></div>';
+
+  const end=Math.min(start+PER_PAGE,all.length);
+  document.getElementById('rangeLabel').innerHTML = all.length? `${start+1}–${end} of <b>${all.length.toLocaleString()}</b>` : '0 clients';
+  let pg='';
+  if(pages>1){
+    pg+=`<button ${page<=1?'disabled':''} onclick="goPage(${page-1})">‹</button>`;
+    pg+=`<button class="active">${page}</button><span style="align-self:center;color:var(--text-3);font-size:13px;padding:0 4px">of ${pages}</span>`;
+    pg+=`<button ${page>=pages?'disabled':''} onclick="goPage(${page+1})">›</button>`;
+  }
+  document.getElementById('pager').innerHTML=pg;
+}
+function goPage(p){ page=p; renderList(); document.getElementById('clientList').scrollTop=0; }
+
+async function openClient(id){
+  selId=id; renderList();
+  document.getElementById('detail').innerHTML='<div class="empty"><div>Loading…</div></div>';
+  try{
+    const res=await fetch('/admin/api/clients/'+id);
+    const d=await res.json();
+    if(d.error){ document.getElementById('detail').innerHTML='<div class="empty"><div>Not found.</div></div>'; return; }
+    renderDetail(d);
+  }catch(e){ document.getElementById('detail').innerHTML='<div class="empty"><div>Could not load profile.</div></div>'; }
+}
+
+function renderDetail(d){
+  const c=d.client||{}, bk=d.bookings||[], notes=d.notes||[];
+  const tags=tagsOf(c);
+  const allTags=['VIP','FAMILY','COUPLE','RETURNING','NEW','CORPORATE'];
+  const tagRow = allTags.map(t=>`<span class="tag ${t}" style="cursor:pointer;opacity:${tags.includes(t)?1:.32}" onclick="toggleTag(${c.id},'${t}')">${t}</span>`).join('');
+  const hist = bk.length? bk.map(b=>{
+    const paid=b.confirmed||b.status==='confirmed';
+    return `<div class="hist"><span class="dt">${esc(b.date||'')}</span>
+      ${paid?'<span class="pill green">Paid</span>':'<span class="pill amber">'+esc(b.status||'pending')+'</span>'}
+      <span style="flex:1">${esc(b.session_type||b.event_id||'Session')}</span>
+      <span class="money">${b.paid_amount?money(b.paid_amount):'—'}</span></div>`;
+  }).join('') : '<div style="color:var(--text-3);font-size:13px">No bookings yet.</div>';
+  const noteList = notes.length? notes.map(n=>`<div class="note">${esc(n.text||n.note||'')}<div class="meta">${esc((n.created_at||'').toString().slice(0,16))}</div></div>`).join('') : '';
+
+  document.getElementById('detail').innerHTML=`
+    <div class="profile">
+      <div class="ava" style="background:linear-gradient(135deg,#c4857a,#a3685e)">${esc(ini(c.name))}</div>
+      <div style="flex:1;min-width:0"><h2>${esc(c.name||'Unknown')}</h2>
+        <div class="pm">${esc(c.email||'')}${c.phone?' · '+esc(c.phone):''}${c.instagram?' · '+esc(c.instagram):''}</div></div>
+      <a class="btn ghost sm" href="/admin?v=2&search=${encodeURIComponent(c.email||'')}">Bookings</a>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><b>${c.total_bookings||0}</b><span>Sessions</span></div>
+      <div class="stat"><b>${money(c.total_paid)}</b><span>Total spent</span></div>
+      <div class="stat"><b>${esc((c.last_booking_at||'—').toString().slice(0,10))}</b><span>Last booking</span></div>
+    </div>
+    <div class="d-sec"><h4>Tags <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-3)">· click to toggle</span></h4><div class="tagrow">${tagRow}</div></div>
+    <div class="d-sec"><h4>Booking history</h4>${hist}</div>
+    <div class="d-sec"><h4>Notes</h4>${noteList}
+      <textarea id="noteInput" placeholder="Add a note…" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;min-height:54px;margin-top:${notes.length?'8px':'0'}"></textarea>
+      <button class="btn primary sm" style="margin-top:8px" onclick="addNote(${c.id})">Save note</button>
+    </div>`;
+}
+
+async function addNote(id){
+  const ta=document.getElementById('noteInput'); const text=(ta.value||'').trim();
+  if(!text){ toast('Write a note first'); return; }
+  try{
+    const res=await fetch('/admin/api/clients/'+id+'/note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const d=await res.json();
+    if(d.success||d.note){ toast('✓ Note saved'); openClient(id); } else toast('Error: '+(d.error||'failed'));
+  }catch(e){ toast('Error: '+e.message); }
+}
+async function toggleTag(id,t){
+  try{
+    const res=await fetch('/admin/api/clients/'+id+'/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag:t})});
+    const d=await res.json();
+    if(d.success||d.tags!==undefined){ toast('✓ Tags updated'); openClient(id); reload(); } else toast('Error: '+(d.error||'failed'));
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+window.addEventListener('DOMContentLoaded',reload);
+</script>
+</body>
+</html>

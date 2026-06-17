@@ -20,6 +20,7 @@ import sqlite3
 import subprocess
 import threading
 import time
+from html import escape as _html_escape
 from email.utils import parseaddr, parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 
@@ -74,7 +75,7 @@ def _should_send_alert(key):
 def _send_admin_alert(text):
     """Deliver an admin alert via the app's Telegram notifier."""
     from app import _notify_admin
-    _notify_admin(text)
+    _notify_admin(_html_escape(str(text or ""), quote=False))
 
 
 def get_db():
@@ -127,6 +128,110 @@ def mark_message_processed(message_id, booking_id, amount):
             pass
     conn.commit()
     conn.close()
+
+
+_GIFT_CODE_RE = re.compile(r"\bGIFT-[A-Z0-9]{4}-[A-Z0-9]{4}\b", re.I)
+
+
+def extract_gift_code(body_text):
+    """Return a gift certificate code embedded in an Interac memo/body."""
+    match = _GIFT_CODE_RE.search(body_text or "")
+    return match.group(0).upper() if match else None
+
+
+def _ensure_etransfer_gift_column(conn):
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(etransfers)").fetchall()}
+    if "matched_gift_code" not in columns:
+        try:
+            conn.execute("ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+
+def _mark_etransfer_gift_match(message_id, code):
+    conn = get_db()
+    try:
+        _ensure_etransfer_gift_column(conn)
+        conn.execute(
+            "UPDATE etransfers SET matched_gift_code=?, status='matched' WHERE message_id=?",
+            (code, message_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _gift_modules():
+    gift_dir = os.path.join(os.path.dirname(__file__), "gift-referral")
+    if gift_dir not in sys.path:
+        sys.path.insert(0, gift_dir)
+    import gift_referral_db as gift_db
+    from gift_referral_pdf import save_gift_pdf
+    from gift_referral_email import send_gift_purchaser_email, send_gift_recipient_email
+
+    gift_db.init_db()
+    return gift_db, save_gift_pdf, send_gift_purchaser_email, send_gift_recipient_email
+
+
+def try_confirm_gift_etransfer(amount, body, message_id):
+    """Confirm a pending gift certificate when the Interac memo includes its code.
+
+    Gift certificates live in their own DB, so booking amount-matching must not
+    guess here. A gift is activated only by exact amount plus explicit code.
+    Returns True when the Interac email was handled as a gift payment.
+    """
+    code = extract_gift_code(body)
+    if not code:
+        return False
+
+    gift_db, save_gift_pdf, send_buyer_email, send_recipient_email = _gift_modules()
+    cert = gift_db.get_gift_certificate(code)
+    if not cert:
+        _send_admin_alert(
+            f"Gift payment memo has unknown code {code}. Amount: ${amount:.2f}. Message ID: {message_id}"
+        )
+        return True
+
+    expected = float(cert.get("amount_with_gst") or 0)
+    if cert.get("status") != "pending_payment":
+        _send_admin_alert(
+            f"Gift e-Transfer received for {code}, but status is {cert.get('status')}. "
+            f"Amount: ${amount:.2f}; expected ${expected:.2f}."
+        )
+        _mark_etransfer_gift_match(message_id, code)
+        return True
+
+    if abs(amount - expected) >= 0.01:
+        _send_admin_alert(
+            f"Gift e-Transfer amount mismatch for {code}. Received ${amount:.2f}; "
+            f"expected ${expected:.2f}. Certificate is still pending."
+        )
+        return True
+
+    if not gift_db.mark_gift_payment_confirmed(code, amount, payment_reference=message_id):
+        _send_admin_alert(f"Gift e-Transfer matched {code}, but DB activation failed.")
+        return True
+
+    cert = gift_db.get_gift_certificate(code)
+    pdf_path = None
+    try:
+        pdf_path = save_gift_pdf(cert)
+        gift_db.update_gift_pdf(code, pdf_path)
+        cert = gift_db.get_gift_certificate(code) or cert
+    except Exception as exc:
+        print(f"   [gift] PDF generation failed for {code}: {exc}")
+
+    send_buyer_email(cert, pdf_path=pdf_path)
+    if cert.get("recipient_email"):
+        send_recipient_email(cert)
+    _mark_etransfer_gift_match(message_id, code)
+    _send_admin_alert(
+        f"Gift certificate paid and activated: {code}\n"
+        f"Amount: ${amount:.2f}\n"
+        f"Buyer: {cert.get('purchaser_name')} <{cert.get('purchaser_email')}>"
+    )
+    print(f"   ✅ CONFIRMED Gift certificate {code} — ${amount:.2f}")
+    return True
 
 
 def get_emails(page_size=None, lookback_days=None):
@@ -869,6 +974,34 @@ def _notify_admin_ambiguity(amount, candidates):
         print(f"[admin] Failed to send ambiguity alert: {e}")
 
 
+def record_partial_payment(booking_id, paid_amount):
+    """Record a partial/underpayment without confirming the booking.
+    
+    Updates paid_amount on the booking but keeps confirmed=0, paid=0.
+    Sets status to 'partial_payment' so admin can see it needs attention.
+    
+    Returns True if updated, False if booking is already confirmed or not found.
+    """
+    conn = get_db()
+    c = conn.cursor()
+    # Check if booking is already confirmed or paid
+    c.execute("SELECT confirmed, paid FROM bookings WHERE id=?", (booking_id,))
+    row = c.fetchone()
+    if not row or row["confirmed"] or row["paid"]:
+        conn.close()
+        return False
+    
+    c.execute("""
+        UPDATE bookings
+        SET paid_amount=?, status='partial_payment'
+        WHERE id=?
+    """, (paid_amount, booking_id))
+    updated = c.rowcount
+    conn.commit()
+    conn.close()
+    return updated > 0
+
+
 def _notify_admin_orphan(amount, body, msg_id, reason=None):
     """Send admin notification when e-Transfer has no matching pending booking.
 
@@ -1092,6 +1225,10 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
         )
     except Exception as _e:
         print(f"   [ledger] record failed: {_e}")
+
+    if not processed and try_confirm_gift_etransfer(amount, body, msg_id):
+        mark_message_processed(msg_id, None, amount)
+        return None, None
 
     if processed:
         # Do not re-confirm/re-run side effects. The one safe exception is

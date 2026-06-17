@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gift Certificates — Pashynska Photography</title>
+  <meta name="description" content="Premium Pashynska Photography gift certificates for mini, family, maternity, newborn, and custom sessions in Calgary.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Tenor+Sans&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('gift_referral.static', filename='gift/gift.css') }}">
+  <script id="gift-config" type="application/json">{{ gift_config | tojson }}</script>
+</head>
+<body>
+
+<nav class="gift-nav">
+  <div class="gift-nav-brand"><span>Pashynska</span> Photography</div>
+  <a href="{{ booking_url or '/' }}" class="gift-nav-back">Back to booking</a>
+</nav>
+
+<section class="gift-hero gift-hero-compact">
+  <div class="gift-hero-content">
+    <span class="gift-hero-eyebrow">Pashynska Photography · Calgary, AB</span>
+    <h1>Gift Certificate</h1>
+    <p class="gift-hero-sub">
+      A polished photography gift that feels personal before it even arrives.
+    </p>
+    <a href="#gift-builder" class="gift-scroll-cta">Create a Gift</a>
+  </div>
+</section>
+
+<section class="gift-section gift-builder-section" id="gift-builder">
+  <form id="gift-purchase-form" action="/gift/checkout" method="POST">
+    <input type="hidden" name="session_type" id="session_type" value="mini">
+    <input type="hidden" name="certificate_style" id="certificate_style" value="signature">
+    <input type="hidden" name="gift_photo" id="gift_photo" value="">
+
+    <div class="gift-personalize-grid">
+      <div class="gift-form-wrap">
+        <h2 class="gift-form-title">Build the gift</h2>
+
+        <div class="gift-step-label">1. Choose a session</div>
+        <div class="gift-packages">
+          {% for key, pkg in packages.items() %}
+          <label class="gift-package-card" data-type="{{ key }}">
+            <input type="radio" name="_session_type" value="{{ key }}" {% if loop.first %}checked{% endif %}>
+            <div class="gift-pkg-check">✓</div>
+            <div class="gift-pkg-icon">{{ pkg.icon }}</div>
+            <div class="gift-pkg-name">{{ pkg.label }}</div>
+            <div class="gift-pkg-detail">{{ pkg.details }}</div>
+            {% if key == 'custom' %}
+              <div class="gift-pkg-price">From ${{ "%.2f"|format(pkg.amount) }} <span class="gift-pkg-price-sub">+ GST</span></div>
+            {% else %}
+              <div class="gift-pkg-price">${{ "%.2f"|format(pkg.amount) }} <span class="gift-pkg-price-sub">+ GST</span></div>
+            {% endif %}
+          </label>
+          {% endfor %}
+        </div>
+
+        <div class="gift-custom-amount" id="gift-custom-amount-wrap">
+          <div class="gift-step-label">Custom base</div>
+          <div class="gift-option-list">
+            {% for key, base in custom_bases.items() %}
+            <label class="gift-option-row">
+              <input type="radio" name="custom_base" value="{{ key }}" {% if loop.first %}checked{% endif %}>
+              <span>
+                <strong>{{ base.label }}</strong>
+                <small>{{ base.details }}</small>
+              </span>
+              <b>${{ "%.2f"|format(base.amount) }}</b>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="gift-step-label">2. Add upgrades</div>
+        <div class="gift-option-list gift-addons-list">
+          {% for key, addon in add_ons.items() %}
+          <label class="gift-option-row">
+            <input type="checkbox" name="gift_addons" value="{{ key }}">
+            <span>
+              <strong>{{ addon.label }}</strong>
+              <small>Optional upgrade for the recipient</small>
+            </span>
+            <b>+${{ "%.2f"|format(addon.amount) }}</b>
+          </label>
+          {% endfor %}
+        </div>
+
+        <hr class="gift-form-divider">
+
+        <h2 class="gift-form-title">Personalize</h2>
+        <div class="gift-form-row">
+          <div class="gift-field">
+            <label for="purchaser_name">Your Name <span>*</span></label>
+            <input type="text" id="purchaser_name" name="purchaser_name" placeholder="Jane Smith" required autocomplete="name">
+          </div>
+          <div class="gift-field">
+            <label for="purchaser_email">Your Email <span>*</span></label>
+            <input type="email" id="purchaser_email" name="purchaser_email" placeholder="jane@example.com" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="gift-form-row">
+          <div class="gift-field">
+            <label for="recipient_name">Recipient's Name</label>
+            <input type="text" id="recipient_name" name="recipient_name" placeholder="Sarah Johnson" autocomplete="off">
+          </div>
+          <div class="gift-field">
+            <label for="recipient_email">Recipient's Email <small>optional</small></label>
+            <input type="email" id="recipient_email" name="recipient_email" placeholder="sarah@example.com" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="gift-field">
+          <label for="personal_message">Personal Message <small>printed on certificate</small></label>
+          <textarea id="personal_message" name="personal_message" placeholder="You deserve to be seen in your most beautiful light." maxlength="220"></textarea>
+        </div>
+
+        <hr class="gift-form-divider">
+
+        <div class="gift-step-label">3. Payment</div>
+        <div class="gift-payment-methods" role="radiogroup" aria-label="Payment method">
+          <label class="gift-payment-card selected">
+            <input type="radio" name="payment_method" value="card" checked>
+            <span>Card / Apple Pay</span>
+            <small>Instant PDF after Stripe checkout</small>
+          </label>
+          <label class="gift-payment-card">
+            <input type="radio" name="payment_method" value="interac">
+            <span>Interac e-Transfer</span>
+            <small>PDF after payment confirmation</small>
+          </label>
+        </div>
+
+        <div class="gift-price-summary">
+          <div>
+            <div class="gift-price-label">Total amount charged</div>
+            <div class="gift-price-sub" id="gift-price-sub">($210.00 + 5% GST)</div>
+          </div>
+          <div id="gift-price-value" class="gift-price-value">$220.50 CAD</div>
+        </div>
+
+        <button type="submit" class="gift-submit-btn" id="gift-submit-btn">
+          Purchase Gift Certificate — $220.50 CAD
+        </button>
+        <p class="gift-secure-note" id="gift-payment-note">
+          Secure checkout via Stripe · receipt and PDF emailed instantly.
+        </p>
+      </div>
+
+      <aside class="gift-cert-preview-wrap style-signature" id="gift-cert-preview-wrap" aria-label="Live gift certificate preview">
+        <div class="gift-style-panel">
+          <button type="button" class="gift-style-arrow" id="gift-style-prev" aria-label="Previous certificate style">‹</button>
+          <div>
+            <div class="gift-style-kicker">Certificate style</div>
+            <div class="gift-style-name" id="gift-style-name">Signature Luxe</div>
+          </div>
+          <button type="button" class="gift-style-arrow" id="gift-style-next" aria-label="Next certificate style">›</button>
+        </div>
+        <div class="gift-style-dots" id="gift-style-dots" aria-hidden="true"></div>
+        <div class="gift-photo-controls">
+          <button type="button" class="gift-photo-btn" id="gift-photo-shuffle"><span aria-hidden="true">&#10227;</span> Shuffle photo</button>
+        </div>
+
+        <div class="gift-cert-float">
+          <div class="gift-cert-card" id="gift-cert-card">
+            <div class="gift-cert-glint"></div>
+            <div class="gift-cert-corner gift-cert-c-tl"></div>
+            <div class="gift-cert-corner gift-cert-c-tr"></div>
+            <div class="gift-cert-corner gift-cert-c-bl"></div>
+            <div class="gift-cert-corner gift-cert-c-br"></div>
+
+            <div class="gift-cert-photo-wrap">
+              <img class="gift-cert-photo" id="gift-preview-photo" alt="Photography session preview" src="" loading="lazy">
+            </div>
+
+            <p class="gift-cert-brand">Pashynska Photography</p>
+            <div class="gift-cert-divider">
+              <div class="gift-cert-line"></div>
+              <div class="gift-cert-diamond"></div>
+              <div class="gift-cert-line"></div>
+            </div>
+
+            <p class="gift-cert-title">Gift Certificate</p>
+            <p class="gift-cert-subtitle">Lovingly gifted to</p>
+            <p class="gift-cert-to" id="gift-preview-to">Sarah</p>
+
+            <div class="gift-cert-seal-wrap" aria-hidden="true">
+              <div class="gift-cert-seal-ring">
+                <svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="45" cy="45" r="43" fill="none" stroke="currentColor" stroke-width=".8" stroke-dasharray="3.5 6.2"/>
+                  <circle cx="45" cy="2.5" r="1.5" fill="currentColor"/>
+                  <circle cx="45" cy="87.5" r="1.5" fill="currentColor"/>
+                  <circle cx="2.5" cy="45" r="1.5" fill="currentColor"/>
+                  <circle cx="87.5" cy="45" r="1.5" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="gift-cert-seal-disk">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M14 11l2.5-4h7l2.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <rect x="7" y="11" width="26" height="18" rx="3.5" stroke="currentColor" stroke-width="1.5"/>
+                  <circle cx="20" cy="20" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+                  <circle cx="20" cy="20" r="2.2" fill="currentColor"/>
+                  <circle cx="30" cy="15" r="1.2" fill="currentColor"/>
+                </svg>
+              </div>
+            </div>
+
+            <p class="gift-cert-session-label">Entitles the holder to</p>
+            <p class="gift-cert-session" id="gift-preview-session">Mini Session</p>
+            <p class="gift-cert-duration" id="gift-preview-duration"><span aria-hidden="true">&#9201;</span> 20 minutes</p>
+            <p class="gift-cert-package-meta" id="gift-preview-package-meta">15 edited photos · all originals included</p>
+            <p class="gift-cert-addons" id="gift-preview-addons">No upgrades selected</p>
+
+            <div class="gift-cert-message-box">
+              <p class="gift-cert-message" id="gift-preview-message">You deserve to be seen in your most beautiful light.</p>
+            </div>
+
+            <div class="gift-cert-from-row">
+              <div class="gift-cert-line"></div>
+              <p class="gift-cert-from" id="gift-preview-from">With love, Jane</p>
+              <div class="gift-cert-line"></div>
+            </div>
+
+            <p class="gift-cert-price" id="gift-preview-price">$220.50 CAD</p>
+            <p class="gift-cert-code">GIFT-A3K9-7BXM</p>
+            <p class="gift-cert-footer">Valid for 12 months · book.pashynskaphoto.com</p>
+          </div>
+        </div>
+        <div class="gift-cert-sparks" id="gift-preview-sparks" aria-hidden="true"></div>
+      </aside>
+    </div>
+  </form>
+</section>
+
+<section class="gift-section gift-how-section">
+  <h2 class="gift-section-title">How it works</h2>
+  <div class="gift-how-grid">
+    <div><strong>1</strong><span>Choose the gift package and style.</span></div>
+    <div><strong>2</strong><span>Pay by card or Interac e-Transfer.</span></div>
+    <div><strong>3</strong><span>The PDF certificate is emailed after payment.</span></div>
+    <div><strong>4</strong><span>The recipient books their own date.</span></div>
+  </div>
+</section>
+
+<footer class="gift-footer">
+  <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>
+</footer>
+
+<script src="{{ url_for('gift_referral.static', filename='gift/gift.js') }}"></script>
+</body>
+</html>
