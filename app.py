@@ -1978,6 +1978,29 @@ def notify_payment_confirmed(booking_id, paid_amount=None):
         log.error(f"[notify_confirmed] Failed: {e}")
 
 
+def _maybe_payout_referral(booking_id):
+    """If this booking used a referral code, credit the code owner $20 and email them.
+    No-op for non-referral bookings; idempotent (confirm_referral_payment only fires once
+    per booking), so it is safe to call from every payment-confirmation path. Never raises."""
+    try:
+        use = gift_db.confirm_referral_payment(booking_id)
+        if not use:
+            return
+        from gift_referral_email import send_referral_reward_email
+        send_referral_reward_email(
+            owner_email=use["owner_email"],
+            owner_name=use["owner_name"],
+            friend_name=use.get("referee_name") or "Your friend",
+            reward=use["reward_for_owner"],
+            code=use["referral_code"],
+            new_balance=use.get("new_balance", use["reward_for_owner"]),
+            total_earned=use.get("total_earned", use["reward_for_owner"]),
+        )
+        log.info(f"[referral] Paid ${use['reward_for_owner']:.0f} credit to {use['owner_email']} for booking #{booking_id}")
+    except Exception as e:
+        log.error(f"[referral] payout failed for booking #{booking_id}: {e}")
+
+
 def _after_auto_payment_confirmed(booking_id):
     """Run the same side-effects after automatic e-Transfer confirmation
     that manual admin confirmation runs: calendar, Notion, client email,
@@ -3344,6 +3367,10 @@ def init_db():
         ("bookings",  "deposit_amount",    "ALTER TABLE bookings ADD COLUMN deposit_amount REAL"),
         # Store full_price in booking so invoice always matches what was agreed
         ("bookings",  "full_price",        "ALTER TABLE bookings ADD COLUMN full_price REAL"),
+        # Referral code applied at booking + the friend's discount (comes off the BALANCE,
+        # never the deposit, so e-Transfer amount-matching is unaffected)
+        ("bookings",  "referral_code",     "ALTER TABLE bookings ADD COLUMN referral_code TEXT"),
+        ("bookings",  "referral_discount", "ALTER TABLE bookings ADD COLUMN referral_discount REAL DEFAULT 0"),
         # Session-inspired add-ons, agreement, and optional post-confirmation questionnaire
         ("bookings",  "selected_addons_json", "ALTER TABLE bookings ADD COLUMN selected_addons_json TEXT"),
         ("bookings",  "addons_total",      "ALTER TABLE bookings ADD COLUMN addons_total REAL DEFAULT 0"),
@@ -5647,10 +5674,12 @@ def _booking_paid_amount(booking, event=None):
 
 
 def _booking_balance_due(booking, event):
-    """Return remaining balance for a booking in CAD, never below zero."""
+    """Return remaining balance for a booking in CAD, never below zero.
+    A referral discount (if any) comes off the balance — not the deposit."""
     total = _booking_total_price(booking, event)
     paid = _booking_paid_amount(booking, event)
-    return round(max(total - paid, 0.0), 2)
+    discount = float(booking.get("referral_discount") or 0)
+    return round(max(total - paid - discount, 0.0), 2)
 
 
 def _create_balance_checkout_url(booking, event, balance_due):

@@ -974,6 +974,34 @@ def _notify_admin_ambiguity(amount, candidates):
         print(f"[admin] Failed to send ambiguity alert: {e}")
 
 
+def record_partial_payment(booking_id, paid_amount):
+    """Record a partial/underpayment without confirming the booking.
+    
+    Updates paid_amount on the booking but keeps confirmed=0, paid=0.
+    Sets status to 'partial_payment' so admin can see it needs attention.
+    
+    Returns True if updated, False if booking is already confirmed or not found.
+    """
+    conn = get_db()
+    c = conn.cursor()
+    # Check if booking is already confirmed or paid
+    c.execute("SELECT confirmed, paid FROM bookings WHERE id=?", (booking_id,))
+    row = c.fetchone()
+    if not row or row["confirmed"] or row["paid"]:
+        conn.close()
+        return False
+    
+    c.execute("""
+        UPDATE bookings
+        SET paid_amount=?, status='partial_payment'
+        WHERE id=?
+    """, (paid_amount, booking_id))
+    updated = c.rowcount
+    conn.commit()
+    conn.close()
+    return updated > 0
+
+
 def _notify_admin_orphan(amount, body, msg_id, reason=None):
     """Send admin notification when e-Transfer has no matching pending booking.
 
