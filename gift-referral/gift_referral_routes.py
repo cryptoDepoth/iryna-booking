@@ -58,8 +58,9 @@ INTERAC_EMAIL     = (
     or "iryna.pashynska@gmail.com"
 )
 
-if STRIPE_SECRET_KEY:
-    stripe.api_key = STRIPE_SECRET_KEY
+# Gift certificate routes are temporarily disabled; Stripe is not needed here.
+# if STRIPE_SECRET_KEY:
+#     stripe.api_key = STRIPE_SECRET_KEY
 
 _TOKEN_SECRET = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-prod")
 
