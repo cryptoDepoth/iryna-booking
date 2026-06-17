@@ -9,8 +9,11 @@ import hashlib
 import hmac
 import json
 import os
+import re
 
-import stripe
+# Gift certificate routes are temporarily disabled. Re-enable imports when
+# anti-spam protections and payment confirmation workflow are restored.
+# import stripe
 from flask import (
     Blueprint, abort, jsonify, redirect, render_template, render_template_string,
     request, send_file, session, url_for,
@@ -27,10 +30,8 @@ from gift_referral_catalog import (
     calculate_with_gst,
     public_catalog,
 )
-from gift_referral_pdf import generate_gift_certificate_pdf, save_gift_pdf
+# from gift_referral_pdf import generate_gift_certificate_pdf, save_gift_pdf
 from gift_referral_email import (
-    send_gift_purchaser_email,
-    send_gift_recipient_email,
     send_referral_invite_notification_email,
     send_referral_reward_email,
     send_referral_welcome_email,
@@ -143,302 +144,61 @@ def _referral_for(email: str, name: str) -> dict:
 # Gift Certificate routes — DISABLED while we add anti-spam protections
 # ---------------------------------------------------------------------------
 
+# All gift pages currently show a "temporarily unavailable" notice. The gift
+# checkout flow, PDF generation, and gift emails are disabled to stop the
+# spam/abuse incident that started on 2026-06-17.
+
+_DISABLED_GIFT_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gift Certificates — Temporarily Unavailable</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; padding:0; background:#FAF7F2; font-family:'Inter',sans-serif; color:#2C2C2C; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    .box { max-width:520px; background:#fff; border:1px solid #E8D5A3; border-radius:12px; padding:40px 32px; text-align:center; }
+    h1 { font-family:'Playfair Display',serif; font-size:26px; margin:0 0 16px; }
+    p { font-size:15px; line-height:1.6; color:#555; margin:0 0 24px; }
+    a { display:inline-block; background:#C4973A; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:600; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Gift Certificates</h1>
+    <p>Gift certificates are temporarily unavailable while we add extra security. Please check back soon, or contact Iryna directly to purchase a gift certificate.</p>
+    <a href="{{ booking_url }}">Return to booking →</a>
+  </div>
+</body>
+</html>
+"""
+
+
 @gift_referral_bp.route("/gift")
 @gift_referral_bp.route("/gift/checkout", methods=["GET", "POST"])
 def gift_disabled(*args, **kwargs):
-    return render_template_string(
-        """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Gift Certificates — Temporarily Unavailable</title>
-          <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-          <style>
-            body { margin:0; padding:0; background:#FAF7F2; font-family:'Inter',sans-serif; color:#2C2C2C; display:flex; align-items:center; justify-content:center; min-height:100vh; }
-            .box { max-width:520px; background:#fff; border:1px solid #E8D5A3; border-radius:12px; padding:40px 32px; text-align:center; }
-            h1 { font-family:'Playfair Display',serif; font-size:26px; margin:0 0 16px; }
-            p { font-size:15px; line-height:1.6; color:#555; margin:0 0 24px; }
-            a { display:inline-block; background:#C4973A; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:600; }
-          </style>
-        </head>
-        <body>
-          <div class="box">
-            <h1>Gift Certificates</h1>
-            <p>Gift certificates are temporarily unavailable while we add extra security. Please check back soon, or contact Iryna directly to purchase a gift certificate.</p>
-            <a href="{{ booking_url }}">Return to booking →</a>
-          </div>
-        </body>
-        </html>
-        """,
-        booking_url=BOOKING_URL,
-    )
+    return render_template_string(_DISABLED_GIFT_HTML, booking_url=BOOKING_URL)
 
 
-# ---------------------------------------------------------------------------
-# Referral routes
-# ---------------------------------------------------------------------------
-    purchaser_name    = request.form.get("purchaser_name", "").strip()
-    purchaser_email   = request.form.get("purchaser_email", "").strip().lower()
-    recipient_name    = request.form.get("recipient_name", "").strip()
-    recipient_email   = request.form.get("recipient_email", "").strip().lower()
-    personal_message  = request.form.get("personal_message", "").strip()
-    session_type      = request.form.get("session_type", "custom").strip()
-    custom_base       = request.form.get("custom_base", "custom_30").strip()
-    certificate_style = request.form.get("certificate_style", "signature").strip()
-    payment_method    = request.form.get("payment_method", "card").strip().lower()
-    photo_url         = _safe_photo(request.form.get("gift_photo", ""), session_type)
-
-    if not purchaser_name or not purchaser_email:
-        return jsonify({"error": "Name and email are required"}), 400
-
-    pkg = PACKAGES.get(session_type)
-    if not pkg:
-        return jsonify({"error": "Invalid session type"}), 400
-
-    if certificate_style not in CERTIFICATE_STYLES:
-        return jsonify({"error": "Invalid certificate style"}), 400
-
-    try:
-        addons = _selected_addons(request.form.getlist("gift_addons"))
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-    if session_type == "custom":
-        base = CUSTOM_BASES.get(custom_base)
-        if not base:
-            return jsonify({"error": "Invalid custom package"}), 400
-        amount = float(base["amount"])
-    else:
-        custom_base = ""
-        amount = float(pkg["amount"])
-
-    amount += sum(addon["amount"] for addon in addons)
-    amount_with_gst = calculate_with_gst(amount)
-    package_label = _package_label(session_type, custom_base or "custom_30", addons)
-    addons_json = json.dumps(addons, separators=(",", ":"))
-    if payment_method not in ("card", "interac"):
-        return jsonify({"error": "Invalid payment method"}), 400
-
-    # Store form data in Flask session so we can retrieve it on success
-    session["gift_form"] = {
-        "purchaser_name":   purchaser_name,
-        "purchaser_email":  purchaser_email,
-        "recipient_name":   recipient_name,
-        "recipient_email":  recipient_email,
-        "personal_message": personal_message,
-        "session_type":     session_type,
-        "custom_base":      custom_base,
-        "certificate_style": certificate_style,
-        "package_label":    package_label,
-        "addons_json":      addons_json,
-        "photo_url":        photo_url,
-        "amount":           amount,
-        "amount_with_gst":  amount_with_gst,
-    }
-
-    if payment_method == "interac":
-        code = db.create_gift_certificate(
-            purchaser_email   = purchaser_email,
-            purchaser_name    = purchaser_name,
-            recipient_name    = recipient_name,
-            recipient_email   = recipient_email,
-            personal_message  = personal_message,
-            session_type      = session_type,
-            amount            = amount,
-            amount_with_gst   = amount_with_gst,
-            custom_base       = custom_base,
-            certificate_style = certificate_style,
-            package_label     = package_label,
-            addons_json       = addons_json,
-            photo_url         = photo_url,
-            payment_method    = "interac",
-            payment_status    = "pending",
-            paid_amount       = 0.0,
-            payment_reference = "Interac e-Transfer pending",
-            status            = "pending_payment",
-        )
-        cert = db.get_gift_certificate(code)
-        try:
-            from gift_referral_email import send_gift_pending_payment_email
-            send_gift_pending_payment_email(cert, INTERAC_EMAIL)
-        except Exception as exc:
-            print(f"[GIFT ETRANSFER EMAIL ERROR] {exc}")
-        return redirect(url_for("gift_referral.gift_pending", code=code))
-
-    if TEST_MODE:
-        # Skip Stripe — go straight to success with a mock session ID
-        import secrets as _secrets
-        mock_id = f"TEST_MOCK_{_secrets.token_hex(8).upper()}"
-        return redirect(url_for("gift_referral.gift_success", session_id=mock_id))
-
-    # --- Real Stripe Checkout ---
-    success_url = (STRIPE_SUCCESS_URL or request.host_url.rstrip("/")) + "/gift/success?session_id={CHECKOUT_SESSION_ID}"
-    cancel_url  = request.host_url.rstrip("/") + "/gift"
-
-    stripe_session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[{
-            "price_data": {
-                "currency": "cad",
-                "product_data": {
-                    "name": f"Gift Certificate — {pkg['label']}",
-                    "description": f"{package_label} · Recipient: {recipient_name or 'To be determined'}",
-                },
-                "unit_amount": int(amount_with_gst * 100),
-            },
-            "quantity": 1,
-        }],
-        mode="payment",
-        success_url=success_url,
-        cancel_url=cancel_url,
-        customer_email=purchaser_email,
-        metadata={
-            "gift_session_type":     session_type,
-            "custom_base":            custom_base,
-            "certificate_style":      certificate_style,
-            "gift_addons":            ",".join(addon["id"] for addon in addons),
-            "package_label":          package_label[:450],
-            "purchaser_name":        purchaser_name,
-            "recipient_name":        recipient_name,
-            "recipient_email":       recipient_email,
-        },
-    )
-    return redirect(stripe_session.url)
-
-
+@gift_referral_bp.route("/gift/success")
 def gift_success():
-    stripe_session_id = request.args.get("session_id", "")
-    form = session.pop("gift_form", None)
-
-    is_mock = stripe_session_id.startswith("TEST_MOCK_")
-
-    if not is_mock and not TEST_MODE:
-        # Verify real Stripe session
-        try:
-            stripe_sess = stripe.checkout.Session.retrieve(stripe_session_id)
-            if stripe_sess.payment_status != "paid":
-                return render_template("gift/gift_success.html", error="Payment not confirmed. Please contact us.")
-            # Pull metadata if form not in Flask session
-            if not form:
-                meta = stripe_sess.metadata or {}
-                form = {
-                    "purchaser_name":   meta.get("purchaser_name", ""),
-                    "purchaser_email":  stripe_sess.customer_email or "",
-                    "recipient_name":   meta.get("recipient_name", ""),
-                    "recipient_email":  meta.get("recipient_email", ""),
-                    "personal_message": "",
-                    "session_type":     meta.get("gift_session_type", "custom"),
-                    "custom_base":      meta.get("custom_base", ""),
-                    "certificate_style": meta.get("certificate_style", "signature"),
-                    "package_label":    meta.get("package_label", ""),
-                    "addons_json":      json.dumps(
-                        _selected_addons([
-                            item for item in meta.get("gift_addons", "").split(",") if item
-                        ]),
-                        separators=(",", ":"),
-                    ),
-                    "amount":           (stripe_sess.amount_total or 0) / 100 / 1.05,
-                    "amount_with_gst":  (stripe_sess.amount_total or 0) / 100,
-                }
-        except stripe.StripeError as e:
-            return render_template("gift/gift_success.html", error=f"Payment verification failed: {e}")
-
-    if not form:
-        # No form data at all — maybe session expired
-        return render_template("gift/gift_success.html",
-                               error="Session expired. If you completed payment, please email us with your receipt.")
-
-    # Check for duplicate (idempotent on stripe_session_id)
-    existing = db.get_gift_certificate_by_stripe_session(stripe_session_id) if stripe_session_id else None
-    if existing:
-        code = existing["code"]
-        cert = existing
-    else:
-        code = db.create_gift_certificate(
-            purchaser_email   = form["purchaser_email"],
-            purchaser_name    = form["purchaser_name"],
-            recipient_name    = form.get("recipient_name", ""),
-            recipient_email   = form.get("recipient_email", ""),
-            personal_message  = form.get("personal_message", ""),
-            session_type      = form["session_type"],
-            amount            = form["amount"],
-            amount_with_gst   = form["amount_with_gst"],
-            custom_base       = form.get("custom_base", ""),
-            certificate_style = form.get("certificate_style", "signature"),
-            package_label     = form.get("package_label", ""),
-            addons_json       = form.get("addons_json", "[]"),
-            photo_url         = form.get("photo_url", ""),
-            payment_method    = "stripe",
-            payment_status    = "paid",
-            paid_amount       = form["amount_with_gst"],
-            stripe_session_id = stripe_session_id,
-        )
-        cert = db.get_gift_certificate(code)
-
-    # Generate PDF
-    pdf_path = None
-    try:
-        pdf_path = save_gift_pdf(cert)
-        db.update_gift_pdf(code, pdf_path)
-    except Exception as e:
-        print(f"[PDF ERROR] {e}")
-
-    # Send emails
-    send_gift_purchaser_email(cert, pdf_path=pdf_path)
-    if cert.get("recipient_email"):
-        send_gift_recipient_email(cert)
-
-    referral = _referral_for(cert.get("purchaser_email", ""), cert.get("purchaser_name", ""))
-    return render_template("gift/gift_success.html", cert=cert, pdf_path=pdf_path,
-                           booking_url=BOOKING_URL, **referral)
+    return render_template_string(_DISABLED_GIFT_HTML, booking_url=BOOKING_URL)
 
 
+@gift_referral_bp.route("/gift/pending/<code>")
 def gift_pending(code):
-    code = code.strip().upper()
-    cert = db.get_gift_certificate(code)
-    if not cert:
-        abort(404)
-    if cert.get("status") == "active":
-        referral = _referral_for(cert.get("purchaser_email", ""), cert.get("purchaser_name", ""))
-        return render_template("gift/gift_success.html", cert=cert, pdf_path=cert.get("pdf_path"),
-                               booking_url=BOOKING_URL, **referral)
-    bank_message = f"Gift certificate {code}"
-    return render_template(
-        "gift/gift_pending.html",
-        cert=cert,
-        interac_email=INTERAC_EMAIL,
-        bank_message=bank_message,
-        booking_url=BOOKING_URL,
-    )
+    return render_template_string(_DISABLED_GIFT_HTML, booking_url=BOOKING_URL)
 
 
+@gift_referral_bp.route("/gift/certificate/<code>")
 def download_certificate(code):
-    cert = db.get_gift_certificate(code)
-    if not cert:
-        abort(404)
-    if cert.get("status") not in ("active", "redeemed"):
-        abort(403)
-    # Regenerate on the fly if PDF not on disk
-    if cert.get("pdf_path") and os.path.exists(cert["pdf_path"]):
-        return send_file(cert["pdf_path"], mimetype="application/pdf",
-                         as_attachment=True, download_name=f"GiftCertificate_{code}.pdf")
-    # Re-generate
-    pdf_bytes = generate_gift_certificate_pdf(cert)
-    import io
-    return send_file(io.BytesIO(pdf_bytes), mimetype="application/pdf",
-                     as_attachment=True, download_name=f"GiftCertificate_{code}.pdf")
+    return render_template_string(_DISABLED_GIFT_HTML, booking_url=BOOKING_URL)
 
 
+@gift_referral_bp.route("/gift/validate", methods=["POST"])
 def gift_validate():
-    data         = request.get_json(silent=True) or {}
-    code         = (data.get("code") or request.form.get("code", "")).strip().upper()
-    session_type = (data.get("session_type") or request.form.get("session_type", "")).strip()
-    if not code:
-        return jsonify({"valid": False, "error": "No code provided"}), 400
-    result = db.validate_gift_certificate(code, session_type or None)
-    return jsonify(result)
+    return jsonify({"valid": False, "error": "Gift certificates are temporarily unavailable."}), 503
 
 
 # ---------------------------------------------------------------------------
