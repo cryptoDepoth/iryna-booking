@@ -411,3 +411,53 @@ Book at: {BOOKING_URL}/referral/{code}
 — Iryna Pashynska
 """
     return _send_email(referee_email, subject, html, text.strip())
+
+
+def send_referral_invite_notification_email(
+    owner_email: str,
+    owner_name: str,
+    friend_name: str,
+    friend_email: str,
+    code: str,
+) -> bool:
+    """Notify the referral owner that someone has been invited using their code."""
+    subject = f"Your referral code {code} was shared with {friend_name}"
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#FAF7F2;font-family:Georgia,serif;color:#2C2C2C;">
+  <div style="max-width:560px;margin:0 auto;padding:40px 20px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="font-size:22px;color:#C4973A;margin:0 0 4px;">Pashynska Photography</h1>
+      <p style="color:#888;margin:0;font-size:13px;">Calgary, AB</p>
+    </div>
+    <div style="background:#fff;border-radius:8px;border:1px solid #E8D5A3;padding:32px;">
+      <h2 style="margin:0 0 16px;font-size:20px;">Your referral is on its way 🎉</h2>
+      <p>Hi {owner_name},</p>
+      <p>You invited <strong>{friend_name}</strong> to Pashynska Photography using your referral code <strong>{code}</strong>.</p>
+      <p>When {friend_name} books a session, you will earn a $20 credit toward your next shoot.</p>
+      <div style="text-align:center;margin:24px 0 16px;">
+        <a href="{BOOKING_URL}/my-credits?email={owner_email}" style="background:#C4973A;color:#fff;padding:14px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:bold;">View My Credits</a>
+      </div>
+    </div>
+    <p style="text-align:center;color:#999;font-size:12px;margin-top:24px;">
+      — Iryna Pashynska<br>
+      <a href="mailto:irynapashynska@gmail.com" style="color:#C4973A;">irynapashynska@gmail.com</a>
+    </p>
+  </div>
+</body>
+</html>
+"""
+    text = f"""
+Hi {owner_name},
+
+You invited {friend_name} ({friend_email}) to Pashynska Photography using your referral code {code}.
+
+When they book, you will earn a $20 credit toward your next session.
+
+View your credits: {BOOKING_URL}/my-credits?email={owner_email}
+
+— Iryna Pashynska
+"""
+    return _send_email(owner_email, subject, html, text.strip())

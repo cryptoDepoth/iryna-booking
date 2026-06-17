@@ -59,6 +59,23 @@
     <p class="referral-by">
       Invited by <strong>{{ ref.owner_name }}</strong> · discount applies at checkout
     </p>
+
+    <!-- Send code to a friend by email -->
+    <div style="max-width:520px;margin:42px auto 0;padding:24px;background:#fff;border:1px solid #E8D5A3;border-radius:12px;">
+      <p style="margin:0 0 16px;font-weight:600;color:#2C2C2C;">Send this ${{ ref.discount_for_friend|int }} discount to a friend</p>
+      <form id="rf-send-form" style="display:flex;flex-direction:column;gap:12px;" onsubmit="return false;">
+        <div>
+          <label for="rf-friend-name" style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a8378;margin-bottom:4px;">Friend's name</label>
+          <input id="rf-friend-name" type="text" placeholder="Anna" required style="width:100%;border:1px solid rgba(196,151,58,.4);border-radius:10px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:15px;background:#fff;color:#2C2C2C;">
+        </div>
+        <div>
+          <label for="rf-friend-email" style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a8378;margin-bottom:4px;">Friend's email</label>
+          <input id="rf-friend-email" type="email" placeholder="anna@example.com" required style="width:100%;border:1px solid rgba(196,151,58,.4);border-radius:10px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:15px;background:#fff;color:#2C2C2C;">
+        </div>
+        <button type="submit" id="rf-send-btn" class="referral-cta-btn" style="margin-top:4px;">✉️ Send code by email</button>
+        <p id="rf-send-status" style="font-size:13px;margin:0;min-height:18px;"></p>
+      </form>
+    </div>
   </section>
 
   <!-- How it works -->
@@ -93,13 +110,60 @@
         warm family and lifestyle photography. With 500+ sessions and a gentle,
         joyful approach, she captures the moments families actually treasure.
       </p>
-      <a href="{{ booking_url or '/' }}" class="referral-cta-btn">
-        Claim Your ${{ ref.discount_for_friend|int }} Discount →
-      </a>
+      <div style="text-align:center;margin:28px 0 16px;">
+        <a href="{{ booking_url or '/' }}" class="referral-cta-btn">
+          Claim Your ${{ ref.discount_for_friend|int }} Discount →
+        </a>
+      </div>
     </div>
   </section>
 
 {% endif %}
+
+<script>
+(function(){
+  var form = document.getElementById('rf-send-form');
+  if(!form) return;
+  var btn = document.getElementById('rf-send-btn');
+  var status = document.getElementById('rf-send-status');
+  var code = {{ code|tojson }};
+  var ownerName = {{ (ref.owner_name.split()[0] if ref else '')|tojson }};
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var name = document.getElementById('rf-friend-name').value.trim();
+    var email = document.getElementById('rf-friend-email').value.trim();
+    if(!name || !email){
+      status.style.color = '#c53030';
+      status.textContent = 'Please enter both name and email.';
+      return;
+    }
+    btn.disabled = true;
+    status.style.color = '#2d3748';
+    status.textContent = 'Sending…';
+    fetch('/referral/send-welcome', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code: code, referee_name: name, referee_email: email, owner_name: ownerName})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data.success){
+        status.style.color = '#2f855a';
+        status.textContent = '✓ Invitation sent! Your friend will receive the discount code shortly.';
+        form.reset();
+      } else {
+        status.style.color = '#c53030';
+        status.textContent = 'Could not send: ' + (data.error || 'unknown error');
+      }
+    })
+    .catch(function(){
+      status.style.color = '#c53030';
+      status.textContent = 'Network error. Please try again.';
+    })
+    .finally(function(){ btn.disabled = false; });
+  });
+})();
+</script>
 
 <footer class="gift-footer">
   <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>

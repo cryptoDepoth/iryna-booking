@@ -31,6 +31,7 @@ from gift_referral_pdf import generate_gift_certificate_pdf, save_gift_pdf
 from gift_referral_email import (
     send_gift_purchaser_email,
     send_gift_recipient_email,
+    send_referral_invite_notification_email,
     send_referral_reward_email,
     send_referral_welcome_email,
 )
@@ -535,6 +536,58 @@ def unified_validate():
 
 
 # ---------------------------------------------------------------------------
+# Share referral code by email
+# ---------------------------------------------------------------------------
+
+@gift_referral_bp.route("/referral/send-welcome", methods=["POST"])
+def referral_send_welcome():
+    """
+    Public endpoint: share a referral code with a friend by email.
+    Sends a beautiful welcome email to the friend and a confirmation
+    notification to the code owner.
+    """
+    data = request.get_json(silent=True) or {}
+    code = (data.get("code") or "").strip().upper()
+    referee_email = (data.get("referee_email") or "").strip().lower()
+    referee_name = (data.get("referee_name") or "Friend").strip()
+
+    if not code:
+        return jsonify({"success": False, "error": "No referral code provided"}), 400
+    if not referee_email or "@" not in referee_email:
+        return jsonify({"success": False, "error": "Please provide a valid friend email"}), 400
+
+    ref = db.get_referral_code(code)
+    if not ref or ref["status"] != "active":
+        return jsonify({"success": False, "error": "Invalid or expired referral code"}), 400
+
+    validation = db.validate_referral_code(code, referee_email)
+    if not validation.get("valid"):
+        return jsonify({"success": False, "error": validation.get("error", "This code cannot be used")}), 400
+
+    friend_ok = send_referral_welcome_email(
+        referee_email=referee_email,
+        referee_name=referee_name,
+        owner_name=ref["owner_name"],
+        discount=float(ref["discount_for_friend"]),
+        code=code,
+    )
+
+    owner_ok = send_referral_invite_notification_email(
+        owner_email=ref["owner_email"],
+        owner_name=ref["owner_name"],
+        friend_name=referee_name,
+        friend_email=referee_email,
+        code=code,
+    )
+
+    return jsonify({
+        "success": bool(friend_ok),
+        "friend_email_sent": friend_ok,
+        "owner_notification_sent": owner_ok,
+    })
+
+
+# ---------------------------------------------------------------------------
 # Webhook: called by main app when a friend's payment is confirmed
 # ---------------------------------------------------------------------------
 
@@ -547,6 +600,9 @@ def referral_payment_confirmed(booking_id):
     use = db.confirm_referral_payment(booking_id)
     if not use:
         return jsonify({"triggered": False, "reason": "No pending referral use found"})
+
+    if use.get("self_use"):
+        return jsonify({"triggered": False, "reason": "Self-use referral, no reward"})
 
     send_referral_reward_email(
         owner_email=use["owner_email"],
