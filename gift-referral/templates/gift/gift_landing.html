@@ -34,6 +34,11 @@
     <input type="hidden" name="session_type" id="session_type" value="mini">
     <input type="hidden" name="certificate_style" id="certificate_style" value="signature">
     <input type="hidden" name="gift_photo" id="gift_photo" value="">
+    <!-- Honeypot: hidden from humans, bots fill every field -->
+    <div style="display:none" aria-hidden="true">
+      <label for="website">Website</label>
+      <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+    </div>
 
     <div class="gift-personalize-grid">
       <div class="gift-form-wrap">
