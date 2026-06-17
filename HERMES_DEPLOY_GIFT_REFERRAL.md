@@ -1,16 +1,21 @@
 # Hermes Deployment: Gift Certificates + Referral System
 
-## BEFORE DEPLOYING — Iryna needs to provide:
+## BEFORE DEPLOYING — What's actually needed
 
-| Secret | Description |
-|--------|-------------|
-| `STRIPE_SECRET_KEY` | Live Stripe secret key (starts with `sk_live_...`) |
-| `STRIPE_GIFT_PRICE_MINI` | Stripe Price ID for the Mini Session gift package (e.g. `price_...`) |
-| `STRIPE_GIFT_PRICE_STANDARD` | Stripe Price ID for the Standard Session gift package |
-| `STRIPE_GIFT_PRICE_EXTENDED` | Stripe Price ID for the Extended Session gift package |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (starts with `whsec_...`) |
+**Good news:** No new Stripe products or price IDs to create. Gift checkout uses dynamic `price_data` — prices are defined in code.
 
-Create the Stripe Products/Prices in the Stripe Dashboard first, then copy the Price IDs here.
+**Check what's already set:**
+```bash
+flyctl secrets list --app iryna-booking | grep -E "STRIPE|TEST_MODE"
+```
+
+| Secret | Status | Notes |
+|--------|--------|-------|
+| `STRIPE_SECRET_KEY` | ✅ already set | Used by existing deposit flow |
+| `TEST_MODE` | ⚠️ likely NOT set | Defaults to `"true"` → bypasses Stripe for gifts! Must set to `false` |
+| `STRIPE_WEBHOOK_SECRET` | optional | Only needed if gift success relies on webhook (it doesn't — uses sync Stripe API verify) |
+
+**The only required action before deploy:** set `TEST_MODE=false`.
 
 ---
 
@@ -45,19 +50,15 @@ flyctl deploy --app iryna-booking
 
 Wait for the deploy to finish (look for `✓ Deployment complete!`).
 
-### 4. Set Stripe secrets (skip any already set)
-
-Replace the placeholder values with Iryna's real keys:
+### 4. Set TEST_MODE=false (the only required new secret)
 
 ```bash
-flyctl secrets set STRIPE_SECRET_KEY=sk_live_REPLACE_ME --app iryna-booking
-flyctl secrets set STRIPE_GIFT_PRICE_MINI=price_REPLACE_ME --app iryna-booking
-flyctl secrets set STRIPE_GIFT_PRICE_STANDARD=price_REPLACE_ME --app iryna-booking
-flyctl secrets set STRIPE_GIFT_PRICE_EXTENDED=price_REPLACE_ME --app iryna-booking
-flyctl secrets set STRIPE_WEBHOOK_SECRET=whsec_REPLACE_ME --app iryna-booking
+# CRITICAL — the gift checkout defaults TEST_MODE to "true" if not set.
+# Without this, clicking "Purchase Gift Certificate" skips Stripe entirely.
+flyctl secrets set TEST_MODE=false --app iryna-booking
 ```
 
-Setting secrets triggers an automatic re-deploy. Wait for it to finish.
+Setting a secret triggers an automatic re-deploy. Wait for `✓ Deployment complete!`.
 
 ### 5. Verify the deploy
 
