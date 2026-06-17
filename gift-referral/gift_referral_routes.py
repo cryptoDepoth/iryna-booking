@@ -621,7 +621,32 @@ def unified_validate():
 
 @gift_referral_bp.route("/referral/send-welcome", methods=["POST"])
 def referral_send_welcome():
-    data          = request.get_json(silent=True) or {}
+    # ------------------------------------------------------------------
+    # 1. Anti-CSRF / same-origin check
+    # ------------------------------------------------------------------
+    origin = request.headers.get("Origin") or ""
+    referer = request.headers.get("Referer") or ""
+    allowed_base = BOOKING_URL.rstrip("/")
+    # Allow same origin or requests without origin from same referer
+    if origin and not origin.startswith(allowed_base):
+        if not (origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1")):
+            return jsonify({"success": False, "error": "Invalid origin"}), 403
+    if not origin and referer and not referer.startswith(allowed_base):
+        if not (referer.startswith("http://localhost") or referer.startswith("http://127.0.0.1")):
+            return jsonify({"success": False, "error": "Invalid referer"}), 403
+
+    # ------------------------------------------------------------------
+    # 2. Honeypot + rate limiting
+    # ------------------------------------------------------------------
+    data = request.get_json(silent=True) or {}
+    if not check_honeypot(data):
+        # Silently accept but do not send — bots shouldn't learn they were caught
+        return jsonify({"success": True})
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+    if not check_rate_limit(client_ip, max_requests=5, window_seconds=3600):
+        return jsonify({"success": False, "error": "Too many invitations. Please try again later."}), 429
+
     code          = (data.get("code") or "").strip().upper()
     referee_email = (data.get("referee_email") or "").strip().lower()
     referee_name  = (data.get("referee_name") or "Friend").strip()
@@ -630,6 +655,11 @@ def referral_send_welcome():
         return jsonify({"success": False, "error": "No referral code provided"}), 400
     if not referee_email or "@" not in referee_email:
         return jsonify({"success": False, "error": "Please provide a valid friend email"}), 400
+
+    # Validate the friend email more strictly
+    ok, msg = validate_email_field(referee_email, "Friend's email")
+    if not ok:
+        return jsonify({"success": False, "error": msg}), 400
 
     ref = db.get_referral_code(code)
     if not ref or ref["status"] != "active":

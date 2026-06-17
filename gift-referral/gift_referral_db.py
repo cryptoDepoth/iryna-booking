@@ -496,13 +496,12 @@ def record_referral_use(
     )
     use_id = cursor.lastrowid
     # For owner self-use, only mark owner_self_used; do NOT consume friend uses or credit reward.
+    # For normal friend uses, we intentionally do NOT increment uses_count here.
+    # uses_count is incremented only after the friend's payment is confirmed
+    # (in confirm_referral_payment), preventing abuse via pending reservations.
     if is_owner_self_use:
         conn.execute(
             "UPDATE referral_codes SET owner_self_used = 1 WHERE id = ?", (ref["id"],)
-        )
-    else:
-        conn.execute(
-            "UPDATE referral_codes SET uses_count = uses_count + 1 WHERE id = ?", (ref["id"],)
         )
     conn.commit()
     conn.close()
@@ -548,6 +547,10 @@ def confirm_referral_payment(referee_booking_id: int) -> dict | None:
            SET payment_confirmed = 1, reward_triggered = 1, confirmed_at = CURRENT_TIMESTAMP
            WHERE id = ?""",
         (use["id"],),
+    )
+    # Increment the code's use count only when payment is actually confirmed.
+    conn.execute(
+        "UPDATE referral_codes SET uses_count = uses_count + 1 WHERE id = ?", (use["referral_code_id"],)
     )
     conn.commit()
     conn.close()

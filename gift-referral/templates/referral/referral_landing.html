@@ -64,6 +64,11 @@
     <div style="max-width:520px;margin:42px auto 0;padding:24px;background:#fff;border:1px solid #E8D5A3;border-radius:12px;">
       <p style="margin:0 0 16px;font-weight:600;color:#2C2C2C;">Send this ${{ ref.discount_for_friend|int }} discount to a friend</p>
       <form id="rf-send-form" style="display:flex;flex-direction:column;gap:12px;" onsubmit="return false;">
+        <!-- Honeypot: hidden from humans, bots fill every field -->
+        <div style="display:none" aria-hidden="true">
+          <label for="rf-website">Website</label>
+          <input type="text" id="rf-website" name="website" tabindex="-1" autocomplete="off">
+        </div>
         <div>
           <label for="rf-friend-name" style="display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a8378;margin-bottom:4px;">Friend's name</label>
           <input id="rf-friend-name" type="text" placeholder="Anna" required style="width:100%;border:1px solid rgba(196,151,58,.4);border-radius:10px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:15px;background:#fff;color:#2C2C2C;">
@@ -132,6 +137,7 @@
     e.preventDefault();
     var name = document.getElementById('rf-friend-name').value.trim();
     var email = document.getElementById('rf-friend-email').value.trim();
+    var website = document.getElementById('rf-website').value.trim();
     if(!name || !email){
       status.style.color = '#c53030';
       status.textContent = 'Please enter both name and email.';
@@ -143,7 +149,7 @@
     fetch('/referral/send-welcome', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({code: code, referee_name: name, referee_email: email, owner_name: ownerName})
+      body: JSON.stringify({code: code, referee_name: name, referee_email: email, owner_name: ownerName, website: website})
     })
     .then(function(r){ return r.json(); })
     .then(function(data){

@@ -172,6 +172,11 @@ class TestEmailValidation:
         ok, _ = validate_email_field("user@gmail.com")
         assert ok is True
 
+    def test_rejects_typo_comm(self):
+        # .comm is a common bot typo we saw in the spam incident
+        ok, _ = validate_email_field("victim@gmail.comm")
+        assert ok is False
+
     def test_valid_plus_addressing(self):
         ok, _ = validate_email_field("user+tag@example.org")
         assert ok is True

@@ -51,6 +51,10 @@ _SPAM_KEYWORDS = [
 
 _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
+# Common typos and fake TLDs seen in bot submissions
+_BAD_TLDS = {"comm", "con", "cm", "gm", "gamil"}
+
+
 _SUSPICIOUS_DOMAINS = {
     "tempmail", "throwaway", "guerrilla", "mailinator",
     "yopmail", "sharklasers", "guerrillamail", "spam4",
@@ -90,6 +94,9 @@ def validate_email_field(value: str, field_name: str = "Email") -> tuple[bool, s
     if not _EMAIL_RE.match(value):
         return False, f"{field_name} is not a valid email address"
     domain = value.split("@")[-1]
+    tld = domain.split(".")[-1].lower()
+    if tld in _BAD_TLDS:
+        return False, f"{field_name} appears to contain a typo"
     for sus in _SUSPICIOUS_DOMAINS:
         if sus in domain:
             return False, f"{field_name} appears to be a disposable/temporary address"
