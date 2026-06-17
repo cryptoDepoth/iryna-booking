@@ -80,6 +80,7 @@ def init_db(db_path: str | None = None) -> None:
             reward_for_owner    REAL DEFAULT 20.0,
             uses_count          INTEGER DEFAULT 0,
             max_uses            INTEGER DEFAULT 10,
+            owner_self_used     INTEGER DEFAULT 0,
             status              TEXT DEFAULT 'active',
             created_at          TEXT DEFAULT CURRENT_TIMESTAMP,
             expires_at          TEXT
@@ -122,6 +123,7 @@ def init_db(db_path: str | None = None) -> None:
         );
     """)
     _ensure_gift_columns(conn)
+    _ensure_referral_columns(conn)
     conn.execute("""
         UPDATE gift_certificates
            SET payment_status=COALESCE(payment_status, 'paid'),
@@ -161,6 +163,16 @@ def _ensure_gift_columns(conn: sqlite3.Connection) -> None:
         "paid_amount": "ALTER TABLE gift_certificates ADD COLUMN paid_amount REAL DEFAULT 0",
         "payment_reference": "ALTER TABLE gift_certificates ADD COLUMN payment_reference TEXT",
         "activated_at": "ALTER TABLE gift_certificates ADD COLUMN activated_at TEXT",
+    }
+    for column, ddl in migrations.items():
+        if column not in columns:
+            conn.execute(ddl)
+
+
+def _ensure_referral_columns(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(referral_codes)").fetchall()}
+    migrations = {
+        "owner_self_used": "ALTER TABLE referral_codes ADD COLUMN owner_self_used INTEGER DEFAULT 0",
     }
     for column, ddl in migrations.items():
         if column not in columns:
@@ -414,25 +426,18 @@ def validate_referral_code(code: str, referee_email: str | None = None) -> dict:
         return {"valid": False, "error": "This referral code has reached its maximum uses"}
 
     if referee_email and referee_email.lower().strip() == ref["owner_email"].lower().strip():
-        # Owner is trying to use their own code — check accumulated credits
-        credits = get_credit_balance(referee_email.lower().strip())
-        balance = credits["balance"] if credits else 0.0
-        if balance >= ref["discount_for_friend"]:
+        # Owner using their own code — allowed once, no reward, discount only.
+        if ref.get("owner_self_used"):
             return {
-                "valid": True,
-                "type": "credit_redemption",
-                "discount": ref["discount_for_friend"],
-                "balance": balance,
-                "owner_name": ref["owner_name"],
-                "code": code,
+                "valid": False,
+                "error": "You have already used your own referral code once.",
             }
         return {
-            "valid": False,
-            "error": (
-                f"You cannot use your own referral code. "
-                f"Your credit balance is ${balance:.0f}."
-            ),
-            "balance": balance,
+            "valid": True,
+            "type": "referral_self",
+            "discount": ref["discount_for_friend"],
+            "owner_name": ref["owner_name"],
+            "code": code,
         }
 
     return {
@@ -455,6 +460,9 @@ def record_referral_use(
     if not ref:
         return None
     conn = get_db()
+    is_owner_self_use = (
+        referee_email and referee_email.lower().strip() == ref["owner_email"].lower().strip()
+    )
     cursor = conn.execute(
         """INSERT INTO referral_uses
            (referral_code_id, referee_email, referee_name, referee_booking_id, discount_applied)
@@ -463,9 +471,15 @@ def record_referral_use(
          discount_applied if discount_applied is not None else ref["discount_for_friend"]),
     )
     use_id = cursor.lastrowid
-    conn.execute(
-        "UPDATE referral_codes SET uses_count = uses_count + 1 WHERE id = ?", (ref["id"],)
-    )
+    # For owner self-use, only mark owner_self_used; do NOT consume friend uses or credit reward.
+    if is_owner_self_use:
+        conn.execute(
+            "UPDATE referral_codes SET owner_self_used = 1 WHERE id = ?", (ref["id"],)
+        )
+    else:
+        conn.execute(
+            "UPDATE referral_codes SET uses_count = uses_count + 1 WHERE id = ?", (ref["id"],)
+        )
     conn.commit()
     conn.close()
     return use_id
@@ -489,6 +503,22 @@ def confirm_referral_payment(referee_booking_id: int) -> dict | None:
         conn.close()
         return None
     use = dict(row)
+    is_owner_self_use = (
+        use.get("referee_email", "").lower().strip()
+        == use.get("owner_email", "").lower().strip()
+    )
+    # Owner self-use gets the discount but never a reward.
+    if is_owner_self_use:
+        conn.execute(
+            """UPDATE referral_uses
+               SET payment_confirmed = 1, reward_triggered = 0, confirmed_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (use["id"],),
+        )
+        conn.commit()
+        conn.close()
+        return {**use, "reward_added": 0.0, "new_credit_balance": 0.0, "self_use": True}
+
     conn.execute(
         """UPDATE referral_uses
            SET payment_confirmed = 1, reward_triggered = 1, confirmed_at = CURRENT_TIMESTAMP
