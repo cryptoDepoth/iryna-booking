@@ -4878,6 +4878,18 @@ def reserve_slot():
         return jsonify({"success": False, "error": "Too many requests. Please wait 10 minutes."}), 429
     record_request(ip)
 
+    # ── Referral / gift code handling ───────────────────────────────────────
+    referral_code = (data.get("referral_code") or "").strip().upper()
+    referral_discount = 0.0
+    if referral_code:
+        validation = gift_db.validate_referral_code(referral_code, referee_email=client_email)
+        if not validation.get("valid"):
+            return jsonify({"success": False, "error": validation.get("error", "Invalid referral code")}), 400
+        referral_discount = float(validation.get("discount") or 0)
+        if referral_discount <= 0:
+            referral_code = None
+            referral_discount = 0.0
+
     now = _local_now()
     expires = now + timedelta(minutes=RESERVATION_MINUTES)
 
@@ -4925,6 +4937,12 @@ def reserve_slot():
         _deposit_amt = float(ev.get("deposit") or SESSION_PRICE)
         _base_full_price = float(ev.get("full_price") or 0) or _deposit_amt * 2
         _full_price = round(_base_full_price + addons_total, 2)
+        # Discount applies to remaining balance, never to deposit or below zero.
+        referral_discount = round(min(referral_discount, _full_price - _deposit_amt), 2)
+        if referral_discount <= 0:
+            referral_code = None
+            referral_discount = 0.0
+
         if agreement_enabled and terms_accepted:
             agreement_accepted_at = now.isoformat()
         c.execute("""
@@ -4933,8 +4951,9 @@ def reserve_slot():
                  event_id, confirmation_token, deposit_amount, full_price, selected_addons_json,
                  addons_total, marketing_consent, agreement_name, agreement_accepted_at, terms_version,
                  visitor_id, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
-                 fbclid, gclid, referrer, landing_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 fbclid, gclid, referrer, landing_url,
+                 referral_code, referral_discount)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type,
             expires.isoformat(), ev["id"], token, _deposit_amt, _full_price,
@@ -4944,6 +4963,7 @@ def reserve_slot():
             attribution.get("utm_source"), attribution.get("utm_medium"), attribution.get("utm_campaign"),
             attribution.get("utm_content"), attribution.get("utm_term"), attribution.get("fbclid"),
             attribution.get("gclid"), attribution.get("referrer"), attribution.get("landing_url"),
+            referral_code, referral_discount,
         ))
 
         if c.rowcount == 0:
@@ -4959,6 +4979,19 @@ def reserve_slot():
     finally:
         conn.close()
 
+    # Record referral use now that booking_id is known (idempotent if no code)
+    if referral_code and referral_discount > 0:
+        try:
+            gift_db.record_referral_use(
+                code=referral_code,
+                referee_email=client_email,
+                referee_name=client_name,
+                referee_booking_id=booking_id,
+                discount_applied=referral_discount,
+            )
+        except Exception as _e:
+            log.warning(f"[reserve] record_referral_use failed: {_e}")
+
     # Sync client record (upsert) — creates or updates client profile
     if visitor_id and booking_id:
         _record_analytics_event(
@@ -4967,7 +5000,7 @@ def reserve_slot():
             booking_id=booking_id,
             event_id=ev["id"],
             page=attribution.get("landing_url") or "",
-            metadata={"time": slot_time, "date": event_date, "session_type": session_type, "deposit": _deposit_amt},
+            metadata={"time": slot_time, "date": event_date, "session_type": session_type, "deposit": _deposit_amt, "referral_discount": referral_discount},
             attribution=attribution,
         )
     try:
@@ -4997,6 +5030,8 @@ def reserve_slot():
         "event_id": ev["id"],
         "confirmation_token": token,
         "expires_at": expires.isoformat(),
+        "referral_discount": referral_discount,
+        "referral_code": referral_code,
         "message": f"Reserved for {RESERVATION_MINUTES} minutes. Complete payment before {expires.strftime('%H:%M')}."
     })
 

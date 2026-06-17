@@ -1482,11 +1482,14 @@ function updateBookingSummary() {
   const addonsTotal = addons.reduce((sum, addon) => sum + Number(addon.price || 0), 0);
   const dueToday = Number(e.deposit || e.price || 0);
   const total = Number(e.full_price || e.price || 0) + addonsTotal;
-  const remaining = Math.max(0, total - dueToday);
+  const remaining = Math.max(0, total - dueToday - (appliedReferral?.discount || 0));
+  const referralLine = appliedReferral ? `
+    <div class="summary-row" style="color:#2f855a"><span>${appliedReferral.type === 'gift' ? 'Gift certificate' : 'Referral discount'} (${escapeHtml(appliedReferral.code)})</span><span>-$${money(appliedReferral.discount)} CAD</span></div>` : '';
   box.innerHTML = `
     <div class="summary-row"><span>${escapeHtml(e.title || 'Session')}</span><button type="button" class="change-time" onclick="changeTimeFocus()">Change time</button></div>
     <div class="summary-row"><span>${fmtDate(date)} · ${escapeHtml(time)}</span><span>${escapeHtml(e.location || 'Calgary')}</span></div>
     ${addonsTotal ? `<div class="summary-row"><span>Selected add-ons</span><span>$${money(addonsTotal)} CAD</span></div>` : ''}
+    ${referralLine}
     <div class="summary-row"><span>Amount due today</span><span>$${money(dueToday)} CAD</span></div>
     <div class="summary-row"><span>Remaining balance</span><span>$${money(remaining)} CAD</span></div>`;
 }
@@ -2008,6 +2011,13 @@ async function openDrawer(id) {
         <input data-ph="phone_ph" placeholder="${T('phone_ph')}" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
         <input data-ph="email_ph" placeholder="${T('email_ph')}" id="fEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
         <input data-ph="ig_ph" placeholder="${T('ig_ph')}" id="fIg" autocomplete="off" oninput="clearFieldError(this)">
+        <div class="referral-wrap" style="grid-column:1/-1; margin-top:4px;">
+          <div style="display:flex; gap:8px; align-items:stretch;">
+            <input id="fReferral" type="text" placeholder="Referral or gift code (optional)" autocomplete="off" oninput="clearFieldError(this); document.getElementById('referralStatus').textContent='';" style="flex:1; text-transform:uppercase;">
+            <button type="button" id="referralApplyBtn" onclick="applyReferralCode()" style="padding:10px 14px; border-radius:10px; border:1px solid var(--rose); background:#fff; color:var(--rose); font-weight:600; cursor:pointer;">Apply</button>
+          </div>
+          <span id="referralStatus" style="display:block; font-size:.78rem; margin-top:4px; min-height:1.2em;"></span>
+        </div>
         <!-- Honeypot: invisible field — bots fill it, humans don't see it -->
         <input type="text" id="hp_website" name="website" style="position:absolute;left:-9999px;opacity:0" tabindex="-1" autocomplete="off" placeholder="Leave empty">
       </div>
@@ -2135,6 +2145,40 @@ function validateBookingForm() {
   return valid;
 }
 
+let appliedReferral = null; // {code, discount, type, owner_name}
+
+async function applyReferralCode() {
+  const codeInput = document.getElementById('fReferral');
+  const status = document.getElementById('referralStatus');
+  const code = (codeInput?.value || '').trim().toUpperCase();
+  const email = (document.getElementById('fEmail')?.value || '').trim().toLowerCase();
+  if (!code) { status.textContent = 'Enter a code first'; status.style.color = '#e53e3e'; return; }
+  const eventObj = eventsData.find(e => e.id === currentDrawerEventId) || {};
+  try {
+    const r = await fetch('/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code, session_type: eventObj.session_type || 'mini', email})
+    });
+    const data = await r.json();
+    if (data.valid) {
+      appliedReferral = { code, discount: data.discount || 0, type: data.type, owner_name: data.owner_name };
+      status.innerHTML = `✓ ${data.type === 'gift' ? 'Gift certificate' : 'Referral code'} applied — $${Number(data.discount || 0).toFixed(2)} off balance`;
+      status.style.color = '#2f855a';
+      updateBookingSummary();
+    } else {
+      appliedReferral = null;
+      status.textContent = data.error || 'Invalid code';
+      status.style.color = '#e53e3e';
+    }
+  } catch (err) {
+    console.error('validate code failed', err);
+    appliedReferral = null;
+    status.textContent = 'Could not verify code. You can still continue without it.';
+    status.style.color = '#c05621';
+  }
+}
+
 // ── RESERVE SLOT ──
 const RECAPTCHA_SITE_KEY = '6Ld98uosAAAAALZYp2NkeESIBAvL8BrUlgsMs1IG';
 let recaptchaLoadPromise = null;
@@ -2211,6 +2255,8 @@ async function reserveSlot(eventId, eventDate) {
       instagram: ig,
       session_type: eventObj.session_type || 'mini',
       addons: getSelectedAddons(),
+      referral_code: appliedReferral?.code || '',
+      referral_discount: appliedReferral?.discount || 0,
       terms_accepted: termsAccepted,
       agreement_name: agreementName,
       marketing_consent: marketingConsent,
@@ -2236,6 +2282,8 @@ async function reserveSlot(eventId, eventDate) {
         addons_total: selectedAddonDetails(eventObj).reduce((sum, addon) => sum + Number(addon.price || 0), 0),
         amount_due_today: Number(eventObj.deposit || eventObj.price || 0),
         total_price: Number(eventObj.full_price || eventObj.price || 0) + selectedAddonDetails(eventObj).reduce((sum, addon) => sum + Number(addon.price || 0), 0),
+        referral_code: result.referral_code || '',
+        referral_discount: Number(result.referral_discount || 0),
       };
       goToPayment(eventId, eventDate);
     } else {
@@ -2269,7 +2317,11 @@ function goToPayment(eventId, eventDate) {
   const addons = currentBooking?.addons || [];
   const addonsTotal = Number(currentBooking?.addons_total || 0);
   const totalPrice = Number(currentBooking?.total_price || ((e.full_price || 0) + addonsTotal));
-  const remaining = Math.max(0, totalPrice - amt);
+  const referralDiscount = Number(currentBooking?.referral_discount || 0);
+  const remaining = Math.max(0, totalPrice - amt - referralDiscount);
+  const referralRows = referralDiscount > 0 ? `
+    <div class="row" style="color:#2f855a"><span class="key">Referral discount ${escapeHtml(currentBooking.referral_code || '')}</span><span>-$${money(referralDiscount)} CAD</span></div>
+  ` : '';
   const addonsRows = addonsTotal ? `
       <div class="row"><span class="key">Selected add-ons</span><span>$${money(addonsTotal)} CAD</span></div>
       ${addons.map(addon => `<div class="row"><span class="key">${escapeHtml(addon.title || 'Add-on')}</span><span>$${money(addon.price)} CAD</span></div>`).join('')}
@@ -2293,6 +2345,7 @@ function goToPayment(eventId, eventDate) {
       <div class="row"><span class="key">${T('pay_row_date')}</span><span>${fmtDate(eventDate)}</span></div>
       <div class="row"><span class="key">${T('pay_row_time')}</span><span>${time}</span></div>
       ${addonsRows}
+      ${referralRows}
       <div class="row"><span class="key">Remaining balance</span><span>$${money(remaining)} CAD</span></div>
       <div class="row"><span class="key">Amount due today</span><span class="val-rose">$${money(amt)} CAD</span></div>
     </div>
