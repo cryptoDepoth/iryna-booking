@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · Pashynska Studio Admin</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}">
+<!--
+  admin_pro.html — NEW admin dashboard (P1 of the approved redesign).
+  Rendered by /admin when ?v=2 is passed. Uses the SAME context as the legacy
+  dashboard (bookings, filtered_stats, overall_stats, event_summaries, next_event, filters).
+  Session detail + Clients CRM are still TODO — see CODEX-HANDOFF-ADMIN-REDESIGN.md §4 (P2/P3).
+-->
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand"><span class="dot">◆</span><div>Pashynska<small>Studio Admin</small></div></div>
+    <nav class="nav">
+      <div class="nav-group">
+        <div class="lbl">Main</div>
+        <a class="nav-item active" href="/admin?v=2"><span class="ic">▦</span> Dashboard</a>
+        <a class="nav-item" href="#sessions"><span class="ic">📷</span> Sessions <span class="badge dim">{{ event_summaries|length }}</span></a>
+        <a class="nav-item" href="/admin/clients"><span class="ic">👥</span> Clients</a>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">Needs action</div>
+        {% set attn = event_summaries|selectattr('attention_count')|list %}
+        <a class="nav-item" href="#bookings"><span class="ic">⏳</span> Pending {% if filtered_stats.pending %}<span class="badge">{{ filtered_stats.pending }}</span>{% endif %}</a>
+        <a class="nav-item" href="/admin/transfers"><span class="ic">💸</span> Interac</a>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">Tools</div>
+        <a class="nav-item" href="/admin/analytics"><span class="ic">📊</span> Analytics</a>
+        <a class="nav-item" href="/admin/link-generator"><span class="ic">🔗</span> Payment links</a>
+        <a class="nav-item" href="/admin/health"><span class="ic">❤</span> Health</a>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">View</div>
+        <a class="nav-item" href="/admin?legacy=1"><span class="ic">↺</span> Classic admin</a>
+      </div>
+    </nav>
+    <div class="side-foot">
+      <div class="avatar">IP</div>
+      <div class="who">Pashynska Photography<small>Admin</small></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <form class="search" method="get" action="/admin">
+        <span class="si">⌕</span>
+        <input name="search" value="{{ filters.search or '' }}" placeholder="Search bookings by name, email, phone, instagram…">
+        <input type="hidden" name="v" value="2">
+      </form>
+      <div class="top-actions">
+        <a class="btn ghost" href="/admin/export?{{ request.query_string.decode('utf-8') }}">⬇ Export</a>
+        <a class="btn ghost" href="/" target="_blank">↗ Site</a>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- HEADER -->
+      <div class="page-head">
+        <div>
+          <h1>Dashboard</h1>
+          <div class="sub">{{ now.strftime('%A, %B %d') }} · {{ overall_stats.total }} bookings total · {{ event_summaries|length }} active session{{ '' if event_summaries|length == 1 else 's' }}</div>
+        </div>
+        <div class="row">
+          <button class="btn ghost" type="button" onclick="openStripeModal()">💳 Stripe link</button>
+          <button class="btn ghost" type="button" onclick="openPrivateSessionModal()">✦ Индивидуальная фотосессия</button>
+          <button class="btn ghost" type="button" onclick="openCreateModal()">✦ Новое событие</button>
+          <a class="btn ghost" href="/admin?legacy=1#events-section">✏️ Редактировать события</a>
+          <a class="btn primary" href="{% if next_event %}/admin/event/{{ next_event.id }}{% else %}/admin?legacy=1#events-section{% endif %}">{% if next_event %}Open next session{% else %}Create session{% endif %}</a>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpis">
+        <div class="kpi">
+          <div class="h"><span>Confirmed</span><span class="ic" style="background:var(--green-light);color:var(--green-text)">✓</span></div>
+          <div class="v" style="color:var(--green-text)">{{ filtered_stats.confirmed }}</div>
+          <div class="d">{% if filtered_stats.total %}{{ ((100 * filtered_stats.confirmed / filtered_stats.total)|round(0,'floor'))|int }}% of {{ filtered_stats.total }} shown{% else %}—{% endif %}</div>
+        </div>
+        <div class="kpi">
+          <div class="h"><span>Pending payment</span><span class="ic" style="background:var(--amber-light);color:var(--amber-text)">⏳</span></div>
+          <div class="v" style="color:var(--amber-text)">{{ filtered_stats.pending }}</div>
+          <div class="d">Awaiting verification</div>
+        </div>
+        <div class="kpi">
+          <div class="h"><span>Expected revenue</span><span class="ic" style="background:var(--blue-light);color:var(--blue-text)">$</span></div>
+          <div class="v" style="color:var(--blue-text)">${{ "%.0f"|format(filtered_stats.total_expected or 0) }}</div>
+          <div class="d">CAD · deposits + balances on confirmed</div>
+        </div>
+        <div class="kpi">
+          <div class="h"><span>Cancelled / expired</span><span class="ic" style="background:var(--surface-3);color:var(--text-2)">✕</span></div>
+          <div class="v" style="color:var(--text-2)">{{ filtered_stats.cancelled + filtered_stats.expired }}</div>
+          <div class="d">{{ filtered_stats.cancelled }} cancelled · {{ filtered_stats.expired }} expired</div>
+        </div>
+      </div>
+
+      <!-- NEEDS ATTENTION -->
+      {% if attn %}
+      <div class="section">
+        <div class="section-head"><h2>⚠ Needs attention</h2></div>
+        <div class="sessions">
+          {% for ev in attn %}
+          <a class="s-card" href="/admin/event/{{ ev.id }}" style="display:block">
+            <div class="s-attn" style="margin:0 0 10px">⚠ {{ ev.attention_count }} client{{ '' if ev.attention_count == 1 else 's' }} awaiting payment or follow-up</div>
+            <h3>{{ ev.title }}</h3>
+            <div class="s-meta"><span>📅 {{ ev.date or 'No date' }}</span>{% if ev.location %}<span>📍 {{ ev.location.split(',')[0] }}</span>{% endif %}</div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- SESSIONS -->
+      <div class="section" id="sessions">
+        <div class="section-head"><h2>📷 Sessions</h2><a class="link" href="/admin?legacy=1#events-section">Manage setup →</a></div>
+        {% if event_summaries %}
+        <div class="sessions">
+          {% for ev in event_summaries %}
+          <div class="s-card {% if next_event and ev.id == next_event.id %}next{% endif %}" onclick="location.href='/admin/event/{{ ev.id }}'">
+            {% if next_event and ev.id == next_event.id %}<div class="ribbon">Next up</div>{% endif %}
+            <h3>{{ ev.title }}</h3>
+            <div class="s-meta">
+              <span>📅 {{ ev.date or 'No date' }}{% if ev.start_time %} · {{ ev.start_time }}{% endif %}</span>
+              {% if ev.location %}<span>📍 {{ ev.location.split(',')[0] }}</span>{% endif %}
+            </div>
+            <div class="s-metrics">
+              <div class="s-metric"><b>{{ ev.booked }}</b><span>Booked</span></div>
+              <div class="s-metric"><b style="color:var(--green-text)">{{ ev.confirmed }}</b><span>Paid</span></div>
+              <div class="s-metric"><b style="color:var(--amber-text)">{{ ev.pending }}</b><span>Pend</span></div>
+              <div class="s-metric"><b style="color:var(--text-2)">{{ ev.free }}</b><span>Free</span></div>
+            </div>
+            <div class="bar"><i style="width:{{ ev.occupancy or 0 }}%"></i></div>
+            <div class="s-actions">
+              <a class="btn primary sm" href="/admin/event/{{ ev.id }}" onclick="event.stopPropagation()">Open session</a>
+              <a class="btn ghost sm" href="/?event={{ ev.id }}" target="_blank" onclick="event.stopPropagation()">View</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="card" style="padding:40px;text-align:center;color:var(--text-3)">No active or upcoming sessions yet. <a class="link" href="/admin?legacy=1#events-section">Create one →</a></div>
+        {% endif %}
+      </div>
+
+      <!-- BOOKINGS -->
+      <div class="section card" id="bookings">
+        <div class="toolbar">
+          <strong style="font-size:14px">Bookings</strong>
+          <div class="chips" style="margin-left:6px">
+            {% set st = filters.status or 'all' %}
+            <a class="chip {% if st == 'all' or not filters.status %}active{% endif %}" href="/admin?v=2{% if filters.search %}&search={{ filters.search }}{% endif %}">All <span class="n">{{ overall_stats.total }}</span></a>
+            <a class="chip {% if st == 'pending' %}active{% endif %}" href="/admin?v=2&status=pending{% if filters.search %}&search={{ filters.search }}{% endif %}">Pending <span class="n">{{ overall_stats.pending }}</span></a>
+            <a class="chip {% if st == 'confirmed' %}active{% endif %}" href="/admin?v=2&status=confirmed{% if filters.search %}&search={{ filters.search }}{% endif %}">Confirmed <span class="n">{{ overall_stats.confirmed }}</span></a>
+            <a class="chip {% if st == 'cancelled' %}active{% endif %}" href="/admin?v=2&status=cancelled{% if filters.search %}&search={{ filters.search }}{% endif %}">Cancelled <span class="n">{{ overall_stats.cancelled }}</span></a>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Client</th><th>Session</th><th>Date</th><th>Status</th><th>Amount</th><th></th></tr></thead>
+            <tbody>
+              {% for b in bookings %}
+              {% set cls = 'green' if b.status == 'confirmed' else ('amber' if b.status in ('pending_payment','reserved') else ('red' if b.status == 'cancelled' else 'gray')) %}
+              {% set lbl = 'Confirmed' if b.status == 'confirmed' else ('Pending' if b.status in ('pending_payment','reserved') else ('Cancelled' if b.status == 'cancelled' else 'Expired')) %}
+              <tr onclick="location.href='/admin/booking/{{ b.id }}'" style="cursor:pointer">
+                <td><div class="cust">
+                  <div class="ava" style="background:linear-gradient(135deg,#c4857a,#a3685e)">{{ (b.name or '?')[:1]|upper }}</div>
+                  <div><div class="nm">{{ b.name or 'Unknown' }}</div><div class="em">{{ b.email or '' }}</div></div>
+                </div></td>
+                <td>{{ b.session_type or '—' }}</td>
+                <td>{{ b.date or '—' }}{% if b.time %} · {{ b.time }}{% endif %}</td>
+                <td><span class="pill {{ cls }}">{{ lbl }}</span></td>
+                <td class="money">{% if b.paid_amount %}${{ "%.0f"|format(b.paid_amount) }}{% else %}—{% endif %}</td>
+                <td><div class="row-act"><a class="btn subtle sm" href="/admin/booking/{{ b.id }}" onclick="event.stopPropagation()">Open</a></div></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:40px">No bookings match these filters.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="foot">
+          <span>Showing <b>{{ filtered_stats.total }}</b> of {{ filters.total_count }} bookings{% if filters.search %} · search "{{ filters.search }}"{% endif %}</span>
+          {% if filters.total_pages and filters.total_pages > 1 %}
+          <div class="pager">
+            {% if filters.page > 1 %}<a class="pager"><button onclick="location.href='/admin?v=2&page={{ filters.page - 1 }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}'">‹</button></a>{% endif %}
+            <button class="active">{{ filters.page }}</button>
+            <span style="color:var(--text-3);font-size:13px;align-self:center;padding:0 4px">of {{ filters.total_pages }}</span>
+            {% if filters.page < filters.total_pages %}<button onclick="location.href='/admin?v=2&page={{ filters.page + 1 }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}'">›</button>{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<!-- ===== STRIPE LINK MODAL ===== -->
+<div class="modal-ov" id="stripe-modal" onclick="closeStripeModalOutside(event)">
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <div class="modal-head"><h3>💳 Stripe payment link</h3><p>Разовая ссылка на оплату картой. Бронь не меняется, письмо клиенту не отправляется.</p></div>
+    <div class="modal-body">
+      <div class="fgrid">
+        <div class="fld"><label>Сумма CAD *</label><input type="number" id="stripe-amount" min="1" step="0.01" placeholder="120.50"></div>
+        <div class="fld"><label>Email клиента (необязательно)</label><input type="email" id="stripe-email" placeholder="client@example.com"></div>
+        <div class="fld full"><label>Описание</label><input type="text" id="stripe-description" maxlength="120" placeholder="Boho photoshoot payment"></div>
+      </div>
+      <div class="fld full" id="stripe-result"><label>Ссылка Stripe</label><div class="linkout"><input id="stripe-link-output" type="text" readonly><button class="btn ghost sm" type="button" onclick="copyStripeLink()">Копировать</button></div></div>
+      <div class="modal-foot"><button class="btn ghost" type="button" onclick="closeStripeModal()">Закрыть</button><button class="btn primary" type="button" id="stripe-create-btn" onclick="createStripeLink()">Создать ссылку</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== INDIVIDUAL PHOTOSHOOT MODAL ===== -->
+<div class="modal-ov" id="private-session-modal" onclick="closePrivateSessionModalOutside(event)">
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <div class="modal-head"><h3>✦ Индивидуальная фотосессия</h3><p>Создать отдельную запись для клиента. На публичном сайте эта фотосессия не отображается.</p></div>
+    <div class="modal-body">
+      <div class="fsec"><div class="fsec-t">Сессия</div><div class="fgrid">
+        <div class="fld"><label>Дата</label><input type="date" id="private-date" required></div>
+        <div class="fld"><label>Edited photos</label><input type="number" id="private-photos" min="1" step="1" value="25"></div>
+        <div class="fld"><label>Начало</label><input type="time" id="private-start-time" step="60" required></div>
+        <div class="fld"><label>Конец</label><input type="time" id="private-end-time" step="60" required></div>
+      </div></div>
+      <div class="fsec"><div class="fsec-t">Клиент</div><div class="fgrid">
+        <div class="fld"><label>Имя</label><input type="text" id="private-firstname" placeholder="Иван" required></div>
+        <div class="fld"><label>Фамилия</label><input type="text" id="private-lastname" placeholder="Иванов" required></div>
+        <div class="fld"><label>Email</label><input type="email" id="private-email" placeholder="ivan@example.com"></div>
+        <div class="fld"><label>Instagram</label><input type="text" id="private-instagram" placeholder="@handle"></div>
+      </div></div>
+      <div class="fsec"><div class="fsec-t">Оплата</div><div class="fgrid">
+        <div class="fld"><label>Цена (CAD)</label><input type="number" id="private-price" min="0" step="0.01" placeholder="300" value="300" oninput="updateDepositCalc()"></div>
+        <div class="fld"><label>Депозит (CAD)</label><input type="number" id="private-deposit" min="0" step="0.01" placeholder="100" value="300" oninput="updateDepositCalc()"></div>
+        <div class="fld"><label>Остаток</label><div class="balance" id="private-balance-display">$0.00</div></div>
+        <div class="fld"><label>Пресет депозита</label><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="preset-btn" onclick="setDepositPreset(50)">50%</button><button type="button" class="preset-btn" onclick="setDepositPreset(100)">$100</button><button type="button" class="preset-btn" onclick="setDepositPreset(150)">$150</button><button type="button" class="preset-btn" onclick="setDepositFull()">Full</button></div></div>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="private-send-email" checked><span>Отправить клиенту письмо со ссылкой на оплату депозита</span></label>
+        <label class="check"><input type="checkbox" id="private-already-paid" onchange="togglePrivatePaid()"><span>Уже оплачено — просто записать сессию</span></label>
+      </div></div>
+      <div class="fld full" id="private-link-row" style="display:none"><label>Ссылка для клиента (e-Transfer или карта)</label><div class="linkout"><input type="text" id="private-payment-link" readonly><button type="button" class="btn ghost sm" onclick="copyPaymentLink()">Копировать</button></div></div>
+      <div id="private-status" role="status" aria-live="polite"></div>
+      <div class="modal-foot"><button type="button" class="btn ghost" onclick="closePrivateSessionModal()">Отмена</button><button type="button" class="btn primary" id="private-create-btn" onclick="submitPrivateSession()">Создать</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="ic">✓</span><span id="toastMsg"></span></div>
+
+<script>
+let _tt; function toast(m){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2400)}
+
+/* ===== Stripe link (reused from classic) ===== */
+function openStripeModal(){document.getElementById('stripe-modal').classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('stripe-amount').focus(),80)}
+function closeStripeModal(){document.getElementById('stripe-modal').classList.remove('open');document.body.style.overflow=''}
+function closeStripeModalOutside(e){if(e.target===document.getElementById('stripe-modal'))closeStripeModal()}
+async function createStripeLink(){
+  const btn=document.getElementById('stripe-create-btn'),result=document.getElementById('stripe-result'),output=document.getElementById('stripe-link-output');
+  const body={amount:document.getElementById('stripe-amount').value,email:document.getElementById('stripe-email').value.trim(),description:document.getElementById('stripe-description').value.trim()};
+  btn.disabled=true;btn.textContent='Создаём…';
+  try{
+    const res=await fetch('/admin/stripe-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await res.json().catch(()=>null);
+    if(res.ok&&data&&data.success){output.value=data.checkout_url;result.classList.add('show');toast('Stripe-ссылка создана')}
+    else toast((data&&data.error)||('HTTP '+res.status))
+  }catch(e){toast('Сеть недоступна: '+e.message)}finally{btn.disabled=false;btn.textContent='Создать ссылку'}
+}
+async function copyStripeLink(){
+  const o=document.getElementById('stripe-link-output');if(!o||!o.value){toast('Сначала создайте ссылку');return}
+  try{await navigator.clipboard.writeText(o.value);toast('Ссылка скопирована')}catch(e){o.select();document.execCommand('copy');toast('Ссылка скопирована')}
+}
+
+/* ===== Individual photoshoot (reused from classic) ===== */
+function _pvStatus(msg,kind){const el=document.getElementById('private-status');if(!el)return;if(!msg){el.style.display='none';el.innerHTML='';return}
+  const p={error:['#fdf0f0','#8b3535'],success:['#edf5f0','#3d6b4f'],info:['#f7ece8','#a3685e']}[kind||'info'];el.style.background=p[0];el.style.color=p[1];el.innerHTML=msg;el.style.display='block'}
+function _pvBusy(btnId,busyText){const btn=document.getElementById(btnId);if(!btn)return()=>{};const o=btn.textContent;btn.disabled=true;btn.textContent=busyText;return()=>{btn.disabled=false;btn.textContent=o}}
+function updateDepositCalc(){const price=parseFloat(document.getElementById('private-price').value)||0,deposit=parseFloat(document.getElementById('private-deposit').value)||0,bal=Math.max(price-deposit,0);const d=document.getElementById('private-balance-display');d.textContent='$'+bal.toFixed(2);d.style.color=bal>0?'var(--rose-deep)':'var(--green-text)'}
+function setDepositPreset(val){const price=parseFloat(document.getElementById('private-price').value)||0;document.getElementById('private-deposit').value=(val<=100&&price>0)?(price*val/100).toFixed(2):val.toFixed(2);updateDepositCalc()}
+function setDepositFull(){const price=parseFloat(document.getElementById('private-price').value)||0;document.getElementById('private-deposit').value=price.toFixed(2);updateDepositCalc()}
+function _pvTimes(){const s=document.getElementById('private-start-time').value,e=document.getElementById('private-end-time').value;if(!s||!e)return null;if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(s)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(e))return null;return{start:s,end:e}}
+function _pvCollect(){
+  const firstname=document.getElementById('private-firstname').value.trim(),lastname=document.getElementById('private-lastname').value.trim(),email=document.getElementById('private-email').value.trim(),instagram=document.getElementById('private-instagram').value.trim();
+  const price=parseFloat(document.getElementById('private-price').value)||0,deposit=parseFloat(document.getElementById('private-deposit').value)||0,photos=parseInt(document.getElementById('private-photos').value)||25,date=document.getElementById('private-date').value;
+  const alreadyPaid=document.getElementById('private-already-paid').checked,sendEmail=!alreadyPaid&&document.getElementById('private-send-email').checked,t=_pvTimes();
+  if(!firstname||!lastname||!price||!date||!t){_pvStatus('Заполните все поля (имя, фамилия, дата, время, цена).','error');return null}
+  if(deposit<=0){_pvStatus('Укажите сумму депозита (или нажмите «Full»).','error');return null}
+  if(deposit>price){_pvStatus('Депозит не может превышать полную цену.','error');return null}
+  if(!email&&!alreadyPaid){_pvStatus('Email обязателен — на него уйдёт ссылка на оплату.','error');return null}
+  if(t.end<=t.start){_pvStatus('Время окончания должно быть позже начала.','error');return null}
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){_pvStatus('Проверьте email — формат некорректный.','error');return null}
+  return{firstname,lastname,email,price,deposit,photos,date,startTime:t.start,endTime:t.end,instagram,alreadyPaid,sendEmail}
+}
+function togglePrivatePaid(){const paid=document.getElementById('private-already-paid').checked,sb=document.getElementById('private-send-email');sb.disabled=paid;sb.checked=!paid}
+async function copyPaymentLink(){const link=document.getElementById('private-payment-link').value;if(!link){_pvStatus('Сначала создайте сессию — ссылка появится автоматически.','error');return}try{await navigator.clipboard.writeText(link);_pvStatus('📋 Ссылка скопирована.','success')}catch(e){const ta=document.getElementById('private-payment-link');ta.focus();ta.select();document.execCommand('copy');_pvStatus('📋 Ссылка скопирована.','success')}}
+function openPrivateSessionModal(){
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('private-date').value=today;document.getElementById('private-date').min=today;
+  ['private-firstname','private-lastname','private-email','private-instagram'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('private-start-time').value='10:00';document.getElementById('private-end-time').value='11:00';
+  document.getElementById('private-price').value='300';document.getElementById('private-photos').value='25';document.getElementById('private-deposit').value='300';
+  document.getElementById('private-payment-link').value='';document.getElementById('private-link-row').style.display='none';
+  document.getElementById('private-already-paid').checked=false;const sb=document.getElementById('private-send-email');sb.checked=true;sb.disabled=false;
+  updateDepositCalc();const btn=document.getElementById('private-create-btn');btn.disabled=false;btn.textContent='Создать';_pvStatus('');
+  document.getElementById('private-session-modal').style.display='flex';document.body.style.overflow='hidden'
+}
+function closePrivateSessionModal(){document.getElementById('private-session-modal').style.display='none';document.body.style.overflow=''}
+function closePrivateSessionModalOutside(e){if(e.target===document.getElementById('private-session-modal'))closePrivateSessionModal()}
+async function submitPrivateSession(){
+  const f=_pvCollect();if(!f)return;const done=_pvBusy('private-create-btn','Создаём…');
+  _pvStatus(f.sendEmail?'Создаём сессию и отправляем письмо клиенту…':'Создаём индивидуальную сессию…','info');
+  try{
+    const r=await fetch('/admin/api/private-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      date:f.date,start_time:f.startTime,end_time:f.endTime,client_name:`${f.firstname} ${f.lastname}`,email:f.email,instagram:f.instagram,
+      price:f.price,deposit:f.deposit,photos:f.photos,send_email:f.sendEmail,already_paid:f.alreadyPaid})});
+    const data=await r.json();
+    if(r.ok&&data.success){
+      let note=data.paid?'✅ Сессия записана как оплаченная.':data.email_sent?'✉️ Письмо со ссылкой на оплату отправлено клиенту.':(f.sendEmail?'⚠️ Сессия создана, но письмо не ушло — отправьте ссылку ниже вручную.':'🔗 Сессия создана — отправьте клиенту ссылку ниже.');
+      if(data.payment_url){document.getElementById('private-payment-link').value=data.payment_url;document.getElementById('private-link-row').style.display=''}
+      _pvStatus(`${note}<br><a href="${data.booking_url}" style="color:inherit;text-decoration:underline">Открыть бронь #${data.booking_id} →</a>`,(data.paid||data.email_sent||!f.sendEmail)?'success':'error');
+      const btn=document.getElementById('private-create-btn');btn.textContent='Создано ✓';btn.disabled=true;
+    }else{_pvStatus(data.error||'Ошибка создания.','error');done()}
+  }catch(e){_pvStatus('Сеть недоступна: '+e.message,'error');done()}
+}
+</script>
+<!-- ===== CREATE EVENT MODAL ===== -->
+<div class="modal-ov" id="create-modal" onclick="closeCreateModalOutside(event)">
+  <div class="modal-box" style="max-width:640px" role="dialog" aria-modal="true">
+    <div class="modal-head"><h3>✦ Новое событие</h3><p>Заполните детали — всё можно изменить позже.</p></div>
+    <div class="modal-body">
+      <div class="fsec"><div class="fsec-t">Основное</div><div class="fgrid">
+        <div class="fld full"><label>Название *</label><input type="text" id="new-title" maxlength="120" placeholder="🌸 Spring Mini Sessions"></div>
+        <div class="fld full"><label>Подзаголовок</label><input type="text" id="new-subtitle" maxlength="200" placeholder="Soft spring moments…"></div>
+        <div class="fld"><label>Дата *</label><input type="date" id="new-date"></div>
+        <div class="fld"><label>Локация</label><input type="text" id="new-location" placeholder="Riley Park, Calgary"></div>
+        <label class="check" style="grid-column:1/-1"><input type="checkbox" id="new-featured"><span>Featured (показывать первым)</span></label>
+      </div></div>
+      <div class="fsec"><div class="fsec-t">Расписание</div><div class="fgrid">
+        <div class="fld"><label>Начало</label><input type="time" id="new-start" value="10:00"></div>
+        <div class="fld"><label>Конец</label><input type="time" id="new-end" value="17:00"></div>
+        <div class="fld"><label>Сессия (мин)</label><input type="number" id="new-session" value="20" min="5" max="120"></div>
+        <div class="fld"><label>Перерыв (мин)</label><input type="number" id="new-break" value="10" min="0" max="60"></div>
+      </div></div>
+      <div class="fsec"><div class="fsec-t">Цена</div><div class="fgrid">
+        <div class="fld"><label>Депозит (CAD)</label><input type="number" id="new-deposit" value="100" min="0" step="5"></div>
+        <div class="fld"><label>Полная цена (CAD)</label><input type="number" id="new-fullprice" value="300" min="0" step="5"></div>
+      </div></div>
+      <div class="fsec"><div class="fsec-t">Add-ons</div>
+        <div class="fgrid">
+          <div class="fld"><label>10 доп. фото — цена</label><input type="number" id="new-addon-extra-price" value="50" min="0" step="5"></div>
+          <label class="check"><input type="checkbox" id="new-addon-extra-active" checked><span>Активно</span></label>
+          <div class="fld"><label>Reel (BTS) — цена</label><input type="number" id="new-addon-reel-price" value="50" min="0" step="5"></div>
+          <label class="check"><input type="checkbox" id="new-addon-reel-active" checked><span>Активно</span></label>
+        </div>
+        <div id="new-custom-addons" style="margin-top:10px"></div>
+        <button type="button" class="btn subtle sm" style="margin-top:8px" onclick="addNewCustomAddonRow()">+ Свой add-on</button>
+      </div>
+      <div class="fsec"><div class="fsec-t">Тип бронирования</div><div class="fgrid">
+        <div class="fld"><label>Статус</label><select id="new-status" class="select" style="width:100%"><option value="upcoming">Upcoming (виден, без брони)</option><option value="active">Active (бронируется)</option></select></div>
+        <div class="fld"><label>Booking flow</label><select id="new-booking-type" class="select" style="width:100%" onchange="toggleCreateBookingTypeFields()"><option value="fixed_slots" selected>Fixed slots (mini)</option><option value="rolling_availability">Rolling (individual)</option><option value="inquiry_only">Inquiry only (wedding)</option></select></div>
+        <div class="fld"><label>Session type</label><select id="new-session-type" class="select" style="width:100%"><option value="mini" selected>Mini</option><option value="individual">Individual</option><option value="wedding">Wedding</option><option value="custom">Custom</option></select></div>
+        <div class="fld" id="new-horizon-group"><label>Горизонт (дней)</label><input type="number" id="new-horizon" value="90" min="7" max="365"></div>
+        <div class="fld full" id="new-blackout-group"><label>Blackout dates</label><input type="text" id="new-blackout" placeholder="2026-07-01, 2026-07-02"></div>
+      </div></div>
+      <div class="fsec"><div class="fsec-t">Что включено</div>
+        <div id="new-included-presets" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','⏱ 20-minute photo session')">⏱ 20-min</button>
+          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','🖼 15 professionally edited photos')">🖼 15 edited</button>
+          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','📸 All original photos included')">📸 All originals</button>
+          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','🎨 Beautiful boho-style setup &amp; decorations')">🎨 Boho setup</button>
+          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','✨ Assistance with posing')">✨ Posing</button>
+          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','⚡ Quick turnaround (within 48 hours)')">⚡ 48h</button>
+        </div>
+        <div id="new-included-list">
+          <div class="included-row" style="display:flex;gap:8px;margin-bottom:8px"><input type="text" class="included-input" value="🖼 15 professionally edited photos" style="flex:1;height:38px;border:1px solid var(--border);border-radius:8px;padding:0 11px"><button type="button" onclick="removeIncludedRow(this)" class="btn subtle sm">✕</button></div>
+          <div class="included-row" style="display:flex;gap:8px;margin-bottom:8px"><input type="text" class="included-input" value="📸 All original photos included" style="flex:1;height:38px;border:1px solid var(--border);border-radius:8px;padding:0 11px"><button type="button" onclick="removeIncludedRow(this)" class="btn subtle sm">✕</button></div>
+        </div>
+        <button type="button" class="btn subtle sm" style="margin-top:6px" onclick="addNewIncludedRow()">+ Пункт</button>
+      </div>
+      <div class="modal-foot"><button class="btn ghost" type="button" onclick="closeCreateModal()">Отмена</button><button class="btn primary" type="button" id="create-submit-btn" onclick="submitCreateEvent()">✦ Создать событие</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== Create event (reused payload/collectors from classic) ===== */
+function openCreateModal(){const d=new Date();d.setDate(d.getDate()+7);document.getElementById('new-date').value=d.toISOString().split('T')[0];toggleCreateBookingTypeFields();document.getElementById('create-modal').classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('new-title').focus(),100)}
+function closeCreateModal(){document.getElementById('create-modal').classList.remove('open');document.body.style.overflow=''}
+function closeCreateModalOutside(e){if(e.target===document.getElementById('create-modal'))closeCreateModal()}
+function toggleCreateBookingTypeFields(){const bt=document.getElementById('new-booking-type').value,hg=document.getElementById('new-horizon-group'),bg=document.getElementById('new-blackout-group');const show=bt==='rolling_availability';if(hg)hg.style.display=show?'':'none';if(bg)bg.style.display=show?'':'none'}
+function addonCustomRowHtml(o){o=o||{};const q=s=>(s||'').replace(/"/g,'&quot;');return `<div class="addon-custom-row" data-addon-id="${q(o.id)}" style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
+  <input class="addon-title" placeholder="Название add-on" value="${q(o.title)}" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px;margin-bottom:6px">
+  <div style="display:flex;gap:8px"><input class="addon-description" placeholder="Описание (необязательно)" value="${q(o.description)}" style="flex:1;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px"><input class="addon-price" type="number" min="0" step="5" placeholder="CAD" value="${o.price!=null?o.price:''}" style="width:90px;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><label class="check"><input class="addon-active" type="checkbox" ${o.active?'checked':''}><span>Активно</span></label><button type="button" class="btn subtle sm" onclick="this.closest('.addon-custom-row').remove()">Удалить</button></div>
+</div>`}
+function addNewCustomAddonRow(){document.getElementById('new-custom-addons').insertAdjacentHTML('beforeend',addonCustomRowHtml({active:true}))}
+function _incRow(value){const row=document.createElement('div');row.className='included-row';row.style.cssText='display:flex;gap:8px;margin-bottom:8px';row.innerHTML=`<input type="text" class="included-input" value="${(value||'').replace(/"/g,'&quot;')}" style="flex:1;height:38px;border:1px solid var(--border);border-radius:8px;padding:0 11px"><button type="button" onclick="removeIncludedRow(this)" class="btn subtle sm">✕</button>`;return row}
+function addNewIncludedRow(){const l=document.getElementById('new-included-list');const r=_incRow('');l.appendChild(r);r.querySelector('input').focus()}
+function addPresetIncluded(eventId,text){const l=document.getElementById('new-included-list');if(!l)return;l.appendChild(_incRow(text))}
+function removeIncludedRow(btn){btn.closest('.included-row').remove()}
+function collectNewAddons(){
+  const addons=[
+    {id:'extra-10-edited-images',title:'10 Extra Edited Images',price:parseFloat(document.getElementById('new-addon-extra-price')?.value||'50'),active:!!document.getElementById('new-addon-extra-active')?.checked},
+    {id:'short-vertical-reel',title:'Short Vertical Behind-the-Scenes Reel',price:parseFloat(document.getElementById('new-addon-reel-price')?.value||'50'),active:!!document.getElementById('new-addon-reel-active')?.checked},
+  ];
+  document.querySelectorAll('#new-custom-addons .addon-custom-row').forEach((row,idx)=>{
+    const title=row.querySelector('.addon-title')?.value.trim()||'';
+    addons.push({id:row.dataset.addonId||title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||`custom-addon-${idx+1}`,title,description:row.querySelector('.addon-description')?.value.trim()||'',price:parseFloat(row.querySelector('.addon-price')?.value||'0'),active:!!row.querySelector('.addon-active')?.checked});
+  });
+  return addons;
+}
+async function submitCreateEvent(){
+  const title=document.getElementById('new-title').value.trim(),date=document.getElementById('new-date').value;
+  if(!title){toast('Укажите название события');document.getElementById('new-title').focus();return}
+  if(!date){toast('Укажите дату');document.getElementById('new-date').focus();return}
+  const included=Array.from(document.querySelectorAll('#new-included-list .included-input')).map(i=>i.value.trim()).filter(Boolean);
+  const bookingType=document.getElementById('new-booking-type').value;
+  const horizon=parseInt(document.getElementById('new-horizon').value)||90;
+  const blackoutRaw=document.getElementById('new-blackout').value.trim();
+  const blackoutDates=blackoutRaw?blackoutRaw.split(',').map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)):[];
+  const payload={title,subtitle:document.getElementById('new-subtitle').value.trim(),date,start_time:document.getElementById('new-start').value,end_time:document.getElementById('new-end').value,session_length:parseInt(document.getElementById('new-session').value),break_length:parseInt(document.getElementById('new-break').value),deposit:parseFloat(document.getElementById('new-deposit').value),full_price:parseFloat(document.getElementById('new-fullprice').value),status:document.getElementById('new-status').value,location:document.getElementById('new-location').value.trim(),featured:document.getElementById('new-featured').checked,included,addons:collectNewAddons(),booking_type:bookingType,session_type:document.getElementById('new-session-type').value,availability_horizon_days:bookingType==='rolling_availability'?horizon:undefined,blackout_dates:bookingType==='rolling_availability'?blackoutDates:undefined};
+  const btn=document.getElementById('create-submit-btn');btn.disabled=true;btn.textContent='⏳ Создаём…';
+  try{
+    const res=await fetch('/admin/events/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
+    if(data.success){toast('✅ Событие создано');closeCreateModal();setTimeout(()=>location.reload(),800)}
+    else{toast('Ошибка: '+(data.error||'Unknown'));btn.disabled=false;btn.textContent='✦ Создать событие'}
+  }catch(e){toast('Сеть недоступна: '+e.message);btn.disabled=false;btn.textContent='✦ Создать событие'}
+}
+</script>
+</body>
+</html>

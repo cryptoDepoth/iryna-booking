@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ event.title }} · Session · Pashynska Studio</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}">
+<!-- admin_event_pro.html — redesigned session detail (P2). Rendered by /admin/event/<id>?v=2.
+     Photo uploader wired to real routes: upload-batch / upload / delete. Board+roster from /admin/api/event/<id>/slots. -->
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot">◆</span><div>Pashynska<small>Studio Admin</small></div></div>
+    <nav class="nav">
+      <div class="nav-group">
+        <div class="lbl">Main</div>
+        <a class="nav-item" href="/admin?v=2"><span class="ic">▦</span> Dashboard</a>
+        <a class="nav-item active" href="/admin?v=2#sessions"><span class="ic">📷</span> Sessions</a>
+        <a class="nav-item" href="/admin/clients?v=2"><span class="ic">👥</span> Clients</a>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">Tools</div>
+        <a class="nav-item" href="/admin/transfers"><span class="ic">💸</span> Interac</a>
+        <a class="nav-item" href="/admin/analytics"><span class="ic">📊</span> Analytics</a>
+        <a class="nav-item" href="/admin/link-generator"><span class="ic">🔗</span> Payment links</a>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">View</div>
+        <a class="nav-item" href="/admin/event/{{ event.id }}?legacy=1"><span class="ic">↺</span> Classic session</a>
+      </div>
+    </nav>
+    <div class="side-foot"><div class="avatar">IP</div><div class="who">Pashynska Photography<small>Admin</small></div></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <a class="btn ghost" href="/admin?v=2">← Dashboard</a>
+      <div class="top-actions">
+        <a class="btn ghost" href="/?event={{ event.id }}" target="_blank">↗ Public page</a>
+        <a class="btn ghost" href="/admin/event/{{ event.id }}?legacy=1">Classic view</a>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="detail-head">
+        <div class="cover" style="background:linear-gradient(135deg,#c4857a,#a3685e)">📷</div>
+        <div style="flex:1">
+          <h1>{{ event.title }}</h1>
+          <div class="s-meta" style="margin:6px 0 0">
+            <span>📅 {{ event.date or 'No date' }}{% if event.start_time %} · {{ event.start_time }}{% if event.end_time %}–{{ event.end_time }}{% endif %}{% endif %}</span>
+            {% if event.location %}<span>📍 {{ event.location.split(',')[0] }}</span>{% endif %}
+            {% if event.status %}<span class="pill {{ 'green' if event.status == 'active' else 'gray' }}">{{ event.status }}</span>{% endif %}
+            {% if event.hidden %}<span class="pill gray">hidden</span>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="kpis" style="grid-template-columns:repeat(5,1fr)">
+        <div class="kpi"><div class="v" id="kBooked">—</div><div class="d">Booked</div></div>
+        <div class="kpi"><div class="v" style="color:var(--green-text)" id="kPaid">—</div><div class="d">Paid</div></div>
+        <div class="kpi"><div class="v" style="color:var(--amber-text)" id="kPending">—</div><div class="d">Pending</div></div>
+        <div class="kpi"><div class="v" style="color:var(--text-2)" id="kClosed">—</div><div class="d">Closed</div></div>
+        <div class="kpi"><div class="v" style="color:var(--accent-600)" id="kFree">—</div><div class="d">Free</div></div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="photos" onclick="stab(this)">📸 Photos <span class="cnt">{{ event.photos|length if event.photos else 0 }}</span></div>
+        <div class="tab" data-tab="schedule" onclick="stab(this)">📅 Schedule</div>
+        <div class="tab" data-tab="clients" onclick="stab(this)">👥 Clients <span class="cnt" id="rosterCnt">—</span></div>
+        <div class="tab" data-tab="info" onclick="stab(this)">✏️ Info</div>
+      </div>
+
+      <!-- PHOTOS -->
+      <div class="tpanel active" id="t-photos">
+        <div class="section-head" style="margin-bottom:14px">
+          <div><h2 style="font-size:15px">Gallery photos</h2>
+            <div class="sub" style="color:var(--text-2);font-size:12.5px;margin-top:2px">Shown on the public booking page. The first photo is the main card image.</div></div>
+          <span class="pcount"><span id="pc">{{ event.photos|length if event.photos else 0 }}</span> photo{{ '' if (event.photos and event.photos|length == 1) else 's' }}</span>
+        </div>
+
+        <div class="dropzone" id="dz" onclick="document.getElementById('fileInput').click()">
+          <div class="dz-ic">⬆</div>
+          <h3>Drag &amp; drop photos here</h3>
+          <p>or <span style="color:var(--accent-600);font-weight:700">click to browse</span> — up to 5 at a time</p>
+          <div class="formats">JPG · PNG · WEBP</div>
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple style="display:none" onchange="uploadBatch(this)">
+        </div>
+
+        <div class="pgrid" id="pgrid">
+          {% if event.photos %}
+            {% for photo in event.photos %}
+            <div class="ptile {% if loop.index0 == 0 %}main{% endif %}">
+              {% if loop.index0 == 0 %}<span class="tag-main">Main</span>{% endif %}
+              <div class="img" style="background:#222"><img src="{{ photo }}" style="width:100%;height:100%;object-fit:cover" alt="photo {{ loop.index }}"></div>
+              <div class="ov">
+                <label class="b">↑ Replace<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="replacePhoto({{ loop.index0 }}, this)"></label>
+                <div class="b del" onclick="deletePhoto({{ loop.index0 }})">✕</div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty" style="grid-column:1/-1;height:auto;padding:30px"><div><div class="big">🖼</div>No photos yet — drop files above to upload.</div></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- SCHEDULE -->
+      <div class="tpanel" id="t-schedule">
+        <div class="section-head" style="margin-bottom:14px">
+          <h2 style="font-size:15px">Slot board</h2>
+          <a class="btn ghost sm" href="/admin/event/{{ event.id }}?legacy=1">Manage slots in classic →</a>
+        </div>
+        <div class="board" id="board"><div class="empty" style="grid-column:1/-1"><div>Loading slots…</div></div></div>
+      </div>
+
+      <!-- CLIENTS -->
+      <div class="tpanel" id="t-clients">
+        <div class="card"><div class="tbl-wrap"><table>
+          <thead><tr><th>Client</th><th>Slot</th><th>Status</th><th>Paid</th><th></th></tr></thead>
+          <tbody id="roster"><tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:30px">Loading…</td></tr></tbody>
+        </table></div></div>
+      </div>
+
+      <!-- INFO / EDIT -->
+      {% set ev_addons = event.addons or [] %}
+      {% set _extra = (ev_addons | selectattr('id','equalto','extra-10-edited-images') | list) %}
+      {% set _reel = (ev_addons | selectattr('id','equalto','short-vertical-reel') | list) %}
+      {% set extra = _extra[0] if _extra else None %}
+      {% set reel = _reel[0] if _reel else None %}
+      {% set customs = ev_addons | rejectattr('id','in',['extra-10-edited-images','short-vertical-reel']) | list %}
+      <div class="tpanel" id="t-info">
+        <div class="card" style="padding:22px;max-width:720px">
+          <div class="fsec" style="margin-top:0"><div class="fsec-t">Основное</div><div class="fgrid">
+            <div class="fld full"><label>Название</label><input type="text" id="ev-title" value="{{ event.title|e }}"></div>
+            <div class="fld full"><label>Подзаголовок</label><input type="text" id="ev-subtitle" value="{{ event.subtitle|e if event.subtitle else '' }}"></div>
+            <div class="fld"><label>Дата</label><input type="date" id="ev-date" value="{{ event.date }}"></div>
+            <div class="fld"><label>Локация</label><input type="text" id="e-location" value="{{ event.location|e if event.location else '' }}"></div>
+            <label class="check" style="grid-column:1/-1"><input type="checkbox" id="ev-featured" {% if event.featured %}checked{% endif %}><span>Featured</span></label>
+          </div></div>
+          <div class="fsec"><div class="fsec-t">Расписание</div><div class="fgrid">
+            <div class="fld"><label>Начало</label><input type="time" id="e-start" value="{{ event.start_time }}"></div>
+            <div class="fld"><label>Конец</label><input type="time" id="e-end" value="{{ event.end_time }}"></div>
+            <div class="fld"><label>Сессия (мин)</label><input type="number" id="e-session" value="{{ event.session_length }}" min="5" max="120"></div>
+            <div class="fld"><label>Перерыв (мин)</label><input type="number" id="e-break" value="{{ event.break_length }}" min="0" max="60"></div>
+          </div></div>
+          <div class="fsec"><div class="fsec-t">Цена</div><div class="fgrid">
+            <div class="fld"><label>Депозит (CAD)</label><input type="number" id="e-deposit" value="{{ event.deposit }}" min="0" step="5"></div>
+            <div class="fld"><label>Полная цена (CAD)</label><input type="number" id="e-fullprice" value="{{ event.full_price }}" min="0" step="5"></div>
+          </div></div>
+          <div class="fsec"><div class="fsec-t">Add-ons</div><div class="fgrid">
+            <div class="fld"><label>10 доп. фото — цена</label><input type="number" id="e-extra-price" value="{{ extra.price if extra else 50 }}" min="0" step="5"></div>
+            <label class="check"><input type="checkbox" id="e-extra-active" {% if (not extra) or extra.active %}checked{% endif %}><span>Активно</span></label>
+            <div class="fld"><label>Reel (BTS) — цена</label><input type="number" id="e-reel-price" value="{{ reel.price if reel else 50 }}" min="0" step="5"></div>
+            <label class="check"><input type="checkbox" id="e-reel-active" {% if (not reel) or reel.active %}checked{% endif %}><span>Активно</span></label>
+          </div>
+          <div id="e-custom-addons" style="margin-top:10px">
+            {% for a in customs %}
+            <div class="addon-custom-row" data-addon-id="{{ a.id|e }}" style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
+              <input class="addon-title" placeholder="Название add-on" value="{{ a.title|e if a.title else '' }}" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px;margin-bottom:6px">
+              <div style="display:flex;gap:8px"><input class="addon-description" placeholder="Описание" value="{{ a.description|e if a.description else '' }}" style="flex:1;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px"><input class="addon-price" type="number" min="0" step="5" value="{{ a.price if a.price is not none else 0 }}" style="width:90px;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><label class="check"><input class="addon-active" type="checkbox" {% if a.active %}checked{% endif %}><span>Активно</span></label><button type="button" class="btn subtle sm" onclick="this.closest('.addon-custom-row').remove()">Удалить</button></div>
+            </div>
+            {% endfor %}
+          </div>
+          <button type="button" class="btn subtle sm" style="margin-top:8px" onclick="addEditCustomAddon()">+ Свой add-on</button>
+          </div>
+          <div class="fsec"><div class="fsec-t">Тип бронирования</div><div class="fgrid">
+            <div class="fld"><label>Статус</label><select id="e-status" class="select" style="width:100%"><option value="upcoming" {% if event.status=='upcoming' %}selected{% endif %}>Upcoming</option><option value="active" {% if event.status=='active' %}selected{% endif %}>Active</option><option value="completed" {% if event.status=='completed' %}selected{% endif %}>Completed</option></select></div>
+            <div class="fld"><label>Booking flow</label><select id="e-btype" class="select" style="width:100%"><option value="fixed_slots" {% if event.booking_type=='fixed_slots' %}selected{% endif %}>Fixed slots</option><option value="rolling_availability" {% if event.booking_type=='rolling_availability' %}selected{% endif %}>Rolling</option><option value="inquiry_only" {% if event.booking_type=='inquiry_only' %}selected{% endif %}>Inquiry only</option></select></div>
+            <div class="fld"><label>Session type</label><select id="e-stype" class="select" style="width:100%"><option value="mini" {% if event.session_type=='mini' %}selected{% endif %}>Mini</option><option value="individual" {% if event.session_type=='individual' %}selected{% endif %}>Individual</option><option value="wedding" {% if event.session_type=='wedding' %}selected{% endif %}>Wedding</option><option value="custom" {% if event.session_type=='custom' %}selected{% endif %}>Custom</option></select></div>
+            <div class="fld"><label>Горизонт (дней)</label><input type="number" id="e-horizon" value="{{ event.availability_horizon_days or 90 }}" min="7" max="365"></div>
+            <div class="fld full"><label>Blackout dates</label><input type="text" id="e-blackout" value="{{ (event.blackout_dates or [])|join(', ') }}" placeholder="2026-07-01, 2026-07-02"></div>
+          </div></div>
+          <div class="fsec"><div class="fsec-t">Что включено</div>
+            <div id="e-included-list">
+              {% for item in (event.included or []) %}
+              <div class="included-row" style="display:flex;gap:8px;margin-bottom:8px"><input type="text" class="included-input" value="{{ item|e }}" style="flex:1;height:38px;border:1px solid var(--border);border-radius:8px;padding:0 11px"><button type="button" onclick="this.closest('.included-row').remove()" class="btn subtle sm">✕</button></div>
+              {% endfor %}
+            </div>
+            <button type="button" class="btn subtle sm" style="margin-top:6px" onclick="addEditIncluded()">+ Пункт</button>
+          </div>
+          <div class="modal-foot" style="border-top:1px solid var(--border);margin-top:20px">
+            <button type="button" class="btn danger" onclick="deleteEvent()">Удалить событие</button>
+            <button type="button" class="btn ghost" onclick="duplicateEvent()">Дублировать</button>
+            <button type="button" class="btn primary" id="e-save" onclick="saveEvent()">💾 Сохранить</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="ic">✓</span><span id="toastMsg"></span></div>
+
+<script>
+const EVENT_ID = {{ event.id|tojson }};
+
+function stab(el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
+  document.querySelectorAll('.tpanel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('t-'+el.dataset.tab).classList.add('active');
+}
+let tt;
+function toast(m){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
+
+/* ---- photos (wired to real routes) ---- */
+async function uploadBatch(input){
+  const files = Array.from(input.files||[]);
+  if(!files.length) return;
+  if(files.length>5){ toast('Upload up to 5 photos at a time'); input.value=''; return; }
+  toast(files.length>1?('Uploading '+files.length+' photos…'):'Uploading…');
+  const fd=new FormData(); files.forEach(f=>fd.append('photos',f));
+  try{
+    const res=await fetch('/admin/photos/'+EVENT_ID+'/upload-batch',{method:'POST',body:fd});
+    const data=await res.json();
+    if(res.ok&&data.success){ toast('✓ '+(data.count||files.length)+' photo(s) saved'); setTimeout(()=>location.reload(),700); }
+    else toast('Error: '+(data.error||'upload failed'));
+  }catch(e){ toast('Upload failed: '+e.message); }
+  input.value='';
+}
+async function replacePhoto(index,input){
+  const f=(input.files||[])[0]; if(!f) return;
+  toast('Replacing…');
+  const fd=new FormData(); fd.append('photo',f); fd.append('slot_index',index);
+  try{
+    const res=await fetch('/admin/photos/'+EVENT_ID+'/upload',{method:'POST',body:fd});
+    const data=await res.json();
+    if(res.ok&&data.success){ toast('✓ Photo replaced'); setTimeout(()=>location.reload(),700); }
+    else toast('Error: '+(data.error||'failed'));
+  }catch(e){ toast('Failed: '+e.message); }
+  input.value='';
+}
+async function deletePhoto(index){
+  if(!confirm('Remove this photo from the session?')) return;
+  try{
+    const res=await fetch('/admin/photos/'+EVENT_ID+'/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slot_index:index})});
+    const data=await res.json();
+    if(data.success){ toast('Photo removed'); setTimeout(()=>location.reload(),700); }
+    else toast('Error: '+(data.error||'failed'));
+  }catch(e){ toast('Error: '+e.message); }
+}
+
+/* ---- slot board + roster ---- */
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ini=n=>(n||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'?';
+function pillFor(state){return state==='confirmed'?'<span class="pill green">Paid</span>':state==='pending'?'<span class="pill amber">Pending</span>':state==='blocked'?'<span class="pill gray">Closed</span>':'<span class="pill blue">Free</span>';}
+
+/* ---- manual booking + block/unblock (reused endpoints) ---- */
+let _pendingSlot=null;
+function openBook(time,label){_pendingSlot=time;document.getElementById('book-sub').textContent='Слот: '+label+' — добавить клиента вручную.';['bName','bEmail','bPhone','bInsta'].forEach(id=>document.getElementById(id).value='');document.getElementById('bPaid').checked=true;document.getElementById('book-modal').classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('bName').focus(),60)}
+function closeBook(){_pendingSlot=null;document.getElementById('book-modal').classList.remove('open');document.body.style.overflow=''}
+async function submitBook(){
+  if(!_pendingSlot)return;
+  const name=document.getElementById('bName').value.trim();
+  if(!name){toast('Введите имя клиента');return}
+  const body={time:_pendingSlot,name,email:document.getElementById('bEmail').value.trim(),phone:document.getElementById('bPhone').value.trim(),instagram:document.getElementById('bInsta').value.trim(),mark_paid:document.getElementById('bPaid').checked};
+  const btn=document.getElementById('book-btn');btn.disabled=true;btn.textContent='Создаём…';
+  try{
+    const res=await fetch('/admin/api/event/'+EVENT_ID+'/manual-book',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await res.json().catch(()=>null);
+    if(res.ok&&data&&data.success){toast('✓ Бронь создана #'+data.booking_id);closeBook();loadSlots()}
+    else toast((data&&data.error)||('HTTP '+res.status))
+  }catch(e){toast('Сеть недоступна: '+e.message)}finally{btn.disabled=false;btn.textContent='Создать бронь'}
+}
+async function blockSlot(time){
+  if(!confirm('Закрыть слот '+time+'? На публичной странице он станет недоступен.'))return;
+  try{const res=await fetch('/admin/api/event/'+EVENT_ID+'/block-slot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({time:time,reason:'Closed by admin'})});const data=await res.json().catch(()=>null);if(res.ok&&data&&data.success){toast('Слот закрыт');loadSlots()}else toast((data&&data.error)||'Ошибка')}catch(e){toast('Сеть: '+e.message)}
+}
+async function unblockSlot(bookingId,time){
+  if(!confirm('Открыть слот '+(time||'')+'?'))return;
+  try{const res=await fetch('/admin/api/event/'+EVENT_ID+'/unblock-slot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_id:bookingId})});const data=await res.json().catch(()=>null);if(res.ok&&data&&data.success){toast('Слот открыт');loadSlots()}else toast((data&&data.error)||'Ошибка')}catch(e){toast('Сеть: '+e.message)}
+}
+
+async function loadSlots(){
+  try{
+    const res=await fetch('/admin/api/event/'+EVENT_ID+'/slots');
+    const d=await res.json();
+    const s=d.summary||{};
+    document.getElementById('kBooked').textContent = s.booked!=null?s.booked:(d.bookings||[]).length;
+    document.getElementById('kPaid').textContent = s.confirmed!=null?s.confirmed:'—';
+    document.getElementById('kPending').textContent = s.pending!=null?s.pending:'—';
+    document.getElementById('kClosed').textContent = s.blocked!=null?s.blocked:'—';
+    document.getElementById('kFree').textContent = s.free!=null?s.free:'—';
+
+    const slots=d.slots||[];
+    document.getElementById('board').innerHTML = slots.length? slots.map(sl=>`
+      <div class="slot ${sl.state==='free'?'free':''}">
+        <div class="t">${esc(sl.time)}</div>
+        <div class="who2">${esc(sl.client|| (sl.state==='free'?'Available':''))}</div>
+        <div class="st">${
+          sl.state==='free'
+            ? `<div style="display:flex;gap:5px"><button class="btn ghost sm" style="flex:1;justify-content:center" onclick="openBook('${sl.time}','${sl.time}')">+ Book</button><button class="btn subtle sm" title="Закрыть слот" onclick="blockSlot('${sl.time}')">✕</button></div>`
+            : sl.state==='blocked'
+              ? `<div style="display:flex;gap:6px;align-items:center"><span class="pill gray">Closed</span><button class="btn subtle sm" onclick="unblockSlot(${sl.booking_id||'null'},'${sl.time}')">Открыть</button></div>`
+              : pillFor(sl.state)
+        }</div>
+      </div>`).join('') : '<div class="empty" style="grid-column:1/-1"><div>No slots configured.</div></div>';
+
+    const roster=(d.bookings||[]);
+    document.getElementById('rosterCnt').textContent = roster.length;
+    document.getElementById('roster').innerHTML = roster.length? roster.map(b=>`
+      <tr onclick="location.href='/admin/booking/${b.id}'" style="cursor:pointer">
+        <td><div class="cust"><div class="ava" style="background:linear-gradient(135deg,#c4857a,#a3685e)">${esc(ini(b.name))}</div>
+          <div><div class="nm">${esc(b.name||'Unknown')}</div><div class="em">${esc(b.email||'')}</div></div></div></td>
+        <td>${esc(b.time||'—')}</td>
+        <td>${b.confirmed?'<span class="pill green">Paid</span>':'<span class="pill amber">'+esc(b.status||'pending')+'</span>'}</td>
+        <td class="money">${b.paid_amount?('$'+Math.round(b.paid_amount)):'—'}</td>
+        <td><div class="row-act"><a class="btn subtle sm" href="/admin/booking/${b.id}" onclick="event.stopPropagation()">Open</a></div></td>
+      </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:30px">No clients booked yet.</td></tr>';
+  }catch(e){
+    document.getElementById('board').innerHTML='<div class="empty" style="grid-column:1/-1"><div>Could not load slots.</div></div>';
+  }
+}
+
+/* ---- edit event (reused /update + /update-meta) ---- */
+function _val(id){return document.getElementById(id).value}
+function collectEditAddons(){
+  const addons=[
+    {id:'extra-10-edited-images',title:'10 Extra Edited Images',price:parseFloat(document.getElementById('e-extra-price')?.value||'50'),active:!!document.getElementById('e-extra-active')?.checked},
+    {id:'short-vertical-reel',title:'Short Vertical Behind-the-Scenes Reel',price:parseFloat(document.getElementById('e-reel-price')?.value||'50'),active:!!document.getElementById('e-reel-active')?.checked},
+  ];
+  document.querySelectorAll('#e-custom-addons .addon-custom-row').forEach((row,idx)=>{
+    const title=row.querySelector('.addon-title')?.value.trim()||'';
+    addons.push({id:row.dataset.addonId||title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||`custom-addon-${idx+1}`,title,description:row.querySelector('.addon-description')?.value.trim()||'',price:parseFloat(row.querySelector('.addon-price')?.value||'0'),active:!!row.querySelector('.addon-active')?.checked});
+  });
+  return addons;
+}
+function addonRowHtml(o){o=o||{};const q=s=>(s||'').replace(/"/g,'&quot;');return `<div class="addon-custom-row" data-addon-id="${q(o.id)}" style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px"><input class="addon-title" placeholder="Название add-on" value="${q(o.title)}" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px;margin-bottom:6px"><div style="display:flex;gap:8px"><input class="addon-description" placeholder="Описание" value="${q(o.description)}" style="flex:1;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px"><input class="addon-price" type="number" min="0" step="5" value="${o.price!=null?o.price:''}" style="width:90px;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 10px"></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><label class="check"><input class="addon-active" type="checkbox" ${o.active?'checked':''}><span>Активно</span></label><button type="button" class="btn subtle sm" onclick="this.closest('.addon-custom-row').remove()">Удалить</button></div></div>`}
+function addEditCustomAddon(){document.getElementById('e-custom-addons').insertAdjacentHTML('beforeend',addonRowHtml({active:true}))}
+function addEditIncluded(){const l=document.getElementById('e-included-list');const r=document.createElement('div');r.className='included-row';r.style.cssText='display:flex;gap:8px;margin-bottom:8px';r.innerHTML='<input type="text" class="included-input" style="flex:1;height:38px;border:1px solid var(--border);border-radius:8px;padding:0 11px"><button type="button" onclick="this.closest(\'.included-row\').remove()" class="btn subtle sm">✕</button>';l.appendChild(r);r.querySelector('input').focus()}
+async function saveEvent(){
+  const btn=document.getElementById('e-save');btn.disabled=true;btn.textContent='⏳ Сохраняем…';
+  const blackout=(_val('e-blackout')||'').split(',').map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s));
+  const sched={start_time:_val('e-start'),end_time:_val('e-end'),session_length:parseInt(_val('e-session')),break_length:parseInt(_val('e-break')),deposit:parseFloat(_val('e-deposit')),full_price:parseFloat(_val('e-fullprice')),status:_val('e-status'),location:_val('e-location'),booking_type:_val('e-btype'),session_type:_val('e-stype'),availability_horizon_days:parseInt(_val('e-horizon'))||90,blackout_dates:blackout,addons:collectEditAddons()};
+  const included=Array.from(document.querySelectorAll('#e-included-list .included-input')).map(i=>i.value.trim()).filter(Boolean);
+  const meta={title:_val('ev-title'),subtitle:_val('ev-subtitle'),date:_val('ev-date'),featured:document.getElementById('ev-featured').checked,included};
+  try{
+    const r1=await fetch('/admin/events/'+EVENT_ID+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sched)});
+    const d1=await r1.json().catch(()=>({error:'bad response'}));
+    if(!r1.ok||d1.error){toast('Ошибка: '+(d1.error||r1.statusText));btn.disabled=false;btn.textContent='💾 Сохранить';return}
+    const r2=await fetch('/admin/events/'+EVENT_ID+'/update-meta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
+    const d2=await r2.json().catch(()=>({error:'bad response'}));
+    if(d2.error){toast('Ошибка: '+d2.error)}else{toast('✅ Сохранено'+(d1.slots_count!=null?(' — '+d1.slots_count+' слотов'):''));loadSlots()}
+  }catch(e){toast('Сеть недоступна: '+e.message)}
+  btn.disabled=false;btn.textContent='💾 Сохранить';
+}
+async function duplicateEvent(){
+  if(!confirm('Дублировать это событие?'))return;
+  try{const res=await fetch('/admin/events/'+EVENT_ID+'/duplicate',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const d=await res.json().catch(()=>null);if(res.ok&&d&&d.success){toast('✓ Событие дублировано');setTimeout(()=>location.href='/admin?v=2',700)}else toast((d&&d.error)||'Ошибка')}catch(e){toast('Сеть: '+e.message)}
+}
+async function deleteEvent(){
+  if(!confirm('Удалить это событие? Существующие брони останутся в базе.'))return;
+  try{const res=await fetch('/admin/events/'+EVENT_ID+'/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const d=await res.json().catch(()=>null);
+    if(res.ok&&d&&d.success){toast('Событие удалено');setTimeout(()=>location.href='/admin?v=2',700)}
+    else if(d&&d.active_bookings){toast('В событии активные брони ('+d.active_bookings+') — удалите через «Classic».')}
+    else toast((d&&d.error)||'Ошибка')}catch(e){toast('Сеть: '+e.message)}
+}
+
+/* ---- dropzone drag&drop ---- */
+window.addEventListener('DOMContentLoaded',()=>{
+  loadSlots();
+  const z=document.getElementById('dz');
+  ['dragenter','dragover'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.add('drag')}));
+  ['dragleave','drop'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.remove('drag')}));
+  z.addEventListener('drop',e=>{
+    const files=e.dataTransfer.files;
+    if(files&&files.length){ const inp=document.getElementById('fileInput'); inp.files=files; uploadBatch(inp); }
+  });
+});
+</script>
+
+<!-- ===== MANUAL BOOKING MODAL ===== -->
+<div class="modal-ov" id="book-modal" onclick="if(event.target===this)closeBook()">
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <div class="modal-head"><h3>Ручная бронь</h3><p id="book-sub">Добавить клиента в этот слот вручную.</p></div>
+    <div class="modal-body">
+      <div class="fgrid">
+        <div class="fld full"><label>Имя клиента *</label><input type="text" id="bName" placeholder="Имя Фамилия"></div>
+        <div class="fld"><label>Email</label><input type="email" id="bEmail" placeholder="client@example.com"></div>
+        <div class="fld"><label>Телефон</label><input type="text" id="bPhone" placeholder="+1 403 …"></div>
+        <div class="fld full"><label>Instagram</label><input type="text" id="bInsta" placeholder="@handle"></div>
+      </div>
+      <div class="checks"><label class="check"><input type="checkbox" id="bPaid" checked><span>Отметить как оплачено</span></label></div>
+      <div class="modal-foot"><button class="btn ghost" type="button" onclick="closeBook()">Отмена</button><button class="btn primary" type="button" id="book-btn" onclick="submitBook()">Создать бронь</button></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

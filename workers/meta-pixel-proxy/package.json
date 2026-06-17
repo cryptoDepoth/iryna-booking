@@ -1,0 +1,18 @@
+{
+  "name": "meta-pixel-proxy",
+  "version": "1.0.0",
+  "description": "Proxy Meta Pixel events via Cloudflare Workers to avoid ad blockers",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Hermes Agent",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230518.0",
+    "wrangler": "^3.0.0"
+  }
+}

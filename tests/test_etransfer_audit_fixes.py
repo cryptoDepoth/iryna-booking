@@ -15,6 +15,8 @@ F9  legacy footgun: v1 checker deleted; timed_cron delegates to v2.
 """
 import os
 import sqlite3
+import sys
+from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -385,6 +387,16 @@ def test_orphan_alert_dedupes_per_message_id(monkeypatch):
     assert len(sent) == 2
 
 
+def test_admin_alert_escapes_raw_email_angle_brackets(monkeypatch):
+    sent = []
+    fake_app = SimpleNamespace(_notify_admin=lambda text: sent.append(text))
+    monkeypatch.setitem(sys.modules, "app", fake_app)
+
+    checker._send_admin_alert("Email snippet: Interac <notify@payments.interac.ca>")
+
+    assert sent == ["Email snippet: Interac &lt;notify@payments.interac.ca&gt;"]
+
+
 # ── F7: no hardcoded $95 fallback ─────────────────────────────────────────────
 
 def test_unknown_deposit_returns_none_instead_of_95(tmp_path, monkeypatch):
@@ -430,6 +442,73 @@ def test_booking_with_unknown_deposit_never_matches_95_dollars(tmp_path, monkeyp
     row = conn.execute("SELECT confirmed, paid FROM bookings WHERE id=?", (booking_id,)).fetchone()
     conn.close()
     assert tuple(row) == (0, 0)
+
+
+def test_interac_email_with_gift_code_confirms_pending_gift_certificate(tmp_path, monkeypatch):
+    booking_db_path = str(tmp_path / "bookings.db")
+    conn = _init_db(booking_db_path)
+    conn.close()
+    gift_db_path = str(tmp_path / "gift.db")
+    gift_pdf_dir = str(tmp_path / "gift_pdfs")
+
+    monkeypatch.setattr(checker, "DB_PATH", booking_db_path)
+    monkeypatch.setenv("GIFT_REFERRAL_DB", gift_db_path)
+    monkeypatch.setenv("GIFT_PDF_DIR", gift_pdf_dir)
+    monkeypatch.setenv("TEST_MODE", "true")
+    alerts = []
+    monkeypatch.setattr(checker, "_send_admin_alert", lambda text: alerts.append(text))
+
+    gift_dir = os.path.join(ROOT, "gift-referral")
+    if gift_dir not in sys.path:
+        sys.path.insert(0, gift_dir)
+    import gift_referral_db as gift_db
+    import gift_referral_email as gift_email
+
+    monkeypatch.setattr(gift_db, "DB_PATH", gift_db_path)
+    monkeypatch.setattr(gift_email, "TEST_MODE", True)
+    gift_db.init_db(gift_db_path)
+    code = gift_db.create_gift_certificate(
+        purchaser_email="buyer@example.com",
+        purchaser_name="Buyer",
+        recipient_name="Recipient",
+        recipient_email="",
+        personal_message="Enjoy",
+        session_type="mini",
+        amount=210.0,
+        amount_with_gst=220.50,
+        payment_method="interac",
+        payment_status="pending",
+        paid_amount=0.0,
+        status="pending_payment",
+    )
+
+    body = f"You've received $220.50 from Client. Message: Gift certificate {code}"
+    monkeypatch.setattr(checker, "read_message_body", lambda message_id: body)
+
+    confirmed_id, ambiguous = checker.check_single_email(
+        {"id": "gift-pay-1", "date": datetime.now(timezone.utc).isoformat()},
+        bookings=[],
+    )
+
+    assert confirmed_id is None
+    assert ambiguous is None
+    cert = gift_db.get_gift_certificate(code)
+    assert cert["status"] == "active"
+    assert cert["payment_status"] == "paid"
+    assert cert["paid_amount"] == 220.50
+
+    conn = sqlite3.connect(booking_db_path)
+    conn.row_factory = sqlite3.Row
+    transfer = conn.execute(
+        "SELECT matched_gift_code, status FROM etransfers WHERE message_id='gift-pay-1'"
+    ).fetchone()
+    processed = conn.execute(
+        "SELECT message_id FROM processed_emails WHERE message_id='gift-pay-1'"
+    ).fetchone()
+    conn.close()
+    assert dict(transfer) == {"matched_gift_code": code, "status": "matched"}
+    assert processed is not None
+    assert any(code in alert for alert in alerts)
 
 
 # ── F8: UTC everywhere in watcher / pending windows ───────────────────────────

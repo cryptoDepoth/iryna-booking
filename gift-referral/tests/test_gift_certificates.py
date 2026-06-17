@@ -32,8 +32,8 @@ def _make_cert(**kwargs):
         recipient_email  = "jane@example.com",
         personal_message = "Happy birthday!",
         session_type     = "mini",
-        amount           = 230.0,
-        amount_with_gst  = 241.50,
+        amount           = 210.0,
+        amount_with_gst  = 220.50,
     )
     defaults.update(kwargs)
     return db.create_gift_certificate(**defaults)
@@ -66,8 +66,8 @@ def test_create_gift_certificate_stored_in_db():
     assert cert["purchaser_email"] == "buyer@example.com"
     assert cert["recipient_name"] == "Alice"
     assert cert["session_type"] == "mini"
-    assert cert["amount"] == 230.0
-    assert cert["amount_with_gst"] == 241.50
+    assert cert["amount"] == 210.0
+    assert cert["amount_with_gst"] == 220.50
     assert cert["status"] == "active"
 
 
@@ -81,7 +81,7 @@ def test_validate_active_certificate():
     assert result["valid"] is True
     assert result["type"] == "gift"
     assert result["session_type"] == "mini"
-    assert result["amount"] == 230.0
+    assert result["amount"] == 210.0
 
 
 def test_validate_nonexistent_code():
@@ -121,6 +121,33 @@ def test_validate_custom_cert_works_for_any_session():
     code   = _make_cert(session_type="custom")
     result = db.validate_gift_certificate(code, session_type="family")
     assert result["valid"] is True
+
+
+def test_pending_gift_certificate_is_not_valid_until_paid():
+    code = _make_cert(
+        status="pending_payment",
+        payment_method="interac",
+        payment_status="pending",
+        paid_amount=0.0,
+    )
+    result = db.validate_gift_certificate(code, session_type="mini")
+    assert result["valid"] is False
+    assert "awaiting payment" in result["error"].lower()
+
+
+def test_mark_gift_payment_confirmed_activates_exact_pending_certificate():
+    code = _make_cert(
+        status="pending_payment",
+        payment_method="interac",
+        payment_status="pending",
+        paid_amount=0.0,
+    )
+    assert db.mark_gift_payment_confirmed(code, 220.50, "msg-123") is True
+    cert = db.get_gift_certificate(code)
+    assert cert["status"] == "active"
+    assert cert["payment_status"] == "paid"
+    assert cert["paid_amount"] == 220.50
+    assert cert["payment_reference"] == "msg-123"
 
 
 def test_validate_session_type_match():
@@ -187,13 +214,13 @@ def test_pdf_contains_code():
 # ---------------------------------------------------------------------------
 
 def test_gst_calculation_mini():
-    gst = db.calculate_gst(230.0)
-    assert gst == 241.50
+    gst = db.calculate_gst(210.0)
+    assert gst == 220.50
 
 
 def test_gst_calculation_family():
-    gst = db.calculate_gst(290.0)
-    assert gst == 304.50
+    gst = db.calculate_gst(320.0)
+    assert gst == 336.00
 
 
 def test_gst_calculation_custom():

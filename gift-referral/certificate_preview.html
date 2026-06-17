@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gift Certificate Designer — Pashynska Photography</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #FAF7F2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 40px 20px 60px;
+    font-family: 'Montserrat', sans-serif;
+    color: #2C2C2C;
+  }
+
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 22px;
+    letter-spacing: 4px;
+    color: #C4973A;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: rgba(44,44,44,0.45);
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  .layout {
+    display: flex;
+    gap: 48px;
+    align-items: flex-start;
+    max-width: 980px;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ─── FORM PANEL ─── */
+  .form-panel {
+    flex: 0 0 280px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(196,151,58,.15);
+    border-radius: 16px;
+    padding: 28px 24px;
+  }
+  .form-panel h2 {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(196,151,58,.7);
+    margin-bottom: 24px;
+    font-weight: 400;
+  }
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(250,247,242,.4);
+    margin-bottom: 7px;
+    font-weight: 400;
+  }
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(196,151,58,.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    color: #FAF7F2;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: rgba(196,151,58,.55);
+  }
+  .field textarea { height: 80px; resize: vertical; }
+  .field select option { background: #1a1612; color: #FAF7F2; }
+
+  .divider-form {
+    height: 1px;
+    background: rgba(196,151,58,.12);
+    margin: 22px 0;
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    background: #C4973A;
+    color: #0e0c0a;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .2s, transform .1s;
+  }
+  .btn:hover { background: #d4a748; }
+  .btn:active { transform: scale(.98); }
+
+  /* ─── CERTIFICATE ─── */
+  .cert-wrapper {
+    flex: 0 0 420px;
+    perspective: 1200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .cert-float {
+    animation: float 5s ease-in-out infinite;
+    width: 100%;
+  }
+  @keyframes float {
+    0%,100% { transform: translateY(0) rotateX(2deg) rotateY(-1deg); }
+    50%      { transform: translateY(-12px) rotateX(-1deg) rotateY(1deg); }
+  }
+
+  .cert-card {
+    position: relative;
+    background: #181410;
+    border-radius: 18px;
+    padding: 40px 36px 32px;
+    text-align: center;
+    overflow: hidden;
+    border: 1px solid rgba(196,151,58,.4);
+    box-shadow:
+      0 0 0 1px rgba(196,151,58,.08) inset,
+      0 30px 80px rgba(0,0,0,.7),
+      0 0 60px rgba(196,151,58,.05);
+  }
+
+  /* inner frame */
+  .cert-card::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border: 1px solid rgba(196,151,58,.18);
+    border-radius: 12px;
+    pointer-events: none;
+  }
+  .cert-card::after {
+    content: '';
+    position: absolute;
+    inset: 14px;
+    border: 1px solid rgba(196,151,58,.07);
+    border-radius: 8px;
+    pointer-events: none;
+  }
+
+  /* glint sweep */
+  .glint {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 60%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.04), transparent);
+    animation: glint 5s ease-in-out infinite;
+    pointer-events: none;
+    transform: skewX(-10deg);
+  }
+  @keyframes glint {
+    0%   { left: -70%; }
+    100% { left: 130%; }
+  }
+
+  /* corner ornaments */
+  .corner {
+    position: absolute;
+    width: 22px; height: 22px;
+    border-color: #C4973A;
+    border-style: solid;
+    border-width: 0;
+  }
+  .c-tl { top:16px; left:16px;  border-top-width:1.5px; border-left-width:1.5px; }
+  .c-tr { top:16px; right:16px; border-top-width:1.5px; border-right-width:1.5px; }
+  .c-bl { bottom:16px; left:16px;  border-bottom-width:1.5px; border-left-width:1.5px; }
+  .c-br { bottom:16px; right:16px; border-bottom-width:1.5px; border-right-width:1.5px; }
+
+  /* decorative dots at corner tips */
+  .c-tl::before, .c-tl::after,
+  .c-tr::before, .c-tr::after,
+  .c-bl::before, .c-bl::after,
+  .c-br::before, .c-br::after {
+    content: '';
+    position: absolute;
+    width: 3px; height: 3px;
+    background: #C4973A;
+    border-radius: 50%;
+  }
+  .c-tl::before { top:-1.5px; left:-1.5px; }
+  .c-tl::after  { display: none; }
+  .c-tr::before { top:-1.5px; right:-1.5px; left:auto; }
+  .c-tr::after  { display: none; }
+  .c-bl::before { bottom:-1.5px; left:-1.5px; top:auto; }
+  .c-bl::after  { display: none; }
+  .c-br::before { bottom:-1.5px; right:-1.5px; left:auto; top:auto; }
+  .c-br::after  { display: none; }
+
+  .brand-name {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 9px;
+    letter-spacing: 5px;
+    color: rgba(196,151,58,.7);
+    text-transform: uppercase;
+    font-weight: 400;
+    margin-bottom: 12px;
+  }
+
+  .h-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .h-line { flex: 1; height: .5px; background: rgba(196,151,58,.3); }
+  .h-diamond {
+    width: 5px; height: 5px;
+    background: #C4973A;
+    transform: rotate(45deg);
+    flex-shrink: 0;
+  }
+
+  .cert-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: #C4973A;
+    text-transform: uppercase;
+    font-weight: 400;
+    margin-bottom: 8px;
+  }
+  .cert-subtitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px;
+    color: rgba(250,247,242,.4);
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+  .cert-to {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px;
+    font-weight: 300;
+    font-style: italic;
+    color: #FAF7F2;
+    margin-bottom: 20px;
+    min-height: 44px;
+    line-height: 1.1;
+  }
+
+  /* ── SEAL ── */
+  .seal-wrap {
+    position: relative;
+    width: 90px; height: 90px;
+    margin: 0 auto 18px;
+  }
+  .seal-ring {
+    position: absolute; inset: 0;
+    animation: rotateSeal 22s linear infinite;
+  }
+  @keyframes rotateSeal {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  .seal-disk {
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background: #C4973A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .seal-disk::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.25);
+  }
+  .seal-disk::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.2), transparent 65%);
+    pointer-events: none;
+  }
+
+  .cert-session-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 9px;
+    color: rgba(196,151,58,.6);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-weight: 400;
+    margin-bottom: 4px;
+  }
+  .cert-session {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-style: italic;
+    color: #C4973A;
+    margin-bottom: 18px;
+  }
+
+  .msg-box {
+    background: rgba(196,151,58,.05);
+    border: .5px solid rgba(196,151,58,.2);
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-bottom: 18px;
+  }
+  .cert-message {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px;
+    font-style: italic;
+    color: rgba(250,247,242,.6);
+    line-height: 1.7;
+    min-height: 24px;
+  }
+
+  .from-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .from-line { flex: 1; height: .5px; background: rgba(196,151,58,.2); }
+  .cert-from {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 12px;
+    font-style: italic;
+    color: rgba(250,247,242,.45);
+    white-space: nowrap;
+  }
+
+  .cert-code {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: rgba(196,151,58,.5);
+    font-weight: 400;
+    margin-bottom: 4px;
+  }
+  .cert-footer {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 9px;
+    color: rgba(250,247,242,.2);
+    letter-spacing: 1px;
+    font-weight: 300;
+  }
+
+  /* sparkles */
+  .sparks {
+    position: relative;
+    height: 30px;
+    width: 420px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  @keyframes pop {
+    0%   { transform: translateY(0) scale(1); opacity: .85; }
+    100% { transform: translateY(-28px) scale(.1); opacity: 0; }
+  }
+
+  /* stamp pulse on load */
+  @keyframes stampIn {
+    0%   { transform: scale(1.6); opacity: 0; }
+    60%  { transform: scale(.92); opacity: 1; }
+    80%  { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .seal-disk { animation: stampIn .7s cubic-bezier(.34,1.56,.64,1) forwards; }
+</style>
+</head>
+<body>
+
+<h1>Gift Certificate</h1>
+<p class="subtitle">Pashynska Photography · Calgary</p>
+
+<div class="layout">
+
+  <!-- FORM -->
+  <div class="form-panel">
+    <h2>Personalise</h2>
+
+    <div class="field">
+      <label>To (recipient's name)</label>
+      <input type="text" id="tn" placeholder="e.g. Sofia" oninput="upd()">
+    </div>
+
+    <div class="field">
+      <label>From (your name)</label>
+      <input type="text" id="fn" placeholder="e.g. Anna" oninput="upd()">
+    </div>
+
+    <div class="field">
+      <label>Session type</label>
+      <select id="st" onchange="upd()">
+        <option value="Mini Session">Mini Session — $241.50</option>
+        <option value="Family Session">Family Session — $304.50</option>
+        <option value="Maternity Session">Maternity Session — $304.50</option>
+        <option value="Individual Session">Individual Session — $304.50</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Personal message</label>
+      <textarea id="msg" placeholder="e.g. You deserve to shine in front of the camera..." oninput="upd()"></textarea>
+    </div>
+
+    <div class="divider-form"></div>
+
+    <div class="field">
+      <label>Your email</label>
+      <input type="email" id="fe" placeholder="you@email.com">
+    </div>
+
+    <div class="field">
+      <label>Recipient's email</label>
+      <input type="email" id="te" placeholder="friend@email.com">
+    </div>
+
+    <button class="btn" onclick="alert('🎁 В реальной версии здесь Stripe Checkout!')">
+      Purchase Gift Certificate
+    </button>
+  </div>
+
+  <!-- CERTIFICATE -->
+  <div class="cert-wrapper">
+    <div class="cert-float">
+      <div class="cert-card">
+        <div class="glint"></div>
+
+        <!-- corners -->
+        <div class="corner c-tl"></div>
+        <div class="corner c-tr"></div>
+        <div class="corner c-bl"></div>
+        <div class="corner c-br"></div>
+
+        <p class="brand-name">Pashynska Photography</p>
+
+        <div class="h-divider">
+          <div class="h-line"></div>
+          <div class="h-diamond"></div>
+          <div class="h-line"></div>
+        </div>
+
+        <p class="cert-title">Gift Certificate</p>
+        <p class="cert-subtitle">This certificate is lovingly gifted to</p>
+        <p class="cert-to" id="d-to">Sofia</p>
+
+        <!-- Rotating seal -->
+        <div class="seal-wrap">
+          <!-- rotating dashed ring -->
+          <div class="seal-ring">
+            <svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="45" cy="45" r="43" fill="none" stroke="rgba(196,151,58,.45)" stroke-width=".8" stroke-dasharray="3.5 6.2"/>
+              <!-- small dots at regular intervals -->
+              <circle cx="45" cy="2.5" r="1.5" fill="rgba(196,151,58,.5)"/>
+              <circle cx="45" cy="87.5" r="1.5" fill="rgba(196,151,58,.5)"/>
+              <circle cx="2.5" cy="45" r="1.5" fill="rgba(196,151,58,.5)"/>
+              <circle cx="87.5" cy="45" r="1.5" fill="rgba(196,151,58,.5)"/>
+            </svg>
+          </div>
+          <!-- static inner disk -->
+          <div class="seal-disk">
+            <!-- camera icon -->
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:relative;z-index:1">
+              <path d="M14 11l2.5-4h7l2.5 4" stroke="rgba(250,247,242,.92)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="7" y="11" width="26" height="18" rx="3.5" stroke="rgba(250,247,242,.92)" stroke-width="1.5"/>
+              <circle cx="20" cy="20" r="5.5" stroke="rgba(250,247,242,.92)" stroke-width="1.5"/>
+              <circle cx="20" cy="20" r="2.2" fill="rgba(250,247,242,.92)"/>
+              <circle cx="30" cy="15" r="1.2" fill="rgba(250,247,242,.92)"/>
+            </svg>
+          </div>
+        </div>
+
+        <p class="cert-session-label">Entitles the holder to a</p>
+        <p class="cert-session" id="d-st">Mini Session</p>
+
+        <div class="msg-box">
+          <p class="cert-message" id="d-msg">You deserve to be seen in your most beautiful light.</p>
+        </div>
+
+        <div class="from-row">
+          <div class="from-line"></div>
+          <p class="cert-from" id="d-from">With love, Anna</p>
+          <div class="from-line"></div>
+        </div>
+
+        <p class="cert-code">GIFT-A3K9-7BXM</p>
+        <p class="cert-footer">Valid for 12 months · book.pashynskaphoto.com</p>
+      </div>
+    </div>
+
+    <!-- sparkles -->
+    <div class="sparks" id="sparks"></div>
+  </div>
+</div>
+
+<script>
+  function upd() {
+    var to   = document.getElementById('tn').value || 'Sofia';
+    var from = document.getElementById('fn').value || 'Anna';
+    var st   = document.getElementById('st').value;
+    var msg  = document.getElementById('msg').value || 'You deserve to be seen in your most beautiful light.';
+
+    document.getElementById('d-to').textContent   = to;
+    document.getElementById('d-from').textContent  = 'With love, ' + from;
+    document.getElementById('d-st').textContent    = st;
+    document.getElementById('d-msg').textContent   = msg;
+  }
+
+  // Sparkles
+  function spark() {
+    var c = document.getElementById('sparks');
+    var s = document.createElement('div');
+    var x = Math.random() * 92 + 2;
+    var sz = Math.random() * 4 + 2;
+    var dur = (Math.random() * 1.2 + 0.9).toFixed(2);
+    s.style.cssText = [
+      'position:absolute',
+      'bottom:0',
+      'left:' + x + '%',
+      'width:' + sz + 'px',
+      'height:' + sz + 'px',
+      'background:#C4973A',
+      'border-radius:50%',
+      'animation:pop ' + dur + 's ease-out forwards'
+    ].join(';');
+    c.appendChild(s);
+    setTimeout(function () { s.remove(); }, (parseFloat(dur) + 0.2) * 1000);
+  }
+  setInterval(spark, 380);
+</script>
+</body>
+</html>

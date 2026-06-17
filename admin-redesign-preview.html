@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Redesign — Preview · Pashynska Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Tenor+Sans&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --nude:#f5ede8; --blush:#e8c8c0; --rose:#c4857a; --rose-deep:#a3685e; --rose-glow:rgba(196,133,122,.18);
+  --ink:#1c1917; --ink-2:#44403c; --ink-3:#78716c; --ink-4:#a8a29e; --ink-5:#e7e5e4;
+  --bg:#faf7f5; --surface:#ffffff; --surface-2:#faf7f5; --surface-3:#f3ece7;
+  --border:rgba(28,25,23,.08); --border-strong:rgba(28,25,23,.16);
+  --text:#1c1917; --text-2:#57514c; --text-3:#8a827c;
+  --primary:#1c1917; --primary-hover:#000;
+  --accent:#c4857a; --accent-600:#a3685e; --accent-light:#f7ece8; --accent-ring:rgba(196,133,122,.30);
+  --green:#3d6b4f; --green-light:#edf5f0; --green-text:#3d6b4f;
+  --red:#8b3535; --red-light:#fdf0f0; --red-text:#8b3535;
+  --amber:#92722a; --amber-light:#fdf5e4; --amber-text:#92722a;
+  --blue:#3a5a6b; --blue-light:#eef2f4; --blue-text:#3a5a6b;
+  --side:#f3ebe5; --side-2:#ece0d9; --side-line:rgba(28,25,23,.08); --side-text:#57514c; --side-text-2:#a8a29e;
+  --r:11px; --r-lg:16px; --r-sm:8px;
+  --shadow:0 2px 14px rgba(28,25,23,.05); --shadow-md:0 14px 40px rgba(28,25,23,.08); --shadow-lg:0 24px 60px rgba(28,25,23,.16);
+  --font-d:'Cormorant Garamond',Georgia,serif; --font-h:'Tenor Sans','Cormorant Garamond',Georgia,serif;
+  --font:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+h1,h2,h3,h4{font-family:var(--font-h);font-weight:400;letter-spacing:.01em}
+::selection{background:var(--accent-ring)}
+.app{display:flex;min-height:100vh}
+.sidebar{width:238px;background:var(--side);color:var(--side-text);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0;border-right:1px solid var(--side-line)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:11px;padding:20px 18px 16px;font-family:var(--font-h);font-size:16px;color:var(--ink);letter-spacing:.02em}
+.brand .dot{width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,var(--rose),var(--rose-deep));display:grid;place-items:center;font-size:13px;color:#fff;box-shadow:0 3px 10px var(--rose-glow)}
+.brand small{display:block;font-family:var(--font);font-size:10.5px;font-weight:500;color:var(--side-text-2);letter-spacing:.06em;text-transform:uppercase}
+.nav{padding:8px 10px;overflow-y:auto;flex:1}
+.nav-group{margin-top:16px}
+.nav-group .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--side-text-2);padding:6px 10px 5px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--side-text);font-weight:500;font-size:13.5px;transition:.14s;cursor:pointer;position:relative}
+.nav-item .ic{width:18px;text-align:center;font-size:15px;opacity:.85}
+.nav-item:hover{background:var(--side-2);color:var(--ink)}
+.nav-item.active{background:var(--accent-light);color:var(--ink)}
+.nav-item.active::before{content:"";position:absolute;left:-10px;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--rose)}
+.nav-item .badge{margin-left:auto;background:var(--rose);color:#fff;font-size:11px;font-weight:600;min-width:19px;height:19px;border-radius:10px;display:grid;place-items:center;padding:0 5px}
+.nav-item .badge.dim{background:var(--ink-5);color:var(--ink-3)}
+.side-foot{border-top:1px solid var(--side-line);padding:13px;display:flex;align-items:center;gap:10px}
+.avatar{width:33px;height:33px;border-radius:10px;background:linear-gradient(135deg,var(--rose),var(--rose-deep));display:grid;place-items:center;color:#fff;font-weight:600;font-size:13px}
+.side-foot .who{font-size:12.5px;color:var(--ink);font-weight:600;line-height:1.3}
+.side-foot .who small{display:block;color:var(--side-text-2);font-weight:500;font-size:11px}
+.topbar{height:62px;background:rgba(250,247,245,.85);backdrop-filter:saturate(180%) blur(8px);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 24px;position:sticky;top:0;z-index:30}
+.search{flex:1;max-width:440px;position:relative}
+.search input{width:100%;height:40px;border:1px solid var(--border);background:var(--surface);border-radius:11px;padding:0 12px 0 38px;font-size:13.5px;color:var(--text);font-family:var(--font);transition:.15s}
+.search input:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px var(--accent-ring)}
+.search .si{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:14px}
+.search kbd{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text-3);border:1px solid var(--border);border-radius:6px;padding:1px 6px;background:var(--surface);font-family:var(--font)}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.icon-btn{width:40px;height:40px;border-radius:11px;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;font-size:15px;color:var(--text-2);transition:.14s}
+.icon-btn:hover{border-color:var(--border-strong);color:var(--text)}
+.content{padding:26px 26px 60px;max-width:1340px;width:100%;margin:0 auto}
+.view{display:none;animation:fade .25s ease}.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.page-head h1{font-size:27px;font-family:var(--font-d);font-weight:500}
+.page-head .sub{color:var(--text-2);font-size:13.5px;margin-top:4px}
+.page-head .row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 17px;border-radius:11px;font-size:13px;font-weight:500;font-family:var(--font);transition:.15s;border:1px solid transparent;white-space:nowrap}
+.btn.primary{background:var(--primary);color:#fff;letter-spacing:.04em}
+.btn.primary:hover{background:var(--primary-hover);transform:translateY(-1px)}
+.btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--ink-5)}
+.btn.ghost:hover{border-color:var(--ink);transform:translateY(-1px)}
+.btn.subtle{background:var(--surface-3);color:var(--text-2)}
+.btn.subtle:hover{background:var(--blush);color:var(--ink)}
+.btn.sm{height:33px;padding:0 12px;font-size:12.5px;border-radius:9px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 19px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi .h{display:flex;align-items:center;justify-content:space-between;color:var(--text-2);font-size:12.5px;font-weight:500}
+.kpi .h .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px}
+.kpi .v{font-family:var(--font-d);font-size:34px;font-weight:600;margin-top:8px;line-height:1}
+.kpi .d{font-size:12px;color:var(--text-3);margin-top:8px}
+.kpi .d b.up{color:var(--green-text)}
+.section{margin-bottom:28px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-head h2{font-size:18px;font-family:var(--font-h);font-weight:400;display:flex;align-items:center;gap:8px}
+.section-head .link{color:var(--rose-deep);font-size:13px;font-weight:500;font-family:var(--font)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+.sessions{display:grid;grid-template-columns:repeat(auto-fill,minmax(294px,1fr));gap:16px}
+.s-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow);transition:.18s;cursor:pointer;position:relative}
+.s-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.s-card.next{border-color:var(--rose);box-shadow:0 0 0 1px var(--rose),var(--shadow-md)}
+.s-card .ribbon{position:absolute;top:-1px;right:16px;background:var(--rose);color:#fff;font-size:9.5px;font-weight:600;padding:4px 10px;border-radius:0 0 8px 8px;letter-spacing:.08em;text-transform:uppercase}
+.s-card .thumb{height:96px;border-radius:12px;margin-bottom:13px;display:grid;place-items:center;color:rgba(255,255,255,.92);font-size:24px}
+.s-card h3{font-size:17px;font-family:var(--font-h);font-weight:400;margin-bottom:6px}
+.s-meta{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--text-2);font-size:12.5px;margin-bottom:14px}
+.s-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;text-align:center}
+.s-metric b{display:block;font-family:var(--font-d);font-size:20px;font-weight:600}
+.s-metric span{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+.bar{height:7px;border-radius:6px;background:var(--surface-3);overflow:hidden;margin-bottom:13px}
+.bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--rose),var(--blush))}
+.s-actions{display:flex;gap:8px}.s-actions .btn{flex:1;justify-content:center}
+.s-attn{margin-top:12px;font-size:12px;color:var(--amber-text);background:var(--amber-light);border-radius:9px;padding:8px 11px;display:flex;align-items:center;gap:7px}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;padding:3px 10px;border-radius:20px;line-height:1.5}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.9}
+.pill.green{background:var(--green-light);color:var(--green-text)}
+.pill.amber{background:var(--amber-light);color:var(--amber-text)}
+.pill.red{background:var(--red-light);color:var(--red-text)}
+.pill.blue{background:var(--blue-light);color:var(--blue-text)}
+.pill.gray{background:var(--surface-3);color:var(--text-2)}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:15px 16px;border-bottom:1px solid var(--border)}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{font-size:12.5px;font-weight:500;padding:7px 14px;border-radius:22px;border:1px solid var(--ink-5);color:var(--text-2);background:var(--surface);transition:.14s;cursor:pointer}
+.chip:hover{border-color:var(--rose);color:var(--ink)}
+.chip.active{background:var(--rose);border-color:var(--rose);color:#fff}
+.chip .n{opacity:.7;margin-left:3px}
+.mini-search{position:relative;margin-left:auto}
+.mini-search input{height:36px;border:1px solid var(--border);border-radius:10px;padding:0 11px 0 32px;font-size:13px;background:var(--surface);width:220px;font-family:var(--font)}
+.mini-search input:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px var(--accent-ring)}
+.mini-search .si{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:13px}
+.select{height:36px;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:0 10px;font-size:13px;color:var(--text-2);font-weight:500;font-family:var(--font)}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{position:sticky;top:62px;background:var(--surface-3);text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);font-weight:600;padding:12px 16px;border-bottom:1px solid var(--border);white-space:nowrap;z-index:5}
+tbody td{padding:14px 16px;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+tbody tr{transition:.1s}tbody tr:hover{background:var(--surface-2)}tbody tr:last-child td{border-bottom:none}
+.cust{display:flex;align-items:center;gap:11px}
+.cust .ava{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:600;font-size:13px;color:#fff;flex-shrink:0;background:linear-gradient(135deg,var(--rose),var(--rose-deep))}
+.cust .nm{font-weight:600}.cust .em{font-size:12px;color:var(--text-3)}
+.money{font-weight:600;font-family:var(--font-d);font-size:15px}
+.row-act{display:flex;gap:6px;opacity:0;transition:.14s}tr:hover .row-act{opacity:1}
+.foot{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;color:var(--text-2);font-size:13px;flex-wrap:wrap;gap:10px}
+.pager{display:flex;gap:5px}
+.pager button{min-width:33px;height:33px;border-radius:9px;border:1px solid var(--ink-5);background:var(--surface);font-size:13px;font-weight:500;color:var(--text-2)}
+.pager button.active{background:var(--rose);color:#fff;border-color:var(--rose)}
+.detail-head{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.detail-head .back{width:40px;height:40px;border-radius:11px;border:1px solid var(--ink-5);background:var(--surface);display:grid;place-items:center;font-size:16px;color:var(--text-2);cursor:pointer}
+.detail-head .cover{width:74px;height:74px;border-radius:14px;display:grid;place-items:center;color:#fff;font-size:28px;flex-shrink:0}
+.detail-head h1{font-size:24px;font-family:var(--font-d);font-weight:500}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:22px;overflow-x:auto}
+.tab{padding:12px 16px;font-size:13.5px;font-weight:500;color:var(--text-2);border-bottom:2px solid transparent;white-space:nowrap;transition:.14s;display:flex;align-items:center;gap:7px;cursor:pointer}
+.tab:hover{color:var(--ink)}
+.tab.active{color:var(--rose-deep);border-bottom-color:var(--rose)}
+.tab .cnt{background:var(--surface-3);color:var(--text-2);font-size:11px;font-weight:600;border-radius:10px;padding:1px 7px}
+.tab.active .cnt{background:var(--accent-light);color:var(--rose-deep)}
+.tpanel{display:none}.tpanel.active{display:block;animation:fade .2s}
+.dropzone{border:2px dashed var(--border-strong);border-radius:var(--r-lg);background:var(--surface);padding:38px;text-align:center;transition:.18s;cursor:pointer;margin-bottom:20px}
+.dropzone:hover{border-color:var(--rose);background:var(--accent-light)}
+.dropzone.drag{border-color:var(--rose);background:var(--accent-light);transform:scale(1.005);box-shadow:0 0 0 4px var(--accent-ring)}
+.dropzone .dz-ic{width:56px;height:56px;border-radius:16px;background:var(--accent-light);border:1px solid var(--border);display:grid;place-items:center;font-size:24px;margin:0 auto 13px;color:var(--rose-deep)}
+.dropzone h3{font-size:18px;font-family:var(--font-h);font-weight:400;margin-bottom:5px}
+.dropzone p{font-size:13px;color:var(--text-2)}
+.dropzone .formats{font-size:11.5px;color:var(--text-3);margin-top:9px;letter-spacing:.04em}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:16px}
+.ptile{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3;background:var(--surface-3);cursor:grab}
+.ptile .img{width:100%;height:100%;display:grid;place-items:center;color:rgba(255,255,255,.85);font-size:22px}
+.ptile.main{box-shadow:0 0 0 2px var(--rose)}
+.ptile .tag-main{position:absolute;top:8px;left:8px;background:var(--rose);color:#fff;font-size:9.5px;font-weight:600;padding:3px 9px;border-radius:7px;text-transform:uppercase;letter-spacing:.06em;z-index:3}
+.ptile .ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(28,25,23,.6),transparent 55%);opacity:0;transition:.15s;display:flex;align-items:flex-end;gap:6px;padding:10px}
+.ptile:hover .ov{opacity:1}
+.ptile .ov .b{flex:1;background:rgba(255,255,255,.96);color:var(--ink);border-radius:8px;padding:7px;font-size:11.5px;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.ptile .ov .b.del{background:var(--red);color:#fff;flex:0 0 40px}
+.pcount{font-size:12.5px;color:var(--text-2);font-weight:500}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:11px}
+.slot{border:1px solid var(--border);border-radius:11px;padding:13px;background:var(--surface);transition:.14s}
+.slot:hover{border-color:var(--border-strong);box-shadow:var(--shadow)}
+.slot .t{font-weight:600;font-size:14px;font-family:var(--font-d)}
+.slot .who2{font-size:12px;color:var(--text-2);margin-top:3px;min-height:16px}
+.slot.free{border-style:dashed;background:var(--surface-2)}.slot.free .who2{color:var(--text-3)}
+.slot .st{margin-top:9px}
+.crm{display:grid;grid-template-columns:384px 1fr;gap:18px;align-items:start}
+.crm .list{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
+.crm .list .top{padding:14px;border-bottom:1px solid var(--border)}
+.crm .clients{max-height:670px;overflow-y:auto}
+.c-card{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--border);cursor:pointer;transition:.1s}
+.c-card:hover{background:var(--surface-2)}
+.c-card.sel{background:var(--accent-light);box-shadow:inset 3px 0 0 var(--rose)}
+.c-card .nm{font-weight:600;font-size:13.5px}.c-card .em{font-size:12px;color:var(--text-3)}
+.c-card .st{margin-left:auto;text-align:right;font-size:11.5px;color:var(--text-2)}
+.c-card .st b{color:var(--ink);font-size:13px;font-family:var(--font-d)}
+.crm .detail{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:24px;min-height:670px}
+.profile{display:flex;align-items:center;gap:15px;margin-bottom:22px}
+.profile .ava{width:62px;height:62px;border-radius:16px;display:grid;place-items:center;color:#fff;font-weight:600;font-size:22px;font-family:var(--font-d);background:linear-gradient(135deg,var(--rose),var(--rose-deep))}
+.profile h2{font-size:22px;font-family:var(--font-d);font-weight:500}
+.profile .pm{font-size:13px;color:var(--text-2);margin-top:3px}
+.tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:20px;letter-spacing:.04em;text-transform:uppercase}
+.tag.VIP{background:#f3ead7;color:#8a6d1f}.tag.FAMILY{background:#e7f1fb;color:#26618f}
+.tag.RETURNING{background:var(--green-light);color:var(--green-text)}.tag.NEW{background:#efe9fb;color:#6a40b0}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.stat{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px}
+.stat b{display:block;font-size:24px;font-family:var(--font-d);font-weight:600}
+.stat span{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+.d-sec{margin-bottom:22px}
+.d-sec h4{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);font-weight:600;margin-bottom:11px}
+.hist{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.hist .dt{font-size:12px;color:var(--text-3);width:96px;flex-shrink:0}
+.note{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:13px;margin-bottom:8px}
+.note .meta{font-size:11px;color:var(--text-3);margin-top:5px}
+.empty{display:grid;place-items:center;height:560px;color:var(--text-3);text-align:center}
+.empty .big{font-size:42px;margin-bottom:11px;opacity:.45}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:12px;font-size:13.5px;font-weight:500;box-shadow:var(--shadow-lg);z-index:100;transition:.3s;display:flex;align-items:center;gap:9px}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast .ic{color:var(--blush)}
+.pbanner{background:linear-gradient(90deg,#1c1917,#3a322e);color:#fff;font-size:12.5px;padding:9px 24px;display:flex;align-items:center;gap:9px;justify-content:center;font-family:var(--font)}
+.pbanner b{color:var(--blush)}
+@media(max-width:1080px){.kpis{grid-template-columns:repeat(2,1fr)}.crm{grid-template-columns:1fr}.crm .detail{display:none}}
+@media(max-width:720px){.sidebar{display:none}}
+</style>
+</head>
+<body>
+
+<div class="pbanner">◆ <b>PREVIEW</b> — новый стиль админки (как на странице бронирования). Тестовые данные · к реальной системе не подключено.</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot">◆</span><div>Pashynska<small>Studio Admin</small></div></div>
+    <nav class="nav">
+      <div class="nav-group">
+        <div class="lbl">Main</div>
+        <div class="nav-item active" onclick="go('dashboard',this)"><span class="ic">▦</span> Dashboard</div>
+        <div class="nav-item" onclick="go('session',this)"><span class="ic">📷</span> Sessions <span class="badge dim">4</span></div>
+        <div class="nav-item" onclick="go('clients',this)"><span class="ic">👥</span> Clients <span class="badge dim">1.7k</span></div>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">Needs action</div>
+        <div class="nav-item" onclick="go('dashboard',this)"><span class="ic">⏳</span> Pending <span class="badge">5</span></div>
+        <div class="nav-item" onclick="toast('Interac — образец')"><span class="ic">💸</span> Interac <span class="badge">2</span></div>
+      </div>
+      <div class="nav-group">
+        <div class="lbl">Tools</div>
+        <div class="nav-item" onclick="toast('Analytics — образец')"><span class="ic">📊</span> Analytics</div>
+        <div class="nav-item" onclick="toast('Links — образец')"><span class="ic">🔗</span> Payment links</div>
+      </div>
+    </nav>
+    <div class="side-foot"><div class="avatar">IP</div><div class="who">Iryna Pashynska<small>Owner · Admin</small></div></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search"><span class="si">⌕</span><input placeholder="Search bookings, clients, sessions…" onfocus="toast('Глобальный поиск')"><kbd>⌘K</kbd></div>
+      <div class="top-actions">
+        <button class="icon-btn" onclick="toast('3 новых уведомления')">🔔</button>
+        <button class="btn primary" onclick="toast('New session / booking')">+ New</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="view active" id="v-dashboard">
+        <div class="page-head">
+          <div><h1>Dashboard</h1><div class="sub">Sunday, June 14 · вот что требует внимания сегодня.</div></div>
+          <div class="row"><button class="btn ghost" onclick="toast('Stripe link')">💳 Stripe link</button><button class="btn primary" onclick="toast('Open next session')">Open next session</button></div>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><div class="h"><span>Confirmed (30d)</span><span class="ic" style="background:var(--green-light);color:var(--green-text)">✓</span></div><div class="v" style="color:var(--green-text)">38</div><div class="d"><b class="up">▲ 12%</b> vs last month</div></div>
+          <div class="kpi"><div class="h"><span>Pending payment</span><span class="ic" style="background:var(--amber-light);color:var(--amber-text)">⏳</span></div><div class="v" style="color:var(--amber-text)">5</div><div class="d">Awaiting verification</div></div>
+          <div class="kpi"><div class="h"><span>Revenue (30d)</span><span class="ic" style="background:var(--blue-light);color:var(--blue-text)">$</span></div><div class="v" style="color:var(--blue-text)">$6,240</div><div class="d"><b class="up">▲ 8%</b> CAD</div></div>
+          <div class="kpi"><div class="h"><span>Cancelled / expired</span><span class="ic" style="background:var(--surface-3);color:var(--text-2)">✕</span></div><div class="v" style="color:var(--text-2)">3</div><div class="d">2 cancelled · 1 expired</div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h2>📷 Sessions</h2><a class="link" href="#" onclick="toast('All sessions');return false">Manage all →</a></div>
+          <div class="sessions" id="sessions"></div>
+        </div>
+        <div class="section card">
+          <div class="toolbar">
+            <strong style="font-size:15px;font-family:var(--font-h);font-weight:400">Recent bookings</strong>
+            <div class="chips" style="margin-left:6px"><span class="chip active" onclick="chip(this)">All <span class="n">42</span></span><span class="chip" onclick="chip(this)">Pending <span class="n">5</span></span><span class="chip" onclick="chip(this)">Confirmed <span class="n">34</span></span><span class="chip" onclick="chip(this)">Cancelled <span class="n">3</span></span></div>
+            <div class="mini-search"><span class="si">⌕</span><input placeholder="Filter…" oninput="filterRows(this,'bk-body')"></div>
+          </div>
+          <div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Session</th><th>Date</th><th>Status</th><th>Amount</th><th></th></tr></thead><tbody id="bk-body"></tbody></table></div>
+          <div class="foot"><span>Showing <b>8</b> of 42 bookings</span><div class="pager"><button>‹</button><button class="active">1</button><button>2</button><button>3</button><button>›</button></div></div>
+        </div>
+      </div>
+
+      <!-- SESSION -->
+      <div class="view" id="v-session">
+        <div class="detail-head">
+          <div class="back" onclick="go('dashboard',document.querySelector('.nav-item'))">←</div>
+          <div class="cover" style="background:linear-gradient(135deg,var(--rose),var(--rose-deep))">🌿</div>
+          <div style="flex:1"><h1>Boho Spring Mini Sessions</h1><div class="s-meta" style="margin:6px 0 0"><span>📅 Sat, Jun 21 · 10:00–16:00</span><span>📍 Fish Creek Park</span><span class="pill green">Upcoming</span></div></div>
+          <button class="btn primary" onclick="toast('Edit session')">✦ Edit setup</button>
+        </div>
+        <div class="kpis" style="grid-template-columns:repeat(5,1fr)">
+          <div class="kpi"><div class="v">9</div><div class="d">Booked</div></div>
+          <div class="kpi"><div class="v" style="color:var(--green-text)">7</div><div class="d">Paid</div></div>
+          <div class="kpi"><div class="v" style="color:var(--amber-text)">2</div><div class="d">Pending</div></div>
+          <div class="kpi"><div class="v" style="color:var(--text-2)">1</div><div class="d">Closed</div></div>
+          <div class="kpi"><div class="v" style="color:var(--rose-deep)">2</div><div class="d">Free</div></div>
+        </div>
+        <div class="tabs">
+          <div class="tab active" onclick="stab('photos',this)">📸 Photos <span class="cnt" id="pcnt">4</span></div>
+          <div class="tab" onclick="stab('schedule',this)">📅 Schedule</div>
+          <div class="tab" onclick="stab('clients',this)">👥 Clients <span class="cnt">9</span></div>
+          <div class="tab" onclick="stab('info',this)">✏️ Info</div>
+        </div>
+        <div class="tpanel active" id="t-photos">
+          <div class="section-head" style="margin-bottom:14px"><div><h2 style="font-size:16px">Gallery photos</h2><div class="sub" style="color:var(--text-2);font-size:12.5px;margin-top:2px">Показываются на странице бронирования. Первое фото — главное.</div></div><span class="pcount"><span id="pc2">4</span> / 8 photos</span></div>
+          <div class="dropzone" id="dz" onclick="document.getElementById('fileInput').click()">
+            <div class="dz-ic">⬆</div><h3>Drag &amp; drop photos here</h3><p>или <span style="color:var(--rose-deep);font-weight:700">нажми, чтобы выбрать</span> — несколько сразу</p><div class="formats">JPG · PNG · WEBP · до 8 фото</div>
+            <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="addFiles(this.files)">
+          </div>
+          <div class="pgrid" id="pgrid"></div>
+        </div>
+        <div class="tpanel" id="t-schedule">
+          <div class="section-head" style="margin-bottom:14px"><h2 style="font-size:16px">Slot board</h2><button class="btn ghost sm" onclick="toast('Block time')">＋ Block time</button></div>
+          <div class="board" id="board"></div>
+        </div>
+        <div class="tpanel" id="t-clients">
+          <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Slot</th><th>Status</th><th>Paid</th><th></th></tr></thead><tbody id="roster"></tbody></table></div></div>
+        </div>
+        <div class="tpanel" id="t-info">
+          <div class="card" style="padding:20px;max-width:640px">
+            <div class="d-sec"><h4>Description</h4><div style="color:var(--text-2)">20-минутные boho мини-сессии в весеннем свете. 5 обработанных фото.</div></div>
+            <div class="d-sec"><h4>Price</h4><div class="money">$180 CAD <span style="color:var(--text-3);font-weight:500">· $50 deposit</span></div></div>
+            <button class="btn primary" onclick="toast('Saved (образец)')">Save changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLIENTS -->
+      <div class="view" id="v-clients">
+        <div class="page-head"><div><h1>Clients</h1><div class="sub"><b>1,713</b> clients · поиск по имени, email, телефону и Instagram</div></div><div class="row"><button class="btn ghost" onclick="toast('Export CSV')">⬇ Export</button><button class="btn primary" onclick="toast('Add client')">+ Add client</button></div></div>
+        <div class="crm">
+          <div class="list">
+            <div class="top">
+              <div class="mini-search" style="margin:0 0 10px"><span class="si">⌕</span><input style="width:100%" placeholder="Search 1,713 clients…" oninput="filterClients(this.value)"></div>
+              <div class="chips"><span class="chip active" onclick="chip(this)">All</span><span class="chip" onclick="chip(this)">VIP</span><span class="chip" onclick="chip(this)">Family</span><span class="chip" onclick="chip(this)">Returning</span><span class="chip" onclick="chip(this)">New</span></div>
+            </div>
+            <div class="clients" id="clientList"></div>
+            <div class="foot"><span>1–25 of <b>1,713</b></span><div class="pager"><button class="active">1</button><button>2</button><button>3</button><button>…</button><button>69</button></div></div>
+          </div>
+          <div class="detail" id="clientDetail"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="ic">✓</span><span id="toastMsg"></span></div>
+
+<script>
+const ini=n=>(n||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+const sessions=[
+ {t:'Boho Spring Mini Sessions',ic:'🌿',d:'Sat, Jun 21 · 10:00',loc:'Fish Creek Park',booked:9,paid:7,pend:2,free:2,occ:82,next:true,attn:2},
+ {t:'Maternity Golden Hour',ic:'🤍',d:'Sat, Jun 28 · 18:30',loc:'Nose Hill Park',booked:5,paid:5,pend:0,free:5,occ:50,attn:0},
+ {t:'Family Fall Minis',ic:'🍁',d:'Sun, Sep 13 · 11:00',loc:'Bowness Park',booked:3,paid:2,pend:1,free:9,occ:25,attn:1},
+ {t:"Mother's Day Minis",ic:'🌷',d:'Sun, May 11 · done',loc:'Studio',booked:12,paid:12,pend:0,free:0,occ:100,attn:0},
+];
+const bookings=[
+ {n:'Olena Kovalenko',e:'olena.k@gmail.com',s:'Boho Spring Mini',d:'Jun 21',st:'amber',stt:'Pending',amt:'$50'},
+ {n:'Sarah Thompson',e:'sarah.t@outlook.com',s:'Boho Spring Mini',d:'Jun 21',st:'green',stt:'Confirmed',amt:'$180'},
+ {n:'Marta Wójcik',e:'marta.w@gmail.com',s:'Maternity Golden Hour',d:'Jun 28',st:'green',stt:'Confirmed',amt:'$220'},
+ {n:'Jessica Lee',e:'jess.lee@gmail.com',s:'Boho Spring Mini',d:'Jun 21',st:'green',stt:'Confirmed',amt:'$180'},
+ {n:'Anna Shevchenko',e:'anna.sh@gmail.com',s:'Family Fall Minis',d:'Sep 13',st:'amber',stt:'Pending',amt:'$50'},
+ {n:'Emily Carter',e:'em.carter@gmail.com',s:'Maternity Golden Hour',d:'Jun 28',st:'green',stt:'Confirmed',amt:'$220'},
+ {n:'Natalia Boyko',e:'n.boyko@gmail.com',s:'Boho Spring Mini',d:'Jun 21',st:'red',stt:'Cancelled',amt:'—'},
+ {n:'Rachel Green',e:'rachel.g@gmail.com',s:'Family Fall Minis',d:'Sep 13',st:'green',stt:'Confirmed',amt:'$180'},
+];
+const clients=[
+ {n:'Olena Kovalenko',e:'olena.k@gmail.com',ph:'+1 403 555 0198',ig:'@olena.k',tags:['VIP','RETURNING'],bk:4,paid:'$720',last:'Jun 2026'},
+ {n:'Sarah Thompson',e:'sarah.t@outlook.com',ph:'+1 403 555 0142',ig:'@sarah.tho',tags:['FAMILY'],bk:2,paid:'$360',last:'Jun 2026'},
+ {n:'Marta Wójcik',e:'marta.w@gmail.com',ph:'+1 403 555 0167',ig:'@marta.w',tags:['NEW'],bk:1,paid:'$220',last:'Jun 2026'},
+ {n:'Jessica Lee',e:'jess.lee@gmail.com',ph:'+1 403 555 0111',ig:'@jesslee',tags:['RETURNING'],bk:3,paid:'$540',last:'Jun 2026'},
+ {n:'Anna Shevchenko',e:'anna.sh@gmail.com',ph:'+1 403 555 0173',ig:'@anna.shev',tags:['VIP','FAMILY'],bk:5,paid:'$980',last:'May 2026'},
+ {n:'Emily Carter',e:'em.carter@gmail.com',ph:'+1 403 555 0120',ig:'@emcarter',tags:['NEW'],bk:1,paid:'$220',last:'Jun 2026'},
+ {n:'Natalia Boyko',e:'n.boyko@gmail.com',ph:'+1 403 555 0155',ig:'@nataliab',tags:['RETURNING'],bk:2,paid:'$360',last:'Apr 2026'},
+ {n:'Rachel Green',e:'rachel.g@gmail.com',ph:'+1 403 555 0188',ig:'@rachg',tags:['FAMILY'],bk:2,paid:'$360',last:'Jun 2026'},
+];
+const sessGrad='linear-gradient(135deg,#c4857a,#a3685e)';
+const photoGrads=['linear-gradient(135deg,#c4857a,#e8c8c0)','linear-gradient(135deg,#b08d7a,#dcb8a6)','linear-gradient(135deg,#a3685e,#c79081)','linear-gradient(135deg,#cd9a86,#e8c8c0)','linear-gradient(135deg,#b8806f,#d8a892)'];
+let photos=[1,2,3,4];
+
+function renderSessions(){
+ document.getElementById('sessions').innerHTML=sessions.map(s=>`
+  <div class="s-card ${s.next?'next':''}" onclick="go('session',document.querySelectorAll('.nav-item')[1])">
+   ${s.next?'<div class="ribbon">Next up</div>':''}
+   <div class="thumb" style="background:${sessGrad}">${s.ic}</div>
+   <h3>${s.t}</h3>
+   <div class="s-meta"><span>📅 ${s.d}</span><span>📍 ${s.loc}</span></div>
+   <div class="s-metrics"><div class="s-metric"><b>${s.booked}</b><span>Booked</span></div><div class="s-metric"><b style="color:var(--green-text)">${s.paid}</b><span>Paid</span></div><div class="s-metric"><b style="color:var(--amber-text)">${s.pend}</b><span>Pend</span></div><div class="s-metric"><b style="color:var(--text-2)">${s.free}</b><span>Free</span></div></div>
+   <div class="bar"><i style="width:${s.occ}%"></i></div>
+   <div class="s-actions"><button class="btn primary sm">Open session</button><button class="btn ghost sm" onclick="event.stopPropagation();toast('Public page')">View</button></div>
+   ${s.attn?`<div class="s-attn">⚠ ${s.attn} client${s.attn>1?'s':''} awaiting payment</div>`:''}
+  </div>`).join('');
+}
+function renderBookings(){
+ document.getElementById('bk-body').innerHTML=bookings.map(b=>`
+  <tr><td><div class="cust"><div class="ava">${ini(b.n)}</div><div><div class="nm">${b.n}</div><div class="em">${b.e}</div></div></div></td>
+  <td>${b.s}</td><td>${b.d}</td><td><span class="pill ${b.st}">${b.stt}</span></td><td class="money">${b.amt}</td>
+  <td><div class="row-act"><button class="btn subtle sm" onclick="toast('Open booking')">Open</button><button class="btn primary sm" onclick="toast('Confirm payment')">Confirm</button></div></td></tr>`).join('');
+}
+function renderPhotos(){
+ document.getElementById('pgrid').innerHTML=photos.map((p,i)=>`
+  <div class="ptile ${i===0?'main':''}">
+   ${i===0?'<span class="tag-main">Main</span>':''}
+   <div class="img" style="background:${typeof p==='string'?'#222':photoGrads[(p-1)%photoGrads.length]}">${typeof p==='string'?`<img src="${p}" style="width:100%;height:100%;object-fit:cover">`:'🖼'}</div>
+   <div class="ov"><div class="b" onclick="toast('Replace / set main')">↑ Replace</div><div class="b del" onclick="delPhoto(${i})">✕</div></div>
+  </div>`).join('');
+ document.getElementById('pcnt').textContent=photos.length;
+ document.getElementById('pc2').textContent=photos.length;
+}
+function delPhoto(i){photos.splice(i,1);renderPhotos();toast('Photo removed')}
+function addFiles(files){[...files].forEach(f=>{if(photos.length<8)photos.push(URL.createObjectURL(f))});renderPhotos();toast((files.length||1)+' фото добавлено')}
+function renderBoard(){
+ const slots=[['10:00','Olena K.','amber'],['10:30','Sarah T.','green'],['11:00','Jessica L.','green'],['11:30','','free'],['12:00','Marta W.','green'],['12:30','','free'],['13:30','Anna S.','amber'],['14:00','Emily C.','green'],['14:30','Rachel G.','green'],['15:00','','blocked']];
+ document.getElementById('board').innerHTML=slots.map(([t,w,st])=>`
+  <div class="slot ${st==='free'?'free':''}"><div class="t">${t}</div><div class="who2">${w||(st==='blocked'?'Closed':'Available')}</div>
+  <div class="st">${st==='free'?'<button class="btn ghost sm" style="width:100%" onclick="toast(\'Manual booking\')">+ Book</button>':st==='blocked'?'<span class="pill gray">Closed</span>':`<span class="pill ${st}">${st==='green'?'Paid':'Pending'}</span>`}</div></div>`).join('');
+ document.getElementById('roster').innerHTML=bookings.slice(0,5).map(b=>`
+  <tr><td><div class="cust"><div class="ava">${ini(b.n)}</div><div class="nm">${b.n}</div></div></td><td>10:30</td><td><span class="pill ${b.st}">${b.stt}</span></td><td class="money">${b.amt}</td><td><div class="row-act"><button class="btn subtle sm" onclick="toast('Message')">Message</button></div></td></tr>`).join('');
+}
+let sel=0;
+function renderClients(filter=''){
+ const f=filter.toLowerCase();
+ const list=clients.filter(c=>!f||c.n.toLowerCase().includes(f)||c.e.toLowerCase().includes(f));
+ document.getElementById('clientList').innerHTML=list.map(c=>{const i=clients.indexOf(c);return `
+  <div class="c-card ${i===sel?'sel':''}" onclick="selClient(${i})"><div class="ava" style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;background:${sessGrad}">${ini(c.n)}</div><div><div class="nm">${c.n}</div><div class="em">${c.e}</div></div><div class="st"><b>${c.bk}</b> sessions<br>${c.paid}</div></div>`}).join('')||'<div style="padding:30px;text-align:center;color:var(--text-3)">No matches</div>';
+}
+function selClient(i){sel=i;renderClients(document.querySelector('#v-clients .mini-search input').value);renderDetail()}
+function renderDetail(){
+ const c=clients[sel];
+ document.getElementById('clientDetail').innerHTML=`
+  <div class="profile"><div class="ava">${ini(c.n)}</div><div style="flex:1"><h2>${c.n}</h2><div class="pm">${c.e} · ${c.ph} · ${c.ig}</div><div class="tagrow">${c.tags.map(t=>`<span class="tag ${t}">${t}</span>`).join('')}</div></div><button class="btn ghost sm" onclick="toast('Edit client')">Edit</button></div>
+  <div class="stat-grid"><div class="stat"><b>${c.bk}</b><span>Sessions</span></div><div class="stat"><b>${c.paid}</b><span>Total spent</span></div><div class="stat"><b>${c.last}</b><span>Last booking</span></div></div>
+  <div class="d-sec"><h4>Booking history</h4>
+   <div class="hist"><span class="dt">Jun 21 2026</span><span class="pill amber">Pending</span><span style="flex:1">Boho Spring Mini Sessions</span><span class="money">$50</span></div>
+   <div class="hist"><span class="dt">May 11 2026</span><span class="pill green">Paid</span><span style="flex:1">Mother's Day Minis</span><span class="money">$180</span></div></div>
+  <div class="d-sec"><h4>Notes</h4><div class="note">Любит естественный свет.<div class="meta">Added May 8 2026</div></div>
+   <textarea placeholder="Add a note…" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;min-height:54px"></textarea>
+   <button class="btn primary sm" style="margin-top:8px" onclick="toast('Note saved')">Save note</button></div>`;
+}
+function filterClients(v){renderClients(v)}
+function go(view,el){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('v-'+view).classList.add('active');if(el){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active')}window.scrollTo({top:0,behavior:'smooth'})}
+function stab(t,el){document.querySelectorAll('#v-session .tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');document.querySelectorAll('#v-session .tpanel').forEach(p=>p.classList.remove('active'));document.getElementById('t-'+t).classList.add('active')}
+function chip(el){[...el.parentElement.children].forEach(c=>c.classList.remove('active'));el.classList.add('active')}
+function filterRows(inp,bodyId){const f=inp.value.toLowerCase();document.querySelectorAll('#'+bodyId+' tr').forEach(r=>{r.style.display=r.textContent.toLowerCase().includes(f)?'':'none'})}
+let tt;function toast(m){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2200)}
+window.addEventListener('DOMContentLoaded',()=>{
+ renderSessions();renderBookings();renderPhotos();renderBoard();renderClients();renderDetail();
+ const z=document.getElementById('dz');
+ ['dragenter','dragover'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.add('drag')}));
+ ['dragleave','drop'].forEach(ev=>z.addEventListener(ev,e=>{e.preventDefault();z.classList.remove('drag')}));
+ z.addEventListener('drop',e=>{if(e.dataTransfer.files.length)addFiles(e.dataTransfer.files)});
+});
+</script>
+</body>
+</html>

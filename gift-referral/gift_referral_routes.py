@@ -7,6 +7,7 @@ Drop into main app with:
 
 import hashlib
 import hmac
+import json
 import os
 
 import stripe
@@ -16,6 +17,16 @@ from flask import (
 )
 
 import gift_referral_db as db
+from gift_referral_catalog import (
+    CERTIFICATE_STYLES,
+    CUSTOM_BASES,
+    GIFT_ADD_ONS,
+    GIFT_PACKAGES,
+    GIFT_PHOTOS,
+    GIFT_PHOTO_FALLBACK,
+    calculate_with_gst,
+    public_catalog,
+)
 from gift_referral_pdf import generate_gift_certificate_pdf, save_gift_pdf
 from gift_referral_email import (
     send_gift_purchaser_email,
@@ -38,6 +49,12 @@ TEST_MODE         = os.environ.get("TEST_MODE", "true").lower() in ("1", "true",
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_SUCCESS_URL = os.environ.get("STRIPE_SUCCESS_URL", "")
 BOOKING_URL       = os.environ.get("BOOKING_URL", "https://book.pashynskaphoto.com")
+INTERAC_EMAIL     = (
+    os.environ.get("ETRANSFER_EMAIL")
+    or os.environ.get("PHOTOGRAPHER_EMAIL")
+    or os.environ.get("GMAIL_USER")
+    or "iryna.pashynska@gmail.com"
+)
 
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
@@ -53,12 +70,73 @@ def _verify_credits_token(email: str, token: str) -> bool:
     return hmac.compare_digest(_make_credits_token(email), token)
 
 PACKAGES = {
-    "mini":       {"label": "Mini Session (30 min)",      "amount": 230.00, "amount_with_gst": 241.50},
-    "family":     {"label": "Family Session (1 hour)",     "amount": 290.00, "amount_with_gst": 304.50},
-    "maternity":  {"label": "Maternity Session (1 hour)",  "amount": 290.00, "amount_with_gst": 304.50},
-    "individual": {"label": "Individual Session (1 hour)", "amount": 290.00, "amount_with_gst": 304.50},
-    "custom":     {"label": "Custom Amount",               "amount": 0.0,    "amount_with_gst": 0.0},
+    key: {**value, "amount_with_gst": calculate_with_gst(value["amount"])}
+    for key, value in GIFT_PACKAGES.items()
 }
+
+# Only certificate photos from our own curated catalog may be stored. This prevents
+# arbitrary / attacker-supplied URLs from ever being persisted or rendered.
+_ALLOWED_PHOTOS = {url for urls in GIFT_PHOTOS.values() for url in urls}
+_ALLOWED_PHOTOS.add(GIFT_PHOTO_FALLBACK)
+
+
+def _safe_photo(url: str, session_type: str) -> str:
+    url = (url or "").strip()
+    if url in _ALLOWED_PHOTOS:
+        return url
+    pool = GIFT_PHOTOS.get(session_type) or []
+    return pool[0] if pool else GIFT_PHOTO_FALLBACK
+
+
+def _selected_addons(addon_ids: list[str]) -> list[dict]:
+    addons: list[dict] = []
+    for addon_id in addon_ids:
+        addon = GIFT_ADD_ONS.get(addon_id)
+        if not addon:
+            raise ValueError(f"Invalid add-on: {addon_id}")
+        addons.append({
+            "id": addon_id,
+            "label": addon["label"],
+            "amount": float(addon["amount"]),
+        })
+    return addons
+
+
+def _package_label(session_type: str, custom_base: str, addons: list[dict]) -> str:
+    if session_type == "custom":
+        base = CUSTOM_BASES.get(custom_base, CUSTOM_BASES["custom_30"])
+        label = f"Custom Gift Certificate - {base['label']}"
+    else:
+        label = GIFT_PACKAGES[session_type]["label"]
+    if addons:
+        label = f"{label} + " + " + ".join(addon["label"] for addon in addons)
+    return label
+
+
+def _referral_for(email: str, name: str) -> dict:
+    """Get or create the purchaser's own referral code so they can share & earn $20."""
+    email = (email or "").strip().lower()
+    empty = {"ref_code": None, "referral_url": None, "referral_msg": None,
+             "referral_friend": 20, "referral_owner": 20}
+    if not email:
+        return empty
+    try:
+        ref = db.get_referral_code_by_owner(email)
+        if not ref:
+            code = db.create_referral_code(email, name or "Friend")
+            ref = db.get_referral_code(code)
+        if not ref:
+            return empty
+    except Exception as exc:
+        print(f"[REFERRAL CODE ERROR] {exc}")
+        return empty
+    url = f"{BOOKING_URL}/referral/{ref['code']}"
+    friend = int(ref.get("discount_for_friend") or 20)
+    owner = int(ref.get("reward_for_owner") or 20)
+    msg = (f"I love Pashynska Photography in Calgary! Use my code {ref['code']} "
+           f"for ${friend} off your first session: {url}")
+    return {"ref_code": ref["code"], "referral_url": url, "referral_msg": msg,
+            "referral_friend": friend, "referral_owner": owner}
 
 # ---------------------------------------------------------------------------
 # Gift Certificate routes
@@ -66,7 +144,15 @@ PACKAGES = {
 
 @gift_referral_bp.route("/gift")
 def gift_landing():
-    return render_template("gift/gift_landing.html", packages=PACKAGES, booking_url=BOOKING_URL)
+    return render_template(
+        "gift/gift_landing.html",
+        packages=PACKAGES,
+        custom_bases=CUSTOM_BASES,
+        add_ons=GIFT_ADD_ONS,
+        certificate_styles=CERTIFICATE_STYLES,
+        gift_config=public_catalog(),
+        booking_url=BOOKING_URL,
+    )
 
 
 @gift_referral_bp.route("/gift/checkout", methods=["POST"])
@@ -77,7 +163,10 @@ def gift_checkout():
     recipient_email   = request.form.get("recipient_email", "").strip().lower()
     personal_message  = request.form.get("personal_message", "").strip()
     session_type      = request.form.get("session_type", "custom").strip()
-    custom_amount_str = request.form.get("custom_amount", "0").strip()
+    custom_base       = request.form.get("custom_base", "custom_30").strip()
+    certificate_style = request.form.get("certificate_style", "signature").strip()
+    payment_method    = request.form.get("payment_method", "card").strip().lower()
+    photo_url         = _safe_photo(request.form.get("gift_photo", ""), session_type)
 
     if not purchaser_name or not purchaser_email:
         return jsonify({"error": "Name and email are required"}), 400
@@ -86,17 +175,29 @@ def gift_checkout():
     if not pkg:
         return jsonify({"error": "Invalid session type"}), 400
 
+    if certificate_style not in CERTIFICATE_STYLES:
+        return jsonify({"error": "Invalid certificate style"}), 400
+
+    try:
+        addons = _selected_addons(request.form.getlist("gift_addons"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
     if session_type == "custom":
-        try:
-            amount = float(custom_amount_str)
-            if amount < 50 or amount > 500:
-                return jsonify({"error": "Custom amount must be between $50 and $500"}), 400
-        except ValueError:
-            return jsonify({"error": "Invalid amount"}), 400
-        amount_with_gst = round(amount * 1.05, 2)
+        base = CUSTOM_BASES.get(custom_base)
+        if not base:
+            return jsonify({"error": "Invalid custom package"}), 400
+        amount = float(base["amount"])
     else:
-        amount          = pkg["amount"]
-        amount_with_gst = pkg["amount_with_gst"]
+        custom_base = ""
+        amount = float(pkg["amount"])
+
+    amount += sum(addon["amount"] for addon in addons)
+    amount_with_gst = calculate_with_gst(amount)
+    package_label = _package_label(session_type, custom_base or "custom_30", addons)
+    addons_json = json.dumps(addons, separators=(",", ":"))
+    if payment_method not in ("card", "interac"):
+        return jsonify({"error": "Invalid payment method"}), 400
 
     # Store form data in Flask session so we can retrieve it on success
     session["gift_form"] = {
@@ -106,9 +207,43 @@ def gift_checkout():
         "recipient_email":  recipient_email,
         "personal_message": personal_message,
         "session_type":     session_type,
+        "custom_base":      custom_base,
+        "certificate_style": certificate_style,
+        "package_label":    package_label,
+        "addons_json":      addons_json,
+        "photo_url":        photo_url,
         "amount":           amount,
         "amount_with_gst":  amount_with_gst,
     }
+
+    if payment_method == "interac":
+        code = db.create_gift_certificate(
+            purchaser_email   = purchaser_email,
+            purchaser_name    = purchaser_name,
+            recipient_name    = recipient_name,
+            recipient_email   = recipient_email,
+            personal_message  = personal_message,
+            session_type      = session_type,
+            amount            = amount,
+            amount_with_gst   = amount_with_gst,
+            custom_base       = custom_base,
+            certificate_style = certificate_style,
+            package_label     = package_label,
+            addons_json       = addons_json,
+            photo_url         = photo_url,
+            payment_method    = "interac",
+            payment_status    = "pending",
+            paid_amount       = 0.0,
+            payment_reference = "Interac e-Transfer pending",
+            status            = "pending_payment",
+        )
+        cert = db.get_gift_certificate(code)
+        try:
+            from gift_referral_email import send_gift_pending_payment_email
+            send_gift_pending_payment_email(cert, INTERAC_EMAIL)
+        except Exception as exc:
+            print(f"[GIFT ETRANSFER EMAIL ERROR] {exc}")
+        return redirect(url_for("gift_referral.gift_pending", code=code))
 
     if TEST_MODE:
         # Skip Stripe — go straight to success with a mock session ID
@@ -127,7 +262,7 @@ def gift_checkout():
                 "currency": "cad",
                 "product_data": {
                     "name": f"Gift Certificate — {pkg['label']}",
-                    "description": f"Pashynska Photography · Recipient: {recipient_name or 'To be determined'}",
+                    "description": f"{package_label} · Recipient: {recipient_name or 'To be determined'}",
                 },
                 "unit_amount": int(amount_with_gst * 100),
             },
@@ -139,6 +274,10 @@ def gift_checkout():
         customer_email=purchaser_email,
         metadata={
             "gift_session_type":     session_type,
+            "custom_base":            custom_base,
+            "certificate_style":      certificate_style,
+            "gift_addons":            ",".join(addon["id"] for addon in addons),
+            "package_label":          package_label[:450],
             "purchaser_name":        purchaser_name,
             "recipient_name":        recipient_name,
             "recipient_email":       recipient_email,
@@ -170,6 +309,15 @@ def gift_success():
                     "recipient_email":  meta.get("recipient_email", ""),
                     "personal_message": "",
                     "session_type":     meta.get("gift_session_type", "custom"),
+                    "custom_base":      meta.get("custom_base", ""),
+                    "certificate_style": meta.get("certificate_style", "signature"),
+                    "package_label":    meta.get("package_label", ""),
+                    "addons_json":      json.dumps(
+                        _selected_addons([
+                            item for item in meta.get("gift_addons", "").split(",") if item
+                        ]),
+                        separators=(",", ":"),
+                    ),
                     "amount":           (stripe_sess.amount_total or 0) / 100 / 1.05,
                     "amount_with_gst":  (stripe_sess.amount_total or 0) / 100,
                 }
@@ -196,6 +344,14 @@ def gift_success():
             session_type      = form["session_type"],
             amount            = form["amount"],
             amount_with_gst   = form["amount_with_gst"],
+            custom_base       = form.get("custom_base", ""),
+            certificate_style = form.get("certificate_style", "signature"),
+            package_label     = form.get("package_label", ""),
+            addons_json       = form.get("addons_json", "[]"),
+            photo_url         = form.get("photo_url", ""),
+            payment_method    = "stripe",
+            payment_status    = "paid",
+            paid_amount       = form["amount_with_gst"],
             stripe_session_id = stripe_session_id,
         )
         cert = db.get_gift_certificate(code)
@@ -213,7 +369,29 @@ def gift_success():
     if cert.get("recipient_email"):
         send_gift_recipient_email(cert)
 
-    return render_template("gift/gift_success.html", cert=cert, pdf_path=pdf_path)
+    referral = _referral_for(cert.get("purchaser_email", ""), cert.get("purchaser_name", ""))
+    return render_template("gift/gift_success.html", cert=cert, pdf_path=pdf_path,
+                           booking_url=BOOKING_URL, **referral)
+
+
+@gift_referral_bp.route("/gift/pending/<code>")
+def gift_pending(code):
+    code = code.strip().upper()
+    cert = db.get_gift_certificate(code)
+    if not cert:
+        abort(404)
+    if cert.get("status") == "active":
+        referral = _referral_for(cert.get("purchaser_email", ""), cert.get("purchaser_name", ""))
+        return render_template("gift/gift_success.html", cert=cert, pdf_path=cert.get("pdf_path"),
+                               booking_url=BOOKING_URL, **referral)
+    bank_message = f"Gift certificate {code}"
+    return render_template(
+        "gift/gift_pending.html",
+        cert=cert,
+        interac_email=INTERAC_EMAIL,
+        bank_message=bank_message,
+        booking_url=BOOKING_URL,
+    )
 
 
 @gift_referral_bp.route("/gift/certificate/<code>")
@@ -221,6 +399,8 @@ def download_certificate(code):
     cert = db.get_gift_certificate(code)
     if not cert:
         abort(404)
+    if cert.get("status") not in ("active", "redeemed"):
+        abort(403)
     # Regenerate on the fly if PDF not on disk
     if cert.get("pdf_path") and os.path.exists(cert["pdf_path"]):
         return send_file(cert["pdf_path"], mimetype="application/pdf",
@@ -414,6 +594,7 @@ th{background:#C4973A;color:#fff;padding:10px 12px;text-align:left;font-size:13p
 td{padding:8px 12px;border-bottom:1px solid #E8D5A3;font-size:13px;}
 tr:hover td{background:#FEF9F2;}
 .active{color:#2a7a2a;font-weight:bold;}
+.pending_payment{color:#b7791f;font-weight:bold;}
 .redeemed{color:#888;}
 .expired{color:#c00;}
 a{color:#C4973A;}
@@ -441,7 +622,8 @@ def admin_gifts():
             f"<td><code>{c['code']}</code></td>"
             f"<td>{c['purchaser_name']}<br><small>{c['purchaser_email']}</small></td>"
             f"<td>{c.get('recipient_name','') or '—'}</td>"
-            f"<td>{c.get('session_type','') or 'custom'}</td>"
+            f"<td>{c.get('package_label') or c.get('session_type','') or 'custom'}"
+            f"<br><small>{c.get('certificate_style') or 'signature'} · {c.get('payment_method') or 'stripe'}</small></td>"
             f"<td>${c['amount_with_gst']:.2f}</td>"
             f"<td class='{status_cls}'>{c['status']}</td>"
             f"<td>{c['created_at'][:10]}</td>"

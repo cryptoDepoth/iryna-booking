@@ -51,8 +51,10 @@ def _seed_test_data():
                 recipient_email  = "jane@example.com",
                 personal_message = "Hope you love it!",
                 session_type     = "mini",
-                amount           = 230.0,
-                amount_with_gst  = 241.50,
+                amount           = 210.0,
+                amount_with_gst  = 220.50,
+                certificate_style= "signature",
+                package_label    = "Mini Session",
                 stripe_session_id= "TEST_SEED_GIFT",
             )
             # Manually set the code so it's predictable for tests

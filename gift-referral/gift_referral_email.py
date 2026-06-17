@@ -15,10 +15,17 @@ TEST_MODE: bool = os.environ.get("TEST_MODE", "true").lower() in ("1", "true", "
 
 SMTP_HOST   = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT   = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER   = os.environ.get("SMTP_USER", "")
-SMTP_PASS   = os.environ.get("SMTP_PASS", "")
+SMTP_USER   = os.environ.get("SMTP_USER") or os.environ.get("GMAIL_USER", "")
+SMTP_PASS   = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_APP_PASSWORD", "")
 FROM_EMAIL  = os.environ.get("FROM_EMAIL", "Iryna Pashynska Photography <irynapashynska@gmail.com>")
 BOOKING_URL = os.environ.get("BOOKING_URL", "https://book.pashynskaphoto.com")
+
+
+def _cert_session_label(cert: dict) -> str:
+    return (
+        cert.get("package_label")
+        or (cert.get("session_type", "custom").replace("_", " ").title() + " Session")
+    )
 
 
 def _send_email(
@@ -87,7 +94,7 @@ def send_gift_purchaser_email(cert: dict, pdf_path: str | None = None) -> bool:
     to_name   = cert.get("recipient_name") or "your recipient"
     expires   = cert.get("expires_at", "12 months from today")
     amount    = cert.get("amount_with_gst", 0)
-    session   = cert.get("session_type", "custom").capitalize()
+    session   = _cert_session_label(cert)
 
     subject = f"🎁 Your Pashynska Photography Gift Certificate ({code})"
     html = f"""
@@ -112,7 +119,7 @@ def send_gift_purchaser_email(cert: dict, pdf_path: str | None = None) -> bool:
         <p style="margin:8px 0 0;color:#888;font-size:12px;">Valid until: {expires}</p>
       </div>
 
-      <p><strong>Session:</strong> {session} — ${amount:.2f} CAD</p>
+      <p><strong>Gift:</strong> {session} — ${amount:.2f} CAD</p>
       <p>Simply forward the PDF (or share the code) with {to_name}. When they're ready to book, they can enter the code at checkout.</p>
 
       <div style="text-align:center;margin:28px 0 16px;">
@@ -135,7 +142,7 @@ Hi {from_name},
 
 Your gift certificate ({code}) for {to_name} is attached as a PDF.
 
-Session: {session} — ${amount:.2f} CAD
+Gift: {session} — ${amount:.2f} CAD
 Valid until: {expires}
 
 Book at: {BOOKING_URL}
@@ -156,7 +163,7 @@ def send_gift_recipient_email(cert: dict) -> bool:
     from_name  = cert["purchaser_name"]
     to_name    = cert.get("recipient_name") or "Friend"
     expires    = cert.get("expires_at", "12 months from purchase")
-    session    = cert.get("session_type", "custom").capitalize()
+    session    = _cert_session_label(cert)
     msg        = cert.get("personal_message", "")
     download   = f"{BOOKING_URL}/gift/certificate/{code}"
 
@@ -185,7 +192,7 @@ def send_gift_recipient_email(cert: dict) -> bool:
         <p style="margin:8px 0 0;color:#888;font-size:12px;">Valid until: {expires}</p>
       </div>
 
-      <p><strong>Session:</strong> {session}</p>
+      <p><strong>Gift:</strong> {session}</p>
       <p>Enter your code when booking to apply your certificate. You choose the date and time!</p>
 
       <div style="text-align:center;margin:28px 0 16px;">
@@ -209,7 +216,7 @@ You received a Pashynska Photography Gift Certificate!
 
 Hi {to_name},
 
-{from_name} has gifted you a {session} photography session.
+{from_name} has gifted you: {session}.
 
 {f'Their message: "{msg}"' if msg else ''}
 
@@ -220,6 +227,59 @@ Book at: {BOOKING_URL}
 Download PDF: {download}
 
 — Iryna Pashynska
+"""
+    return _send_email(to, subject, html, text.strip())
+
+
+def send_gift_pending_payment_email(cert: dict, interac_email: str) -> bool:
+    """Email e-Transfer instructions for a pending gift certificate."""
+    to = cert["purchaser_email"]
+    code = cert["code"]
+    from_name = cert["purchaser_name"]
+    to_name = cert.get("recipient_name") or "your recipient"
+    amount = cert.get("amount_with_gst", 0)
+    session = _cert_session_label(cert)
+    bank_message = f"Gift certificate {code}"
+
+    subject = f"e-Transfer instructions for your Pashynska gift ({code})"
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#FAF7F2;font-family:Georgia,serif;color:#2C2C2C;">
+  <div style="max-width:560px;margin:0 auto;padding:40px 20px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="font-size:22px;color:#C4973A;margin:0 0 4px;">Pashynska Photography</h1>
+      <p style="color:#888;margin:0;font-size:13px;">Calgary, AB</p>
+    </div>
+    <div style="background:#fff;border-radius:8px;border:1px solid #E8D5A3;padding:32px;">
+      <h2 style="margin:0 0 16px;font-size:20px;">Almost done</h2>
+      <p>Hi {from_name},</p>
+      <p>Your gift certificate for <strong>{to_name}</strong> is saved and waiting for e-Transfer confirmation.</p>
+      <div style="background:#FAF7F2;border:2px solid #C4973A;border-radius:6px;padding:20px;margin:24px 0;">
+        <p style="margin:0 0 10px;"><strong>Amount:</strong> ${amount:.2f} CAD</p>
+        <p style="margin:0 0 10px;"><strong>Send to:</strong> {interac_email}</p>
+        <p style="margin:0 0 10px;"><strong>Bank message:</strong> <span style="font-family:monospace;">{bank_message}</span></p>
+        <p style="margin:0;color:#888;font-size:12px;">Auto-deposit is enabled. The certificate PDF is emailed after payment is confirmed.</p>
+      </div>
+      <p><strong>Gift:</strong> {session}</p>
+      <p style="color:#666;font-size:13px;">Please keep the code in the bank message so the system can match the payment automatically.</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+    text = f"""
+Hi {from_name},
+
+Your Pashynska Photography gift certificate is saved and waiting for e-Transfer.
+
+Gift: {session}
+Amount: ${amount:.2f} CAD
+Send to: {interac_email}
+Bank message: {bank_message}
+
+The certificate PDF will be emailed after payment is confirmed.
 """
     return _send_email(to, subject, html, text.strip())
 

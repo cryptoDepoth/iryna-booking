@@ -59,9 +59,21 @@
       <a href="/family">Family</a>
       <a href="/maternity">Maternity</a>
       <a class="nav-portfolio" href="{{ PORTFOLIO_URL }}" rel="noopener" target="_blank">Portfolio</a>
+      <a class="nav-gift-cta" href="/gift">&#127873; Gift Cards</a>
       <a href="/book">Book Now</a>
     </div>
   </div>
+  <style>
+    .nav-gift-cta{display:inline-flex;align-items:center;gap:6px;color:#3a2a05 !important;font-weight:700;
+      padding:7px 14px;border-radius:30px;background:linear-gradient(135deg,#F6E3B0,#E8C45F 45%,#C4973A);
+      border:1px solid rgba(255,255,255,.55);text-decoration:none;position:relative;overflow:hidden;
+      box-shadow:0 3px 12px rgba(196,151,58,.4)}
+    .nav-gift-cta::after{content:"";position:absolute;top:0;left:-60%;width:38%;height:100%;
+      background:linear-gradient(100deg,transparent,rgba(255,255,255,.8),transparent);
+      transform:skewX(-18deg);animation:ngShine 3.8s ease-in-out infinite}
+    @keyframes ngShine{0%{left:-60%}55%{left:135%}100%{left:135%}}
+    @media(prefers-reduced-motion:reduce){.nav-gift-cta::after{animation:none}}
+  </style>
 </nav>
 
 <!-- ═══ Hero Section ═══ -->

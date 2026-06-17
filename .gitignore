@@ -44,3 +44,6 @@ tunnel.log
 flask.log
 *.tokens
 FLY_API_TOKEN.txt
+cookies.txt
+*.orig
+.claude/

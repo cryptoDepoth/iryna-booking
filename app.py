@@ -433,6 +433,14 @@ _FLY_INTERNAL_HOST = "iryna-booking.fly.dev"
 # Centralised so any future rebrand only touches one line.
 PORTFOLIO_URL = "https://pashynskaphoto.com"
 
+# ── Gift & Referral module ────────────────────────────────────────────────────
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gift-referral'))
+from gift_referral_routes import gift_referral_bp  # noqa: E402
+import gift_referral_db as gift_db                 # noqa: E402
+gift_db.init_db()
+app.register_blueprint(gift_referral_bp)
+
 
 @app.context_processor
 def _inject_site_links():
@@ -475,6 +483,10 @@ def _canonical_redirect():
         return redirect(new_url, code=301)
 
 PYTHON_BIN = os.environ.get("PYTHON_BIN", sys.executable)
+
+
+def _background_threads_disabled():
+    return os.environ.get("DISABLE_BACKGROUND_THREADS", "").lower() in ("1", "true", "yes", "on")
 
 # ===== GLOBAL E-TRANSFER WATCHER (replaces per-booking Popen) =====
 import threading as _threading
@@ -590,6 +602,9 @@ def _watcher_thread():
 
 def _start_global_watcher():
     global _watcher_started
+    if _background_threads_disabled():
+        log.info("[main] Background e-Transfer watcher disabled by DISABLE_BACKGROUND_THREADS")
+        return
     if _watcher_started:
         return
     t = _threading.Thread(target=_watcher_thread, daemon=True, name="etransfer-watcher")
@@ -3353,7 +3368,8 @@ def init_db():
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
-        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, matched_gift_code TEXT, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        ("etransfers", "matched_gift_code", "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT"),
     ]
     for _tbl, _col, _ddl in _migrations:
         try:
@@ -3587,10 +3603,13 @@ def _process_review_emails():
 
 
 # Start the scheduler in a background daemon thread
-import threading as _bg_thread
-_sched = _bg_thread.Thread(target=_run_email_scheduler, daemon=True, name="email-scheduler")
-_sched.start()
-log.info("[scheduler] Email scheduler started (abandoned / 48h reminder / 24h reminder / review)")
+if _background_threads_disabled():
+    log.info("[scheduler] Email scheduler disabled by DISABLE_BACKGROUND_THREADS")
+else:
+    import threading as _bg_thread
+    _sched = _bg_thread.Thread(target=_run_email_scheduler, daemon=True, name="email-scheduler")
+    _sched.start()
+    log.info("[scheduler] Email scheduler started (abandoned / 48h reminder / 24h reminder / review)")
 
 
 def db_conn():
@@ -8703,11 +8722,19 @@ def _ensure_etransfers_table(conn=None):
             direction TEXT DEFAULT 'in',
             email_date TEXT,
             matched_booking_id INTEGER,
+            matched_gift_code TEXT,
             status TEXT DEFAULT 'unmatched',
             source TEXT DEFAULT 'email',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(etransfers)").fetchall()}
+        if "matched_gift_code" not in cols:
+            conn.execute("ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT")
+            conn.commit()
+    except Exception:
+        pass
     conn.commit()
     if own:
         conn.close()

@@ -7,18 +7,21 @@ import os
 import secrets
 import sqlite3
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+from gift_referral_catalog import GIFT_PACKAGES, GST_RATE, calculate_with_gst
 
 DB_PATH = os.environ.get("GIFT_REFERRAL_DB", os.path.join(os.path.dirname(__file__), "gift_referral.db"))
 
-GST_RATE = 0.05  # Alberta 5%
-
 PACKAGES = {
-    "mini":       {"label": "Mini Session",       "duration": "30 min", "photos": 20, "amount": 230.0},
-    "family":     {"label": "Family Session",      "duration": "1 hour", "photos": 30, "amount": 290.0},
-    "maternity":  {"label": "Maternity Session",   "duration": "1 hour", "photos": 30, "amount": 290.0},
-    "individual": {"label": "Individual Session",  "duration": "1 hour", "photos": 30, "amount": 290.0},
-    "custom":     {"label": "Custom Amount",       "duration": "",       "photos": 0,  "amount": 0.0},
+    key: {
+        "label": value["label"],
+        "duration": value["duration"],
+        "photos": value["photos"],
+        "amount": value["amount"],
+        "amount_with_gst": calculate_with_gst(value["amount"]),
+    }
+    for key, value in GIFT_PACKAGES.items()
 }
 
 
@@ -46,6 +49,16 @@ def init_db(db_path: str | None = None) -> None:
             session_type        TEXT,
             amount              REAL NOT NULL,
             amount_with_gst     REAL NOT NULL,
+            custom_base         TEXT DEFAULT '',
+            certificate_style   TEXT DEFAULT 'signature',
+            package_label       TEXT DEFAULT '',
+            addons_json         TEXT DEFAULT '[]',
+            photo_url           TEXT DEFAULT '',
+            payment_method      TEXT DEFAULT 'stripe',
+            payment_status      TEXT DEFAULT 'paid',
+            paid_amount         REAL DEFAULT 0,
+            payment_reference   TEXT,
+            activated_at        TEXT,
             stripe_payment_intent TEXT,
             stripe_session_id   TEXT,
             status              TEXT DEFAULT 'active',
@@ -108,6 +121,17 @@ def init_db(db_path: str | None = None) -> None:
             created_at       TEXT DEFAULT CURRENT_TIMESTAMP
         );
     """)
+    _ensure_gift_columns(conn)
+    conn.execute("""
+        UPDATE gift_certificates
+           SET payment_status=COALESCE(payment_status, 'paid'),
+               payment_method=COALESCE(payment_method, 'stripe'),
+               paid_amount=CASE
+                   WHEN paid_amount IS NULL AND status='active' THEN amount_with_gst
+                   WHEN paid_amount IS NULL THEN 0
+                   ELSE paid_amount
+               END
+    """)
     conn.commit()
     conn.close()
 
@@ -121,7 +145,26 @@ def _random_chars(n: int) -> str:
 
 
 def calculate_gst(amount: float) -> float:
-    return round(amount * (1 + GST_RATE), 2)
+    return calculate_with_gst(amount)
+
+
+def _ensure_gift_columns(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(gift_certificates)").fetchall()}
+    migrations = {
+        "custom_base": "ALTER TABLE gift_certificates ADD COLUMN custom_base TEXT DEFAULT ''",
+        "certificate_style": "ALTER TABLE gift_certificates ADD COLUMN certificate_style TEXT DEFAULT 'signature'",
+        "package_label": "ALTER TABLE gift_certificates ADD COLUMN package_label TEXT DEFAULT ''",
+        "addons_json": "ALTER TABLE gift_certificates ADD COLUMN addons_json TEXT DEFAULT '[]'",
+        "photo_url": "ALTER TABLE gift_certificates ADD COLUMN photo_url TEXT DEFAULT ''",
+        "payment_method": "ALTER TABLE gift_certificates ADD COLUMN payment_method TEXT DEFAULT 'stripe'",
+        "payment_status": "ALTER TABLE gift_certificates ADD COLUMN payment_status TEXT DEFAULT 'paid'",
+        "paid_amount": "ALTER TABLE gift_certificates ADD COLUMN paid_amount REAL DEFAULT 0",
+        "payment_reference": "ALTER TABLE gift_certificates ADD COLUMN payment_reference TEXT",
+        "activated_at": "ALTER TABLE gift_certificates ADD COLUMN activated_at TEXT",
+    }
+    for column, ddl in migrations.items():
+        if column not in columns:
+            conn.execute(ddl)
 
 
 # ---------------------------------------------------------------------------
@@ -141,10 +184,24 @@ def create_gift_certificate(
     session_type: str,
     amount: float,
     amount_with_gst: float,
+    custom_base: str = "",
+    certificate_style: str = "signature",
+    package_label: str = "",
+    addons_json: str = "[]",
+    photo_url: str = "",
+    payment_method: str = "stripe",
+    payment_status: str = "paid",
+    paid_amount: float | None = None,
+    payment_reference: str | None = None,
+    status: str = "active",
     stripe_payment_intent: str | None = None,
     stripe_session_id: str | None = None,
 ) -> str:
-    expires_at = (datetime.utcnow() + timedelta(days=365)).strftime("%Y-%m-%d")
+    now = datetime.now(timezone.utc)
+    expires_at = (now + timedelta(days=365)).strftime("%Y-%m-%d")
+    if paid_amount is None:
+        paid_amount = amount_with_gst if status == "active" else 0.0
+    activated_at = now.strftime("%Y-%m-%d %H:%M:%S") if status == "active" else None
     for _ in range(20):
         code = generate_gift_code()
         conn = get_db()
@@ -153,12 +210,16 @@ def create_gift_certificate(
                 """INSERT INTO gift_certificates
                    (code, purchaser_email, purchaser_name, recipient_name, recipient_email,
                     personal_message, session_type, amount, amount_with_gst,
-                    stripe_payment_intent, stripe_session_id, expires_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    custom_base, certificate_style, package_label, addons_json, photo_url,
+                    payment_method, payment_status, paid_amount, payment_reference,
+                    activated_at, stripe_payment_intent, stripe_session_id, status, expires_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     code, purchaser_email, purchaser_name, recipient_name, recipient_email,
                     personal_message, session_type, amount, amount_with_gst,
-                    stripe_payment_intent, stripe_session_id, expires_at,
+                    custom_base, certificate_style, package_label, addons_json, photo_url,
+                    payment_method, payment_status, paid_amount, payment_reference,
+                    activated_at, stripe_payment_intent, stripe_session_id, status, expires_at,
                 ),
             )
             conn.commit()
@@ -194,7 +255,9 @@ def validate_gift_certificate(code: str, session_type: str | None = None) -> dic
         return {"valid": False, "error": "This certificate has already been redeemed"}
     if cert["status"] in ("expired", "refunded"):
         return {"valid": False, "error": f"This certificate is {cert['status']}"}
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    if cert["status"] != "active":
+        return {"valid": False, "error": "This certificate is awaiting payment confirmation"}
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     if cert["expires_at"] and cert["expires_at"] < today:
         _set_gift_status(code, "expired")
         return {"valid": False, "error": "This certificate has expired"}
@@ -248,6 +311,26 @@ def update_gift_pdf(code: str, pdf_path: str) -> None:
     )
     conn.commit()
     conn.close()
+
+
+def mark_gift_payment_confirmed(code: str, paid_amount: float, payment_reference: str | None = None) -> bool:
+    conn = get_db()
+    conn.execute(
+        """UPDATE gift_certificates
+              SET status='active',
+                  payment_status='paid',
+                  paid_amount=?,
+                  payment_reference=COALESCE(?, payment_reference),
+                  activated_at=CURRENT_TIMESTAMP
+            WHERE code=?
+              AND status='pending_payment'
+              AND ABS(amount_with_gst - ?) < 0.01""",
+        (paid_amount, payment_reference, code, paid_amount),
+    )
+    conn.commit()
+    changed = conn.total_changes
+    conn.close()
+    return changed > 0
 
 
 def list_gift_certificates() -> list[dict]:

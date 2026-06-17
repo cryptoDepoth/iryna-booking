@@ -36,6 +36,11 @@ primary_region = 'sjc'
   EVENTS_YAML_PATH   = "/data/events.yaml"
   ASSISTANT_SITE_URL = "https://book.pashynskaphoto.com"
   ASSISTANT_KNOWLEDGE_PATH = "/data/assistant_knowledge.jsonl"
+  TEST_MODE          = "false"
+  BOOKING_URL        = "https://book.pashynskaphoto.com"
+  STRIPE_SUCCESS_URL = "https://book.pashynskaphoto.com"
+  GIFT_REFERRAL_DB   = "/data/gift_referral.db"
+  GIFT_PDF_DIR       = "/data/gift_pdfs"
 
 [[mounts]]
   source = "booking_data"

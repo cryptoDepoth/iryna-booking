@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gift Certificate Designer v2 — Pashynska Photography</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Tenor+Sans&family=Inter:wght@300;400;500;600&family=Great+Vibes&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --ivory:#FAF7F2; --ink:#2C2C2C; --ink-soft:#6c6760;
+    --gold:#C4973A; --gold-lite:#E8CE8A; --rose:#C98B86; --rose-deep:#9a4b00;
+    --sage:#8A9A7B;
+  }
+  body{background:var(--ivory);color:var(--ink);font-family:'Inter',sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased;padding:0 0 70px}
+
+  .page-head{text-align:center;padding:34px 20px 10px}
+  .page-head .eyebrow{font-family:'Tenor Sans',sans-serif;letter-spacing:3px;
+    text-transform:uppercase;font-size:11px;color:var(--gold)}
+  .page-head h1{font-family:'Cormorant Garamond',serif;font-weight:300;
+    font-size:30px;letter-spacing:.5px;margin:6px 0 4px}
+  .page-head p{font-size:13px;color:var(--ink-soft);max-width:560px;margin:0 auto}
+
+  /* Homepage entry-point mock */
+  .mock-wrap{max-width:1060px;margin:26px auto 6px;padding:0 20px}
+  .mock-label{font-family:'Tenor Sans',sans-serif;font-size:10px;letter-spacing:2px;
+    text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .mock-label::after{content:"";flex:1;height:1px;background:rgba(44,44,44,.12)}
+  .mock-nav{display:flex;align-items:center;gap:18px;background:#fff;border:1px solid rgba(44,44,44,.08);
+    border-radius:14px;padding:14px 20px;box-shadow:0 6px 22px rgba(44,44,44,.05);flex-wrap:wrap}
+  .mock-brand{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:500;letter-spacing:.3px}
+  .mock-brand small{display:block;font-family:'Inter';font-size:9px;letter-spacing:2px;
+    text-transform:uppercase;color:var(--ink-soft);font-weight:400}
+  .mock-links{display:flex;gap:16px;align-items:center;margin-left:8px;flex-wrap:wrap}
+  .mock-links a{font-size:13px;color:var(--ink-soft);text-decoration:none;font-weight:500}
+  .mock-links a.portfolio{color:var(--rose-deep);font-weight:600}
+  .mock-spacer{flex:1}
+  .gift-badge{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
+    font-family:'Inter';font-weight:600;font-size:13px;letter-spacing:.2px;color:#3a2a05;
+    padding:9px 16px;border-radius:30px;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,#F6E3B0 0%,#E8C45F 45%,#C4973A 100%);
+    box-shadow:0 4px 14px rgba(196,151,58,.45);border:1px solid rgba(255,255,255,.5)}
+  .gift-badge .gb-ico{font-size:15px;line-height:1}
+  .gift-badge::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.75),transparent);
+    transform:skewX(-18deg);animation:badgeShine 3.6s ease-in-out infinite}
+  @keyframes badgeShine{0%{left:-60%}55%{left:130%}100%{left:130%}}
+  .gift-badge .pulse{position:absolute;inset:0;border-radius:30px;
+    box-shadow:0 0 0 0 rgba(196,151,58,.5);animation:badgePulse 2.6s ease-out infinite}
+  @keyframes badgePulse{0%{box-shadow:0 0 0 0 rgba(196,151,58,.5)}
+    70%{box-shadow:0 0 0 12px rgba(196,151,58,0)}100%{box-shadow:0 0 0 0 rgba(196,151,58,0)}}
+
+  /* Designer layout */
+  .designer{max-width:1060px;margin:30px auto 0;padding:0 20px;display:grid;
+    grid-template-columns:330px 1fr;gap:40px;align-items:start}
+  @media(max-width:880px){.designer{grid-template-columns:1fr;gap:30px}}
+
+  .panel{background:#fff;border:1px solid rgba(196,151,58,.18);border-radius:16px;
+    padding:24px 22px;box-shadow:0 10px 30px rgba(44,44,44,.05)}
+  .panel h2{font-family:'Tenor Sans',sans-serif;font-size:10px;letter-spacing:3px;
+    text-transform:uppercase;color:var(--gold);margin:20px 0 10px}
+  .panel h2:first-child{margin-top:0}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;
+    color:var(--ink-soft);margin-bottom:5px}
+  .field input,.field textarea,.field select{width:100%;border:1px solid rgba(44,44,44,.16);
+    border-radius:9px;padding:10px 12px;font-family:'Inter';font-size:13px;color:var(--ink);
+    background:#fdfcfa;transition:border-color .2s}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--gold)}
+  .field textarea{resize:vertical;min-height:62px}
+  .addons label{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);
+    margin-bottom:9px;cursor:pointer}
+  .addons input{width:16px;height:16px;accent-color:var(--gold);flex-shrink:0}
+  .addons .amt{margin-left:auto;color:var(--gold);font-weight:600;font-size:12px}
+
+  /* price breakdown */
+  .price-box{background:#fbf6ec;border:1px solid rgba(196,151,58,.3);border-radius:12px;
+    padding:14px 16px;margin-top:4px}
+  .price-box .row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-soft);
+    padding:3px 0}
+  .price-box .row span:last-child{color:var(--ink);font-weight:500}
+  .price-box .row.total{border-top:1px solid rgba(196,151,58,.3);margin-top:6px;padding-top:9px;
+    font-size:15px}
+  .price-box .row.total span{color:var(--gold);font-weight:600;font-family:'Cormorant Garamond',serif;font-size:19px}
+  .price-box .dur{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--gold);
+    background:#fff;border:1px solid rgba(196,151,58,.35);border-radius:20px;padding:3px 10px;margin-bottom:8px}
+
+  /* photo controls */
+  .photo-ctrl{display:flex;gap:8px;flex-wrap:wrap}
+  .pbtn{flex:1;min-width:120px;border:1px solid rgba(196,151,58,.4);background:#fff;color:var(--gold);
+    border-radius:9px;padding:9px 10px;font-family:'Inter';font-size:12px;font-weight:600;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all .2s}
+  .pbtn:hover{background:var(--gold);color:#fff}
+  .muted{font-size:11px;color:var(--ink-soft);margin-top:8px;line-height:1.45}
+  .note{font-size:11px;color:var(--ink-soft);background:#faf4e8;border:1px dashed rgba(196,151,58,.4);
+    border-radius:9px;padding:8px 10px;margin-top:8px;line-height:1.45;display:none}
+
+  /* Stage */
+  .stage{display:flex;flex-direction:column;align-items:center}
+  .style-bar{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:6px}
+  .style-arrow{width:38px;height:38px;border-radius:50%;border:1px solid rgba(196,151,58,.4);
+    background:#fff;color:var(--gold);font-size:18px;cursor:pointer;display:flex;
+    align-items:center;justify-content:center;transition:all .2s}
+  .style-arrow:hover{background:var(--gold);color:#fff}
+  .style-meta{text-align:center;min-width:170px}
+  .style-meta .k{font-family:'Tenor Sans';font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-soft)}
+  .style-meta .n{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:500;color:var(--ink)}
+  .style-dots{display:flex;gap:7px;justify-content:center;margin:8px 0 18px}
+  .style-dots button{width:8px;height:8px;border-radius:50%;border:none;cursor:pointer;
+    background:rgba(44,44,44,.18);transition:all .2s;padding:0}
+  .style-dots button.on{background:var(--gold);transform:scale(1.25)}
+
+  .float{perspective:1400px}
+  .anim-float{animation:certFloat 6s ease-in-out infinite}
+  @keyframes certFloat{0%,100%{transform:rotateX(2deg) rotateY(-2deg) translateY(0)}
+    50%{transform:rotateX(0deg) rotateY(2deg) translateY(-10px)}}
+
+  .cert{width:392px;max-width:90vw;border-radius:14px;overflow:hidden;position:relative;
+    transition:background .5s,color .5s}
+  .cert-photo-frame{position:relative;overflow:hidden;background:#e9e2d6}
+  .cert-photo{width:100%;height:100%;object-fit:cover;display:block;transition:transform 9s ease,opacity .4s}
+  .cert:hover .cert-photo{transform:scale(1.07)}
+  .cert-body{position:relative;z-index:3}
+  .cert-brand{font-family:'Tenor Sans',sans-serif;letter-spacing:2.5px;text-transform:uppercase}
+  .cert-kicker{font-family:'Inter';letter-spacing:1.5px;text-transform:uppercase;font-size:9px}
+  .cert-title{font-family:'Cormorant Garamond',serif;font-weight:300}
+  .cert-to{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:400}
+  .cert-session{font-family:'Cormorant Garamond',serif;font-weight:500}
+  .cert-duration{display:inline-flex;align-items:center;gap:5px;font-family:'Inter';font-size:10px;
+    font-weight:500;letter-spacing:.8px;text-transform:uppercase;padding:3px 11px;border-radius:20px;margin:6px 0 2px}
+  .cert-meta{font-size:10.5px;opacity:.82}
+  .cert-addons{font-size:10px;letter-spacing:.4px}
+  .cert-msg{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:300}
+  .cert-from{font-family:'Great Vibes',cursive}
+  .cert-amount{font-family:'Cormorant Garamond',serif;font-weight:500}
+  .cert-code{font-family:'Inter';letter-spacing:2px;font-size:10px}
+  .cert-foot{font-family:'Inter';font-size:8.5px;letter-spacing:1px;text-transform:uppercase;opacity:.7}
+  .divider{display:flex;align-items:center;gap:8px;justify-content:center}
+  .divider .ln{height:1px;flex:1;max-width:64px;background:currentColor;opacity:.4}
+  .divider .dm{width:6px;height:6px;transform:rotate(45deg);background:currentColor}
+
+  /* ===== STYLE 1 · EDITORIAL IVORY (simple) ===== */
+  .style-editorial .cert{background:#FBF8F3;color:#2C2C2C;
+    box-shadow:0 26px 60px rgba(44,44,44,.16);border:1px solid rgba(44,44,44,.08)}
+  .style-editorial .cert-photo-frame{height:210px}
+  .style-editorial .seal-wrap,.style-editorial .noir-corners,.style-editorial .sprig,
+  .style-editorial .glint,.style-editorial .particles{display:none}
+  .style-editorial .cert-body{padding:22px 30px 26px;text-align:center}
+  .style-editorial .cert-brand{font-size:10px;color:var(--gold)}
+  .style-editorial .cert-title{font-size:30px;margin:11px 0 2px;letter-spacing:.5px}
+  .style-editorial .cert-kicker{color:var(--ink-soft);margin-top:10px}
+  .style-editorial .cert-to{font-size:27px;margin:1px 0 8px}
+  .style-editorial .cert-duration{color:var(--gold);background:#f6efe2;border:1px solid rgba(196,151,58,.4)}
+  .style-editorial .e-rule{height:1px;background:rgba(44,44,44,.16);margin:11px auto;max-width:70px}
+  .style-editorial .cert-session{font-size:18px}
+  .style-editorial .cert-msg{font-size:14px;color:var(--ink-soft);margin:12px auto;max-width:280px}
+  .style-editorial .cert-from{font-size:24px;color:var(--gold);margin-top:4px}
+  .style-editorial .cert-amount{font-size:17px;margin-top:13px}
+  .style-editorial .cert-code{color:var(--ink-soft);margin-top:7px}
+  .style-editorial .cert-foot{margin-top:9px;color:var(--ink-soft)}
+
+  /* ===== STYLE 2 · SIGNATURE NOIR (complex / luxury) — photo now clearly visible ===== */
+  .style-noir .cert{background:radial-gradient(120% 90% at 50% 0%,#211b15 0%,#14110E 72%);
+    color:#F3E9D6;box-shadow:0 30px 70px rgba(0,0,0,.55);border:1px solid rgba(201,162,75,.5);padding:7px}
+  .style-noir .cert::before{content:"";position:absolute;inset:7px;border:1px solid rgba(201,162,75,.35);
+    border-radius:9px;pointer-events:none;z-index:5}
+  .style-noir .cert-photo-frame{height:166px;border-radius:8px;overflow:hidden;
+    border:1px solid rgba(201,162,75,.55)}
+  .style-noir .cert-photo{filter:saturate(1) brightness(.98)}
+  .style-noir .cert-photo-frame::after{content:"";position:absolute;left:0;right:0;bottom:0;height:34%;
+    background:linear-gradient(180deg,transparent,rgba(20,17,14,.5))}
+  .style-noir .e-rule,.style-noir .sprig{display:none}
+  .style-noir .cert-body{padding:16px 28px 22px;text-align:center;margin-top:10px}
+  .style-noir .cert-brand{font-size:10px;color:var(--gold-lite)}
+  .style-noir .cert-title{font-size:26px;color:#fff;margin:5px 0 0;letter-spacing:1px}
+  .style-noir .cert-title b{color:var(--gold-lite);font-weight:300}
+  .style-noir .divider{color:var(--gold);margin:8px 0}
+  .style-noir .cert-kicker{color:var(--gold-lite);opacity:.8;margin-top:2px}
+  .style-noir .cert-to{font-size:25px;color:#fff;margin:0 0 4px}
+  .style-noir .cert-duration{color:#2a1f0c;background:linear-gradient(135deg,#E8CE8A,#C4973A);border:none}
+  .style-noir .seal-wrap{position:relative;width:74px;height:74px;margin:6px auto 8px}
+  .style-noir .seal-ring{position:absolute;inset:0;color:var(--gold);animation:sealSpin 16s linear infinite}
+  .style-noir .seal-disk{position:absolute;inset:18px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#E8CE8A,#C4973A 70%,#9c7626);
+    display:flex;align-items:center;justify-content:center;color:#2a1f0c;
+    box-shadow:0 4px 12px rgba(0,0,0,.45),inset 0 1px 2px rgba(255,255,255,.5)}
+  @keyframes sealSpin{to{transform:rotate(360deg)}}
+  .style-noir .cert-session{font-size:18px;color:var(--gold-lite)}
+  .style-noir .cert-meta{opacity:.74}
+  .style-noir .cert-addons{color:var(--gold-lite);opacity:.85;margin-top:3px}
+  .style-noir .cert-msg{font-size:13.5px;color:#e7dcc6;opacity:.92;margin:11px auto;max-width:285px}
+  .style-noir .cert-from{font-size:25px;color:var(--gold-lite);margin-top:2px}
+  .style-noir .cert-amount{font-size:18px;color:#fff;margin-top:12px}
+  .style-noir .cert-code{color:var(--gold-lite);opacity:.8;margin-top:7px}
+  .style-noir .cert-foot{margin-top:9px;color:#cdbf9f}
+  .style-noir .noir-corners i{position:absolute;width:22px;height:22px;border:1.5px solid var(--gold);z-index:6;opacity:.85}
+  .style-noir .noir-corners .tl{top:14px;left:14px;border-right:0;border-bottom:0}
+  .style-noir .noir-corners .tr{top:14px;right:14px;border-left:0;border-bottom:0}
+  .style-noir .noir-corners .bl{bottom:14px;left:14px;border-right:0;border-top:0}
+  .style-noir .noir-corners .br{bottom:14px;right:14px;border-left:0;border-top:0}
+  .style-noir .glint{position:absolute;top:0;left:-40%;width:30%;height:100%;z-index:7;
+    background:linear-gradient(100deg,transparent,rgba(255,247,224,.16),transparent);
+    transform:skewX(-18deg);animation:glintSweep 5.5s ease-in-out infinite;pointer-events:none}
+  @keyframes glintSweep{0%{left:-40%}50%{left:120%}100%{left:120%}}
+  .style-noir .particles{position:absolute;inset:0;z-index:4;pointer-events:none;overflow:hidden}
+
+  /* ===== STYLE 3 · BOTANICAL SAGE (natural) ===== */
+  .style-botanical .cert{background:#F4F1E8;color:#3a3f36;
+    box-shadow:0 26px 60px rgba(94,107,84,.22);border:1px solid rgba(138,154,123,.4)}
+  .style-botanical .cert::before{content:"";position:absolute;inset:9px;
+    border:1px solid rgba(138,154,123,.45);border-radius:9px;pointer-events:none;z-index:5}
+  .style-botanical .cert-photo-frame{height:178px;margin:16px 16px 0;border-radius:10px;overflow:hidden;
+    box-shadow:0 8px 20px rgba(94,107,84,.2)}
+  .style-botanical .seal-wrap,.style-botanical .noir-corners,.style-botanical .glint,
+  .style-botanical .particles,.style-botanical .e-rule{display:none}
+  .style-botanical .cert-body{padding:13px 30px 24px;text-align:center}
+  .style-botanical .cert-brand{font-size:10px;color:var(--sage)}
+  .style-botanical .cert-title{font-size:28px;color:#3a4a33;margin:7px 0 0}
+  .style-botanical .divider{color:var(--gold);margin:7px 0}
+  .style-botanical .cert-kicker{color:var(--sage);margin-top:5px}
+  .style-botanical .cert-to{font-size:26px;color:#3a4a33;margin:0 0 5px}
+  .style-botanical .cert-duration{color:#3a4a33;background:#e7ece0;border:1px solid rgba(138,154,123,.55)}
+  .style-botanical .cert-session{font-size:18px;color:#5a6b4f}
+  .style-botanical .cert-meta{opacity:.86}
+  .style-botanical .cert-addons{color:var(--gold);margin-top:3px}
+  .style-botanical .cert-msg{font-size:13.5px;color:#5e6b54;margin:11px auto;max-width:285px}
+  .style-botanical .cert-from{font-size:25px;color:var(--sage);margin-top:2px}
+  .style-botanical .cert-amount{font-size:17px;color:#3a4a33;margin-top:12px}
+  .style-botanical .cert-code{color:var(--sage);margin-top:7px}
+  .style-botanical .cert-foot{margin-top:8px;color:var(--sage)}
+  .style-botanical .sprig{position:absolute;z-index:6;color:var(--sage);opacity:.85;transform-origin:top center}
+  .style-botanical .sprig.s-tl{top:6px;left:4px;animation:sway 7s ease-in-out infinite}
+  .style-botanical .sprig.s-tr{top:6px;right:4px;animation:swayFlip 7s ease-in-out infinite;animation-delay:-2s}
+  .style-botanical .sprig.s-br{bottom:2px;right:8px;transform:rotate(180deg);animation:sway 7s ease-in-out infinite;animation-delay:-3.5s}
+  @keyframes sway{0%,100%{transform:rotate(0deg)}50%{transform:rotate(3deg)}}
+  @keyframes swayFlip{0%,100%{transform:scaleX(-1) rotate(0deg)}50%{transform:scaleX(-1) rotate(3deg)}}
+  .sprig{display:none}
+
+  .reduced-note{text-align:center;font-size:11px;color:var(--ink-soft);margin-top:18px;max-width:392px}
+  @media(prefers-reduced-motion:reduce){
+    .anim-float,.seal-ring,.glint,.gift-badge::after,.gift-badge .pulse,.sprig{animation:none}
+    .cert-photo{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="eyebrow">Pashynska Photography · Calgary</div>
+  <h1>Gift Certificate Designer</h1>
+  <p>Type the names and message, switch styles with the arrows (or swipe the card), pick a session —
+     photo, duration and price update live. Shuffle the photo or upload your own.</p>
+</div>
+
+<div class="mock-wrap">
+  <div class="mock-label">Proposed homepage entry point · book.pashynskaphoto.com</div>
+  <div class="mock-nav">
+    <div class="mock-brand">Pashynska Photography<small>Calgary, Alberta</small></div>
+    <div class="mock-links">
+      <a href="#">Wedding</a><a href="#">Family</a><a href="#">Maternity</a>
+      <a href="#" class="portfolio">Portfolio ↗</a>
+    </div>
+    <div class="mock-spacer"></div>
+    <a class="gift-badge" href="#designer"><span class="pulse"></span><span class="gb-ico">&#127873;</span> Gift Cards</a>
+  </div>
+</div>
+
+<div class="designer" id="designer">
+  <div class="panel">
+    <h2>Personalize</h2>
+    <div class="field"><label>Recipient's name</label>
+      <input id="f-to" type="text" placeholder="Sarah" value="Sarah"></div>
+    <div class="field"><label>Your name</label>
+      <input id="f-from" type="text" placeholder="Jane" value="Jane"></div>
+    <div class="field"><label>Personal message</label>
+      <textarea id="f-msg" maxlength="220">You deserve to be seen in your most beautiful light.</textarea></div>
+
+    <h2>Session</h2>
+    <div class="field"><label>Choose a session</label>
+      <select id="f-pkg">
+        <option value="mini">Mini Session — 20 min — $210</option>
+        <option value="family">Individual / Family — 1 hour — $320</option>
+        <option value="maternity">Maternity Session — 1 hour — $320</option>
+        <option value="newborn">Newborn Lifestyle — 1 hour — $350</option>
+        <option value="custom">Custom Gift — from $210</option>
+      </select></div>
+
+    <h2>Add upgrades</h2>
+    <div class="addons">
+      <label><input type="checkbox" class="ad" value="extra_5"> 5 extra edited photos <span class="amt">+$30</span></label>
+      <label><input type="checkbox" class="ad" value="extra_10"> 10 extra edited photos <span class="amt">+$50</span></label>
+      <label><input type="checkbox" class="ad" value="video"> 1-minute highlight video <span class="amt">+$50</span></label>
+      <label><input type="checkbox" class="ad" value="studio"> Studio session upgrade <span class="amt">+$75</span></label>
+      <label><input type="checkbox" class="ad" value="mountain"> Mountain session upgrade <span class="amt">+$100</span></label>
+    </div>
+
+    <h2>What it costs</h2>
+    <div class="price-box">
+      <span class="dur" id="p-dur">&#9201; 20 minutes</span>
+      <div class="row"><span id="p-base-label">Mini Session</span><span id="p-base">$210.00</span></div>
+      <div class="row"><span>Upgrades</span><span id="p-addons">$0.00</span></div>
+      <div class="row"><span>GST (5%)</span><span id="p-gst">$10.50</span></div>
+      <div class="row total"><span>Total</span><span id="p-total">$220.50 CAD</span></div>
+    </div>
+
+    <h2>Photo on the certificate</h2>
+    <div class="photo-ctrl">
+      <button class="pbtn" id="shuffle">&#128256; Shuffle photo</button>
+      <button class="pbtn" id="upload-btn">&#128247; Upload my own</button>
+    </div>
+    <div class="field" style="margin-top:10px"><input id="f-photourl" type="url" placeholder="…or paste an image URL"></div>
+    <button class="pbtn" id="reset-photo" style="width:100%">&#8634; Reset to live site photos</button>
+    <input id="f-upload" type="file" accept="image/*" style="display:none">
+    <div class="muted" id="pool-info"></div>
+    <div class="note" id="photo-note"></div>
+  </div>
+
+  <div class="stage">
+    <div class="style-bar">
+      <button class="style-arrow" id="prev" aria-label="Previous style">&#8249;</button>
+      <div class="style-meta"><div class="k">Certificate style</div><div class="n" id="style-name">Signature Noir</div></div>
+      <button class="style-arrow" id="next" aria-label="Next style">&#8250;</button>
+    </div>
+    <div class="style-dots" id="dots"></div>
+
+    <div class="float">
+      <div class="anim-float" id="card-wrap">
+        <div class="cert" id="cert">
+          <div class="glint"></div>
+          <div class="particles" id="particles"></div>
+          <div class="noir-corners"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
+
+          <svg class="sprig s-tl" width="86" height="86" viewBox="0 0 86 86" fill="none">
+            <path d="M14 72 C26 52 30 30 30 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <g stroke="currentColor" stroke-width="1.1" stroke-linecap="round" fill="none">
+              <path d="M22 56 q-11 -3 -15 5"/><path d="M25 47 q-12 -4 -16 4"/>
+              <path d="M27 38 q-11 -5 -16 2"/><path d="M29 29 q-10 -6 -15 0"/>
+              <path d="M24 56 q11 -6 9 -16"/><path d="M26 46 q11 -6 10 -16"/><path d="M28 36 q10 -7 10 -16"/></g>
+          </svg>
+          <svg class="sprig s-tr" width="86" height="86" viewBox="0 0 86 86" fill="none">
+            <path d="M14 72 C26 52 30 30 30 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <g stroke="currentColor" stroke-width="1.1" stroke-linecap="round" fill="none">
+              <path d="M22 56 q-11 -3 -15 5"/><path d="M25 47 q-12 -4 -16 4"/>
+              <path d="M27 38 q-11 -5 -16 2"/><path d="M24 56 q11 -6 9 -16"/><path d="M26 46 q11 -6 10 -16"/></g>
+          </svg>
+          <svg class="sprig s-br" width="70" height="70" viewBox="0 0 86 86" fill="none">
+            <path d="M14 72 C26 52 30 30 30 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <g stroke="currentColor" stroke-width="1.1" stroke-linecap="round" fill="none">
+              <path d="M22 56 q-11 -3 -15 5"/><path d="M25 47 q-12 -4 -16 4"/><path d="M24 56 q11 -6 9 -16"/></g>
+          </svg>
+
+          <div class="cert-photo-frame">
+            <img class="cert-photo" id="cert-photo" alt="Session preview"
+                 src="https://book.pashynskaphoto.com/images/golden-boho-moments-2026-06-14_5367d2c1.jpeg">
+          </div>
+
+          <div class="cert-body">
+            <div class="cert-brand">Pashynska Photography</div>
+            <div class="cert-title" id="t-title">Gift <b>Certificate</b></div>
+            <div class="divider"><span class="ln"></span><span class="dm"></span><span class="ln"></span></div>
+            <div class="cert-kicker">Lovingly gifted to</div>
+            <div class="cert-to" id="t-to">Sarah</div>
+
+            <div class="seal-wrap">
+              <svg class="seal-ring" viewBox="0 0 88 88" width="74" height="74">
+                <circle cx="44" cy="44" r="42" fill="none" stroke="currentColor" stroke-width=".7" stroke-dasharray="3 5.5"/>
+                <circle cx="44" cy="3" r="1.4" fill="currentColor"/><circle cx="44" cy="85" r="1.4" fill="currentColor"/>
+                <circle cx="3" cy="44" r="1.4" fill="currentColor"/><circle cx="85" cy="44" r="1.4" fill="currentColor"/>
+              </svg>
+              <div class="seal-disk">
+                <svg width="30" height="30" viewBox="0 0 40 40" fill="none">
+                  <path d="M14 11l2.5-4h7l2.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  <rect x="7" y="11" width="26" height="18" rx="3.5" stroke="currentColor" stroke-width="1.6"/>
+                  <circle cx="20" cy="20" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+                  <circle cx="20" cy="20" r="2.1" fill="currentColor"/>
+                </svg>
+              </div>
+            </div>
+
+            <div class="cert-kicker">Entitles the holder to</div>
+            <div class="cert-session" id="t-session">Mini Session</div>
+            <div class="cert-duration" id="t-duration">&#9201; 20 minutes</div>
+            <div class="cert-meta" id="t-meta">15 edited photos · all originals included</div>
+            <div class="cert-addons" id="t-addons"></div>
+
+            <div class="e-rule"></div>
+            <div class="cert-msg" id="t-msg">You deserve to be seen in your most beautiful light.</div>
+            <div class="cert-from" id="t-from">With love, Jane</div>
+
+            <div class="cert-amount" id="t-amount">$220.50 CAD</div>
+            <div class="cert-code">GIFT-A3K9-7BXM</div>
+            <div class="cert-foot">Valid for 12 months · book.pashynskaphoto.com</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="reduced-note">Drag the card left / right to switch styles. The emailed PDF and the live /gift page will match the chosen style and photo.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var IMG="https://book.pashynskaphoto.com/images/", STATIC="https://book.pashynskaphoto.com/static/";
+  var GST=0.05;
+  var PKG={
+    mini:{label:"Mini Session",dur:"20 minutes",meta:"15 edited photos · all originals included",amount:210,
+      pool:[IMG+"golden-boho-moments-2026-06-14_5367d2c1.jpeg",IMG+"lilac-mini-session-2026-06-06_7f2e5bde.jpeg",
+            IMG+"swing-blossom-mini-session-2026-05-31_539e1b47.jpeg",IMG+"mountains-mini-session-2026-06-20_44d5d944.png",
+            IMG+"canoe-mini-session-2026-07-04_5c96e407.png"]},
+    family:{label:"Individual / Family Session",dur:"1 hour",meta:"25 edited photos · all originals included",amount:320,
+      pool:[IMG+"individual-photoshoot-2026-06-04_ce3a657f.jpeg"]},
+    maternity:{label:"Maternity Session",dur:"1 hour",meta:"25 edited photos · all originals included",amount:320,
+      pool:[STATIC+"og-image.jpg"],placeholder:true},
+    newborn:{label:"Newborn Lifestyle Session",dur:"1 hour",meta:"30 edited photos · all originals included",amount:350,
+      pool:[STATIC+"og-image.jpg"],placeholder:true},
+    custom:{label:"Custom Gift Certificate",dur:"Flexible",meta:"Choose a base experience and add upgrades",amount:210,
+      pool:[IMG+"lilac-mini-session-2026-06-06_7f2e5bde.jpeg",IMG+"golden-boho-moments-2026-06-14_5367d2c1.jpeg"]}
+  };
+  var ADD={extra_5:{l:"5 extra edited photos",a:30},extra_10:{l:"10 extra edited photos",a:50},
+           video:{l:"1-minute highlight video",a:50},studio:{l:"Studio upgrade",a:75},mountain:{l:"Mountain upgrade",a:100}};
+  var STYLES=[{id:"noir",name:"Signature Noir"},{id:"editorial",name:"Editorial Ivory"},{id:"botanical",name:"Botanical Sage"}];
+
+  var $=function(id){return document.getElementById(id);};
+  var cert=$("cert"), stage, idx=0, override=null;
+
+  function money(v){return (Math.round(v*100)/100).toFixed(2);}
+  function selAddons(){return [].slice.call(document.querySelectorAll(".ad:checked")).map(function(c){return c.value;});}
+  function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+
+  function setPhoto(url){override=url;$("cert-photo").src=url;}
+  function poolPhoto(){var p=PKG[$("f-pkg").value]||PKG.mini;return pick(p.pool);}
+
+  function render(){
+    var key=$("f-pkg").value, p=PKG[key]||PKG.mini;
+    var ads=selAddons();
+    var addSum=ads.reduce(function(s,id){return s+(ADD[id]?ADD[id].a:0);},0);
+    var sub=p.amount+addSum, total=Math.round(sub*(1+GST)*100)/100;
+
+    if(!override)$("cert-photo").src=$("cert-photo").src; // keep current pool photo
+    $("t-to").textContent=($("f-to").value||"Sarah").trim();
+    $("t-from").textContent="With love, "+(($("f-from").value||"Jane").trim());
+    $("t-session").textContent=p.label;
+    $("t-duration").innerHTML="&#9201; "+p.dur;
+    $("t-meta").textContent=p.meta;
+    $("t-addons").textContent=ads.length?("+ "+ads.map(function(id){return ADD[id].l;}).join(" · ")):"";
+    $("t-msg").textContent=($("f-msg").value||"You deserve to be seen in your most beautiful light.").trim();
+    $("t-amount").textContent="$"+money(total)+" CAD";
+
+    // form price breakdown
+    $("p-dur").innerHTML="&#9201; "+p.dur;
+    $("p-base-label").textContent=p.label;
+    $("p-base").textContent="$"+money(p.amount);
+    $("p-addons").textContent="$"+money(addSum);
+    $("p-gst").textContent="$"+money(sub*GST);
+    $("p-total").textContent="$"+money(total)+" CAD";
+
+    // pool info + placeholder note
+    var n=p.pool.length;
+    $("pool-info").textContent=override
+      ? "Using your custom photo. Press “Reset” to go back to live site photos."
+      : (p.placeholder
+          ? "Placeholder image — Iryna can add real "+p.label.toLowerCase()+" photos to the pool."
+          : "Pulling a random photo from "+n+" live "+key+" photo"+(n>1?"s":"")+" on the booking site.");
+    var note=$("photo-note");
+    if(p.placeholder&&!override){note.style.display="block";
+      note.textContent="No live "+p.label.toLowerCase()+" photos yet — using the brand image as a placeholder.";}
+    else note.style.display="none";
+  }
+
+  function setStyle(n){
+    idx=(n+STYLES.length)%STYLES.length;var s=STYLES[idx];
+    stage.classList.remove("style-noir","style-editorial","style-botanical");
+    stage.classList.add("style-"+s.id);
+    $("style-name").textContent=s.name;
+    [].slice.call(document.querySelectorAll("#dots button")).forEach(function(b,i){b.className=i===idx?"on":"";});
+  }
+
+  document.addEventListener("DOMContentLoaded",function(){
+    stage=document.querySelector(".designer .stage");
+
+    var dots=$("dots");
+    STYLES.forEach(function(s,i){var b=document.createElement("button");
+      b.addEventListener("click",function(){setStyle(i);});dots.appendChild(b);});
+    $("prev").addEventListener("click",function(){setStyle(idx-1);});
+    $("next").addEventListener("click",function(){setStyle(idx+1);});
+
+    var sx=null;
+    cert.addEventListener("pointerdown",function(e){sx=e.clientX;});
+    window.addEventListener("pointerup",function(e){
+      if(sx===null)return;var dx=e.clientX-sx;sx=null;
+      if(Math.abs(dx)<40)return;setStyle(idx+(dx<0?1:-1));});
+
+    // package change → new random photo from that pool
+    $("f-pkg").addEventListener("change",function(){override=null;$("cert-photo").src=poolPhoto();render();});
+    ["f-to","f-from","f-msg"].forEach(function(id){$(id).addEventListener("input",render);});
+    [].slice.call(document.querySelectorAll(".ad")).forEach(function(c){c.addEventListener("change",render);});
+
+    $("shuffle").addEventListener("click",function(){override=null;$("cert-photo").src=poolPhoto();render();});
+    $("reset-photo").addEventListener("click",function(){override=null;$("f-photourl").value="";$("cert-photo").src=poolPhoto();render();});
+    $("upload-btn").addEventListener("click",function(){$("f-upload").click();});
+    $("f-upload").addEventListener("change",function(e){var f=e.target.files[0];if(f)setPhoto(URL.createObjectURL(f));render();});
+    $("f-photourl").addEventListener("input",function(){var v=$("f-photourl").value.trim();if(v){setPhoto(v);render();}});
+
+    // gold particles for noir
+    var pc=$("particles");
+    if(!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)){
+      setInterval(function(){
+        if(!stage.classList.contains("style-noir"))return;
+        var d=document.createElement("div");
+        var x=Math.random()*92+2,sz=Math.random()*3+1.5,dur=(Math.random()*2+2.5).toFixed(2);
+        d.style.cssText="position:absolute;bottom:-6px;left:"+x+"%;width:"+sz+"px;height:"+sz+
+          "px;border-radius:50%;background:#E8CE8A;opacity:.85;animation:rise "+dur+"s ease-out forwards";
+        pc.appendChild(d);setTimeout(function(){d.remove();},dur*1000+200);
+      },520);
+    }
+    var st=document.createElement("style");
+    st.textContent="@keyframes rise{0%{transform:translateY(0);opacity:0}15%{opacity:.9}100%{transform:translateY(-150px);opacity:0}}";
+    document.head.appendChild(st);
+
+    $("cert-photo").src=poolPhoto();
+    setStyle(0); render();
+  });
+})();
+</script>
+</body>
+</html>

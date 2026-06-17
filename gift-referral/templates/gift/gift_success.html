@@ -5,10 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gift Certificate Confirmed — Pashynska Photography</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Tenor+Sans&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('gift_referral.static', filename='gift/gift.css') }}">
   <style>
-    .gift-success-title { font-family: 'Playfair Display', Georgia, serif; }
+    body { font-family: 'Inter', sans-serif; }
+    .gift-success-title { font-family: 'Cormorant Garamond', Georgia, serif; }
+    .gift-share-card,.gift-refer-card{background:#fff;border:1px solid #E8D5A3;border-radius:12px;padding:26px 24px;margin-bottom:24px;text-align:center}
+    .gift-share-card h3,.gift-refer-card h3{font-family:'Cormorant Garamond',Georgia,serif;font-size:23px;color:#2C2C2C;margin-bottom:6px;font-weight:500}
+    .gs-sub,.gr-sub{font-size:13px;color:#888;margin:0 auto 16px;max-width:360px;line-height:1.5}
+    .gs-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:18px}
+    .gs-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:999px;border:1px solid #E8D5A3;background:#FAF7F2;color:#2C2C2C;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;font-family:'Inter',sans-serif}
+    .gs-btn:hover{background:#f3ead6}
+    .gs-primary{background:linear-gradient(135deg,#E8C45F,#C4973A);color:#3a2a05;border-color:transparent}
+    .gs-qr-wrap{display:inline-flex;flex-direction:column;align-items:center;gap:6px}
+    #gs-qr{padding:10px;background:#fff;border:1px solid #eee;border-radius:10px;display:inline-block;line-height:0}
+    #gs-qr img,#gs-qr canvas{display:block}
+    .gs-qr-cap{font-size:11px;color:#aaa;letter-spacing:.5px}
+    .gift-refer-card{background:linear-gradient(180deg,#fffdf8,#fbf3e4);border-color:#E8C45F}
+    .gr-badge{display:inline-block;background:#2C2C2C;color:#E8C45F;font-weight:700;font-size:13px;letter-spacing:1px;padding:6px 14px;border-radius:999px;margin-bottom:10px}
+    .gr-sub strong{color:#C4973A}
+    .gr-code-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin-top:14px}
+    .gr-code{font-family:'Courier New',monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#2C2C2C;background:#fff;border:1px dashed #C4973A;border-radius:8px;padding:9px 16px}
   </style>
 </head>
 <body>
@@ -46,7 +63,19 @@
         <tr>
           <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; color:#888;">Session</td>
           <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; text-align:right; font-weight:600; color:#2C2C2C;">
-            {{ cert.session_type | capitalize if cert.session_type else 'Custom' }} session
+            {{ cert.package_label or (cert.session_type | capitalize if cert.session_type else 'Custom') }}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; color:#888;">Style</td>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; text-align:right; font-weight:600; color:#2C2C2C;">
+            {{ (cert.certificate_style or 'signature') | replace('_', ' ') | title }}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; color:#888;">Payment</td>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; text-align:right; font-weight:600; color:#2C2C2C;">
+            {{ (cert.payment_method or 'stripe') | replace('_', ' ') | title }}
           </td>
         </tr>
         <tr>
@@ -80,6 +109,37 @@
       </a>
     </div>
 
+    <!-- Share this gift -->
+    <div class="gift-share-card">
+      <h3>Share this gift</h3>
+      <p class="gs-sub">Send it to {{ cert.recipient_name or 'your recipient' }} in one tap, or show the QR code.</p>
+      <div class="gs-actions">
+        <button type="button" class="gs-btn gs-primary" id="gs-share">🔗 Share…</button>
+        <a class="gs-btn" id="gs-wa" target="_blank" rel="noopener">WhatsApp</a>
+        <a class="gs-btn" id="gs-email">Email</a>
+        <button type="button" class="gs-btn" id="gs-copy">Copy code</button>
+      </div>
+      <div class="gs-qr-wrap">
+        <div id="gs-qr" role="img" aria-label="QR code linking to the booking site"></div>
+        <p class="gs-qr-cap">Scan to open booking</p>
+      </div>
+    </div>
+
+    {% if ref_code %}
+    <!-- Refer a friend & earn -->
+    <div class="gift-refer-card">
+      <div class="gr-badge">${{ referral_friend }} + ${{ referral_owner }}</div>
+      <h3>Share Pashynska &amp; you both get ${{ referral_owner }}</h3>
+      <p class="gr-sub">Your friend gets <strong>${{ referral_friend }} off</strong> their first session, and you get
+        <strong>${{ referral_owner }} credit</strong> toward yours when they book.</p>
+      <div class="gr-code-row">
+        <span class="gr-code">{{ ref_code }}</span>
+        <a class="gs-btn" id="gr-wa" target="_blank" rel="noopener">Share on WhatsApp</a>
+        <button type="button" class="gs-btn" id="gr-copy" data-copy="{{ referral_url }}">Copy link</button>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- What happens next -->
     <div style="background:#fff; border:1px solid #E8D5A3; border-radius:10px; padding:28px; text-align:left; margin-bottom:32px;">
       <h3 style="font-size:16px; margin-bottom:16px; color:#2C2C2C;">What happens next?</h3>
@@ -110,6 +170,59 @@
   <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>
 </footer>
 
+{% if cert %}
+<script id="gift-share-config" type="application/json">
+{
+  "code": {{ cert.code|tojson }},
+  "value": {{ ("%.2f"|format(cert.amount_with_gst))|tojson }},
+  "recipient": {{ (cert.recipient_name or "")|tojson }},
+  "bookingUrl": {{ (booking_url or "")|tojson }},
+  "redeemUrl": {{ ((booking_url or "") ~ "/?gift=" ~ cert.code)|tojson }},
+  "referralUrl": {{ (referral_url or "")|tojson }},
+  "referralMsg": {{ (referral_msg or "")|tojson }}
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function () {
+  var el = document.getElementById("gift-share-config");
+  if (!el) return;
+  var cfg = {}; try { cfg = JSON.parse(el.textContent); } catch (e) { return; }
+  var booking = cfg.bookingUrl || "";
+  var redeem = cfg.redeemUrl || booking;
+  var shareText = "A Pashynska Photography gift for you 🎁  Code " + cfg.code +
+                  " ($" + cfg.value + " CAD). Redeem at " + booking;
+
+  if (window.QRCode) {
+    try { new QRCode(document.getElementById("gs-qr"),
+      { text: redeem, width: 128, height: 128, colorDark: "#2C2C2C", colorLight: "#ffffff" }); } catch (e) {}
+  }
+  var wa = document.getElementById("gs-wa");
+  if (wa) wa.href = "https://wa.me/?text=" + encodeURIComponent(shareText);
+  var em = document.getElementById("gs-email");
+  if (em) em.href = "mailto:?subject=" + encodeURIComponent("A gift for you — Pashynska Photography") +
+                    "&body=" + encodeURIComponent(shareText);
+
+  var sh = document.getElementById("gs-share");
+  if (sh) sh.addEventListener("click", function () {
+    if (navigator.share) {
+      navigator.share({ title: "Pashynska Photography Gift", text: shareText, url: redeem }).catch(function () {});
+    } else if (em) { window.location.href = em.href; }
+  });
+
+  function copy(text, btn) {
+    var done = function () { var o = btn.textContent; btn.textContent = "Copied ✓";
+      setTimeout(function () { btn.textContent = o; }, 1800); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); }
+    else { var t = document.createElement("textarea"); t.value = text; document.body.appendChild(t);
+      t.select(); try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(t); done(); }
+  }
+  var cc = document.getElementById("gs-copy"); if (cc) cc.addEventListener("click", function () { copy(cfg.code, cc); });
+  var rw = document.getElementById("gr-wa"); if (rw && cfg.referralMsg) rw.href = "https://wa.me/?text=" + encodeURIComponent(cfg.referralMsg);
+  var rc = document.getElementById("gr-copy"); if (rc) rc.addEventListener("click", function () { copy(rc.getAttribute("data-copy") || cfg.referralUrl, rc); });
+})();
+</script>
+{% endif %}
 <script src="{{ url_for('gift_referral.static', filename='gift/gift.js') }}"></script>
 </body>
 </html>

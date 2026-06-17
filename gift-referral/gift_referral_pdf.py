@@ -4,6 +4,7 @@ Square 148×148 mm, brand colors: beige #FAF7F2, dark #2C2C2C, gold #C4973A.
 """
 
 import io
+import json
 import os
 import textwrap
 from reportlab.lib import colors
@@ -19,14 +20,15 @@ GREY       = colors.HexColor("#888888")
 GREY_DARK  = colors.HexColor("#666666")
 
 SESSION_LABELS = {
-    "mini":       "Mini Session (30 min · 20 photos)",
-    "family":     "Family Session (1 hour · 30 photos)",
-    "maternity":  "Maternity Session (1 hour · 30 photos)",
-    "individual": "Individual Session (1 hour · 30 photos)",
-    "custom":     "Photography Session",
+    "mini":       "Mini Session (20 min · 15 edited photos)",
+    "family":     "Individual / Family Session (1 hour · 25 edited photos)",
+    "individual": "Individual / Family Session (1 hour · 25 edited photos)",
+    "maternity":  "Maternity Session (1 hour · 25 edited photos)",
+    "newborn":    "Newborn Lifestyle Session (1 hour · 30 edited photos)",
+    "custom":     "Custom Gift Certificate",
 }
 
-PDF_DIR = os.path.join(os.path.dirname(__file__), "pdfs")
+PDF_DIR = os.environ.get("GIFT_PDF_DIR", os.path.join(os.path.dirname(__file__), "pdfs"))
 
 
 def generate_gift_certificate_pdf(cert: dict) -> bytes:
@@ -42,109 +44,198 @@ def generate_gift_certificate_pdf(cert: dict) -> bytes:
     return buf.getvalue()
 
 
+DARK_BG    = colors.HexColor("#181410")  # near-black for dark luxury certificate
+DARK_BG2   = colors.HexColor("#1e1a15")  # slightly lighter for code box
+
+STYLE_PALETTES = {
+    "signature": {
+        "bg": DARK_BG,
+        "box": DARK_BG2,
+        "fg": BEIGE,
+        "muted": GOLD_LIGHT,
+        "soft": colors.HexColor("#8d7a56"),
+        "accent": GOLD,
+    },
+    "ivory": {
+        "bg": BEIGE,
+        "box": colors.HexColor("#FFFFFF"),
+        "fg": DARK,
+        "muted": GREY_DARK,
+        "soft": colors.HexColor("#b09a60"),
+        "accent": GOLD,
+    },
+    "botanical": {
+        "bg": colors.HexColor("#E9EDDF"),
+        "box": colors.HexColor("#F7F4EA"),
+        "fg": colors.HexColor("#26342D"),
+        "muted": colors.HexColor("#5F6B5B"),
+        "soft": colors.HexColor("#A99B63"),
+        "accent": colors.HexColor("#8F7A3D"),
+    },
+}
+
+
+def _palette(cert: dict) -> dict:
+    return STYLE_PALETTES.get(cert.get("certificate_style") or "signature", STYLE_PALETTES["signature"])
+
+
+def _addons_line(cert: dict) -> str:
+    try:
+        addons = json.loads(cert.get("addons_json") or "[]")
+    except (TypeError, ValueError):
+        addons = []
+    labels = [str(addon.get("label", "")).strip() for addon in addons if addon.get("label")]
+    return " + ".join(labels[:3])
+
+
 def _draw_certificate(c: canvas.Canvas, cert: dict, w: float, h: float) -> None:
-    # --- Background ---
-    c.setFillColor(BEIGE)
+    palette = _palette(cert)
+    bg = palette["bg"]
+    box = palette["box"]
+    fg = palette["fg"]
+    muted = palette["muted"]
+    soft = palette["soft"]
+    accent = palette["accent"]
+
+    # --- Dark luxury background ---
+    c.setFillColor(bg)
     c.rect(0, 0, w, h, fill=1, stroke=0)
 
     # --- Outer gold border ---
-    c.setStrokeColor(GOLD)
-    c.setLineWidth(2.5)
-    c.rect(8 * mm, 8 * mm, w - 16 * mm, h - 16 * mm, fill=0, stroke=1)
+    c.setStrokeColor(accent)
+    c.setLineWidth(2)
+    c.rect(7 * mm, 7 * mm, w - 14 * mm, h - 14 * mm, fill=0, stroke=1)
 
     # --- Inner hairline border ---
-    c.setStrokeColor(GOLD_LIGHT)
-    c.setLineWidth(0.5)
-    c.rect(10.5 * mm, 10.5 * mm, w - 21 * mm, h - 21 * mm, fill=0, stroke=1)
+    c.setStrokeColor(soft)
+    c.setLineWidth(0.4)
+    c.rect(10 * mm, 10 * mm, w - 20 * mm, h - 20 * mm, fill=0, stroke=1)
 
-    # --- Corner flourishes (simple cross marks) ---
-    for (cx, cy) in [(13*mm, 13*mm), (w-13*mm, 13*mm), (13*mm, h-13*mm), (w-13*mm, h-13*mm)]:
-        c.setStrokeColor(GOLD)
-        c.setLineWidth(0.8)
-        c.line(cx - 2*mm, cy, cx + 2*mm, cy)
-        c.line(cx, cy - 2*mm, cx, cy + 2*mm)
+    # --- Corner L-brackets ---
+    for (cx, cy, sx, sy) in [
+        (12*mm, h-12*mm, 1, -1), (w-12*mm, h-12*mm, -1, -1),
+        (12*mm,   12*mm, 1,  1), (w-12*mm,   12*mm, -1,  1),
+    ]:
+        c.setStrokeColor(accent)
+        c.setLineWidth(1.2)
+        c.line(cx, cy, cx + sx * 5 * mm, cy)
+        c.line(cx, cy, cx, cy + sy * 5 * mm)
+
+    # --- Gold dashed seal ring ---
+    seal_x, seal_y = w / 2, h - 37 * mm
+    seal_r = 10 * mm
+    c.setStrokeColor(accent)
+    c.setLineWidth(0.7)
+    c.setDash(2, 4)
+    c.circle(seal_x, seal_y, seal_r, fill=0, stroke=1)
+    c.setDash()  # reset
+    # inner solid ring
+    c.setStrokeColor(soft)
+    c.setLineWidth(0.3)
+    c.circle(seal_x, seal_y, seal_r - 2 * mm, fill=0, stroke=1)
+    # tiny gold disk centre
+    c.setFillColor(accent)
+    c.circle(seal_x, seal_y, 1 * mm, fill=1, stroke=0)
 
     # --- Brand name ---
-    c.setFillColor(GOLD)
-    c.setFont("Helvetica-Bold", 17)
-    c.drawCentredString(w / 2, h - 24 * mm, "Pashynska Photography")
+    c.setFillColor(accent)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(w / 2, h - 20 * mm, "PASHYNSKA PHOTOGRAPHY")
 
-    # --- Gold rule under brand ---
-    c.setStrokeColor(GOLD)
-    c.setLineWidth(1)
-    c.line(28 * mm, h - 27 * mm, w - 28 * mm, h - 27 * mm)
+    # --- Thin gold rule ---
+    c.setStrokeColor(accent)
+    c.setLineWidth(0.6)
+    c.line(30 * mm, h - 23 * mm, w - 30 * mm, h - 23 * mm)
 
-    # --- "GIFT CERTIFICATE" ---
-    c.setFillColor(DARK)
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(w / 2, h - 39 * mm, "GIFT CERTIFICATE")
+    # --- "GIFT CERTIFICATE" title (below seal) ---
+    c.setFillColor(fg)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(w / 2, h - 53 * mm, "GIFT CERTIFICATE")
 
-    # --- Decorative dots ---
-    c.setFillColor(GOLD)
-    for dx in (-14 * mm, 0, 14 * mm):
-        c.circle(w / 2 + dx, h - 44.5 * mm, 0.9 * mm, fill=1, stroke=0)
+    # --- Diamond row ---
+    c.setFillColor(accent)
+    for dx in (-10 * mm, 0, 10 * mm):
+        cx2, cy2 = w / 2 + dx, h - 58 * mm
+        p = c.beginPath()
+        p.moveTo(cx2, cy2 + 1.4 * mm)
+        p.lineTo(cx2 + 1.4 * mm, cy2)
+        p.lineTo(cx2, cy2 - 1.4 * mm)
+        p.lineTo(cx2 - 1.4 * mm, cy2)
+        p.close()
+        c.drawPath(p, fill=1, stroke=0)
 
-    # --- "This certificate entitles" ---
-    c.setFillColor(DARK)
-    c.setFont("Helvetica", 9.5)
-    c.drawCentredString(w / 2, h - 53 * mm, "This certificate entitles")
+    # --- "This certificate is lovingly gifted to" ---
+    c.setFillColor(muted)
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawCentredString(w / 2, h - 66 * mm, "This certificate is lovingly gifted to")
 
     # --- Recipient name ---
     recipient = (cert.get("recipient_name") or "").strip() or "the bearer"
-    c.setFillColor(GOLD)
-    c.setFont("Helvetica-Bold", 13)
-    c.drawCentredString(w / 2, h - 61 * mm, recipient)
+    c.setFillColor(fg)
+    c.setFont("Times-Italic", 17)
+    c.drawCentredString(w / 2, h - 75 * mm, recipient)
 
-    # --- "to a" ---
-    c.setFillColor(DARK)
-    c.setFont("Helvetica", 9.5)
-    c.drawCentredString(w / 2, h - 67 * mm, "to a")
+    # --- Thin rule under recipient ---
+    c.setStrokeColor(soft)
+    c.setLineWidth(0.4)
+    c.line(32 * mm, h - 78 * mm, w - 32 * mm, h - 78 * mm)
+
+    # --- "Entitles the holder to a" ---
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(w / 2, h - 85 * mm, "Entitles the holder to a")
 
     # --- Session type ---
-    session_label = SESSION_LABELS.get(cert.get("session_type") or "custom", "Photography Session")
-    c.setFillColor(DARK)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawCentredString(w / 2, h - 74 * mm, session_label)
+    session_label = cert.get("package_label") or SESSION_LABELS.get(cert.get("session_type") or "custom", "Photography Session")
+    c.setFillColor(accent)
+    c.setFont("Helvetica-Bold", 10.5 if len(session_label) > 46 else 12)
+    c.drawCentredString(w / 2, h - 93 * mm, session_label[:72])
 
-    c.setFont("Helvetica", 9)
-    c.drawCentredString(w / 2, h - 79 * mm, "with Pashynska Photography · Calgary, AB")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(w / 2, h - 98 * mm, "with Pashynska Photography · Calgary, AB")
+
+    addons_line = _addons_line(cert)
+    if addons_line:
+        c.setFillColor(soft)
+        c.setFont("Helvetica", 6.5)
+        c.drawCentredString(w / 2, h - 102 * mm, addons_line[:82])
 
     # --- Value ---
-    c.setFillColor(GOLD)
+    c.setFillColor(accent)
     c.setFont("Helvetica-Bold", 10)
     c.drawCentredString(
-        w / 2, h - 86 * mm,
+        w / 2, h - 108 * mm,
         f"Value: ${cert['amount_with_gst']:.2f} CAD (incl. GST)"
     )
 
-    # --- Code box ---
-    box_y = h - 103 * mm
-    c.setFillColor(LIGHT_BOX)
-    c.roundRect(24 * mm, box_y, w - 48 * mm, 13 * mm, 2 * mm, fill=1, stroke=0)
-    c.setStrokeColor(GOLD)
-    c.setLineWidth(1)
-    c.roundRect(24 * mm, box_y, w - 48 * mm, 13 * mm, 2 * mm, fill=0, stroke=1)
+    # --- Code box (dark surface with gold border) ---
+    box_y = h - 121 * mm
+    c.setFillColor(box)
+    c.roundRect(22 * mm, box_y, w - 44 * mm, 12 * mm, 2 * mm, fill=1, stroke=0)
+    c.setStrokeColor(accent)
+    c.setLineWidth(0.8)
+    c.roundRect(22 * mm, box_y, w - 44 * mm, 12 * mm, 2 * mm, fill=0, stroke=1)
 
-    c.setFillColor(DARK)
-    c.setFont("Courier-Bold", 15)
-    c.drawCentredString(w / 2, box_y + 4 * mm, cert["code"])
+    c.setFillColor(accent)
+    c.setFont("Courier-Bold", 14)
+    c.drawCentredString(w / 2, box_y + 3.8 * mm, cert["code"])
 
-    c.setFillColor(GREY)
-    c.setFont("Helvetica", 7.5)
-    c.drawCentredString(w / 2, h - 106.5 * mm, "Enter this code when booking your session")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(w / 2, h - 124.5 * mm, "Enter this code when booking your session")
 
     # --- Valid until ---
     expires = cert.get("expires_at", "")
-    c.setFillColor(DARK)
-    c.setFont("Helvetica", 8.5)
-    c.drawCentredString(w / 2, h - 114 * mm, f"Valid until: {expires}")
+    c.setFillColor(fg)
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(w / 2, h - 131 * mm, f"Valid until: {expires}")
 
-    # --- Personal message (if short enough) ---
+    # --- Personal message ---
     msg = (cert.get("personal_message") or "").strip()
     if msg:
-        # Wrap to ~50 chars per line, max 2 lines
         lines = textwrap.wrap(msg, 50)[:2]
-        c.setFillColor(GREY_DARK)
+        c.setFillColor(muted)
         c.setFont("Helvetica-Oblique", 7.5)
         for i, line in enumerate(lines):
             if i == 0 and len(lines) == 1:
@@ -153,21 +244,21 @@ def _draw_certificate(c: canvas.Canvas, cert: dict, w: float, h: float) -> None:
                 line = f'"{line}'
             elif i == len(lines) - 1:
                 line = f'{line}"'
-            c.drawCentredString(w / 2, h - (120 + i * 8) * mm, line)
+            c.drawCentredString(w / 2, h - (136 + i * 8) * mm, line)
 
     # --- Bottom rule ---
-    c.setStrokeColor(GOLD)
-    c.setLineWidth(0.8)
-    c.line(28 * mm, h - 127 * mm, w - 28 * mm, h - 127 * mm)
+    c.setStrokeColor(accent)
+    c.setLineWidth(0.6)
+    c.line(28 * mm, h - 141 * mm, w - 28 * mm, h - 141 * mm)
 
     # --- Website ---
-    c.setFillColor(DARK)
-    c.setFont("Helvetica-Bold", 8.5)
-    c.drawCentredString(w / 2, h - 133 * mm, "book.pashynskaphoto.com")
+    c.setFillColor(accent)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(w / 2, h - 144 * mm, "book.pashynskaphoto.com")
 
-    c.setFillColor(GREY)
-    c.setFont("Helvetica", 7)
-    c.drawCentredString(w / 2, h - 137 * mm, "irynapashynska@gmail.com  ·  Calgary, AB")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 6.5)
+    c.drawCentredString(w / 2, h - 147.5 * mm, "irynapashynska@gmail.com  ·  Calgary, AB")
 
 
 def save_gift_pdf(cert: dict) -> str:

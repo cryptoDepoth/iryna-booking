@@ -803,7 +803,17 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
        style="font-size:13px;color:var(--rose-deep);text-decoration:none;font-weight:600;letter-spacing:.01em;transition:color .2s;"
        title="Recent work — full portfolio">Portfolio ↗</a>
   </div>
-  <style>@media(min-width:900px){.nav-services{display:flex !important}}</style>
+  <style>@media(min-width:900px){.nav-services{display:flex !important}}
+    .nav-gift{display:inline-flex;align-items:center;gap:6px;margin-left:auto;text-decoration:none;font-family:inherit;font-weight:700;font-size:12.5px;letter-spacing:.2px;color:#3a2a05;padding:8px 15px;border-radius:30px;position:relative;overflow:hidden;background:linear-gradient(135deg,#F6E3B0,#E8C45F 45%,#C4973A);border:1px solid rgba(255,255,255,.55);white-space:nowrap;animation:navGiftPulse 2.8s ease-out infinite}
+    .nav-gift:hover{filter:brightness(1.06)}
+    .nav-gift .ng-ico{font-size:14px;line-height:1}
+    .nav-gift::after{content:"";position:absolute;top:0;left:-60%;width:38%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.8),transparent);transform:skewX(-18deg);animation:navGiftShine 3.8s ease-in-out infinite}
+    @keyframes navGiftShine{0%{left:-60%}55%{left:135%}100%{left:135%}}
+    @keyframes navGiftPulse{0%{box-shadow:0 3px 12px rgba(196,151,58,.45),0 0 0 0 rgba(196,151,58,.5)}70%{box-shadow:0 3px 12px rgba(196,151,58,.45),0 0 0 10px rgba(196,151,58,0)}100%{box-shadow:0 3px 12px rgba(196,151,58,.45),0 0 0 0 rgba(196,151,58,0)}}
+    @media(max-width:600px){.nav-gift{padding:7px 12px;font-size:12px}}
+    @media(prefers-reduced-motion:reduce){.nav-gift,.nav-gift::after{animation:none}}
+  </style>
+  <a class="nav-gift" href="/gift" aria-label="Buy a gift certificate" title="Gift certificates"><span class="ng-ico" aria-hidden="true">&#127873;</span><span>Gift Cards</span></a>
   <!-- Language switcher -->
   <div id="lang-sw" style="display:flex;gap:3px;background:rgba(0,0,0,0.05);border-radius:20px;padding:3px;">
     <button class="lbtn active" onclick="setLang('en')" data-lang="en" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:white;color:var(--rose);box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all .2s;font-family:inherit;">EN</button>

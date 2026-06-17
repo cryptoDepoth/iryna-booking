@@ -80,6 +80,9 @@
               {% if t.matched_booking_id %}
                 <a href="/admin/booking/{{ t.matched_booking_id }}">#{{ t.matched_booking_id }} · {{ t.booking_name or 'booking' }}</a><br>
                 <small>{{ t.booking_session or '' }} · {{ t.booking_date or '' }} {{ t.booking_time or '' }}</small>
+              {% elif t.matched_gift_code %}
+                <a href="/gift/certificate/{{ t.matched_gift_code }}">{{ t.matched_gift_code }}</a><br>
+                <small>Gift certificate</small>
               {% else %}
                 <span style="color:#9ca3af">Not linked</span>
               {% endif %}
@@ -88,6 +91,8 @@
               <div class="actions">
                 {% if t.matched_booking_id %}
                   <button class="btn small ghost" data-action="unlink">Unlink</button>
+                {% elif t.matched_gift_code %}
+                  <a class="btn small ghost" href="/gift/certificate/{{ t.matched_gift_code }}">PDF</a>
                 {% else %}
                   <div class="link-row">
                     <select data-booking-select>
