@@ -354,6 +354,30 @@ def list_gift_certificates() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_pending_gift_certs_by_amount(amount: float) -> list[dict]:
+    """
+    Returns all pending gift certificates with the given amount (matched against
+    amount_with_gst, i.e. what the buyer actually transfers).
+    Used for e-Transfer amount-only matching when buyer didn't write the code in memo.
+    """
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """
+            SELECT code, purchaser_name, purchaser_email, recipient_name,
+                   session_type, amount, amount_with_gst, created_at
+            FROM gift_certificates
+            WHERE status = 'pending_payment'
+              AND ABS(amount_with_gst - ?) < 0.01
+            ORDER BY created_at ASC
+            """,
+            (amount,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Referral Codes
 # ---------------------------------------------------------------------------

@@ -173,64 +173,135 @@ def _gift_modules():
     return gift_db, save_gift_pdf, send_gift_purchaser_email, send_gift_recipient_email
 
 
-def try_confirm_gift_etransfer(amount, body, message_id):
-    """Confirm a pending gift certificate when the Interac memo includes its code.
+def try_confirm_gift_etransfer(amount, body, message_id, email_received_at=None):
+    """Confirm a pending gift certificate from an Interac e-Transfer email.
 
-    Gift certificates live in their own DB, so booking amount-matching must not
-    guess here. A gift is activated only by exact amount plus explicit code.
-    Returns True when the Interac email was handled as a gift payment.
+    Two paths:
+      1. Code path  — memo contains GIFT-XXXX-XXXX → exact code + amount match.
+      2. Amount-only fallback — no code in memo → match by amount_with_gst across
+         all pending certs.  Single match → auto-confirm.  Multiple matches →
+         admin Telegram alert, no auto-confirm.
+
+    Returns True when the email was definitively handled as a gift payment
+    (including ambiguous cases that were alerted but not auto-confirmed).
     """
     code = extract_gift_code(body)
-    if not code:
+
+    if code:
+        # ── Code-based path (unchanged) ──────────────────────────────────────
+        gift_db, save_gift_pdf, send_buyer_email, send_recipient_email = _gift_modules()
+        cert = gift_db.get_gift_certificate(code)
+        if not cert:
+            _send_admin_alert(
+                f"Gift payment memo has unknown code {code}. Amount: ${amount:.2f}. Message ID: {message_id}"
+            )
+            return True
+
+        expected = float(cert.get("amount_with_gst") or 0)
+        if cert.get("status") != "pending_payment":
+            _send_admin_alert(
+                f"Gift e-Transfer received for {code}, but status is {cert.get('status')}. "
+                f"Amount: ${amount:.2f}; expected ${expected:.2f}."
+            )
+            _mark_etransfer_gift_match(message_id, code)
+            return True
+
+        if abs(amount - expected) >= 0.01:
+            _send_admin_alert(
+                f"Gift e-Transfer amount mismatch for {code}. Received ${amount:.2f}; "
+                f"expected ${expected:.2f}. Certificate is still pending."
+            )
+            return True
+
+        if not gift_db.mark_gift_payment_confirmed(code, amount, payment_reference=message_id):
+            _send_admin_alert(f"Gift e-Transfer matched {code}, but DB activation failed.")
+            return True
+
+        cert = gift_db.get_gift_certificate(code)
+        pdf_path = None
+        try:
+            pdf_path = save_gift_pdf(cert)
+            gift_db.update_gift_pdf(code, pdf_path)
+            cert = gift_db.get_gift_certificate(code) or cert
+        except Exception as exc:
+            print(f"   [gift] PDF generation failed for {code}: {exc}")
+
+        send_buyer_email(cert, pdf_path=pdf_path)
+        if cert.get("recipient_email"):
+            send_recipient_email(cert)
+        _mark_etransfer_gift_match(message_id, code)
+        _send_admin_alert(
+            f"Gift certificate paid and activated: {code}\n"
+            f"Amount: ${amount:.2f}\n"
+            f"Buyer: {cert.get('purchaser_name')} <{cert.get('purchaser_email')}>"
+        )
+        print(f"   ✅ CONFIRMED Gift certificate {code} — ${amount:.2f}")
+        return True
+
+    # ── Amount-only fallback (no code in memo) ────────────────────────────────
+    try:
+        gift_db, save_gift_pdf, send_buyer_email, send_recipient_email = _gift_modules()
+    except Exception:
         return False
 
-    gift_db, save_gift_pdf, send_buyer_email, send_recipient_email = _gift_modules()
-    cert = gift_db.get_gift_certificate(code)
-    if not cert:
+    candidates = gift_db.get_pending_gift_certs_by_amount(amount)
+    if not candidates:
+        return False  # not a gift payment
+
+    # Apply timing guard: skip certs created after the email arrived.
+    if email_received_at is not None:
+        filtered = []
+        for cert in candidates:
+            cert_created = _parse_db_datetime(cert.get("created_at"))
+            if cert_created is None or cert_created <= email_received_at:
+                filtered.append(cert)
+        candidates = filtered
+
+    if not candidates:
+        return False
+
+    if len(candidates) >= 2:
+        codes_str = ", ".join(c["code"] for c in candidates)
         _send_admin_alert(
-            f"Gift payment memo has unknown code {code}. Amount: ${amount:.2f}. Message ID: {message_id}"
+            f"⚠️ GIFT AMBIGUOUS: e-Transfer ${amount:.2f} received, "
+            f"{len(candidates)} pending gift certs match — confirm manually:\n"
+            f"{codes_str}\n"
+            f"Message ID: {message_id}\n"
+            f"Review: /admin/gift-pending"
+        )
+        print(f"   ⚠️ Gift amount-only fallback: ${amount:.2f} matches {len(candidates)} pending certs — admin alerted")
+        # Return False so the email is NOT marked processed; booking pipeline continues.
+        return False
+
+    # Exactly one match — auto-confirm.
+    cert_row = candidates[0]
+    cert_code = cert_row["code"]
+    if not gift_db.mark_gift_payment_confirmed(cert_code, amount, payment_reference=message_id):
+        _send_admin_alert(
+            f"Gift amount-only match for {cert_code} (${amount:.2f}), but DB activation failed. "
+            f"Message ID: {message_id}"
         )
         return True
 
-    expected = float(cert.get("amount_with_gst") or 0)
-    if cert.get("status") != "pending_payment":
-        _send_admin_alert(
-            f"Gift e-Transfer received for {code}, but status is {cert.get('status')}. "
-            f"Amount: ${amount:.2f}; expected ${expected:.2f}."
-        )
-        _mark_etransfer_gift_match(message_id, code)
-        return True
-
-    if abs(amount - expected) >= 0.01:
-        _send_admin_alert(
-            f"Gift e-Transfer amount mismatch for {code}. Received ${amount:.2f}; "
-            f"expected ${expected:.2f}. Certificate is still pending."
-        )
-        return True
-
-    if not gift_db.mark_gift_payment_confirmed(code, amount, payment_reference=message_id):
-        _send_admin_alert(f"Gift e-Transfer matched {code}, but DB activation failed.")
-        return True
-
-    cert = gift_db.get_gift_certificate(code)
+    cert = gift_db.get_gift_certificate(cert_code)
     pdf_path = None
     try:
         pdf_path = save_gift_pdf(cert)
-        gift_db.update_gift_pdf(code, pdf_path)
-        cert = gift_db.get_gift_certificate(code) or cert
+        gift_db.update_gift_pdf(cert_code, pdf_path)
+        cert = gift_db.get_gift_certificate(cert_code) or cert
     except Exception as exc:
-        print(f"   [gift] PDF generation failed for {code}: {exc}")
+        print(f"   [gift] PDF generation failed for {cert_code}: {exc}")
 
     send_buyer_email(cert, pdf_path=pdf_path)
     if cert.get("recipient_email"):
         send_recipient_email(cert)
-    _mark_etransfer_gift_match(message_id, code)
+    _mark_etransfer_gift_match(message_id, cert_code)
     _send_admin_alert(
-        f"Gift certificate paid and activated: {code}\n"
+        f"Gift certificate paid and activated (amount-only match): {cert_code}\n"
         f"Amount: ${amount:.2f}\n"
         f"Buyer: {cert.get('purchaser_name')} <{cert.get('purchaser_email')}>"
     )
-    print(f"   ✅ CONFIRMED Gift certificate {code} — ${amount:.2f}")
+    print(f"   ✅ CONFIRMED Gift certificate {cert_code} — ${amount:.2f} (amount-only fallback)")
     return True
 
 
@@ -1226,7 +1297,8 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
     except Exception as _e:
         print(f"   [ledger] record failed: {_e}")
 
-    if not processed and try_confirm_gift_etransfer(amount, body, msg_id):
+    _email_received_at = _parse_email_datetime(email.get("date"))
+    if not processed and try_confirm_gift_etransfer(amount, body, msg_id, email_received_at=_email_received_at):
         mark_message_processed(msg_id, None, amount)
         return None, None
 
