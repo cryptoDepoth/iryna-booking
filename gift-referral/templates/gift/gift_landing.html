@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gift Certificates — Pashynska Photography</title>
+  <meta name="description" content="Give the gift of beautiful memories. Pashynska Photography gift certificates for mini, family, maternity, and individual sessions in Calgary.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('gift_referral.static', filename='gift/gift.css') }}">
+  <style>
+    /* Override font to use Playfair if loaded */
+    .gift-hero h1, .gift-section-title, .gift-form-title,
+    .gift-pkg-name { font-family: 'Playfair Display', Georgia, serif; }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="gift-nav">
+  <div class="gift-nav-brand"><span>Pashynska</span> Photography</div>
+  <a href="{{ booking_url or '/' }}" class="gift-nav-back">← Back to booking</a>
+</nav>
+
+<!-- Hero -->
+<section class="gift-hero">
+  <div class="gift-hero-content">
+    <span class="gift-hero-eyebrow">Pashynska Photography · Calgary, AB</span>
+    <h1>Give the gift of<br><em>beautiful memories</em></h1>
+    <p class="gift-hero-sub">
+      A photography gift certificate — for the family moments, the milestones,
+      and the memories that matter most.
+    </p>
+    <a href="#choose-package" class="gift-scroll-cta">Choose a Package →</a>
+  </div>
+</section>
+
+<!-- Package Selection -->
+<section class="gift-section" id="choose-package">
+  <h2 class="gift-section-title">Choose a Session</h2>
+  <p class="gift-section-sub">
+    The recipient books their own date — you give them the experience.
+  </p>
+
+  <form id="gift-purchase-form" action="/gift/checkout" method="POST">
+    <input type="hidden" name="session_type" id="session_type" value="mini">
+
+    <div class="gift-packages">
+
+      <!-- Mini -->
+      <label class="gift-package-card" data-type="mini">
+        <input type="radio" name="_session_type" value="mini">
+        <div class="gift-pkg-check">✓</div>
+        <div class="gift-pkg-icon">🌿</div>
+        <div class="gift-pkg-name">Mini Session</div>
+        <div class="gift-pkg-detail">30 min · 20 edited photos · video clip</div>
+        <div class="gift-pkg-price">$241.50 <span class="gift-pkg-price-sub">CAD incl. GST</span></div>
+      </label>
+
+      <!-- Family -->
+      <label class="gift-package-card" data-type="family">
+        <input type="radio" name="_session_type" value="family">
+        <div class="gift-pkg-check">✓</div>
+        <div class="gift-pkg-icon">👨‍👩‍👧</div>
+        <div class="gift-pkg-name">Family Session</div>
+        <div class="gift-pkg-detail">1 hour · 30 edited photos</div>
+        <div class="gift-pkg-price">$304.50 <span class="gift-pkg-price-sub">CAD incl. GST</span></div>
+      </label>
+
+      <!-- Maternity -->
+      <label class="gift-package-card" data-type="maternity">
+        <input type="radio" name="_session_type" value="maternity">
+        <div class="gift-pkg-check">✓</div>
+        <div class="gift-pkg-icon">🤰</div>
+        <div class="gift-pkg-name">Maternity Session</div>
+        <div class="gift-pkg-detail">1 hour · 30 edited photos</div>
+        <div class="gift-pkg-price">$304.50 <span class="gift-pkg-price-sub">CAD incl. GST</span></div>
+      </label>
+
+      <!-- Individual -->
+      <label class="gift-package-card" data-type="individual">
+        <input type="radio" name="_session_type" value="individual">
+        <div class="gift-pkg-check">✓</div>
+        <div class="gift-pkg-icon">✨</div>
+        <div class="gift-pkg-name">Individual Session</div>
+        <div class="gift-pkg-detail">1 hour · private photoshoot</div>
+        <div class="gift-pkg-price">$304.50 <span class="gift-pkg-price-sub">CAD incl. GST</span></div>
+      </label>
+
+      <!-- Custom -->
+      <label class="gift-package-card" data-type="custom">
+        <input type="radio" name="_session_type" value="custom">
+        <div class="gift-pkg-check">✓</div>
+        <div class="gift-pkg-icon">🎁</div>
+        <div class="gift-pkg-name">Custom Amount</div>
+        <div class="gift-pkg-detail">$50 – $500 · recipient chooses session</div>
+        <div class="gift-pkg-price">Custom <span class="gift-pkg-price-sub">+ 5% GST</span></div>
+      </label>
+
+    </div><!-- /packages -->
+
+    <!-- Custom amount field -->
+    <div class="gift-custom-amount" id="gift-custom-amount-wrap">
+      <label for="custom_amount">Enter amount (CAD, $50–$500)</label>
+      <input type="number" id="custom_amount" name="custom_amount"
+             min="50" max="500" step="1" placeholder="e.g. 150">
+    </div>
+
+    <hr class="gift-form-divider">
+
+    <!-- Purchase form -->
+    <div class="gift-form-wrap">
+      <h3 class="gift-form-title">Personalize your gift</h3>
+
+      <div class="gift-form-row">
+        <div class="gift-field">
+          <label for="purchaser_name">Your Name <span style="color:#c00">*</span></label>
+          <input type="text" id="purchaser_name" name="purchaser_name"
+                 placeholder="Jane Smith" required autocomplete="name">
+        </div>
+        <div class="gift-field">
+          <label for="purchaser_email">Your Email <span style="color:#c00">*</span></label>
+          <input type="email" id="purchaser_email" name="purchaser_email"
+                 placeholder="jane@example.com" required autocomplete="email">
+        </div>
+      </div>
+
+      <hr class="gift-form-divider" style="margin: 4px 0 20px;">
+
+      <div class="gift-form-row">
+        <div class="gift-field">
+          <label for="recipient_name">Recipient's Name</label>
+          <input type="text" id="recipient_name" name="recipient_name"
+                 placeholder="Sarah Johnson" autocomplete="off">
+        </div>
+        <div class="gift-field">
+          <label for="recipient_email">Recipient's Email <small style="font-weight:400;text-transform:none;color:#aaa">(optional)</small></label>
+          <input type="email" id="recipient_email" name="recipient_email"
+                 placeholder="sarah@example.com" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="gift-field">
+        <label for="personal_message">Personal Message <small style="font-weight:400;text-transform:none;color:#aaa">(printed on certificate)</small></label>
+        <textarea id="personal_message" name="personal_message"
+                  placeholder="Thinking of you — can't wait to see your beautiful photos!" maxlength="200"></textarea>
+      </div>
+
+      <!-- Price summary -->
+      <div class="gift-price-summary">
+        <div>
+          <div class="gift-price-label">Total amount charged</div>
+          <div class="gift-price-sub" id="gift-price-sub">($230.00 + 5% GST)</div>
+        </div>
+        <div id="gift-price-value" class="gift-price-value">$241.50 CAD</div>
+      </div>
+
+      <button type="submit" class="gift-submit-btn" id="gift-submit-btn">
+        Purchase Gift Certificate — $241.50 CAD
+      </button>
+
+      <p style="text-align:center;font-size:12px;color:#aaa;margin-top:12px;">
+        Secure checkout via Stripe · Receipt emailed instantly · PDF certificate included
+      </p>
+    </div>
+
+  </form>
+
+</section>
+
+<!-- Social proof -->
+<div class="gift-social-proof">
+  <p>
+    <span>500+</span> Calgary families photographed by Iryna Pashynska 💛<br>
+    Mini, family, maternity &amp; individual sessions in beautiful Calgary locations.
+  </p>
+</div>
+
+<!-- How it works -->
+<section class="gift-section" style="background: #fff; max-width: 100%; padding: 60px 24px;">
+  <div style="max-width: 900px; margin: 0 auto;">
+    <h2 class="gift-section-title">How it works</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-top: 36px;">
+      <div style="text-align:center;">
+        <div style="font-size:36px; margin-bottom:12px;">🛒</div>
+        <h3 style="font-size:16px; margin-bottom:6px;">1. You purchase</h3>
+        <p style="font-size:13px; color:#555;">Choose a session package and pay securely. Takes 2 minutes.</p>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:36px; margin-bottom:12px;">📧</div>
+        <h3 style="font-size:16px; margin-bottom:6px;">2. They receive</h3>
+        <p style="font-size:13px; color:#555;">A beautiful PDF certificate is emailed to you (and optionally to them).</p>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:36px; margin-bottom:12px;">📅</div>
+        <h3 style="font-size:16px; margin-bottom:6px;">3. They book</h3>
+        <p style="font-size:13px; color:#555;">They choose their own date and enter the code at checkout. Done!</p>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:36px; margin-bottom:12px;">📸</div>
+        <h3 style="font-size:16px; margin-bottom:6px;">4. Beautiful photos</h3>
+        <p style="font-size:13px; color:#555;">Iryna captures memories that last a lifetime. Valid 12 months.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="gift-footer">
+  <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>
+  <p style="margin-top:6px;">Questions? Email Iryna directly — she'll reply within 24 hours.</p>
+</footer>
+
+<script src="{{ url_for('gift_referral.static', filename='gift/gift.js') }}"></script>
+<script>
+  // Update the submit button text as package is selected
+  document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('gift-submit-btn');
+    const priceEl = document.getElementById('gift-price-value');
+    if (!btn || !priceEl) return;
+
+    const observer = new MutationObserver(() => {
+      const price = priceEl.textContent.replace(' CAD', '').trim();
+      if (price && price !== '—') {
+        btn.textContent = `Purchase Gift Certificate — ${price} CAD`;
+      }
+    });
+    observer.observe(priceEl, { childList: true, characterData: true, subtree: true });
+  });
+</script>
+
+</body>
+</html>

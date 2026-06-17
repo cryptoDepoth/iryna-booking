@@ -1,0 +1,353 @@
+"""
+Email templates and sending logic for gift certificates and referral program.
+In TEST_MODE, all emails are printed to the console.
+"""
+
+import os
+import smtplib
+import textwrap
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+TEST_MODE: bool = os.environ.get("TEST_MODE", "true").lower() in ("1", "true", "yes")
+
+SMTP_HOST   = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT   = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER   = os.environ.get("SMTP_USER", "")
+SMTP_PASS   = os.environ.get("SMTP_PASS", "")
+FROM_EMAIL  = os.environ.get("FROM_EMAIL", "Iryna Pashynska Photography <irynapashynska@gmail.com>")
+BOOKING_URL = os.environ.get("BOOKING_URL", "https://book.pashynskaphoto.com")
+
+
+def _send_email(
+    to: str,
+    subject: str,
+    html_body: str,
+    text_body: str | None = None,
+    attachment_path: str | None = None,
+    attachment_name: str | None = None,
+) -> bool:
+    if TEST_MODE:
+        print("\n" + "=" * 60)
+        print(f"[EMAIL - TEST MODE]")
+        print(f"To:      {to}")
+        print(f"Subject: {subject}")
+        if attachment_path:
+            print(f"PDF:     {attachment_path}")
+        print("-" * 60)
+        # Print plain-text version for readability
+        if text_body:
+            print(text_body)
+        else:
+            import re
+            print(re.sub(r"<[^>]+>", "", html_body).strip())
+        print("=" * 60 + "\n")
+        return True
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = FROM_EMAIL
+        msg["To"] = to
+
+        if text_body:
+            msg.attach(MIMEText(text_body, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        if attachment_path and os.path.exists(attachment_path):
+            with open(attachment_path, "rb") as f:
+                part = MIMEBase("application", "octet-stream")
+                part.set_payload(f.read())
+            encoders.encode_base64(part)
+            fname = attachment_name or os.path.basename(attachment_path)
+            part.add_header("Content-Disposition", f'attachment; filename="{fname}"')
+            msg.attach(part)
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, [to], msg.as_string())
+        return True
+    except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send to {to}: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Gift Certificate emails
+# ---------------------------------------------------------------------------
+
+def send_gift_purchaser_email(cert: dict, pdf_path: str | None = None) -> bool:
+    """Email to the person who BOUGHT the certificate."""
+    code      = cert["code"]
+    to        = cert["purchaser_email"]
+    from_name = cert["purchaser_name"]
+    to_name   = cert.get("recipient_name") or "your recipient"
+    expires   = cert.get("expires_at", "12 months from today")
+    amount    = cert.get("amount_with_gst", 0)
+    session   = cert.get("session_type", "custom").capitalize()
+
+    subject = f"🎁 Your Pashynska Photography Gift Certificate ({code})"
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#FAF7F2;font-family:Georgia,serif;color:#2C2C2C;">
+  <div style="max-width:560px;margin:0 auto;padding:40px 20px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="font-size:22px;color:#C4973A;margin:0 0 4px;">Pashynska Photography</h1>
+      <p style="color:#888;margin:0;font-size:13px;">Calgary, AB</p>
+    </div>
+
+    <div style="background:#fff;border-radius:8px;border:1px solid #E8D5A3;padding:32px;">
+      <h2 style="margin:0 0 16px;font-size:20px;">Your Gift Certificate is Ready! 🎉</h2>
+      <p>Hi {from_name},</p>
+      <p>Thank you for your purchase! Your gift certificate for <strong>{to_name}</strong> is attached to this email as a beautiful PDF.</p>
+
+      <div style="background:#FAF7F2;border:2px solid #C4973A;border-radius:6px;padding:20px;text-align:center;margin:24px 0;">
+        <p style="margin:0 0 8px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Certificate Code</p>
+        <p style="font-family:monospace;font-size:24px;font-weight:bold;color:#2C2C2C;margin:0;">{code}</p>
+        <p style="margin:8px 0 0;color:#888;font-size:12px;">Valid until: {expires}</p>
+      </div>
+
+      <p><strong>Session:</strong> {session} — ${amount:.2f} CAD</p>
+      <p>Simply forward the PDF (or share the code) with {to_name}. When they're ready to book, they can enter the code at checkout.</p>
+
+      <div style="text-align:center;margin:28px 0 16px;">
+        <a href="{BOOKING_URL}" style="background:#C4973A;color:#fff;padding:14px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:bold;">Book at Pashynska Photography</a>
+      </div>
+    </div>
+
+    <p style="text-align:center;color:#999;font-size:12px;margin-top:24px;">
+      With gratitude 💛 — Iryna Pashynska<br>
+      <a href="mailto:irynapashynska@gmail.com" style="color:#C4973A;">irynapashynska@gmail.com</a>
+    </p>
+  </div>
+</body>
+</html>
+"""
+    text = f"""
+Your Pashynska Photography Gift Certificate
+
+Hi {from_name},
+
+Your gift certificate ({code}) for {to_name} is attached as a PDF.
+
+Session: {session} — ${amount:.2f} CAD
+Valid until: {expires}
+
+Book at: {BOOKING_URL}
+
+— Iryna Pashynska
+"""
+    return _send_email(to, subject, html, text.strip(), attachment_path=pdf_path,
+                       attachment_name=f"GiftCertificate_{code}.pdf")
+
+
+def send_gift_recipient_email(cert: dict) -> bool:
+    """Email to the person who RECEIVED the certificate."""
+    to = cert.get("recipient_email", "")
+    if not to:
+        return False
+
+    code       = cert["code"]
+    from_name  = cert["purchaser_name"]
+    to_name    = cert.get("recipient_name") or "Friend"
+    expires    = cert.get("expires_at", "12 months from purchase")
+    session    = cert.get("session_type", "custom").capitalize()
+    msg        = cert.get("personal_message", "")
+    download   = f"{BOOKING_URL}/gift/certificate/{code}"
+
+    subject = f"🎁 You received a photography gift from {from_name}!"
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#FAF7F2;font-family:Georgia,serif;color:#2C2C2C;">
+  <div style="max-width:560px;margin:0 auto;padding:40px 20px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="font-size:22px;color:#C4973A;margin:0 0 4px;">Pashynska Photography</h1>
+      <p style="color:#888;margin:0;font-size:13px;">Calgary, AB</p>
+    </div>
+
+    <div style="background:#fff;border-radius:8px;border:1px solid #E8D5A3;padding:32px;">
+      <h2 style="margin:0 0 16px;font-size:20px;">You have a gift waiting! 🎁</h2>
+      <p>Hi {to_name},</p>
+      <p><strong>{from_name}</strong> has given you a photography gift certificate with Pashynska Photography.</p>
+
+      {f'<blockquote style="border-left:3px solid #C4973A;padding-left:16px;color:#555;font-style:italic;margin:20px 0;">"{msg}"</blockquote>' if msg else ""}
+
+      <div style="background:#FAF7F2;border:2px solid #C4973A;border-radius:6px;padding:20px;text-align:center;margin:24px 0;">
+        <p style="margin:0 0 8px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Your Certificate Code</p>
+        <p style="font-family:monospace;font-size:24px;font-weight:bold;color:#2C2C2C;margin:0;">{code}</p>
+        <p style="margin:8px 0 0;color:#888;font-size:12px;">Valid until: {expires}</p>
+      </div>
+
+      <p><strong>Session:</strong> {session}</p>
+      <p>Enter your code when booking to apply your certificate. You choose the date and time!</p>
+
+      <div style="text-align:center;margin:28px 0 16px;">
+        <a href="{BOOKING_URL}" style="background:#C4973A;color:#fff;padding:14px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:bold;">Book Your Session</a>
+      </div>
+      <p style="text-align:center;">
+        <a href="{download}" style="color:#C4973A;font-size:13px;">Download your certificate PDF</a>
+      </p>
+    </div>
+
+    <p style="text-align:center;color:#999;font-size:12px;margin-top:24px;">
+      With warmth 💛 — Iryna Pashynska<br>
+      <a href="mailto:irynapashynska@gmail.com" style="color:#C4973A;">irynapashynska@gmail.com</a>
+    </p>
+  </div>
+</body>
+</html>
+"""
+    text = f"""
+You received a Pashynska Photography Gift Certificate!
+
+Hi {to_name},
+
+{from_name} has gifted you a {session} photography session.
+
+{f'Their message: "{msg}"' if msg else ''}
+
+Your code: {code}
+Valid until: {expires}
+
+Book at: {BOOKING_URL}
+Download PDF: {download}
+
+— Iryna Pashynska
+"""
+    return _send_email(to, subject, html, text.strip())
+
+
+# ---------------------------------------------------------------------------
+# Referral emails
+# ---------------------------------------------------------------------------
+
+def send_referral_reward_email(
+    owner_email: str,
+    owner_name: str,
+    friend_name: str,
+    reward: float,
+    code: str,
+    new_balance: float = 0.0,
+    total_earned: float = 0.0,
+) -> bool:
+    """
+    Tell the referral code owner their friend paid.
+    Includes cumulative balance so they see how credits stack up.
+    """
+    subject = f"🎉 {friend_name} just booked! You earned ${reward:.0f}. Balance: ${new_balance:.0f}"
+    credits_url = f"{BOOKING_URL}/my-credits?email={owner_email}"
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#FAF7F2;font-family:Georgia,serif;color:#2C2C2C;">
+  <div style="max-width:560px;margin:0 auto;padding:40px 20px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="font-size:22px;color:#C4973A;margin:0 0 4px;">Pashynska Photography</h1>
+      <p style="color:#888;margin:0;font-size:13px;">Calgary, AB</p>
+    </div>
+
+    <div style="background:#fff;border-radius:8px;border:1px solid #E8D5A3;padding:32px;">
+      <h2 style="margin:0 0 16px;font-size:20px;">Your friend just booked! 🎉</h2>
+      <p>Hi {owner_name},</p>
+      <p>Great news — <strong>{friend_name}</strong> just booked a session using your referral code. You earned another <strong>${reward:.0f}</strong>!</p>
+
+      <div style="background:#FAF7F2;border:2px solid #C4973A;border-radius:6px;padding:20px;text-align:center;margin:24px 0;">
+        <p style="margin:0 0 4px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Just earned</p>
+        <p style="font-size:36px;font-weight:bold;color:#C4973A;margin:4px 0;">+${reward:.0f}</p>
+        <p style="margin:12px 0 4px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Your credit balance is now</p>
+        <p style="font-size:28px;font-weight:bold;color:#2C2C2C;margin:4px 0;">${new_balance:.0f}</p>
+        {f'<p style="margin:8px 0 0;color:#aaa;font-size:11px;">All-time earned: ${total_earned:.0f}</p>' if total_earned > reward else ''}
+      </div>
+
+      <p style="color:#555;font-size:14px;">Use your credit by entering code <strong style="font-family:monospace;">{code}</strong> on your next session at checkout.</p>
+
+      <div style="display:flex;gap:12px;justify-content:center;margin:24px 0 16px;flex-wrap:wrap;">
+        <a href="{BOOKING_URL}" style="background:#C4973A;color:#fff;padding:12px 22px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;">Book a Session</a>
+        <a href="{credits_url}" style="background:#FAF7F2;color:#2C2C2C;border:2px solid #E8D5A3;padding:12px 22px;border-radius:4px;text-decoration:none;font-size:14px;">View My Credits</a>
+      </div>
+
+      <p style="color:#666;font-size:13px;">Thank you for sharing Pashynska Photography 💛 Keep sharing your code to keep earning!</p>
+    </div>
+
+    <p style="text-align:center;color:#999;font-size:12px;margin-top:24px;">
+      — Iryna Pashynska<br>
+      <a href="mailto:irynapashynska@gmail.com" style="color:#C4973A;">irynapashynska@gmail.com</a>
+    </p>
+  </div>
+</body>
+</html>
+"""
+    text = f"""
+Hi {owner_name},
+
+{friend_name} just booked a session using your referral code.
+
+You earned: +${reward:.0f}
+Your balance is now: ${new_balance:.0f}
+All-time earned: ${total_earned:.0f}
+
+Use code {code} at checkout on your next session to spend your credits.
+View your full credit history: {credits_url}
+
+Thank you for sharing 💛
+— Iryna
+"""
+    return _send_email(owner_email, subject, html, text.strip())
+
+
+def send_referral_welcome_email(referee_email: str, referee_name: str, owner_name: str, discount: float, code: str) -> bool:
+    """Tell the friend they have a $20 discount waiting."""
+    subject = f"{owner_name} invited you to Pashynska Photography — ${discount:.0f} off your first session"
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#FAF7F2;font-family:Georgia,serif;color:#2C2C2C;">
+  <div style="max-width:560px;margin:0 auto;padding:40px 20px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="font-size:22px;color:#C4973A;margin:0 0 4px;">Pashynska Photography</h1>
+      <p style="color:#888;margin:0;font-size:13px;">Calgary, AB</p>
+    </div>
+    <div style="background:#fff;border-radius:8px;border:1px solid #E8D5A3;padding:32px;">
+      <h2 style="margin:0 0 16px;font-size:20px;">{owner_name} thinks you'll love this 📸</h2>
+      <p>Hi {referee_name},</p>
+      <p><strong>{owner_name}</strong> shared a ${discount:.0f} discount for your first Pashynska Photography session.</p>
+
+      <div style="background:#FAF7F2;border:2px solid #C4973A;border-radius:6px;padding:20px;text-align:center;margin:24px 0;">
+        <p style="margin:0 0 4px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Your discount code</p>
+        <p style="font-family:monospace;font-size:20px;font-weight:bold;color:#2C2C2C;margin:4px 0;">{code}</p>
+        <p style="margin:8px 0 0;color:#C4973A;font-weight:bold;">${discount:.0f} off your first session</p>
+      </div>
+
+      <div style="text-align:center;margin:24px 0 16px;">
+        <a href="{BOOKING_URL}/referral/{code}" style="background:#C4973A;color:#fff;padding:14px 28px;border-radius:4px;text-decoration:none;font-size:15px;font-weight:bold;">Claim Your Discount</a>
+      </div>
+    </div>
+    <p style="text-align:center;color:#999;font-size:12px;margin-top:24px;">
+      — Iryna Pashynska<br>
+      <a href="mailto:irynapashynska@gmail.com" style="color:#C4973A;">irynapashynska@gmail.com</a>
+    </p>
+  </div>
+</body>
+</html>
+"""
+    text = f"""
+Hi {referee_name},
+
+{owner_name} gave you a ${discount:.0f} discount for your first Pashynska Photography session!
+
+Use code: {code}
+
+Book at: {BOOKING_URL}/referral/{code}
+
+— Iryna Pashynska
+"""
+    return _send_email(referee_email, subject, html, text.strip())

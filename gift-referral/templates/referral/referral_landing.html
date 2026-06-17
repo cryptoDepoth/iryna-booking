@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if ref %}You're invited — ${{ ref.discount_for_friend|int }} off{% else %}Referral — Pashynska Photography{% endif %}</title>
+  <meta name="description" content="You've been invited to Pashynska Photography — get $20 off your first session in Calgary.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('gift_referral.static', filename='gift/gift.css') }}">
+  <style>
+    .referral-hero h1 { font-family: 'Playfair Display', Georgia, serif; }
+  </style>
+</head>
+<body>
+
+<nav class="gift-nav">
+  <div class="gift-nav-brand"><span>Pashynska</span> Photography</div>
+  <a href="{{ booking_url or '/' }}" class="gift-nav-back">Book a session →</a>
+</nav>
+
+{% if error %}
+  <div style="max-width:560px; margin: 60px auto; padding: 0 24px; text-align:center;">
+    <div style="font-size:48px; margin-bottom:20px;">🔍</div>
+    <h2 style="font-family:'Playfair Display',Georgia,serif; font-size:26px; font-weight:400; margin-bottom:12px;">Code not found</h2>
+    <div class="gift-error">{{ error }}</div>
+    <p style="color:#555; font-size:15px; margin-top:16px;">
+      You can still book a session at the regular price — Iryna would love to meet you!
+    </p>
+    <a href="{{ booking_url or '/' }}" style="display:inline-block; margin-top:24px; background:#C4973A; color:#fff; padding:14px 32px; border-radius:8px; font-size:15px; font-weight:600;">
+      Browse Sessions
+    </a>
+  </div>
+
+{% elif ref %}
+  <!-- Hero -->
+  <section class="referral-hero">
+    <p class="referral-hero-eyebrow">🎉 You've been invited</p>
+    <h1>
+      {{ ref.owner_name.split()[0] }} wants you to<br>
+      <em>love your photos</em>
+    </h1>
+    <p class="referral-hero-sub">
+      {{ ref.owner_name.split()[0] }} shared a discount with you for
+      a Pashynska Photography session in Calgary.
+    </p>
+
+    <div class="referral-discount-badge">
+      ${{ ref.discount_for_friend|int }} off
+    </div>
+    <br>
+    <p style="color:#555; font-size:14px; margin-bottom:16px;">Your discount code</p>
+    <div class="referral-code-pill">{{ code }}</div>
+
+    <br>
+    <a href="{{ booking_url or '/' }}" class="referral-cta-btn">
+      Book a Session &amp; Apply Discount →
+    </a>
+    <p class="referral-by">
+      Invited by <strong>{{ ref.owner_name }}</strong> · discount applies at checkout
+    </p>
+  </section>
+
+  <!-- How it works -->
+  <section class="referral-how">
+    <h2 class="gift-section-title">How your discount works</h2>
+    <p class="gift-section-sub">Simple, no catch, no expiry fuss.</p>
+    <div class="referral-steps">
+      <div class="referral-step">
+        <div class="referral-step-num">1</div>
+        <h3>Browse sessions</h3>
+        <p>Mini, family, maternity, or individual — pick what fits your life right now.</p>
+      </div>
+      <div class="referral-step">
+        <div class="referral-step-num">2</div>
+        <h3>Enter your code</h3>
+        <p>At checkout, enter <strong>{{ code }}</strong> and see ${{ ref.discount_for_friend|int }} knocked off instantly.</p>
+      </div>
+      <div class="referral-step">
+        <div class="referral-step-num">3</div>
+        <h3>{{ ref.owner_name.split()[0] }} gets a reward too</h3>
+        <p>When you book, {{ ref.owner_name.split()[0] }} gets ${{ ref.reward_for_owner|int }} credit toward their next session.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- About Iryna -->
+  <section style="background:#fff; padding:60px 24px; text-align:center; border-top:1px solid #E8D5A3;">
+    <div style="max-width:600px; margin:0 auto;">
+      <h2 class="gift-section-title" style="margin-bottom:16px;">About Pashynska Photography</h2>
+      <p style="color:#555; font-size:15px; line-height:1.8; margin-bottom:28px;">
+        Iryna Pashynska is a Calgary-based photographer specializing in authentic,
+        warm family and lifestyle photography. With 500+ sessions and a gentle,
+        joyful approach, she captures the moments families actually treasure.
+      </p>
+      <a href="{{ booking_url or '/' }}" class="referral-cta-btn">
+        Claim Your ${{ ref.discount_for_friend|int }} Discount →
+      </a>
+    </div>
+  </section>
+
+{% endif %}
+
+<footer class="gift-footer">
+  <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>
+</footer>
+
+<script src="{{ url_for('gift_referral.static', filename='gift/gift.js') }}"></script>
+</body>
+</html>

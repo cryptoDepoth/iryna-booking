@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Share Your Code — Pashynska Photography</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('gift_referral.static', filename='gift/gift.css') }}">
+  <style>
+    .share-title { font-family: 'Playfair Display', Georgia, serif; }
+    .credit-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: linear-gradient(135deg, #2C2C2C, #C4973A);
+      color: #fff; border-radius: 50px; padding: 8px 20px;
+      font-size: 14px; font-weight: 700; margin-bottom: 20px;
+    }
+    .credit-progress {
+      background: #F0EBE0; border-radius: 50px; height: 8px; overflow: hidden; margin: 8px 0;
+    }
+    .credit-progress-bar {
+      height: 100%; background: linear-gradient(90deg, #C4973A, #E8D5A3);
+      border-radius: 50px; transition: width 0.5s ease;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="gift-nav">
+  <div class="gift-nav-brand"><span>Pashynska</span> Photography</div>
+</nav>
+
+<div class="share-wrap">
+
+  {% if error %}
+    <div class="gift-error">{{ error }}</div>
+
+  {% elif ref %}
+    <div class="share-hero-icon">🎉</div>
+    <h1 class="share-title">Thank you for booking!</h1>
+    <p class="share-sub">
+      Share your code and <strong>every friend who pays</strong>
+      earns you +${{ ref.reward_for_owner|int }} — it stacks up!
+    </p>
+
+    <!-- Credit balance (if any) -->
+    {% if credits and credits.balance > 0 %}
+    <div style="background:#fff;border:2px solid #C4973A;border-radius:10px;padding:20px 24px;margin-bottom:20px;text-align:left;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+          <p style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">Your credit balance</p>
+          <p style="font-size:28px;font-weight:700;color:#C4973A;margin:0;">${{ credits.balance|int }}</p>
+        </div>
+        <div style="text-align:right;">
+          <p style="font-size:12px;color:#888;margin:0 0 4px;">All-time earned</p>
+          <p style="font-size:18px;font-weight:600;color:#555;margin:0;">${{ credits.total_earned|int }}</p>
+        </div>
+      </div>
+      {% if credits.balance >= 20 %}
+      <div style="margin-top:12px;background:#e8f5e9;border-radius:6px;padding:10px 14px;">
+        <p style="color:#2a7a2a;font-size:13px;font-weight:600;margin:0;">
+          ✓ Ready to spend! Enter <strong style="font-family:monospace;">{{ ref.code }}</strong> at checkout to apply ${{ credits.balance|int }} off.
+        </p>
+      </div>
+      {% endif %}
+      {% if credits_url %}
+      <p style="margin-top:10px;font-size:12px;text-align:right;">
+        <a href="{{ credits_url }}" style="color:#C4973A;">View full credit history →</a>
+      </p>
+      {% endif %}
+    </div>
+    {% elif credits %}
+    <div style="margin-bottom:20px;">
+      <span class="credit-pill">💰 $0 balance — start sharing to earn!</span>
+    </div>
+    {% endif %}
+
+    <!-- Code box -->
+    <div class="share-code-box">
+      <p class="share-code-label">Your referral code</p>
+      <div class="share-code" id="referral-code-text">{{ ref.code }}</div>
+
+      <button class="share-copy-btn" data-copy="{{ ref.code }}" type="button">
+        📋 Copy code
+      </button>
+
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid #F0EBE0;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:#555;margin-bottom:6px;">
+          <span>Friend gets ${{ ref.discount_for_friend|int }} off</span>
+          <span>You earn +${{ ref.reward_for_owner|int }} per booking</span>
+        </div>
+
+        <!-- Progress toward next $20 -->
+        {% set uses = ref.uses_count %}
+        {% set confirmed_pct = [((credits.total_earned if credits else 0) % 20) / 20 * 100, 100]|min if credits else 0 %}
+        {% if credits and credits.total_earned > 0 %}
+        <div style="font-size:12px;color:#888;margin-bottom:4px;">
+          Progress to next ${{ ref.reward_for_owner|int }} credit
+        </div>
+        <div class="credit-progress">
+          <div class="credit-progress-bar" style="width: {{ confirmed_pct }}%"></div>
+        </div>
+        <div style="font-size:11px;color:#aaa;text-align:right;">
+          {{ confirmed_pct|int }}% — invite 1 more friend to earn the next ${{ ref.reward_for_owner|int }}
+        </div>
+        {% else %}
+        <div style="font-size:12px;color:#888;text-align:center;">
+          Invite your first friend → earn ${{ ref.reward_for_owner|int }} when they book
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Pre-filled share message -->
+    <p style="font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:#888; margin-bottom:10px; text-align:left;">
+      Share message
+    </p>
+    <div class="share-message-box" id="share-message" data-message="{{ share_msg }}">
+      {{ share_msg }}
+    </div>
+
+    <!-- Share buttons -->
+    <div class="share-buttons">
+      <button class="share-btn share-btn-wa" id="share-whatsapp" type="button">
+        💬 WhatsApp
+      </button>
+      <button class="share-btn share-btn-sms" id="share-sms" type="button">
+        📱 iMessage / SMS
+      </button>
+      <button class="share-btn share-btn-copy" data-copy="{{ share_msg }}" type="button">
+        📋 Copy message
+      </button>
+    </div>
+
+    <!-- Referral link -->
+    {% if referral_url %}
+    <div style="background:#FAF7F2; border:1px solid #E8D5A3; border-radius:8px; padding:16px 20px; margin-bottom:24px; text-align:left;">
+      <p style="font-size:12px; color:#888; margin-bottom:6px; text-transform:uppercase; letter-spacing:1px;">Or share this link</p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <code style="flex:1; font-size:13px; word-break:break-all; color:#2C2C2C;">{{ referral_url }}</code>
+        <button class="share-copy-btn" data-copy="{{ referral_url }}" type="button" style="white-space:nowrap;">
+          Copy link
+        </button>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- How it works -->
+    <div style="background:#fff; border:1px solid #E8D5A3; border-radius:10px; padding:24px; text-align:left; margin-bottom:28px;">
+      <h3 style="font-size:15px; margin-bottom:14px; color:#2C2C2C;">How the referral works</h3>
+      <ol style="padding-left:18px; font-size:14px; color:#555; line-height:2.2;">
+        <li>Share your code <strong>{{ ref.code }}</strong> with a friend</li>
+        <li>They book a session and enter your code — they get ${{ ref.discount_for_friend|int }} off</li>
+        <li>Once they <em>pay</em>, you earn +${{ ref.reward_for_owner|int }} credit — it's added to your balance</li>
+        <li>Credits <strong>accumulate</strong> — 10 friends = ${{ ref.reward_for_owner|int * 10 }} in credits!</li>
+        <li>Spend credits on your next session — enter your own code at checkout</li>
+      </ol>
+      <p style="font-size:12px; color:#aaa; margin-top:12px;">
+        Max {{ ref.max_uses }} friend uses · Credit activates on payment, not booking · Expires {{ ref.expires_at or '12 months' }}
+      </p>
+    </div>
+
+    {% if credits_url %}
+    <p style="text-align:center;margin-bottom:16px;">
+      <a href="{{ credits_url }}" style="color:#C4973A;font-size:14px;font-weight:600;">
+        View my credit balance & history →
+      </a>
+    </p>
+    {% endif %}
+
+    <p class="share-fine-print">
+      Questions? Email <a href="mailto:irynapashynska@gmail.com" style="color:#C4973A;">irynapashynska@gmail.com</a>
+    </p>
+
+  {% else %}
+    <div class="gift-error">No referral code found. Please contact irynapashynska@gmail.com.</div>
+  {% endif %}
+
+</div>
+
+<footer class="gift-footer">
+  <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>
+</footer>
+
+<script src="{{ url_for('gift_referral.static', filename='gift/gift.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gift Certificate Confirmed — Pashynska Photography</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('gift_referral.static', filename='gift/gift.css') }}">
+  <style>
+    .gift-success-title { font-family: 'Playfair Display', Georgia, serif; }
+  </style>
+</head>
+<body>
+
+<nav class="gift-nav">
+  <div class="gift-nav-brand"><span>Pashynska</span> Photography</div>
+  <a href="/gift" class="gift-nav-back">← Buy another gift</a>
+</nav>
+
+<div class="gift-success-wrap">
+
+  {% if error %}
+    <div class="gift-error">{{ error }}</div>
+    <p style="text-align:center; color:#555; margin-top: 16px;">
+      If you completed payment, please email
+      <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a>
+      with your receipt and we'll sort it out right away.
+    </p>
+  {% elif cert %}
+    <div class="gift-success-icon">🎁</div>
+    <h1 class="gift-success-title">Your gift is on its way!</h1>
+    <p class="gift-success-sub">
+      A beautiful PDF certificate has been emailed to
+      <strong>{{ cert.purchaser_email }}</strong>.
+      {% if cert.recipient_email %}
+        A copy is on its way to <strong>{{ cert.recipient_email }}</strong> too.
+      {% endif %}
+    </p>
+
+    <div class="gift-success-card">
+      <p style="font-size:13px; color:#999; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Certificate Code</p>
+      <div class="gift-success-code">{{ cert.code }}</div>
+
+      <table style="width:100%; font-size:14px; color:#555; margin-top:20px; border-collapse:collapse;">
+        <tr>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; color:#888;">Session</td>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; text-align:right; font-weight:600; color:#2C2C2C;">
+            {{ cert.session_type | capitalize if cert.session_type else 'Custom' }} session
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; color:#888;">Recipient</td>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; text-align:right; font-weight:600; color:#2C2C2C;">
+            {{ cert.recipient_name or '—' }}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; color:#888;">Value</td>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; text-align:right; font-weight:700; color:#C4973A;">
+            ${{ "%.2f"|format(cert.amount_with_gst) }} CAD
+          </td>
+        </tr>
+        {% if cert.personal_message %}
+        <tr>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; color:#888;">Message</td>
+          <td style="padding:8px 0; border-bottom:1px solid #F0EBE0; text-align:right; font-style:italic; color:#555;">
+            "{{ cert.personal_message }}"
+          </td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td style="padding:8px 0; color:#888;">Valid until</td>
+          <td style="padding:8px 0; text-align:right; color:#2C2C2C;">{{ cert.expires_at or '12 months from today' }}</td>
+        </tr>
+      </table>
+
+      <a href="/gift/certificate/{{ cert.code }}" class="gift-download-btn" style="display:block; text-align:center; margin-top:24px;">
+        ⬇ Download PDF Certificate
+      </a>
+    </div>
+
+    <!-- What happens next -->
+    <div style="background:#fff; border:1px solid #E8D5A3; border-radius:10px; padding:28px; text-align:left; margin-bottom:32px;">
+      <h3 style="font-size:16px; margin-bottom:16px; color:#2C2C2C;">What happens next?</h3>
+      <ol style="padding-left:20px; color:#555; font-size:14px; line-height:2;">
+        <li>Check your email for the PDF certificate</li>
+        <li>Forward it (or share the code) with {{ cert.recipient_name or 'your recipient' }}</li>
+        <li>They visit <a href="/">book.pashynskaphoto.com</a> and enter the code <strong>{{ cert.code }}</strong> at checkout</li>
+        <li>They choose their own date — certificate is valid 12 months</li>
+      </ol>
+    </div>
+
+    <p style="font-size:14px; color:#888; text-align:center; margin-bottom:24px;">
+      Questions? Email <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a>
+      — Iryna replies within 24 hours.
+    </p>
+
+    <a href="/gift" style="display:inline-block; background:#FAF7F2; border:2px solid #E8D5A3; color:#2C2C2C; padding:12px 24px; border-radius:8px; font-size:14px;">
+      Buy another gift certificate
+    </a>
+
+  {% else %}
+    <div class="gift-error">Something went wrong. Please contact irynapashynska@gmail.com.</div>
+  {% endif %}
+
+</div>
+
+<footer class="gift-footer">
+  <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>
+</footer>
+
+<script src="{{ url_for('gift_referral.static', filename='gift/gift.js') }}"></script>
+</body>
+</html>
