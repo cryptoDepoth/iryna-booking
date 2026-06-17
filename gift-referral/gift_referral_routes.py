@@ -12,7 +12,7 @@ import os
 
 import stripe
 from flask import (
-    Blueprint, abort, jsonify, redirect, render_template,
+    Blueprint, abort, jsonify, redirect, render_template, render_template_string,
     request, send_file, session, url_for,
 )
 
@@ -140,24 +140,45 @@ def _referral_for(email: str, name: str) -> dict:
             "referral_friend": friend, "referral_owner": owner}
 
 # ---------------------------------------------------------------------------
-# Gift Certificate routes
+# Gift Certificate routes — DISABLED while we add anti-spam protections
 # ---------------------------------------------------------------------------
 
 @gift_referral_bp.route("/gift")
-def gift_landing():
-    return render_template(
-        "gift/gift_landing.html",
-        packages=PACKAGES,
-        custom_bases=CUSTOM_BASES,
-        add_ons=GIFT_ADD_ONS,
-        certificate_styles=CERTIFICATE_STYLES,
-        gift_config=public_catalog(),
+@gift_referral_bp.route("/gift/checkout", methods=["GET", "POST"])
+def gift_disabled(*args, **kwargs):
+    return render_template_string(
+        """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Gift Certificates — Temporarily Unavailable</title>
+          <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+          <style>
+            body { margin:0; padding:0; background:#FAF7F2; font-family:'Inter',sans-serif; color:#2C2C2C; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+            .box { max-width:520px; background:#fff; border:1px solid #E8D5A3; border-radius:12px; padding:40px 32px; text-align:center; }
+            h1 { font-family:'Playfair Display',serif; font-size:26px; margin:0 0 16px; }
+            p { font-size:15px; line-height:1.6; color:#555; margin:0 0 24px; }
+            a { display:inline-block; background:#C4973A; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:600; }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <h1>Gift Certificates</h1>
+            <p>Gift certificates are temporarily unavailable while we add extra security. Please check back soon, or contact Iryna directly to purchase a gift certificate.</p>
+            <a href="{{ booking_url }}">Return to booking →</a>
+          </div>
+        </body>
+        </html>
+        """,
         booking_url=BOOKING_URL,
     )
 
 
-@gift_referral_bp.route("/gift/checkout", methods=["POST"])
-def gift_checkout():
+# ---------------------------------------------------------------------------
+# Referral routes
+# ---------------------------------------------------------------------------
     purchaser_name    = request.form.get("purchaser_name", "").strip()
     purchaser_email   = request.form.get("purchaser_email", "").strip().lower()
     recipient_name    = request.form.get("recipient_name", "").strip()
@@ -287,7 +308,6 @@ def gift_checkout():
     return redirect(stripe_session.url)
 
 
-@gift_referral_bp.route("/gift/success")
 def gift_success():
     stripe_session_id = request.args.get("session_id", "")
     form = session.pop("gift_form", None)
@@ -375,7 +395,6 @@ def gift_success():
                            booking_url=BOOKING_URL, **referral)
 
 
-@gift_referral_bp.route("/gift/pending/<code>")
 def gift_pending(code):
     code = code.strip().upper()
     cert = db.get_gift_certificate(code)
@@ -395,7 +414,6 @@ def gift_pending(code):
     )
 
 
-@gift_referral_bp.route("/gift/certificate/<code>")
 def download_certificate(code):
     cert = db.get_gift_certificate(code)
     if not cert:
@@ -413,7 +431,6 @@ def download_certificate(code):
                      as_attachment=True, download_name=f"GiftCertificate_{code}.pdf")
 
 
-@gift_referral_bp.route("/gift/validate", methods=["POST"])
 def gift_validate():
     data         = request.get_json(silent=True) or {}
     code         = (data.get("code") or request.form.get("code", "")).strip().upper()
