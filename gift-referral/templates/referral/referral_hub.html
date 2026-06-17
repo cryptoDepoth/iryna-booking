@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Give $20, Get $20 — Pashynska Photography</title>
+  <meta name="description" content="Share Pashynska Photography with a friend. They get $20 off their first session in Calgary, and you get $20 credit when they book.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('gift_referral.static', filename='gift/gift.css') }}">
+  <style>
+    .referral-hero h1{font-family:'Playfair Display',Georgia,serif}
+    .rf-form{max-width:430px;margin:10px auto 0;display:flex;flex-direction:column;gap:12px;text-align:left}
+    .rf-form label{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a8378;margin-bottom:4px;display:block}
+    .rf-form input{width:100%;border:1px solid rgba(196,151,58,.4);border-radius:10px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:15px;background:#fff;color:#2C2C2C}
+    .rf-form input:focus{outline:none;border-color:#C4973A}
+    .rf-share{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:18px 0 6px}
+    .rf-btn{display:inline-flex;align-items:center;gap:6px;padding:11px 20px;border-radius:999px;border:1px solid #E8D5A3;background:#FAF7F2;color:#2C2C2C;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;font-family:'Inter',sans-serif}
+    .rf-btn:hover{background:#f3ead6}
+    .rf-primary{background:linear-gradient(135deg,#E8C45F,#C4973A);color:#3a2a05;border-color:transparent}
+    .rf-qr-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:10px}
+    #rf-qr{padding:12px;background:#fff;border:1px solid #eee;border-radius:12px;display:inline-block;line-height:0}
+    .rf-qr-cap{font-size:12px;color:#aaa}
+    .rf-link{word-break:break-all;font-size:13px;color:#8a6d2f;background:#fbf6ec;border:1px dashed #C4973A;border-radius:8px;padding:10px 14px;max-width:520px;margin:0 auto}
+  </style>
+</head>
+<body>
+
+<nav class="gift-nav">
+  <div class="gift-nav-brand"><span>Pashynska</span> Photography</div>
+  <a href="{{ booking_url or '/' }}" class="gift-nav-back">Book a session →</a>
+</nav>
+
+<section class="referral-hero">
+  <p class="referral-hero-eyebrow">🎁 Refer a friend</p>
+  <h1>Give <em>$20</em>, Get <em>$20</em></h1>
+  <p class="referral-hero-sub">
+    Share Pashynska Photography with someone you love. They get <strong>$20 off</strong> their first
+    session in Calgary, and you earn <strong>$20 credit</strong> toward yours the moment they book.
+  </p>
+
+  {% if not ref %}
+  <form class="rf-form" method="POST" action="/refer">
+    <div>
+      <label for="rf-name">Your name</label>
+      <input id="rf-name" name="name" type="text" placeholder="Anna" required autocomplete="name">
+    </div>
+    <div>
+      <label for="rf-email">Your email</label>
+      <input id="rf-email" name="email" type="email" placeholder="anna@example.com" required autocomplete="email">
+    </div>
+    <button type="submit" class="referral-cta-btn" style="margin-top:6px;">Create my referral link →</button>
+    <p style="font-size:12px;color:#8a8378;text-align:center;">We use your email only to track and pay out your $20 credits.</p>
+  </form>
+  {% else %}
+  <p style="color:#555;font-size:14px;margin-bottom:8px;">Your personal code</p>
+  <div class="referral-code-pill">{{ ref.code }}</div>
+  <div class="rf-share">
+    <button type="button" class="rf-btn rf-primary" id="rf-shareb">🔗 Share…</button>
+    <a class="rf-btn" id="rf-wa" target="_blank" rel="noopener">WhatsApp</a>
+    <a class="rf-btn" id="rf-email">Email</a>
+    <button type="button" class="rf-btn" id="rf-copy">Copy link</button>
+  </div>
+  <div class="rf-link" id="rf-link">{{ referral_url }}</div>
+  <div class="rf-qr-wrap">
+    <div id="rf-qr" role="img" aria-label="QR code of your referral link"></div>
+    <p class="rf-qr-cap">Let a friend scan this</p>
+  </div>
+  {% if credits_url %}
+  <p style="margin-top:18px;"><a href="{{ credits_url }}" style="color:#C4973A;font-weight:600;">View my $20 credits →</a></p>
+  {% endif %}
+  {% endif %}
+</section>
+
+<section class="referral-how">
+  <h2 class="gift-section-title">How it works</h2>
+  <p class="gift-section-sub">No catch. You both win.</p>
+  <div class="referral-steps">
+    <div class="referral-step"><div class="referral-step-num">1</div><h3>Share your code</h3><p>Send your link to a friend by text, WhatsApp, email, or the QR code.</p></div>
+    <div class="referral-step"><div class="referral-step-num">2</div><h3>They book &amp; save $20</h3><p>Your friend enters your code when booking and gets $20 off their first session.</p></div>
+    <div class="referral-step"><div class="referral-step-num">3</div><h3>You earn $20</h3><p>As soon as your friend pays their deposit, $20 credit lands in your account — emailed to you instantly.</p></div>
+  </div>
+</section>
+
+<footer class="gift-footer">
+  <p>Pashynska Photography · Calgary, AB · <a href="mailto:irynapashynska@gmail.com">irynapashynska@gmail.com</a></p>
+</footer>
+
+{% if ref %}
+<script id="rf-config" type="application/json">
+{"url": {{ referral_url|tojson }}, "msg": {{ share_msg|tojson }}, "code": {{ ref.code|tojson }}}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function(){
+  var el=document.getElementById("rf-config"); if(!el) return;
+  var cfg={}; try{cfg=JSON.parse(el.textContent);}catch(e){return;}
+  if(window.QRCode){try{new QRCode(document.getElementById("rf-qr"),{text:cfg.url,width:150,height:150,colorDark:"#2C2C2C",colorLight:"#ffffff"});}catch(e){}}
+  var wa=document.getElementById("rf-wa"); if(wa) wa.href="https://wa.me/?text="+encodeURIComponent(cfg.msg);
+  var em=document.getElementById("rf-email"); if(em) em.href="mailto:?subject="+encodeURIComponent("$20 off Pashynska Photography")+"&body="+encodeURIComponent(cfg.msg);
+  var sb=document.getElementById("rf-shareb");
+  if(sb) sb.addEventListener("click",function(){ if(navigator.share){navigator.share({title:"Pashynska Photography",text:cfg.msg,url:cfg.url}).catch(function(){});} else if(em){window.location.href=em.href;} });
+  function copy(t,b){var d=function(){var o=b.textContent;b.textContent="Copied ✓";setTimeout(function(){b.textContent=o;},1700);}; if(navigator.clipboard){navigator.clipboard.writeText(t).then(d,function(){});}else{var x=document.createElement("textarea");x.value=t;document.body.appendChild(x);x.select();try{document.execCommand("copy");}catch(e){}document.body.removeChild(x);d();}}
+  var cp=document.getElementById("rf-copy"); if(cp) cp.addEventListener("click",function(){copy(cfg.url,cp);});
+})();
+</script>
+{% endif %}
+<script src="{{ url_for('gift_referral.static', filename='gift/gift.js') }}"></script>
+</body>
+</html>

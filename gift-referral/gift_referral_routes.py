@@ -483,6 +483,33 @@ def referral_share(booking_id):
     )
 
 
+@gift_referral_bp.route("/refer", methods=["GET", "POST"])
+def refer_hub():
+    """Self-serve referral page: anyone can get their own code and share it.
+    No booking required — safe to link from anywhere or share directly."""
+    name = (request.form.get("name") or request.args.get("name") or "").strip()
+    email = (request.form.get("email") or request.args.get("email") or "").strip().lower()
+    ref = None
+    if email and "@" in email and "." in email.split("@")[-1]:
+        ref = db.get_referral_code_by_owner(email)
+        if not ref:
+            code = db.create_referral_code(email, name or "Friend")
+            ref = db.get_referral_code(code)
+    referral_url = share_msg = credits_url = None
+    if ref:
+        referral_url = f"{BOOKING_URL}/referral/{ref['code']}"
+        share_msg = (
+            f"Hey! I love Pashynska Photography in Calgary. Use my code {ref['code']} "
+            f"for ${int(ref['discount_for_friend'])} off your first session - book here: {referral_url}"
+        )
+        credits_url = f"{BOOKING_URL}/my-credits?email={email}&token={_make_credits_token(email)}"
+    return render_template(
+        "referral/referral_hub.html",
+        booking_url=BOOKING_URL, ref=ref, name=name, email=email,
+        referral_url=referral_url, share_msg=share_msg, credits_url=credits_url,
+    )
+
+
 # Unified validate — tries gift first, then referral/credit
 @gift_referral_bp.route("/validate", methods=["POST"])
 def unified_validate():
