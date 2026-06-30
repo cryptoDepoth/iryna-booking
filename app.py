@@ -1406,6 +1406,95 @@ def _send_email_raw(to_email, client_name, subject, plain, html, attachment_byte
     return _smtp_send_email(to_email, client_name, subject, plain, html, attachment_bytes, attachment_filename, attachment_mime)
 
 
+def _send_gallery_email(booking, wfolio_url):
+    """Send a polished gallery-ready email with the Wfolio/Pic-Time link.
+
+    The previous one-line email ('Your gallery is ready: Open gallery') was
+    frequently reported as empty/broken by clients. This version uses the same
+    branded card style as the confirmation email, includes the client's name,
+    clear next steps, and a prominent call-to-action button.
+    """
+    to_email = str(booking.get("email") or "").strip()
+    client_name = str(booking.get("name") or "Client").strip() or "Client"
+    event_title = str(booking.get("event_title") or "your photo session").strip()
+    session_date = str(booking.get("event_date") or "")
+    try:
+        date_nice = datetime.strptime(session_date, "%Y-%m-%d").strftime("%B %d, %Y")
+    except Exception:
+        date_nice = session_date or "recently"
+
+    safe_client = _html_escape(client_name)
+    safe_event = _html_escape(event_title)
+    safe_date = _html_escape(date_nice)
+    safe_url = _html_escape(wfolio_url)
+
+    subject = f"Your {safe_event} gallery is ready"
+
+    plain = (
+        f"Hi {client_name},\n\n"
+        f"Your {event_title} gallery from {date_nice} is ready!\n\n"
+        f"Open your gallery here:\n{wfolio_url}\n\n"
+        f"What happens next:\n"
+        f"1. Click the link above to view your photos.\n"
+        f"2. Favourite the images you would like retouched (if retouching is included).\n"
+        f"3. Download your favourites — galleries are usually kept online for 1–2 months.\n\n"
+        f"If the link does not open, copy and paste it into your browser.\n\n"
+        f"Have a question? Reply to this email or DM me on Instagram @pashynska.photo.\n\n"
+        f"Warmly,\nIryna Pashynska\nPashynska Photography · Calgary\n@pashynska.photo"
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f7efe9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#3f2d33;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:34px 14px;">
+<tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.14);">
+  <tr><td style="background:linear-gradient(135deg,#f2c9bf 0%,#c4857a 52%,#7e4f46 100%);padding:42px 34px;text-align:center;color:#fff;">
+    <p style="margin:0 0 10px;font-size:34px;line-height:1;">📸</p>
+    <p style="margin:0 0 8px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.88;">Gallery ready</p>
+    <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.15;font-weight:400;letter-spacing:-.02em;">Your photos are here</h1>
+    <p style="margin:12px 0 0;font-size:14px;opacity:.9;">Pashynska Photography · Calgary</p>
+  </td></tr>
+  <tr><td style="padding:34px 34px 10px;">
+    <p style="margin:0 0 14px;font-size:16px;line-height:1.65;color:#5a3d4a;">Hi <strong>{safe_client}</strong>,</p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.75;color:#7a5a6a;">Your <strong>{safe_event}</strong> gallery from <strong>{safe_date}</strong> is ready. Click the button below to view, favourite, and download your photos.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+      <tr><td style="text-align:center;padding:20px 0;">
+        <a href="{safe_url}" style="display:inline-block;background:#4b2f38;color:#ffffff;text-decoration:none;border-radius:14px;padding:18px 32px;font-size:16px;font-weight:700;letter-spacing:.02em;">🖼️ Open My Gallery</a>
+      </td></tr>
+    </table>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8f4;border:1px solid #f1dfd8;border-radius:18px;margin:0 0 24px;">
+      <tr><td style="padding:18px 20px;">
+        <p style="margin:0 0 12px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#b08479;font-weight:700;">Next steps</p>
+        <p style="margin:0 0 8px;color:#6d4d55;font-size:14px;line-height:1.65;">1. Open the gallery and browse your photos.</p>
+        <p style="margin:0 0 8px;color:#6d4d55;font-size:14px;line-height:1.65;">2. Favourite the images you want retouched (if retouching is included in your package).</p>
+        <p style="margin:0;color:#6d4d55;font-size:14px;line-height:1.65;">3. Download your favourites — galleries are usually kept online for 1–2 months.</p>
+      </td></tr>
+    </table>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #ead8d0;border-radius:18px;margin:0 0 24px;">
+      <tr><td style="padding:18px 20px;">
+        <p style="margin:0 0 8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#b08479;font-weight:700;">Having trouble?</p>
+        <p style="margin:0;color:#6d4d55;font-size:14px;line-height:1.65;">If the button above does not work, copy and paste this link into your browser:<br><a href="{safe_url}" style="color:#c4857a;text-decoration:none;font-weight:700;word-break:break-all;">{safe_url}</a></p>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 24px;font-size:14px;line-height:1.75;color:#7a5a6a;">Have a question? Reply to this email or DM me on Instagram <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;text-decoration:none;font-weight:700;">@pashynska.photo</a>.</p>
+  </td></tr>
+  <tr><td style="background:#fff7f4;border-top:1px solid #f1dfd8;padding:24px 34px;text-align:center;">
+    <p style="margin:0 0 6px;font-size:14px;color:#6d4d55;">Warmly,<br><strong style="color:#4b2f38;">Iryna Pashynska</strong></p>
+    <p style="margin:0;font-size:12px;color:#9a756d;">Pashynska Photography · Calgary · @pashynska.photo</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>"""
+
+    return _send_email_raw(to_email, client_name, subject, plain, html)
+
+
 def _send_client_reschedule_email(to_email, client_name, old_event_title, old_date, old_time,
                                   new_event_title, new_date, new_time, booking_id, location=None):
     """Send HTML reschedule notification to client via Himalaya CLI."""
@@ -7559,13 +7648,7 @@ def admin_booking_wfolio(booking_id):
     conn.execute("UPDATE bookings SET wfolio_url=? WHERE id=?", (wfolio_url, booking_id))
     conn.commit()
     conn.close()
-    sent = _send_email_with_attachment(
-        booking.get("email", ""), booking.get("name", "Client"),
-        "Your photo gallery is ready",
-        f"Your gallery is ready: {wfolio_url}",
-        f"<p>Your gallery is ready: <a href=\"{_html_escape(wfolio_url)}\">Open gallery</a></p>",
-        None, "gallery.txt", "text/plain"
-    )
+    sent = _send_gallery_email(dict(booking), wfolio_url)
     _emit_n8n_event(
         "gallery.wfolio_sent",
         booking=dict(booking),

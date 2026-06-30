@@ -244,7 +244,7 @@ def test_gallery_button_saves_url_and_emails(admin_client, monkeypatch):
     Must persist + send + return success."""
     sent = {}
     monkeypatch.setattr(
-        booking_app, "_send_email_with_attachment",
+        booking_app, "_send_gallery_email",
         lambda *a, **k: sent.setdefault("ok", True), raising=False
     )
     bid = _insert_booking()

@@ -191,13 +191,14 @@ def test_admin_invoice_send_email(admin_client, monkeypatch):
 
 # 6. Wfolio URL update + gallery email
 def test_admin_wfolio_update_and_email(admin_client, monkeypatch):
-    """RED: POST /admin/booking/<id>/wfolio should save URL and send gallery email."""
+    """POST /admin/booking/<id>/wfolio should save URL and send gallery email."""
     captured = {}
     def mock_email(*a, **k):
         captured["called"] = True
+        captured["booking"] = k.get("booking") or (a[0] if a else None)
+        captured["url"] = k.get("wfolio_url") or (a[1] if len(a) > 1 else None)
         return True
-    monkeypatch.setattr(booking_app, "_send_email_with_attachment", mock_email, raising=False)
-    monkeypatch.setattr(booking_app, "_send_email_raw", lambda *a, **k: True, raising=False)
+    monkeypatch.setattr(booking_app, "_send_gallery_email", mock_email, raising=False)
 
     booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
     wfolio_url = "https://pashynska.wfolio.com/gallery/test123"
@@ -213,6 +214,8 @@ def test_admin_wfolio_update_and_email(admin_client, monkeypatch):
     conn.close()
     assert row and row[0] == wfolio_url
     assert captured.get("called") is True
+    assert captured.get("url") == wfolio_url
+    assert captured["booking"].get("id") == booking_id
 
 
 # 7. Google Review email
