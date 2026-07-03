@@ -3622,10 +3622,38 @@ def _process_abandoned_emails():
             log.error(f"[scheduler] Abandoned email failed for #{b['id']}: {e}")
 
 
+def _booking_session_local_datetime(booking):
+    """Return the booking's exact session datetime in America/Edmonton.
+
+    Reminder windows must be checked against date+time, not date alone. A
+    date-only query at ~21:00 can include all sessions two calendar days away
+    (for example July 4 at 16:00 is ~43h away on July 2 at 21:00), which makes
+    a "tomorrow" email false.
+    """
+    try:
+        date_text = str(booking.get("date") or "").strip()
+        time_text = str(booking.get("time") or "").strip()
+        if not date_text or not time_text:
+            return None
+        # Slot times are stored as HH:MM. Accept HH:MM:SS defensively.
+        dt = datetime.strptime(f"{date_text} {time_text[:5]}", "%Y-%m-%d %H:%M")
+        return dt.replace(tzinfo=_tz)
+    except Exception:
+        return None
+
+
+def _hours_until_session(booking, now=None):
+    session_dt = _booking_session_local_datetime(booking)
+    if not session_dt:
+        return None
+    now = now or _local_now()
+    return (session_dt - now).total_seconds() / 3600.0
+
+
 def _process_reminder_emails():
     """Send 48h pre-session reminders to confirmed bookings."""
     now = _local_now()
-    # Window: sessions happening between 46h and 50h from now (4h window to avoid duplicates)
+    # Broad date prefilter for DB efficiency; exact hour filtering happens per booking.
     date_from = (now + timedelta(hours=46)).strftime("%Y-%m-%d")
     date_to   = (now + timedelta(hours=50)).strftime("%Y-%m-%d")
     conn = db_conn()
@@ -3639,6 +3667,14 @@ def _process_reminder_emails():
     conn.close()
     for row in rows:
         b = dict(row)
+        hours_until = _hours_until_session(b, now)
+        if hours_until is None or not (46 <= hours_until <= 50):
+            log.info(
+                f"[scheduler] Skipping 48h reminder outside exact window → "
+                f"booking #{b.get('id')} at {b.get('date')} {b.get('time')} "
+                f"({hours_until}h away)"
+            )
+            continue
         try:
             ok = _send_reminder_email(b)
             conn2 = db_conn()
@@ -3657,7 +3693,7 @@ def _process_reminder_emails():
 def _process_24h_reminder_emails():
     """Send 24-hour pre-session reminders to confirmed bookings."""
     now = _local_now()
-    # Window: sessions happening between 22h and 26h from now (4h window to avoid duplicates)
+    # Broad date prefilter for DB efficiency; exact hour filtering happens per booking.
     date_from = (now + timedelta(hours=22)).strftime("%Y-%m-%d")
     date_to   = (now + timedelta(hours=26)).strftime("%Y-%m-%d")
     conn = db_conn()
@@ -3671,6 +3707,14 @@ def _process_24h_reminder_emails():
     conn.close()
     for row in rows:
         b = dict(row)
+        hours_until = _hours_until_session(b, now)
+        if hours_until is None or not (22 <= hours_until <= 26):
+            log.info(
+                f"[scheduler] Skipping 24h reminder outside exact window → "
+                f"booking #{b.get('id')} at {b.get('date')} {b.get('time')} "
+                f"({hours_until}h away)"
+            )
+            continue
         try:
             ok = _send_24h_reminder_email(b)
             conn2 = db_conn()

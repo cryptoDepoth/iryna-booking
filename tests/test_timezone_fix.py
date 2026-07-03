@@ -143,3 +143,67 @@ class TestPublicEventsPayloadUsesLocalToday:
         for ev in payload:
             if ev.get("date"):
                 assert ev["date"] >= fake_today or ev.get("booking_type") == "rolling_availability"
+
+
+class TestExactReminderWindows:
+    """Reminder scheduler must use exact date+time, not just calendar date."""
+
+    def _insert_confirmed_booking(self, date="2026-07-04", time="16:00", email="client@example.com"):
+        conn = booking_app.db_conn()
+        cur = conn.execute(
+            """
+            INSERT INTO bookings (date, time, name, email, phone, status, confirmed, paid)
+            VALUES (?, ?, 'Test Client', ?, '555', 'confirmed', 1, 1)
+            """,
+            (date, time, email),
+        )
+        conn.commit()
+        booking_id = cur.lastrowid
+        conn.close()
+        return booking_id
+
+    def test_24h_reminder_does_not_send_42_hours_early(self, monkeypatch):
+        """Regression: July 4 sessions were emailed 'tomorrow' on July 2 evening."""
+        booking_id = self._insert_confirmed_booking(date="2026-07-04", time="16:00")
+        fake_now = datetime(2026, 7, 2, 22, 0, tzinfo=booking_app._tz)
+        monkeypatch.setattr(booking_app, "_local_now", lambda: fake_now)
+        sent = []
+        monkeypatch.setattr(booking_app, "_send_24h_reminder_email", lambda b: sent.append(b["id"]) or True)
+
+        booking_app._process_24h_reminder_emails()
+
+        assert sent == []
+        conn = booking_app.db_conn()
+        row = conn.execute("SELECT reminder_24h_email_sent FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        conn.close()
+        assert row["reminder_24h_email_sent"] is None
+
+    def test_24h_reminder_sends_inside_exact_22_to_26_hour_window(self, monkeypatch):
+        booking_id = self._insert_confirmed_booking(date="2026-07-04", time="16:00")
+        fake_now = datetime(2026, 7, 3, 15, 0, tzinfo=booking_app._tz)  # 25h before session
+        monkeypatch.setattr(booking_app, "_local_now", lambda: fake_now)
+        sent = []
+        monkeypatch.setattr(booking_app, "_send_24h_reminder_email", lambda b: sent.append(b["id"]) or True)
+
+        booking_app._process_24h_reminder_emails()
+
+        assert sent == [booking_id]
+        conn = booking_app.db_conn()
+        row = conn.execute("SELECT reminder_24h_email_sent FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        conn.close()
+        assert row["reminder_24h_email_sent"] is not None
+
+    def test_48h_reminder_does_not_send_66_hours_early(self, monkeypatch):
+        booking_id = self._insert_confirmed_booking(date="2026-07-04", time="16:00")
+        fake_now = datetime(2026, 7, 1, 22, 0, tzinfo=booking_app._tz)  # 66h before session
+        monkeypatch.setattr(booking_app, "_local_now", lambda: fake_now)
+        sent = []
+        monkeypatch.setattr(booking_app, "_send_reminder_email", lambda b: sent.append(b["id"]) or True)
+
+        booking_app._process_reminder_emails()
+
+        assert sent == []
+        conn = booking_app.db_conn()
+        row = conn.execute("SELECT reminder_email_sent FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        conn.close()
+        assert row["reminder_email_sent"] is None
