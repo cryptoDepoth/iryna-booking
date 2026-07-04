@@ -82,7 +82,7 @@ em{font-style:italic;color:var(--rose-deep)}
 .about-text p{color:var(--ink-2);margin-bottom:10px}
 
 /* Gallery */
-.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .gallery-grid img{border-radius:var(--r-sm);aspect-ratio:1/1;object-fit:cover;width:100%;
   box-shadow:var(--shadow-sm);transition:transform .25s}
 .gallery-grid img:hover{transform:scale(1.02)}
