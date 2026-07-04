@@ -457,7 +457,7 @@
   <h2 class="section-title rv">Wedding Moments<span class="gline"></span></h2>
   <div class="gallery-grid rv">
     {% for photo in gallery_photos %}
-    <img src="{{ photo }}" alt="Calgary wedding photography sample" loading="lazy">
+    <img src="{{ photo }}" alt="Calgary wedding photography sample" loading="eager" decoding="async">
     {% endfor %}
   </div>
 </section>
