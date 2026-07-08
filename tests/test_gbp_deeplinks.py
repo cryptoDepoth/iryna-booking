@@ -44,7 +44,7 @@ def test_gbp_utm_content_canoe_mini_auto_opens_next_canoe_event(client, monkeypa
 
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert 'openDrawer("canoe-mini-session-2026-07-04")' in html
+    assert 'openDrawer("canoe-mini-session-2026-07-26")' in html
 
 
 def test_exact_event_id_alias_auto_opens_drawer(client, monkeypatch):

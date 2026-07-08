@@ -7,6 +7,7 @@
 !.env.*.example
 __pycache__/
 *.pyc
+.venv/
 .pytest_cache/
 .DS_Store
 bookings.db
@@ -35,6 +36,7 @@ event.json
 # Backups
 backups/
 disabled_launchagents/
+qa/nightly/reports/*.json
 
 # AI assistant generated knowledge (contains sanitized but private business chat patterns)
 assistant_knowledge*.jsonl
