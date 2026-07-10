@@ -285,6 +285,27 @@ def _sha256_norm(value):
     return hashlib.sha256(str(value).strip().lower().encode("utf-8")).hexdigest()
 
 
+def _meta_visitor_match(visitor_id):
+    """Read first-party browser match fields captured when the visit began."""
+    visitor_id = _safe_text(visitor_id, 120)
+    if not visitor_id:
+        return {}
+    conn = None
+    try:
+        conn = db_conn()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT first_seen, user_agent, ip_address FROM visitor_sessions WHERE visitor_id=?",
+            (visitor_id,),
+        ).fetchone()
+        return dict(row) if row else {}
+    except sqlite3.Error:
+        return {}
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 def _meta_capi_purchase(booking, value=None, currency="CAD"):
     """Send a server-side Purchase to the Meta Conversions API.
 
@@ -306,6 +327,7 @@ def _meta_capi_purchase(booking, value=None, currency="CAD"):
         return False
     try:
         attribution = _analytics_attribution_from_booking(booking)
+        visitor_match = _meta_visitor_match(booking.get("visitor_id"))
         user_data = {}
         em = _sha256_norm(booking.get("email"))
         if em:
@@ -325,9 +347,25 @@ def _meta_capi_purchase(booking, value=None, currency="CAD"):
                 ln = _sha256_norm(parts[-1])
                 if ln:
                     user_data["ln"] = [ln]
+        visitor_id = _safe_text(booking.get("visitor_id"), 120)
+        if visitor_id:
+            user_data["external_id"] = [_sha256_norm(visitor_id)]
+        client_ip = _safe_text(visitor_match.get("ip_address"), 100)
+        client_ua = _safe_text(visitor_match.get("user_agent"), 500)
+        if client_ip:
+            user_data["client_ip_address"] = client_ip
+        if client_ua:
+            user_data["client_user_agent"] = client_ua
         fbclid = attribution.get("fbclid")
         if fbclid:
-            user_data["fbc"] = f"fb.1.{int(time.time())}.{fbclid}"
+            first_seen_ts = int(time.time())
+            first_seen = visitor_match.get("first_seen")
+            if first_seen:
+                try:
+                    first_seen_ts = int(datetime.fromisoformat(str(first_seen).replace("Z", "+00:00")).timestamp())
+                except (TypeError, ValueError):
+                    pass
+            user_data["fbc"] = f"fb.1.{first_seen_ts}.{fbclid}"
         try:
             val = float(value) if value is not None else float(booking.get("paid_amount") or 0)
         except (TypeError, ValueError):
@@ -6296,8 +6334,9 @@ def custom_payment_success():
 
 
 _PACKAGE_ATTRIBUTION_KEYS = (
-    "gclid", "fbclid", "fbp", "fbc",
-    "utm_source", "utm_medium", "utm_campaign", "utm_content",
+    "gclid", "gbraid", "wbraid", "fbclid", "fbp", "fbc",
+    "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+    "referrer", "landing_url",
 )
 
 
@@ -6327,15 +6366,30 @@ def _send_package_capi(session_obj, metadata, amount_paid):
     em = _sha256_norm(email)
     if em:
         user_data["em"] = [em]
+        user_data["external_id"] = [em]
     phone_digits = re.sub(r"\D", "", str(phone or ""))
     if phone_digits:
+        if len(phone_digits) == 10:
+            phone_digits = "1" + phone_digits
         user_data["ph"] = [hashlib.sha256(phone_digits.encode("utf-8")).hexdigest()]
+    name = str(metadata.get("client_name") or "").strip()
+    if name:
+        parts = name.split()
+        user_data["fn"] = [_sha256_norm(parts[0])]
+        if len(parts) > 1:
+            user_data["ln"] = [_sha256_norm(parts[-1])]
     fbp = _safe_text(metadata.get("fbp"), 200)
     fbc = _safe_text(metadata.get("fbc"), 200)
     if fbp:
         user_data["fbp"] = fbp
     if fbc:
         user_data["fbc"] = fbc
+    client_ip = _safe_text(metadata.get("client_ip_address"), 100)
+    client_ua = _safe_text(metadata.get("client_user_agent"), 500)
+    if client_ip:
+        user_data["client_ip_address"] = client_ip
+    if client_ua:
+        user_data["client_user_agent"] = client_ua
     try:
         value = round(float(amount_paid or 0), 2)
     except (TypeError, ValueError):
@@ -6347,7 +6401,8 @@ def _send_package_capi(session_obj, metadata, amount_paid):
             "event_time": int(time.time()),
             "event_id": session_id,
             "action_source": "website",
-            "event_source_url": f"{base_url}/payment/package/success",
+            "event_source_url": _safe_text(metadata.get("landing_url"), 500)
+                                or f"{base_url}/payment/package/success",
             "user_data": user_data,
             "custom_data": {"currency": "CAD", "value": value},
         }]
@@ -6403,6 +6458,12 @@ def package_checkout():
     preferred_date = (data.get("preferred_date") or "").strip()[:10]
     notes = (data.get("notes") or "").strip()[:500]
     attribution = _package_attribution_from_json(data)
+    forwarded_for = (request.headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
+    client_ip_address = _safe_text(
+        request.headers.get("CF-Connecting-IP") or forwarded_for or request.remote_addr,
+        100,
+    )
+    client_user_agent = _safe_text(request.headers.get("User-Agent"), 500)
     if not name or "@" not in email or "." not in email.split("@")[-1]:
         return jsonify({"error": "Please enter your name and a valid email"}), 400
     if preferred_date:
@@ -6453,6 +6514,8 @@ def package_checkout():
                 "client_phone":   phone,
                 "preferred_date": preferred_date,
                 "notes":          notes,
+                "client_ip_address": client_ip_address,
+                "client_user_agent": client_user_agent,
                 **attribution,
             },
             billing_address_collection="auto",
@@ -6464,12 +6527,65 @@ def package_checkout():
         return jsonify({"error": "Could not start the payment. Please try again."}), 500
 
 
+def _verified_package_payment(sid, requested_slug=""):
+    """Return trusted package-payment details for a paid Stripe session.
+
+    The success URL is public and query parameters are user-controlled. Never
+    emit a Purchase event (or claim that money was received) until Stripe has
+    confirmed both the payment and the package metadata created by this app.
+    """
+    sid = str(sid or "").strip()
+    requested_slug = str(requested_slug or "").strip().lower()
+    if not STRIPE_SECRET_KEY or not sid.startswith("cs_") or len(sid) > 255:
+        return None
+    try:
+        import stripe as _stripe
+    except ImportError:
+        return None
+
+    _stripe.api_key = STRIPE_SECRET_KEY
+    try:
+        session = _stripe.checkout.Session.retrieve(sid)
+    except Exception as exc:
+        log.warning("[stripe] Package success verification failed: %s", type(exc).__name__)
+        return None
+
+    def _get(obj, key, default=None):
+        if hasattr(obj, "get"):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    metadata = _get(session, "metadata", {}) or {}
+    payment_status = str(_get(session, "payment_status", "") or "").lower()
+    payment_type = str(_get(metadata, "payment_type", "") or "")
+    slug = str(_get(metadata, "package_slug", "") or "").strip().lower()
+    if payment_status != "paid" or payment_type != "package_deposit" or slug not in PACKAGES:
+        return None
+    if requested_slug and requested_slug != slug:
+        return None
+    try:
+        amount_paid = round(float(_get(session, "amount_total", 0) or 0) / 100.0, 2)
+    except (TypeError, ValueError):
+        amount_paid = 0.0
+    if amount_paid <= 0:
+        return None
+    return {"sid": sid, "slug": slug, "amount_paid": amount_paid}
+
+
 @app.route("/payment/package/success")
 def package_payment_success():
-    slug = (request.args.get("pkg") or "").strip().lower()
-    sid = request.args.get("sid", "")
-    pkg = PACKAGES.get(slug)
-    return render_template("package_success.html", pkg=pkg, email=EMAIL, sid=sid)
+    requested_slug = (request.args.get("pkg") or "").strip().lower()
+    sid = (request.args.get("sid") or "").strip()
+    payment = _verified_package_payment(sid, requested_slug)
+    verified_slug = payment["slug"] if payment else requested_slug
+    return render_template(
+        "package_success.html",
+        pkg=PACKAGES.get(verified_slug),
+        email=EMAIL,
+        payment_verified=bool(payment),
+        purchase_event_id=payment["sid"] if payment else "",
+        purchase_value=payment["amount_paid"] if payment else 0.0,
+    )
 
 
 @app.route("/stripe/webhook", methods=["POST"])

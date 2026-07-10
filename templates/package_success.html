@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>Deposit received — Pashynska Photography</title>
+  <title>{% if payment_verified %}Deposit received{% else %}Confirming payment{% endif %} — Pashynska Photography</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -26,10 +26,8 @@
   'https://connect.facebook.net/en_US/fbevents.js');
   fbq('init', '{{ meta_pixel_id }}');
   fbq('track', 'PageView');
-  {% if sid %}
-  fbq('track', 'Purchase', {currency:'CAD', value: {{ (pkg.deposit if pkg else 100)|tojson }}}, {eventID: {{ sid|tojson }}});
-  {% else %}
-  fbq('track', 'Purchase', {currency:'CAD', value: {{ (pkg.deposit if pkg else 100)|tojson }}});
+  {% if payment_verified and purchase_event_id %}
+  fbq('track', 'Purchase', {currency:'CAD', value: {{ purchase_value|tojson }}}, {eventID: {{ purchase_event_id|tojson }}});
   {% endif %}
   </script>
   <style>
@@ -40,6 +38,7 @@
     img.logo{height:30px;width:auto;margin-bottom:34px}
     .tick{width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,var(--gold-3),var(--gold-2) 45%,var(--gold));display:flex;align-items:center;justify-content:center;margin:0 auto 24px;box-shadow:0 16px 40px rgba(196,151,58,.4)}
     .tick::after{content:"";width:30px;height:16px;border-left:5px solid #3a2a05;border-bottom:5px solid #3a2a05;transform:rotate(-45deg) translateY(-3px)}
+    .tick.pending::after{content:"…";width:auto;height:auto;border:0;transform:none;font:700 34px/1 var(--sans);color:#3a2a05;margin-top:-10px}
     h1{font-family:var(--serif);font-weight:500;font-size:clamp(1.9rem,5vw,2.6rem)}
     p{max-width:46ch;margin:14px auto 0;color:#6a5d4a}
     p b{color:var(--gold-deep)}
@@ -51,10 +50,16 @@
 </head>
 <body>
   <img class="logo" src="/static/brand/pashynska-logo-wfolio-dark.png" alt="Pashynska Photography">
-  <div class="tick" role="img" aria-label="Success"></div>
-  <h1>Deposit received{% if pkg %} — {{ pkg.name }}{% endif %}</h1>
-  <p><b>Iryna will contact you within 24 hours</b> to confirm your date and walk you through the next steps. A receipt from Stripe and a confirmation email are on their way to your inbox.</p>
-  <p>The remaining balance is due on the session day — card or e-Transfer, whichever is easier.</p>
+  <div class="tick{% if not payment_verified %} pending{% endif %}" role="img" aria-label="{% if payment_verified %}Success{% else %}Payment verification pending{% endif %}"></div>
+  {% if payment_verified %}
+    <h1>Deposit received{% if pkg %} — {{ pkg.name }}{% endif %}</h1>
+    <p><b>Iryna will contact you within 24 hours</b> to confirm your date and walk you through the next steps. A receipt from Stripe and a confirmation email are on their way to your inbox.</p>
+    <p>The remaining balance is due on the session day — card or e-Transfer, whichever is easier.</p>
+  {% else %}
+    <h1>We’re confirming your payment{% if pkg %} — {{ pkg.name }}{% endif %}</h1>
+    <p><b>No action is needed right now.</b> If Stripe completed your payment, its receipt is your confirmation while this page catches up.</p>
+    <p>If you do not receive a Stripe receipt within a few minutes, please return to the package page or email Iryna before trying again.</p>
+  {% endif %}
   <div class="btns">
     <a class="btn" href="/">Back to all sessions</a>
     <a class="btn ghost" href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener">@pashynska.photo</a>

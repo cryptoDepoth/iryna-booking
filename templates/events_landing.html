@@ -5,7 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sessions | Pashynska Photography</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+  <script src="/static/js/attribution.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '{{ meta_pixel_id }}');
+  fbq('track', 'PageView');
+  fbq('track', 'ViewContent', {
+    content_name: 'Session Browser',
+    content_category: {{ (requested_type or 'all')|tojson }}
+  });
+  </script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -113,6 +130,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
 </head>
 <body>
+<noscript><img height="1" width="1" style="display:none" alt=""
+  src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"></noscript>
 
 <div class="hero">
   <div class="kicker">Pashynska Photography · Calgary</div>
@@ -204,6 +223,7 @@
       {% for ev in events %}
       <a class="event-card"
          href="{{ url_for('index') }}?event={{ ev.id }}"
+         data-event="{{ ev.id }}"
          data-type="{{ ev.type }}"
          data-month="{{ ev.date[:7] }}">
         <div class="photo" style="background-image:url('{{ (ev.photos[0] if ev.photos else '') }}')">
@@ -284,6 +304,18 @@
       if (show) visible++;
     });
     if (countEl) countEl.textContent = `${visible} ${visible === 1 ? 'session' : 'sessions'}`;
+  });
+
+  if (grid) grid.addEventListener('click', (e) => {
+    const card = e.target.closest('.event-card');
+    if (!card || !window.fbq) return;
+    try {
+      fbq('track', 'ViewContent', {
+        content_name: card.querySelector('h3')?.textContent?.trim() || 'Photo Session',
+        content_ids: [card.dataset.event],
+        content_type: 'product'
+      });
+    } catch (_error) {}
   });
 </script>
 

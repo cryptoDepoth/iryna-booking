@@ -19,6 +19,7 @@
   <meta name="theme-color" content="#FBF7F0">
   <title>Book {{ pkg.name }} — Pashynska Photography</title>
   <meta name="robots" content="noindex, follow">
+  <script src="/static/js/attribution.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -121,38 +122,15 @@
   </div>
 
 <script>
-function getPackageQueryValue(name){
-  var params = new URLSearchParams(window.location.search || '');
-  return (params.get(name) || '').trim();
-}
-function getPackageCookie(name){
-  var prefix = name + '=';
-  var cookies = document.cookie ? document.cookie.split(';') : [];
-  for(var i = 0; i < cookies.length; i++){
-    var cookie = cookies[i].trim();
-    if(cookie.indexOf(prefix) === 0){
-      var value = cookie.slice(prefix.length);
-      try{return decodeURIComponent(value);}catch(_e){return value;}
-    }
-  }
-  return '';
-}
 document.getElementById('pkgForm').addEventListener('submit', async function(e){
   e.preventDefault();
   var btn = document.getElementById('payBtn'), err = document.getElementById('payErr');
   err.style.display = 'none';
   btn.disabled = true; btn.textContent = 'Opening secure checkout…';
   try{
-    var attribution = {
-      gclid: getPackageQueryValue('gclid'),
-      fbclid: getPackageQueryValue('fbclid'),
-      utm_source: getPackageQueryValue('utm_source'),
-      utm_medium: getPackageQueryValue('utm_medium'),
-      utm_campaign: getPackageQueryValue('utm_campaign'),
-      utm_content: getPackageQueryValue('utm_content'),
-      fbp: getPackageCookie('_fbp'),
-      fbc: getPackageCookie('_fbc')
-    };
+    var attribution = window.PashynskaAttribution
+      ? window.PashynskaAttribution.get()
+      : {};
     var body = {
       package: {{ slug|tojson }},
       name: document.getElementById('f-name').value.trim(),
