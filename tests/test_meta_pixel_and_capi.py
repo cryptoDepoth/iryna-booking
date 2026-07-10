@@ -44,9 +44,22 @@ def test_payment_and_success_pages_carry_the_pixel_and_their_funnel_event():
     payment = (TEMPLATES / "payment.html").read_text()
     success = (TEMPLATES / "success.html").read_text()
     assert "InitiateCheckout" in payment
+    assert "gtag('event', 'begin_checkout'" in payment
+    assert "AW-610866068/DNSFCPCKxr8cEJSnpKMC" not in payment
     assert "'Purchase'" in success
+    assert "AW-610866068/DNSFCPCKxr8cEJSnpKMC" in success
     # Browser Purchase must be deduped against the server CAPI event.
     assert "eventID" in success
+
+
+def test_frontend_google_ads_purchase_is_not_fired_on_payment_view():
+    homepage = (TEMPLATES / "index_v2.html").read_text()
+    analytics = (TEMPLATES.parent / "static" / "js" / "analytics.js").read_text()
+
+    assert "'payment_view':   { event: 'begin_checkout' }" in homepage
+    assert "'payment_view':   { event: 'begin_checkout' }" in analytics
+    assert "'booking_confirmed': { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC' }" in homepage
+    assert "'booking_confirmed': { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC'" in analytics
 
 
 # ── 2. Conversions API (server-side Purchase) ──────────────────────────────────

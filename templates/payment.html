@@ -15,7 +15,7 @@
   document,'script','https://connect.facebook.net/en_US/fbevents.js');
   fbq('init', '{{ meta_pixel_id }}');
   fbq('track', 'PageView');
-  fbq('track', 'InitiateCheckout', {value: {{ (price or 0)|float }}, currency: 'CAD', content_name: {{ (event_title or '')|tojson }}}{% if meta_event_id %}, '{{ meta_event_id }}'{% endif %});
+  fbq('track', 'InitiateCheckout', {value: {{ (price or 0)|float }}, currency: 'CAD', content_name: {{ (event_title or '')|tojson }}}{% if meta_event_id %}, {eventID: {{ meta_event_id|tojson }}}{% endif %});
   </script>
   <noscript><img height="1" width="1" style="display:none"
   src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"/></noscript>
@@ -30,8 +30,8 @@
     gtag('config', 'AW-610866068');
   </script>
   <script>
-    gtag('event', 'conversion', {
-        'send_to': 'AW-610866068/DNSFCPCKxr8cEJSnpKMC',
+    // Checkout is a funnel signal, not a completed Booking Purchase.
+    gtag('event', 'begin_checkout', {
         'value': {{ (price or 0)|float }},
         'currency': 'CAD',
         'transaction_id': '{{ booking_id or '' }}'

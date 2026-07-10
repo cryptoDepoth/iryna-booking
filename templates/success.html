@@ -18,7 +18,7 @@
   fbq('init', '{{ meta_pixel_id }}');
   fbq('track', 'PageView');
   {% if booking and (booking.confirmed or booking.status == 'confirmed') %}
-  fbq('track', 'Purchase', {value: {{ (amount_due_today or price or 0)|float }}, currency: 'CAD', content_name: {{ (event_title or '')|tojson }}}{% if meta_event_id %}, '{{ meta_event_id }}'{% endif %});
+  fbq('track', 'Purchase', {value: {{ (amount_due_today or price or 0)|float }}, currency: 'CAD', content_name: {{ (event_title or '')|tojson }}}{% if meta_event_id %}, {eventID: {{ meta_event_id|tojson }}}{% endif %});
   {% endif %}
   </script>
   <noscript><img height="1" width="1" style="display:none"

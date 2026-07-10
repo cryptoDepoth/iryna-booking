@@ -1302,7 +1302,11 @@ function trackBookingEvent(eventName, eventId, metadata) {
       if (metadata && metadata.price) pxData.value = parseFloat(metadata.price) || 0;
       else if (metadata && metadata.deposit) pxData.value = parseFloat(metadata.deposit) || 0;
       if (pxData.value) pxData.currency = 'CAD';
-      window.fbq('track', pxEvent, pxData);
+      const eventOptions = (pxEvent === 'Purchase' && metadata && metadata.booking_id)
+        ? {eventID: `purchase.${metadata.booking_id}`}
+        : undefined;
+      if (eventOptions) window.fbq('track', pxEvent, pxData, eventOptions);
+      else window.fbq('track', pxEvent, pxData);
     }
   }
   /* ── End Meta Pixel ── */
@@ -1310,20 +1314,21 @@ function trackBookingEvent(eventName, eventId, metadata) {
   /* ── Google Ads conversion events ── */
   if (typeof window.gtag === 'function') {
     const gtagMap = {
-      'payment_view':   { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC' },
+      'payment_view':   { event: 'begin_checkout' },
       'booking_confirmed': { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC' },
       'purchase':       { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC' }
     };
     const gx = gtagMap[eventName];
     if (gx) {
-      const gxData = { send_to: gx.send_to };
+      const gxData = {};
+      if (gx.send_to) gxData.send_to = gx.send_to;
       if (metadata && metadata.price) gxData.value = parseFloat(metadata.price) || 0;
       else if (metadata && metadata.deposit) gxData.value = parseFloat(metadata.deposit) || 0;
       else if (metadata && metadata.amount) gxData.value = parseFloat(metadata.amount) || 0;
       if (gxData.value) gxData.currency = 'CAD';
       if (metadata && metadata.booking_id) gxData.transaction_id = metadata.booking_id;
       window.gtag('event', gx.event, gxData);
-      console.log('[GoogleAds] conversion sent:', gx.event, gxData);
+      console.log('[GoogleAds] event sent:', gx.event, gxData);
     }
   }
   /* ── End Google Ads ── */
