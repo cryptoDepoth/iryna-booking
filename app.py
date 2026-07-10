@@ -19,7 +19,7 @@ if _os.path.exists(_env_path):
                     _os.environ[_key] = _val
     print(f"[env] Loaded {_env_path}")
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, send_file, Response, has_request_context
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, send_file, Response, has_request_context, abort
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 import json
@@ -35,6 +35,8 @@ import threading
 import sys
 import re
 import time
+import urllib.parse
+import urllib.request
 import yaml
 from html import escape as html_escape
 
@@ -64,15 +66,6 @@ META_CAPI_TOKEN = os.environ.get('META_CAPI_TOKEN', '')
 META_CAPI_API_VERSION = os.environ.get('META_CAPI_API_VERSION', 'v19.0')
 META_TEST_EVENT_CODE = os.environ.get('META_TEST_EVENT_CODE', '')  # set temporarily to verify in Events Manager → Test Events, then unset
 
-# Email Settings (Zoho Mail)
-SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.zoho.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
-SMTP_USERNAME = os.environ.get('SMTP_USERNAME', 'info@pashynskafoto.com')
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
-SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() == 'true'
-
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'info@pashynskafoto.com')
-DEFAULT_FROM_NAME = os.environ.get('DEFAULT_FROM_NAME', 'Pashynska Photography')
 
 
 def _local_now():
@@ -1965,7 +1958,7 @@ def _send_24h_reminder_email(booking):
 
 
 def _send_review_email(booking):
-    """Send post-session review request email (5 days after session)."""
+    """Send post-session review request email (7 days after session)."""
     name = booking.get("name", "there")
     email = booking.get("email", "")
     event_id = booking.get("event_id")
@@ -3731,11 +3724,12 @@ def _process_24h_reminder_emails():
 
 
 def _process_review_emails():
-    """Send review request emails 5 days after a confirmed session."""
+    """Send review request emails 7 days after a confirmed session."""
     now = _local_now()
-    # Sessions that happened between 4 and 6 days ago
-    date_from = (now - timedelta(days=6)).strftime("%Y-%m-%d")
-    date_to   = (now - timedelta(days=4)).strftime("%Y-%m-%d")
+    # Sessions that happened between 6 and 8 days ago (target: day 7;
+    # 3-day window tolerates scheduler downtime without double-sends)
+    date_from = (now - timedelta(days=8)).strftime("%Y-%m-%d")
+    date_to   = (now - timedelta(days=6)).strftime("%Y-%m-%d")
     conn = db_conn()
     rows = conn.execute("""
         SELECT * FROM bookings
@@ -4255,20 +4249,77 @@ def _landing_context(slug):
 @app.route("/wedding")
 def landing_wedding():
     """Wedding photography landing page — SEO optimized with schema.org."""
-    return render_template("landing_wedding.html", **_landing_context("wedding"))
+    return render_template("landing_wedding_v5.html", **_landing_context("wedding"))
 
 @app.route("/family")
 def landing_family():
     """Family photography landing page — SEO optimized with schema.org."""
-    return render_template("landing_family.html", **_landing_context("family"))
+    return render_template("landing_family_v2.html", **_landing_context("family"))
 
 @app.route("/maternity")
 def landing_maternity():
     """Maternity photography landing page — SEO optimized with schema.org."""
-    return render_template("landing_maternity.html", **_landing_context("maternity"))
+    return render_template("landing_maternity_v2.html", **_landing_context("maternity"))
 
 
 # ── Booking page: HTML view of available sessions (replaces /events for browser navigation) ──
+# ── Package bookings: landing-page packages -> instant deposit checkout ─────
+# Canonical pricing: 03-Marketing-Center/PRICING.md (2026-07-08). Deposit is a
+# flat reservation amount; the balance is due on the session day (same model
+# as event bookings: deposit now, rest later).
+PACKAGES = {
+    "small-wedding": {
+        "name": "Small Wedding", "type": "wedding", "price": 640.0, "deposit": 200.0,
+        "duration": "2 hours",
+        "includes": ["2 hours of coverage", "50 professionally edited photos",
+                     "All original unedited images", "2 locations (ceremony + portraits)",
+                     "Private online gallery + print rights"]},
+    "wedding-day-4h": {
+        "name": "Wedding Day Coverage — 4 hours", "type": "wedding", "price": 1280.0, "deposit": 200.0,
+        "duration": "4 hours",
+        "includes": ["4 hours of coverage", "150+ edited photos", "All original unedited images",
+                     "Multiple locations", "Preview within 48 hours"]},
+    "wedding-day-6h": {
+        "name": "Wedding Day Coverage — 6 hours", "type": "wedding", "price": 1920.0, "deposit": 200.0,
+        "duration": "6 hours",
+        "includes": ["6 hours of coverage", "150+ edited photos", "All original unedited images",
+                     "Multiple locations", "Preview within 48 hours"]},
+    "full-day-premium": {
+        "name": "Full Day Premium — 8 hours", "type": "wedding", "price": 2600.0, "deposit": 300.0,
+        "duration": "8 hours",
+        "includes": ["8 hours — prep to party", "200+ edited photos", "All original unedited images",
+                     "Unlimited locations", "Priority preview in 24 hours", "Rush delivery included"]},
+    "engagement": {
+        "name": "Engagement Session", "type": "wedding", "price": 320.0, "deposit": 100.0,
+        "duration": "1 hour",
+        "includes": ["1 hour of photography", "25 edited photos + all originals",
+                     "1-2 locations in Calgary", "Outfit change welcome"]},
+    "family-session": {
+        "name": "Family Session", "type": "family", "price": 340.0, "deposit": 100.0,
+        "duration": "1 hour",
+        "includes": ["1 hour of relaxed photography", "25 professionally edited photos",
+                     "All original unedited images", "1-2 outdoor locations in Calgary",
+                     "Private online gallery + print rights"]},
+    "extended-family": {
+        "name": "Extended Family", "type": "family", "price": 510.0, "deposit": 100.0,
+        "duration": "1.5 hours",
+        "includes": ["1.5 hours of photography", "40 edited photos + all originals",
+                     "Multiple group combinations", "2-3 locations"]},
+    "maternity-session": {
+        "name": "Maternity Session", "type": "maternity", "price": 340.0, "deposit": 100.0,
+        "duration": "1 hour",
+        "includes": ["1 hour of gentle photography", "25 professionally edited photos",
+                     "All original unedited images", "Studio or outdoor in Calgary",
+                     "Partner & children welcome"]},
+    "bump-to-baby": {
+        "name": "Bump to Baby — Maternity + Newborn", "type": "maternity", "price": 600.0, "deposit": 100.0,
+        "duration": "2 × 1 hour",
+        "includes": ["Maternity + newborn sessions", "25 edited photos each session",
+                     "All original images", "Save $80 vs booking separately",
+                     "Flexible newborn scheduling"]},
+}
+
+
 @app.route("/book")
 def booking_page():
     """Public booking page — shows upcoming sessions with real-time spot counts."""
@@ -6244,6 +6295,183 @@ def custom_payment_success():
     return render_template("custom_payment_success.html", email=EMAIL)
 
 
+_PACKAGE_ATTRIBUTION_KEYS = (
+    "gclid", "fbclid", "fbp", "fbc",
+    "utm_source", "utm_medium", "utm_campaign", "utm_content",
+)
+
+
+def _package_attribution_from_json(data):
+    return {key: _safe_text((data or {}).get(key), 200) for key in _PACKAGE_ATTRIBUTION_KEYS}
+
+
+def _send_package_capi(session_obj, metadata, amount_paid):
+    """Send package deposit Purchase to Meta CAPI via urllib."""
+    if not META_CAPI_TOKEN or not META_PIXEL_ID:
+        return False
+    session_obj = session_obj or {}
+    metadata = metadata or {}
+    session_id = session_obj.get("id") if hasattr(session_obj, "get") else getattr(session_obj, "id", "")
+    if not session_id:
+        return False
+    customer_details = session_obj.get("customer_details", {}) if hasattr(session_obj, "get") else {}
+    customer_details = customer_details or {}
+    email = (
+        metadata.get("client_email")
+        or customer_details.get("email")
+        or (session_obj.get("customer_email") if hasattr(session_obj, "get") else "")
+        or ""
+    )
+    phone = metadata.get("client_phone") or customer_details.get("phone") or ""
+    user_data = {}
+    em = _sha256_norm(email)
+    if em:
+        user_data["em"] = [em]
+    phone_digits = re.sub(r"\D", "", str(phone or ""))
+    if phone_digits:
+        user_data["ph"] = [hashlib.sha256(phone_digits.encode("utf-8")).hexdigest()]
+    fbp = _safe_text(metadata.get("fbp"), 200)
+    fbc = _safe_text(metadata.get("fbc"), 200)
+    if fbp:
+        user_data["fbp"] = fbp
+    if fbc:
+        user_data["fbc"] = fbc
+    try:
+        value = round(float(amount_paid or 0), 2)
+    except (TypeError, ValueError):
+        value = 0.0
+    base_url = (BASE_URL or CANONICAL_SITE_URL).rstrip("/")
+    payload = {
+        "data": [{
+            "event_name": "Purchase",
+            "event_time": int(time.time()),
+            "event_id": session_id,
+            "action_source": "website",
+            "event_source_url": f"{base_url}/payment/package/success",
+            "user_data": user_data,
+            "custom_data": {"currency": "CAD", "value": value},
+        }]
+    }
+    url = (
+        f"https://graph.facebook.com/v20.0/{META_PIXEL_ID}/events?"
+        f"{urllib.parse.urlencode({'access_token': META_CAPI_TOKEN})}"
+    )
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=6) as resp:
+        status = getattr(resp, "status", None)
+        if status is None:
+            status = resp.getcode()
+        return 200 <= int(status) < 300
+
+
+@app.route("/book/package/<slug>")
+def package_booking_page(slug):
+    """Landing-page package -> pre-selected booking step with deposit checkout."""
+    pkg = PACKAGES.get(slug)
+    if not pkg:
+        abort(404)
+    gst = round(pkg["price"] * 0.05, 2)
+    return render_template(
+        "package_book.html",
+        slug=slug, pkg=pkg, gst=gst, total=round(pkg["price"] + gst, 2),
+        stripe_enabled=bool(STRIPE_SECRET_KEY),
+    )
+
+
+@app.route("/book/package/checkout", methods=["POST"])
+def package_checkout():
+    """Create a Stripe Checkout Session for a package deposit.
+
+    Mirrors /stripe/create-checkout + the custom_admin_link pattern:
+    metadata carries the client details; the webhook notifies Iryna and
+    emails the client. No bookings row is created — date is confirmed
+    personally within 24h (packages have no fixed slots).
+    """
+    data = request.get_json(silent=True) or {}
+    slug = (data.get("package") or "").strip().lower()
+    pkg = PACKAGES.get(slug)
+    if not pkg:
+        return jsonify({"error": "Unknown package"}), 400
+    name  = (data.get("name") or "").strip()[:120]
+    email = (data.get("email") or "").strip()[:200]
+    phone = (data.get("phone") or "").strip()[:40]
+    preferred_date = (data.get("preferred_date") or "").strip()[:10]
+    notes = (data.get("notes") or "").strip()[:500]
+    attribution = _package_attribution_from_json(data)
+    if not name or "@" not in email or "." not in email.split("@")[-1]:
+        return jsonify({"error": "Please enter your name and a valid email"}), 400
+    if preferred_date:
+        try:
+            datetime.strptime(preferred_date, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Preferred date must be YYYY-MM-DD"}), 400
+
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Card payments are not configured yet"}), 503
+    try:
+        import stripe as _stripe
+    except ImportError:
+        return jsonify({"error": "Stripe library not installed"}), 503
+    _stripe.api_key = STRIPE_SECRET_KEY
+
+    deposit_cents = int(round(pkg["deposit"] * 100))
+    base_url = BASE_URL or CANONICAL_SITE_URL
+    date_note = f" · preferred date {preferred_date}" if preferred_date else ""
+    try:
+        session = _stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "cad",
+                    "product_data": {
+                        "name": f"Deposit — {pkg['name']}",
+                        "description": (
+                            f"Reserves your {pkg['duration']} session{date_note}. "
+                            f"Package total ${pkg['price']:.0f} + GST; balance due on the session day."
+                        ),
+                    },
+                    "unit_amount": deposit_cents,
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            customer_email=email,
+            success_url=f"{base_url}/payment/package/success?pkg={slug}&sid={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base_url}/book/package/{slug}",
+            metadata={
+                "payment_type":   "package_deposit",
+                "package_slug":   slug,
+                "package_name":   pkg["name"],
+                "package_price":  f"{pkg['price']:.2f}",
+                "client_name":    name,
+                "client_email":   email,
+                "client_phone":   phone,
+                "preferred_date": preferred_date,
+                "notes":          notes,
+                **attribution,
+            },
+            billing_address_collection="auto",
+        )
+        log.info(f"[stripe] Package deposit session created: {slug} for {email}: {session.id}")
+        return jsonify({"checkout_url": session.url, "session_id": session.id})
+    except Exception as e:
+        log.error(f"[stripe] Package checkout error for {slug}: {e}")
+        return jsonify({"error": "Could not start the payment. Please try again."}), 500
+
+
+@app.route("/payment/package/success")
+def package_payment_success():
+    slug = (request.args.get("pkg") or "").strip().lower()
+    sid = request.args.get("sid", "")
+    pkg = PACKAGES.get(slug)
+    return render_template("package_success.html", pkg=pkg, email=EMAIL, sid=sid)
+
+
 @app.route("/stripe/webhook", methods=["POST"])
 def stripe_webhook():
     """Handle Stripe webhook events.
@@ -6318,6 +6546,53 @@ def stripe_webhook():
                 f"[stripe-webhook] Custom payment completed: "
                 f"${amount_paid:.2f} CAD description={description!r}"
             )
+            return jsonify({"ok": True})
+
+        if payment_type == "package_deposit":
+            amount_cents = session_obj.get("amount_total", 0) or 0
+            amount_paid = amount_cents / 100.0
+            p_name  = metadata.get("package_name") or metadata.get("package_slug") or "Package"
+            c_name  = metadata.get("client_name", "")
+            c_email = metadata.get("client_email") or (session_obj.get("customer_details", {}) or {}).get("email", "")
+            c_phone = metadata.get("client_phone", "")
+            p_date  = metadata.get("preferred_date", "")
+            p_notes = metadata.get("notes", "")
+            p_price = metadata.get("package_price", "")
+            try:
+                _notify_admin(
+                    f"💍 <b>Package Deposit Paid</b>\n\n"
+                    f"📦 {_tg_escape(p_name)} (${p_price} + GST)\n"
+                    f"💰 Deposit: <b>${amount_paid:.2f} CAD</b>\n"
+                    f"👤 {_tg_escape(c_name)}\n"
+                    f"📧 {_tg_escape(c_email or 'no email')} · 📱 {_tg_escape(c_phone or '—')}\n"
+                    f"📅 Preferred date: {_tg_escape(p_date or 'not set')}\n"
+                    f"📝 {_tg_escape(p_notes or '—')}\n\n"
+                    f"⚠️ Contact the client within 24h to confirm the date."
+                )
+            except Exception as e:
+                log.error(f"[stripe-webhook] Telegram package notify error: {e}")
+            if c_email:
+                try:
+                    subj = f"Deposit received — {p_name} 🌸"
+                    plain = (
+                        f"Hi {c_name or 'there'},\n\n"
+                        f"Thank you! Your ${amount_paid:.2f} CAD deposit for the {p_name} is confirmed.\n\n"
+                        f"What happens next:\n"
+                        f"- Iryna will contact you within 24 hours to confirm your date"
+                        + (f" (you asked for {p_date})" if p_date else "") + ".\n"
+                        f"- The remaining balance is due on the session day.\n"
+                        f"- You'll get a styling guide and location ideas after the date is set.\n\n"
+                        f"Questions? Just reply to this email.\n\n"
+                        f"Warmly,\nIryna\n@pashynska.photo"
+                    )
+                    _smtp_send_email(c_email, c_name or "Client", subj, plain, plain.replace("\n", "<br>"))
+                except Exception as e:
+                    log.error(f"[stripe-webhook] Package client email error: {e}")
+            try:
+                _send_package_capi(session_obj, metadata, amount_paid)
+            except Exception as e:
+                log.error(f"[stripe-webhook] Package CAPI error: {e}")
+            log.info(f"[stripe-webhook] Package deposit completed: {p_name} ${amount_paid:.2f} from {c_email}")
             return jsonify({"ok": True})
 
         booking_id  = metadata.get("booking_id")

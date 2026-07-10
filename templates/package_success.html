@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Deposit received — Pashynska Photography</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-610866068"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-610866068');
+  </script>
+  <script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '{{ meta_pixel_id }}');
+  fbq('track', 'PageView');
+  {% if sid %}
+  fbq('track', 'Purchase', {currency:'CAD', value: {{ (pkg.deposit if pkg else 100)|tojson }}}, {eventID: {{ sid|tojson }}});
+  {% else %}
+  fbq('track', 'Purchase', {currency:'CAD', value: {{ (pkg.deposit if pkg else 100)|tojson }}});
+  {% endif %}
+  </script>
+  <style>
+    :root{--bg:#FBF7F0;--ink:#2B241B;--muted:#8A7B66;--gold:#C9A24B;--gold-2:#E8C45F;--gold-3:#F6E3B0;--gold-deep:#A8823A;
+      --serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',sans-serif}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;text-align:center;line-height:1.6}
+    img.logo{height:30px;width:auto;margin-bottom:34px}
+    .tick{width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,var(--gold-3),var(--gold-2) 45%,var(--gold));display:flex;align-items:center;justify-content:center;margin:0 auto 24px;box-shadow:0 16px 40px rgba(196,151,58,.4)}
+    .tick::after{content:"";width:30px;height:16px;border-left:5px solid #3a2a05;border-bottom:5px solid #3a2a05;transform:rotate(-45deg) translateY(-3px)}
+    h1{font-family:var(--serif);font-weight:500;font-size:clamp(1.9rem,5vw,2.6rem)}
+    p{max-width:46ch;margin:14px auto 0;color:#6a5d4a}
+    p b{color:var(--gold-deep)}
+    .btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:30px}
+    a.btn{padding:14px 28px;border-radius:36px;text-decoration:none;font-weight:700;font-size:.95rem;color:#3a2a05;background:linear-gradient(135deg,var(--gold-3),var(--gold-2) 45%,var(--gold));box-shadow:0 10px 28px rgba(196,151,58,.4)}
+    a.ghost{background:transparent;color:var(--gold-deep);border:1px solid rgba(196,151,58,.45);box-shadow:none}
+    .small{margin-top:26px;font-size:.8rem;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <img class="logo" src="/static/brand/pashynska-logo-wfolio-dark.png" alt="Pashynska Photography">
+  <div class="tick" role="img" aria-label="Success"></div>
+  <h1>Deposit received{% if pkg %} — {{ pkg.name }}{% endif %}</h1>
+  <p><b>Iryna will contact you within 24 hours</b> to confirm your date and walk you through the next steps. A receipt from Stripe and a confirmation email are on their way to your inbox.</p>
+  <p>The remaining balance is due on the session day — card or e-Transfer, whichever is easier.</p>
+  <div class="btns">
+    <a class="btn" href="/">Back to all sessions</a>
+    <a class="btn ghost" href="https://instagram.com/pashynska.photo" target="_blank" rel="noopener">@pashynska.photo</a>
+  </div>
+  <p class="small">Questions right now? Email {{ email }}</p>
+</body>
+</html>

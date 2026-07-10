@@ -80,7 +80,7 @@
       "telephone": "+1-368-997-7903",
       "email": "info@pashynska.photo",
       "image": "https://book.pashynskaphoto.com/static/og-image.jpg",
-      "priceRange": "$180-$1160",
+      "priceRange": "$180-$1920",
       "address": {
         "@type": "PostalAddress",
         "addressLocality": "Calgary",
@@ -170,7 +170,7 @@
       "name": "How much does a photography session cost in Calgary?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Family and maternity sessions start at $290 + GST for 1 hour with 25 retouched photos and all originals. Mini sessions range from $180-$230. Wedding packages from $580."
+        "text": "Family and maternity sessions start at $340 + GST for 1 hour with 25 retouched photos and all originals. Mini sessions range from $180-$240. Wedding packages from $640."
       }
     },
     {
@@ -264,6 +264,12 @@
   --font-d:'Cormorant Garamond',Georgia,serif;
   --font-h:'Tenor Sans','Cormorant Garamond',Georgia,serif;
   --font-b:'Inter',system-ui,-apple-system,sans-serif;
+}
+/* ── Champagne brand skin (aligns home with /wedding /family /maternity), 2026-07-09 ── */
+:root{
+  --nude:#F6EEDF; --blush:#EAD9B4; --rose:#B08428; --rose-deep:#8F6A24;
+  --rose-glow:rgba(201,162,75,.20);
+  --page-bg:#FBF7F0;
 }
 html,body{overflow-x:hidden;max-width:100vw}
 body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
@@ -490,8 +496,8 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .drawer .lbl{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:10px}
 .drawer .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
 .drawer .slot{padding:11px 4px;border:1.5px solid var(--ink-5);border-radius:10px;background:#fff;color:var(--ink);font:700 .9rem var(--font-b);text-align:center;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease}
-.drawer .slot:hover{border-color:var(--rose);color:var(--rose);background:#fff8f6}
-.drawer .slot.sel{background:linear-gradient(135deg,var(--rose) 0%,var(--rose-deep) 100%);border-color:var(--rose-deep);color:#fff!important;box-shadow:0 0 0 3px rgba(196,133,122,.28),0 10px 24px rgba(163,104,94,.30);transform:translateY(-1px);font-weight:800;animation:slot-pop .4s cubic-bezier(.34,1.56,.64,1)}
+.drawer .slot:hover{border-color:var(--rose);color:var(--rose);background:#fdf9ef}
+.drawer .slot.sel{background:linear-gradient(135deg,var(--rose) 0%,var(--rose-deep) 100%);border-color:var(--rose-deep);color:#fff!important;box-shadow:0 0 0 3px rgba(201,162,75,.28),0 10px 24px rgba(143,106,36,.30);transform:translateY(-1px);font-weight:800;animation:slot-pop .4s cubic-bezier(.34,1.56,.64,1)}
 .drawer .slot.sel::after{content:' ✓';font-weight:900;color:#fff}
 .drawer .slot.taken{background:var(--ink-5);border-color:var(--ink-5);color:var(--ink-4);cursor:not-allowed;opacity:0.6}
 .drawer .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -620,12 +626,12 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 .toast{position:fixed;bottom:24px;right:24px;background:#1c1917;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px);transition:opacity .25s,transform .25s,visibility 0s linear .25s;z-index:99}
 .toast.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);transition:opacity .25s,transform .25s}
 
-.assistant-launch{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--rose) 0%,#a3707a 100%);color:#fff;box-shadow:0 6px 24px rgba(196,133,122,.35),0 2px 8px rgba(0,0,0,.12);z-index:70;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s,background .18s;animation:assistantPulse 3s ease-in-out infinite}
+.assistant-launch{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--rose) 0%,#8F6A24 100%);color:#fff;box-shadow:0 6px 24px rgba(176,132,40,.35),0 2px 8px rgba(0,0,0,.12);z-index:70;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s,background .18s;animation:assistantPulse 3s ease-in-out infinite}
 .assistant-launch:hover{transform:translateY(-3px) scale(1.06);box-shadow:0 10px 36px rgba(196,133,122,.45),0 4px 12px rgba(0,0,0,.15)}
 .assistant-launch:active{transform:scale(.95)}
 .assistant-launch svg{width:26px;height:26px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
 .assistant-launch .dot{position:absolute;right:5px;top:5px;width:13px;height:13px;border-radius:50%;background:#fff;border:2.5px solid var(--rose);animation:dotBounce 2.4s ease-in-out infinite}
-@keyframes assistantPulse{0%,100%{box-shadow:0 6px 24px rgba(196,133,122,.35),0 2px 8px rgba(0,0,0,.12)}50%{box-shadow:0 6px 24px rgba(196,133,122,.35),0 2px 8px rgba(0,0,0,.12),0 0 0 8px rgba(196,133,122,.12)}}
+@keyframes assistantPulse{0%,100%{box-shadow:0 6px 24px rgba(176,132,40,.35),0 2px 8px rgba(0,0,0,.12)}50%{box-shadow:0 6px 24px rgba(176,132,40,.35),0 2px 8px rgba(0,0,0,.12),0 0 0 8px rgba(196,133,122,.12)}}
 @keyframes dotBounce{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 .assistant-panel{position:fixed;right:22px;bottom:90px;width:min(380px,calc(100vw - 32px));max-height:min(620px,calc(100vh - 118px));background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.22);z-index:75;display:none;overflow:hidden;flex-direction:column}
 .assistant-panel.open{display:flex}
@@ -695,7 +701,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 
 /* ── DIRECT-EVENT CALLOUT (above-fold offer summary for deeplinked sessions) ── */
 .direct-callout{max-width:1200px;margin:18px auto 0;padding:0 20px}
-.direct-callout-inner{background:linear-gradient(135deg,#fdf8f6,#fff);border:1.5px solid rgba(196,133,122,.28);border-radius:18px;padding:20px 22px;display:flex;flex-direction:column;gap:10px}
+.direct-callout-inner{background:linear-gradient(135deg,#fdf8f6,#fff);border:1.5px solid rgba(201,162,75,.28);border-radius:18px;padding:20px 22px;display:flex;flex-direction:column;gap:10px}
 .direct-callout-badge{display:inline-flex;align-items:center;gap:7px;background:var(--rose);color:#fff;padding:5px 13px;border-radius:20px;font:700 .68rem var(--font-b);letter-spacing:.1em;text-transform:uppercase;align-self:flex-start}
 .direct-callout-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.8);flex-shrink:0}
 .direct-callout-title{font-family:var(--font-d);font-size:clamp(1.4rem,4vw,2rem);font-weight:400;color:var(--ink);line-height:1.1}
@@ -814,17 +820,26 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
     @media(prefers-reduced-motion:reduce){.nav-gift,.nav-gift::after{animation:none}}
   </style>
   <a class="nav-gift" href="/gift" aria-label="Buy a gift certificate" title="Gift certificates"><span class="ng-ico" aria-hidden="true">&#127873;</span><span>Gift Cards</span></a>
-  <!-- Language switcher -->
-  <div id="lang-sw" style="display:flex;gap:3px;background:rgba(0,0,0,0.05);border-radius:20px;padding:3px;">
-    <button class="lbtn active" onclick="setLang('en')" data-lang="en" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:white;color:var(--rose);box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all .2s;font-family:inherit;">EN</button>
-    <button class="lbtn" onclick="setLang('ru')" data-lang="ru" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">РУ</button>
-    <button class="lbtn" onclick="setLang('hi')" data-lang="hi" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">हिं</button>
-    <button class="lbtn" onclick="setLang('uk')" data-lang="uk" style="padding:4px 9px;border-radius:16px;border:none;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">УК</button>
-  </div>
+
 </nav>
 
 <!-- ────────── PUBLIC LANDING ────────── -->
 <section id="public">
+
+  <!-- Category pills (mobile): make session types obvious on first screen -->
+  <div class="cat-pills" id="catPills">
+    <a class="cp cp-gold" href="/wedding">&#128141; Wedding</a>
+    <a class="cp" href="/family">Family</a>
+    <a class="cp" href="/maternity">Maternity</a>
+    <button class="cp" type="button" onclick="var c=document.querySelector('.chip[data-filter=mini]');if(c){c.click();}document.getElementById('filters').scrollIntoView({behavior:'smooth',block:'start'})">Minis</button>
+  </div>
+  <style>
+    .cat-pills{display:flex;gap:8px;overflow-x:auto;padding:12px 16px 2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .cat-pills::-webkit-scrollbar{display:none}
+    .cp{flex:none;display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:30px;background:#fff;border:1px solid rgba(0,0,0,.08);box-shadow:0 2px 8px rgba(0,0,0,.05);font-size:13.5px;font-weight:600;color:var(--ink-2);text-decoration:none;font-family:inherit;cursor:pointer}
+    .cp-gold{background:linear-gradient(135deg,#F6E3B0,#E8C45F 45%,#C4973A);color:#3a2a05;border-color:rgba(255,255,255,.55);box-shadow:0 3px 12px rgba(196,151,58,.35)}
+    @media(min-width:900px){.cat-pills{display:none}}
+  </style>
 
   <!-- PHOTO-FIRST HERO (rendered by renderFeatured) -->
   <div class="hero-photo" id="heroPhoto">
@@ -1028,6 +1043,14 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
 <footer>
   <p><span data-i18n="footer_studio"><strong>Pashynska Photography</strong> · Calgary, AB · </span><a href="https://instagram.com/pashynska.photo" target="_blank">@pashynska.photo</a> · <a href="{{ PORTFOLIO_URL }}" target="_blank" rel="noopener" style="color:var(--rose-deep);font-weight:500;" data-i18n="footer_portfolio">View full portfolio ↗</a></p>
   <p style="margin-top:6px;color:var(--ink-4)"><a href="/privacy" data-i18n="privacy_link">Privacy & browser storage</a> · <span data-i18n="footer_copyright">© 2026 Pashynska Photography — All rights reserved</span></p>
+  <p style="margin-top:10px;display:flex;justify-content:center;align-items:center;gap:8px;font-size:.8rem;color:var(--ink-4)">
+    <span>Language:</span>
+  <span id="lang-sw" style="display:inline-flex;gap:3px;background:rgba(0,0,0,0.05);border-radius:20px;padding:3px;vertical-align:middle;">
+    <button class="lbtn active" onclick="setLang('en')" data-lang="en" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:white;color:var(--rose);box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all .2s;font-family:inherit;">EN</button>
+    <button class="lbtn" onclick="setLang('ru')" data-lang="ru" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">РУ</button>
+    <button class="lbtn" onclick="setLang('hi')" data-lang="hi" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">हिं</button>
+    <button class="lbtn" onclick="setLang('uk')" data-lang="uk" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">УК</button>
+  </span></p>
   <!-- Hidden admin access: tiny dot in footer -->
   <a href="/backstage" class="admin-hint" title="Admin access">·</a>
 </footer>

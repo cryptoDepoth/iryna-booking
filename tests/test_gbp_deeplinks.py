@@ -31,7 +31,16 @@ TEST_EVENTS = [
 ]
 
 
+import datetime as _dt
+
+# Freeze the clock after the ended July 4 event but before the July 12/26
+# fixtures. This keeps the alias test deterministic while still verifying that
+# the resolver skips past events and opens the next matching canoe session.
+_FROZEN_NOW = _dt.datetime(2026, 7, 10, 10, 0, tzinfo=_dt.timezone.utc)
+
+
 def _patch_events(monkeypatch):
+    monkeypatch.setattr(booking_app, "_local_now", lambda: _FROZEN_NOW.astimezone(booking_app._tz))
     monkeypatch.setattr(booking_app, "EVENTS", [dict(e) for e in TEST_EVENTS])
     monkeypatch.setattr(booking_app, "_public_events_payload", lambda: [dict(e, spots_left=3, total_spots=4) for e in TEST_EVENTS])
     monkeypatch.setattr(booking_app, "_past_events_payload", lambda: [])

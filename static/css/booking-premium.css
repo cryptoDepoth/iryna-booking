@@ -4,15 +4,15 @@
    CSS-only: no heavy shaders/WebGL, safe for mobile booking flow. */
 
 :root {
-  --premium-cream: #fffaf7;
-  --premium-lilac: #d9c8ff;
-  --premium-lilac-2: #bfa8f5;
-  --premium-pink: #ffd7e5;
-  --premium-rose: #c4857a;
+  --premium-cream: #FFFDF8;
+  --premium-lilac: #EFE3C6;
+  --premium-lilac-2: #E3CFA0;
+  --premium-pink: #F6E7C8;
+  --premium-rose: #B08428;
   --premium-mint: #d9efe4;
   --premium-ink-shadow: rgba(28, 25, 23, 0.11);
-  --premium-glow-rose: rgba(196, 133, 122, 0.22);
-  --premium-glow-lilac: rgba(162, 129, 255, 0.16);
+  --premium-glow-rose: rgba(201, 162, 75, 0.22);
+  --premium-glow-lilac: rgba(201, 162, 75, 0.13);
   --premium-glass: rgba(255, 255, 255, 0.78);
   --premium-border: rgba(255, 255, 255, 0.72);
 }
@@ -23,10 +23,10 @@ body {
   isolation: isolate;
   position: relative;
   background:
-    radial-gradient(circle at 14% -8%, rgba(217, 200, 255, 0.48), transparent 34%),
-    radial-gradient(circle at 92% 8%, rgba(255, 215, 229, 0.48), transparent 30%),
-    radial-gradient(circle at 70% 92%, rgba(217, 239, 228, 0.38), transparent 35%),
-    linear-gradient(180deg, #fffaf7 0%, #faf7f5 44%, #f6eee9 100%) !important;
+    radial-gradient(circle at 14% -8%, rgba(239, 227, 198, 0.55), transparent 34%),
+    radial-gradient(circle at 92% 8%, rgba(246, 231, 200, 0.5), transparent 30%),
+    radial-gradient(circle at 70% 92%, rgba(240, 231, 213, 0.42), transparent 35%),
+    linear-gradient(180deg, #FFFDF8 0%, #FBF7F0 44%, #F5EDDC 100%) !important;
 }
 
 body::before,
@@ -170,8 +170,8 @@ body::after {
 .calendar-panel {
   border-color: rgba(196, 133, 122, 0.18) !important;
   background:
-    radial-gradient(circle at 12% 0%, rgba(217, 200, 255, 0.32), transparent 34%),
-    radial-gradient(circle at 100% 12%, rgba(255, 215, 229, 0.34), transparent 32%),
+    radial-gradient(circle at 12% 0%, rgba(239, 227, 198, 0.32), transparent 34%),
+    radial-gradient(circle at 100% 12%, rgba(246, 231, 200, 0.34), transparent 32%),
     rgba(255, 255, 255, 0.78) !important;
 }
 
