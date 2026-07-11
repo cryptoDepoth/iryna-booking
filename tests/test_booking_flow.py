@@ -90,8 +90,8 @@ def test_public_home_renders_without_undefined_template_config(client):
     assert "Undefined" not in html
 
 
-def test_public_privacy_page_discloses_storage_without_cookie_banner(client):
-    """Best current UX: no intrusive cookie popup, but transparent privacy/storage disclosure."""
+def test_public_privacy_page_discloses_storage_and_ad_measurement(client):
+    """The policy must accurately disclose the advertising tags used by the funnel."""
     c, _ = client
 
     resp = c.get("/privacy")
@@ -99,11 +99,11 @@ def test_public_privacy_page_discloses_storage_without_cookie_banner(client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert "Privacy" in html
-    assert "No cookie banner" in html
+    assert "advertising measurement" in html
     assert "localStorage" in html
     assert "sessionStorage" in html
     assert "Stripe" in html
-    assert "Google Analytics" in html
+    assert "Google Ads" in html
     assert "Meta Pixel" in html
     assert "Set-Cookie" not in resp.headers
 
@@ -160,6 +160,39 @@ def test_success_page_requires_confirmation_token(client):
     assert ok.status_code == 200
     assert "success-token@test.com" not in ok.get_data(as_text=True)
     assert 'href="/privacy"' in ok.get_data(as_text=True)
+
+
+def test_review_link_tracks_valid_booking_and_redirects(client, monkeypatch):
+    c, client_db = client
+    monkeypatch.setenv("GOOGLE_REVIEW_URL", "https://example.test/google-review")
+    slot_time, _date, event_id = _first_slot((c, client_db))
+    reserve = c.post("/reserve", json={
+        "event_id": event_id,
+        "time": slot_time,
+        "name": "Review Client",
+        "email": "review-click@test.com",
+        "phone": "4035550000",
+        "terms_accepted": True,
+        "agreement_name": "Review Client",
+        "marketing_consent": "no",
+        "visitor_id": "v_review_click",
+        "utm_source": "email",
+        "utm_campaign": "review_request",
+    })
+    booking_id = reserve.get_json()["booking_id"]
+    token = reserve.get_json()["confirmation_token"]
+
+    response = c.get(f"/review/{booking_id}?token={token}")
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "https://example.test/google-review"
+    conn = booking_app.db_conn()
+    event = conn.execute(
+        "SELECT event_name FROM analytics_events WHERE booking_id=? AND event_name='review_link_click'",
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    assert event is not None
 
 
 def test_reserve_and_confirm_flow(client):

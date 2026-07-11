@@ -81,6 +81,6 @@ def test_privacy_page_has_language_switcher_and_all_languages():
         assert f"setPrivacyLang('{lang}')" in html
     for key in ["page_title", "notice", "storage_title", "payments_title", "questions_title"]:
         assert f"data-i18n=\"{key}\"" in html
-    assert "No cookie banner" in html  # English source remains present
-    assert "Баннер cookies не нужен" in html
-    assert "Банер cookies не потрібен" in html
+    assert "Meta Pixel and the Google Ads tag" in html  # Accurate English disclosure remains present
+    assert "Сайт использует Meta Pixel и тег Google Ads" in html
+    assert "Сайт використовує Meta Pixel і тег Google Ads" in html

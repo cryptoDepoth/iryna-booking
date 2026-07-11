@@ -58,7 +58,7 @@ def test_payment_and_success_pages_carry_the_pixel_and_their_funnel_event():
     assert "gtag('event', 'begin_checkout'" in payment
     assert "AW-610866068/DNSFCPCKxr8cEJSnpKMC" not in payment
     assert "'Purchase'" in success
-    assert "AW-610866068/DNSFCPCKxr8cEJSnpKMC" in success
+    assert "google_ads_booking_send_to" in success
     # Browser Purchase must be deduped against the server CAPI event.
     assert "eventID" in success
 
@@ -69,8 +69,23 @@ def test_frontend_google_ads_purchase_is_not_fired_on_payment_view():
 
     assert "'payment_view':   { event: 'begin_checkout' }" in homepage
     assert "'payment_view':   { event: 'begin_checkout' }" in analytics
-    assert "'booking_confirmed': { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC' }" in homepage
-    assert "'booking_confirmed': { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC'" in analytics
+    assert "'booking_confirmed': { event: 'conversion', send_to: window.__GOOGLE_ADS_BOOKING_SEND_TO }" in homepage
+    assert "'booking_confirmed': { event: 'conversion', send_to: bookingSendTo" in analytics
+
+
+def test_google_ads_configuration_is_centralized_and_book_page_is_tagged():
+    html = app.test_client().get("/book?type=family").get_data(as_text=True)
+    assert appmod.GOOGLE_ADS_ID in html
+    assert f"gtag('config', window.__GOOGLE_ADS_ID)" in html
+    assert appmod.GOOGLE_ADS_BOOKING_SEND_TO not in (TEMPLATES / "events_landing.html").read_text()
+
+
+def test_async_confirmation_sends_deduplicated_google_purchase():
+    homepage = (TEMPLATES / "index_v2.html").read_text()
+    confirmed_branch = homepage.split("if (data.confirmed) {", 1)[1].split("} else if", 1)[0]
+    assert "trackBookingEvent('booking_confirmed'" in confirmed_branch
+    assert "booking_id: bookingId" in confirmed_branch
+    assert "amount: paidAmount" in confirmed_branch
 
 
 # ── 2. Conversions API (server-side Purchase) ──────────────────────────────────

@@ -193,6 +193,19 @@ class TestExactReminderWindows:
         conn.close()
         assert row["reminder_24h_email_sent"] is not None
 
+    def test_failed_24h_reminder_is_left_unstamped_for_retry(self, monkeypatch):
+        booking_id = self._insert_confirmed_booking(date="2026-07-04", time="16:00")
+        fake_now = datetime(2026, 7, 3, 15, 0, tzinfo=booking_app._tz)
+        monkeypatch.setattr(booking_app, "_local_now", lambda: fake_now)
+        monkeypatch.setattr(booking_app, "_send_24h_reminder_email", lambda _b: False)
+
+        booking_app._process_24h_reminder_emails()
+
+        conn = booking_app.db_conn()
+        row = conn.execute("SELECT reminder_24h_email_sent FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        conn.close()
+        assert row["reminder_24h_email_sent"] is None
+
     def test_48h_reminder_does_not_send_66_hours_early(self, monkeypatch):
         booking_id = self._insert_confirmed_booking(date="2026-07-04", time="16:00")
         fake_now = datetime(2026, 7, 1, 22, 0, tzinfo=booking_app._tz)  # 66h before session

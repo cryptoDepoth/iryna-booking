@@ -12,6 +12,8 @@
   s.parentNode.insertBefore(t,s)}(window, document,'script',
   'https://connect.facebook.net/en_US/fbevents.js');
   window.__META_PIXEL_ID = '{{ meta_pixel_id }}';
+  window.__GOOGLE_ADS_ID = {{ google_ads_id|tojson }};
+  window.__GOOGLE_ADS_BOOKING_SEND_TO = {{ google_ads_booking_send_to|tojson }};
   fbq('init', '{{ meta_pixel_id }}');
   fbq('track', 'PageView');
   </script>
@@ -145,12 +147,12 @@
   <script src="/static/js/analytics.js"></script>
   <script src="/static/js/booking_events.js"></script>
   <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-610866068"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_ads_id }}"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'AW-610866068');
+    gtag('config', {{ google_ads_id|tojson }});
   </script>
   <!-- End Google tag -->
   <style>

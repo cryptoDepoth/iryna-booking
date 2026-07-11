@@ -769,12 +769,14 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
 <!-- End Meta Pixel Code -->
 
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=AW-610866068"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ google_ads_id }}"></script>
 <script>
+  window.__GOOGLE_ADS_ID = {{ google_ads_id|tojson }};
+  window.__GOOGLE_ADS_BOOKING_SEND_TO = {{ google_ads_booking_send_to|tojson }};
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'AW-610866068');
+  gtag('config', window.__GOOGLE_ADS_ID);
 </script>
 <!-- End Google tag -->
 </head>
@@ -1197,12 +1199,15 @@ function captureAttribution() {
     utm_term: params.get('utm_term') || '',
     fbclid: params.get('fbclid') || '',
     gclid: params.get('gclid') || '',
+    gbraid: params.get('gbraid') || '',
+    wbraid: params.get('wbraid') || '',
     referrer: document.referrer || '',
     landing_url: window.location.href
   };
   try {
+    const shared = JSON.parse(localStorage.getItem('pashynska_attribution_v1') || '{}');
     const saved = JSON.parse(localStorage.getItem('pp_attribution') || '{}');
-    const merged = {...saved};
+    const merged = {...shared, ...saved};
     Object.entries(direct).forEach(([k, v]) => { if (v) merged[k] = v; });
     if (!merged.landing_url) merged.landing_url = window.location.href;
     localStorage.setItem('pp_attribution', JSON.stringify(merged));
@@ -1338,11 +1343,12 @@ function trackBookingEvent(eventName, eventId, metadata) {
   if (typeof window.gtag === 'function') {
     const gtagMap = {
       'payment_view':   { event: 'begin_checkout' },
-      'booking_confirmed': { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC' },
-      'purchase':       { event: 'conversion', send_to: 'AW-610866068/DNSFCPCKxr8cEJSnpKMC' }
+      'booking_confirmed': { event: 'conversion', send_to: window.__GOOGLE_ADS_BOOKING_SEND_TO },
+      'purchase':       { event: 'conversion', send_to: window.__GOOGLE_ADS_BOOKING_SEND_TO }
     };
     const gx = gtagMap[eventName];
     if (gx) {
+      if (gx.event === 'conversion' && !gx.send_to) return;
       const gxData = {};
       if (gx.send_to) gxData.send_to = gx.send_to;
       if (metadata && metadata.price) gxData.value = parseFloat(metadata.price) || 0;
@@ -2593,6 +2599,12 @@ function startStatusPolling(bookingId) {
       const data = await r.json();
       if (data.confirmed) {
         stopStatusPolling();
+        const paidAmount = Number(data.paid_amount || currentBooking?.amount_due_today || currentBooking?.deposit || 0);
+        trackBookingEvent('booking_confirmed', currentBooking?.event_id || '', {
+          booking_id: bookingId,
+          deposit: paidAmount,
+          amount: paidAmount
+        });
         showConfirmed(data.name || currentBooking?.name || '');
       } else if (data.status === 'cancelled' || data.status === 'expired') {
         stopStatusPolling();

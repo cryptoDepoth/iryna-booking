@@ -26,17 +26,17 @@
   <!-- End Meta Pixel -->
 
   <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-610866068"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_ads_id }}"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'AW-610866068');
+    gtag('config', {{ google_ads_id|tojson }});
   </script>
   {% if booking and (booking.confirmed or booking.status == 'confirmed') %}
   <script>
     gtag('event', 'conversion', {
-        'send_to': 'AW-610866068/DNSFCPCKxr8cEJSnpKMC',
+        'send_to': {{ google_ads_booking_send_to|tojson }},
         'value': {{ (amount_due_today or price or 0)|float }},
         'currency': 'CAD',
         'transaction_id': '{{ booking.id if booking else '' }}'

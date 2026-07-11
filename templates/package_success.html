@@ -8,12 +8,20 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-610866068"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_ads_id }}"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'AW-610866068');
+    gtag('config', {{ google_ads_id|tojson }});
+    {% if payment_verified and purchase_event_id %}
+    gtag('event', 'conversion', {
+      send_to: {{ google_ads_booking_send_to|tojson }},
+      value: {{ purchase_value|tojson }},
+      currency: 'CAD',
+      transaction_id: {{ purchase_event_id|tojson }}
+    });
+    {% endif %}
   </script>
   <script>
   !function(f,b,e,v,n,t,s)

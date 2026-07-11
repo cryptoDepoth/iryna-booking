@@ -12,7 +12,9 @@ import app as booking_app
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch, tmp_path):
+    monkeypatch.setattr(booking_app, "DB_PATH", str(tmp_path / "package-booking.db"))
+    booking_app.init_db()
     booking_app.app.config["TESTING"] = True
     with booking_app.app.test_client() as c:
         yield c
@@ -133,6 +135,67 @@ def test_checkout_carries_persisted_attribution_and_match_data_to_stripe(client,
     assert metadata["landing_url"].startswith("https://book.pashynskaphoto.com/family")
     assert metadata["client_ip_address"] == "203.0.113.8"
     assert metadata["client_user_agent"] == "pytest-browser"
+    conn = booking_app.db_conn()
+    order = conn.execute(
+        "SELECT * FROM package_orders WHERE stripe_session_id='cs_test_created'"
+    ).fetchone()
+    lead = conn.execute(
+        "SELECT tags FROM clients WHERE email='olena@example.com'"
+    ).fetchone()
+    conn.close()
+    assert order["status"] == "checkout_created"
+    assert order["utm_campaign"] == "summer_minis_2026"
+    assert "package-lead" in lead["tags"]
+
+
+def test_package_order_paid_transition_is_idempotent_and_updates_crm(client):
+    metadata = {
+        "package_slug": "family-session",
+        "package_name": "Family Session",
+        "package_price": "340.00",
+        "client_name": "Olena Koval",
+        "client_email": "olena@example.com",
+        "client_phone": "403-555-0199",
+        "preferred_date": "2026-08-10",
+        "gclid": "google-click",
+    }
+    created, first_created = booking_app._upsert_package_order(
+        "cs_test_ledger", metadata, 100, "checkout_created"
+    )
+    assert first_created is False
+    booking_app._sync_package_client(created)
+
+    paid, first_paid = booking_app._upsert_package_order(
+        "cs_test_ledger", metadata, 100, "paid"
+    )
+    booking_app._sync_package_client(paid)
+    duplicate, duplicate_first = booking_app._upsert_package_order(
+        "cs_test_ledger", metadata, 100, "paid"
+    )
+    booking_app._sync_package_client(duplicate)
+
+    assert first_paid is True
+    assert duplicate_first is False
+    conn = booking_app.db_conn()
+    order_count = conn.execute(
+        "SELECT COUNT(*) FROM package_orders WHERE stripe_session_id='cs_test_ledger'"
+    ).fetchone()[0]
+    client_row = conn.execute(
+        "SELECT tags, total_paid FROM clients WHERE email='olena@example.com'"
+    ).fetchone()
+    client_id = conn.execute(
+        "SELECT id FROM clients WHERE email='olena@example.com'"
+    ).fetchone()[0]
+    note_count = conn.execute(
+        "SELECT COUNT(*) FROM client_notes WHERE client_id=? AND text LIKE 'Stripe package order cs_test_ledger%'",
+        (client_id,),
+    ).fetchone()[0]
+    conn.close()
+    assert order_count == 1
+    assert "package-paid" in client_row["tags"]
+    assert "package-lead" not in client_row["tags"]
+    assert client_row["total_paid"] == 100.0
+    assert note_count == 1
 
 
 def test_package_success_without_verified_session_does_not_fire_purchase(client, monkeypatch):
@@ -144,6 +207,7 @@ def test_package_success_without_verified_session_does_not_fire_purchase(client,
     assert "Small Wedding" in html
     assert "eventID" not in html
     assert "fbq('track', 'Purchase'" not in html
+    assert "gtag('event', 'conversion'" not in html
 
 
 def test_package_success_rejects_unverified_stripe_session(client, monkeypatch):
@@ -162,6 +226,7 @@ def test_package_success_rejects_unverified_stripe_session(client, monkeypatch):
     assert "confirming your payment" in html.lower()
     assert "cs_test_123" not in html
     assert "fbq('track', 'Purchase'" not in html
+    assert "gtag('event', 'conversion'" not in html
 
 
 def test_package_success_fires_deduped_purchase_only_for_paid_matching_session(client, monkeypatch):
@@ -189,6 +254,9 @@ def test_package_success_fires_deduped_purchase_only_for_paid_matching_session(c
     assert "Deposit received" in html
     assert '{eventID: "cs_test_123"}' in html
     assert "value: 200.0" in html
+    assert "gtag('event', 'conversion'" in html
+    assert f'send_to: "{booking_app.GOOGLE_ADS_BOOKING_SEND_TO}"' in html
+    assert 'transaction_id: "cs_test_123"' in html
 
 
 def test_package_success_rejects_slug_mismatch(client, monkeypatch):
@@ -214,6 +282,7 @@ def test_package_success_rejects_slug_mismatch(client, monkeypatch):
     ).get_data(as_text=True)
     assert "confirming your payment" in html.lower()
     assert "fbq('track', 'Purchase'" not in html
+    assert "gtag('event', 'conversion'" not in html
 
 
 def test_send_package_capi_noops_without_token(monkeypatch):

@@ -54,6 +54,17 @@ _tz = _ZoneInfo('America/Edmonton')
 # Load from .env or use defaults
 META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '1335137335347797')  # Pashynska Photography Pixel (Events Manager canonical). Single source of truth — injected into every template via context processor. Override with env/fly secret only to switch pixels.
 GOOGLE_ANALYTICS_ID = os.environ.get('GOOGLE_ANALYTICS_ID', '')
+# Google Ads measurement is centralized for the same reason as Meta Pixel:
+# moving from the legacy PLN account to a Calgary CAD account must be a single
+# environment change, not a hunt through templates and JavaScript files.
+GOOGLE_ADS_ID = os.environ.get('GOOGLE_ADS_ID', 'AW-610866068')
+GOOGLE_ADS_BOOKING_CONVERSION_LABEL = os.environ.get(
+    'GOOGLE_ADS_BOOKING_CONVERSION_LABEL', 'DNSFCPCKxr8cEJSnpKMC'
+)
+GOOGLE_ADS_BOOKING_SEND_TO = (
+    f"{GOOGLE_ADS_ID}/{GOOGLE_ADS_BOOKING_CONVERSION_LABEL}"
+    if GOOGLE_ADS_ID and GOOGLE_ADS_BOOKING_CONVERSION_LABEL else ""
+)
 # ── Meta Conversions API (server-side Purchase) ───────────────────────────────
 # e-Transfer payments confirm asynchronously (the Gmail watcher matches the
 # deposit minutes later, after the client has left the page), so the browser
@@ -141,6 +152,7 @@ ANALYTICS_EVENT_ALLOWLIST = {
     "reserve_attempt", "booking_reserved", "payment_view", "payment_sent_clicked",
     "booking_confirmed", "booking_expired", "booking_cancelled", "waitlist_joined",
     "abandoned_followup_sent", "abandoned_second_followup_sent",
+    "whatsapp_click", "review_link_click",
 }
 
 
@@ -188,8 +200,8 @@ def _record_analytics_event(event_name, *, visitor_id="", booking_id=None, event
         c.execute("""
             INSERT INTO visitor_sessions
                 (visitor_id, first_seen, last_seen, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
-                 fbclid, gclid, referrer, landing_url, user_agent, ip_address)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 fbclid, gclid, gbraid, wbraid, referrer, landing_url, user_agent, ip_address)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(visitor_id) DO UPDATE SET
                 last_seen=excluded.last_seen,
                 utm_source=COALESCE(NULLIF(visitor_sessions.utm_source,''), excluded.utm_source),
@@ -199,6 +211,8 @@ def _record_analytics_event(event_name, *, visitor_id="", booking_id=None, event
                 utm_term=COALESCE(NULLIF(visitor_sessions.utm_term,''), excluded.utm_term),
                 fbclid=COALESCE(NULLIF(visitor_sessions.fbclid,''), excluded.fbclid),
                 gclid=COALESCE(NULLIF(visitor_sessions.gclid,''), excluded.gclid),
+                gbraid=COALESCE(NULLIF(visitor_sessions.gbraid,''), excluded.gbraid),
+                wbraid=COALESCE(NULLIF(visitor_sessions.wbraid,''), excluded.wbraid),
                 referrer=COALESCE(NULLIF(visitor_sessions.referrer,''), excluded.referrer),
                 landing_url=COALESCE(NULLIF(visitor_sessions.landing_url,''), excluded.landing_url),
                 user_agent=COALESCE(NULLIF(visitor_sessions.user_agent,''), excluded.user_agent),
@@ -212,6 +226,8 @@ def _record_analytics_event(event_name, *, visitor_id="", booking_id=None, event
             _safe_text(attribution.get("utm_term"), 180),
             _safe_text(attribution.get("fbclid"), 500),
             _safe_text(attribution.get("gclid"), 500),
+            _safe_text(attribution.get("gbraid"), 500),
+            _safe_text(attribution.get("wbraid"), 500),
             _safe_text(attribution.get("referrer") or request_referrer, 500),
             _safe_text(attribution.get("landing_url") or page, 1000),
             _safe_text(user_agent, 500),
@@ -250,6 +266,8 @@ def _analytics_attribution_from_booking(booking):
         "utm_term": booking.get("utm_term"),
         "fbclid": booking.get("fbclid"),
         "gclid": booking.get("gclid"),
+        "gbraid": booking.get("gbraid"),
+        "wbraid": booking.get("wbraid"),
         "referrer": booking.get("referrer"),
         "landing_url": booking.get("landing_url"),
     }
@@ -485,6 +503,8 @@ def _inject_site_links():
         # Single source of truth for the Meta Pixel — every template renders
         # {{ meta_pixel_id }} so the id can never drift between pages again.
         "meta_pixel_id": META_PIXEL_ID,
+        "google_ads_id": GOOGLE_ADS_ID,
+        "google_ads_booking_send_to": GOOGLE_ADS_BOOKING_SEND_TO,
     }
 
 # ── Canonical domain redirect ─────────────────────────────────────────────────
@@ -2005,7 +2025,14 @@ def _send_review_email(booking):
         return False
 
     insta_url = "https://instagram.com/pashynska.photo"
-    google_review_url = os.environ.get("GOOGLE_REVIEW_URL", "https://review.pashynskaphoto.com")
+    google_review_destination = os.environ.get("GOOGLE_REVIEW_URL", "https://review.pashynskaphoto.com")
+    google_review_url = google_review_destination
+    if booking.get("id") and booking.get("confirmation_token"):
+        base_url = (BASE_URL or CANONICAL_SITE_URL).rstrip("/")
+        google_review_url = (
+            f"{base_url}/review/{booking['id']}?token="
+            f"{urllib.parse.quote(str(booking['confirmation_token']), safe='')}"
+        )
     safe_name = _html_escape(name or "there")
 
     subject = "How were your photos? 🌸"
@@ -2069,6 +2096,27 @@ def _send_review_email(booking):
 </table></td></tr></table></body></html>"""
 
     return _send_email_raw(email, name, subject, plain, html)
+
+
+@app.route("/review/<int:booking_id>")
+def tracked_review_link(booking_id):
+    """Count a valid review-email click, then send the client to Google."""
+    destination = os.environ.get("GOOGLE_REVIEW_URL", "https://review.pashynskaphoto.com")
+    token = _safe_text(request.args.get("token"), 255)
+    if token:
+        conn = db_conn()
+        row = conn.execute(
+            "SELECT * FROM bookings WHERE id=? AND confirmation_token=?",
+            (booking_id, token),
+        ).fetchone()
+        conn.close()
+        if row:
+            _record_booking_funnel_event(
+                dict(row),
+                "review_link_click",
+                {"destination": "google_business_profile"},
+            )
+    return redirect(destination)
 
 
 def notify_payment_confirmed(booking_id, paid_amount=None):
@@ -3444,6 +3492,8 @@ def init_db():
             utm_term TEXT DEFAULT '',
             fbclid TEXT DEFAULT '',
             gclid TEXT DEFAULT '',
+            gbraid TEXT DEFAULT '',
+            wbraid TEXT DEFAULT '',
             referrer TEXT DEFAULT '',
             landing_url TEXT DEFAULT '',
             user_agent TEXT DEFAULT '',
@@ -3460,6 +3510,46 @@ def init_db():
             page TEXT DEFAULT '',
             metadata_json TEXT DEFAULT '{}',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Package checkouts have no confirmed session date yet, so they must not be
+    # inserted into `bookings`. Keep them in a separate idempotent ledger until
+    # Iryna confirms the date and converts the lead into a scheduled booking.
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS package_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stripe_session_id TEXT UNIQUE NOT NULL,
+            package_slug TEXT NOT NULL,
+            package_name TEXT DEFAULT '',
+            package_price REAL DEFAULT 0,
+            deposit_amount REAL DEFAULT 0,
+            currency TEXT DEFAULT 'CAD',
+            status TEXT DEFAULT 'checkout_created',
+            client_name TEXT DEFAULT '',
+            client_email TEXT DEFAULT '',
+            client_phone TEXT DEFAULT '',
+            preferred_date TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            visitor_id TEXT DEFAULT '',
+            utm_source TEXT DEFAULT '',
+            utm_medium TEXT DEFAULT '',
+            utm_campaign TEXT DEFAULT '',
+            utm_content TEXT DEFAULT '',
+            utm_term TEXT DEFAULT '',
+            fbclid TEXT DEFAULT '',
+            gclid TEXT DEFAULT '',
+            gbraid TEXT DEFAULT '',
+            wbraid TEXT DEFAULT '',
+            referrer TEXT DEFAULT '',
+            landing_url TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            paid_at TEXT,
+            admin_notified INTEGER DEFAULT 0,
+            client_email_sent INTEGER DEFAULT 0,
+            meta_capi_sent INTEGER DEFAULT 0,
+            n8n_emitted INTEGER DEFAULT 0
         )
     ''')
 
@@ -3508,6 +3598,14 @@ def init_db():
         ("bookings",  "utm_term",          "ALTER TABLE bookings ADD COLUMN utm_term TEXT"),
         ("bookings",  "fbclid",            "ALTER TABLE bookings ADD COLUMN fbclid TEXT"),
         ("bookings",  "gclid",             "ALTER TABLE bookings ADD COLUMN gclid TEXT"),
+        ("bookings",  "gbraid",            "ALTER TABLE bookings ADD COLUMN gbraid TEXT"),
+        ("bookings",  "wbraid",            "ALTER TABLE bookings ADD COLUMN wbraid TEXT"),
+        ("visitor_sessions", "gbraid",      "ALTER TABLE visitor_sessions ADD COLUMN gbraid TEXT DEFAULT ''"),
+        ("visitor_sessions", "wbraid",      "ALTER TABLE visitor_sessions ADD COLUMN wbraid TEXT DEFAULT ''"),
+        ("package_orders", "admin_notified", "ALTER TABLE package_orders ADD COLUMN admin_notified INTEGER DEFAULT 0"),
+        ("package_orders", "client_email_sent", "ALTER TABLE package_orders ADD COLUMN client_email_sent INTEGER DEFAULT 0"),
+        ("package_orders", "meta_capi_sent", "ALTER TABLE package_orders ADD COLUMN meta_capi_sent INTEGER DEFAULT 0"),
+        ("package_orders", "n8n_emitted", "ALTER TABLE package_orders ADD COLUMN n8n_emitted INTEGER DEFAULT 0"),
         ("bookings",  "referrer",          "ALTER TABLE bookings ADD COLUMN referrer TEXT"),
         ("bookings",  "landing_url",       "ALTER TABLE bookings ADD COLUMN landing_url TEXT"),
         # Stripe payment-link URL for manually-created private sessions
@@ -3550,6 +3648,8 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_analytics_booking     ON analytics_events(booking_id)",
         "CREATE INDEX IF NOT EXISTS idx_analytics_event_time  ON analytics_events(event_name, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_clients_email        ON clients(email)",
+        "CREATE INDEX IF NOT EXISTS idx_package_orders_email ON package_orders(client_email)",
+        "CREATE INDEX IF NOT EXISTS idx_package_orders_status ON package_orders(status)",
         "CREATE INDEX IF NOT EXISTS idx_waitlist_event_email ON waitlist(event_id, email)",
     ]
     for _idx_ddl in _indexes:
@@ -3708,6 +3808,12 @@ def _process_reminder_emails():
             continue
         try:
             ok = _send_reminder_email(b)
+            if not ok:
+                log.error(
+                    f"[scheduler] Reminder email was not accepted for booking #{b['id']}; "
+                    "leaving it unsent so the scheduler can retry"
+                )
+                continue
             conn2 = db_conn()
             conn2.execute(
                 "UPDATE bookings SET reminder_email_sent=? WHERE id=?",
@@ -3715,8 +3821,7 @@ def _process_reminder_emails():
             )
             conn2.commit()
             conn2.close()
-            if ok:
-                log.info(f"[scheduler] Reminder email sent → booking #{b['id']} ({b.get('email')}) for {b.get('date')}")
+            log.info(f"[scheduler] Reminder email sent → booking #{b['id']} ({b.get('email')}) for {b.get('date')}")
         except Exception as e:
             log.error(f"[scheduler] Reminder email failed for #{b['id']}: {e}")
 
@@ -3748,6 +3853,12 @@ def _process_24h_reminder_emails():
             continue
         try:
             ok = _send_24h_reminder_email(b)
+            if not ok:
+                log.error(
+                    f"[scheduler] 24h reminder was not accepted for booking #{b['id']}; "
+                    "leaving it unsent so the scheduler can retry"
+                )
+                continue
             conn2 = db_conn()
             conn2.execute(
                 "UPDATE bookings SET reminder_24h_email_sent=? WHERE id=?",
@@ -3755,8 +3866,7 @@ def _process_24h_reminder_emails():
             )
             conn2.commit()
             conn2.close()
-            if ok:
-                log.info(f"[scheduler] 24h reminder sent → booking #{b['id']} ({b.get('email')}) for {b.get('date')}")
+            log.info(f"[scheduler] 24h reminder sent → booking #{b['id']} ({b.get('email')}) for {b.get('date')}")
         except Exception as e:
             log.error(f"[scheduler] 24h reminder failed for #{b['id']}: {e}")
 
@@ -3781,6 +3891,12 @@ def _process_review_emails():
         b = dict(row)
         try:
             ok = _send_review_email(b)
+            if not ok:
+                log.error(
+                    f"[scheduler] Review email was not accepted for booking #{b['id']}; "
+                    "leaving it unsent so the scheduler can retry"
+                )
+                continue
             conn2 = db_conn()
             conn2.execute(
                 "UPDATE bookings SET review_email_sent=? WHERE id=?",
@@ -3788,8 +3904,7 @@ def _process_review_emails():
             )
             conn2.commit()
             conn2.close()
-            if ok:
-                log.info(f"[scheduler] Review email sent → booking #{b['id']} ({b.get('email')})")
+            log.info(f"[scheduler] Review email sent → booking #{b['id']} ({b.get('email')})")
         except Exception as e:
             log.error(f"[scheduler] Review email failed for #{b['id']}: {e}")
 
@@ -3839,11 +3954,21 @@ def sync_client(email: str, name: str, phone: str = "", instagram: str = ""):
         UPDATE clients SET
             total_bookings   = (SELECT COUNT(*) FROM bookings WHERE LOWER(email)=LOWER(?) AND status NOT IN ('expired')),
             total_confirmed  = (SELECT COUNT(*) FROM bookings WHERE LOWER(email)=LOWER(?) AND confirmed=1),
-            total_paid       = (SELECT COALESCE(SUM(paid_amount),0) FROM bookings WHERE LOWER(email)=LOWER(?) AND confirmed=1),
+            total_paid       = (
+                SELECT COALESCE(SUM(amount), 0) FROM (
+                    SELECT COALESCE(paid_amount, 0) AS amount
+                    FROM bookings
+                    WHERE LOWER(email)=LOWER(?) AND confirmed=1
+                    UNION ALL
+                    SELECT COALESCE(deposit_amount, 0) AS amount
+                    FROM package_orders
+                    WHERE LOWER(client_email)=LOWER(?) AND status='paid'
+                )
+            ),
             first_booking_at = (SELECT MIN(date) FROM bookings WHERE LOWER(email)=LOWER(?) AND status NOT IN ('expired','cancelled')),
             last_booking_at  = (SELECT MAX(date) FROM bookings WHERE LOWER(email)=LOWER(?) AND status NOT IN ('expired','cancelled'))
         WHERE LOWER(email) = LOWER(?)
-    """, (email, email, email, email, email, email))
+    """, (email, email, email, email, email, email, email))
 
     conn.commit()
     conn.close()
@@ -4953,6 +5078,8 @@ def track_event():
     attribution.update({
         "fbclid": _safe_text(data.get("fbclid"), 500),
         "gclid": _safe_text(data.get("gclid"), 500),
+        "gbraid": _safe_text(data.get("gbraid"), 500),
+        "wbraid": _safe_text(data.get("wbraid"), 500),
         "referrer": _safe_text(data.get("referrer") or request.headers.get("Referer"), 500),
         "landing_url": _safe_text(data.get("landing_url") or data.get("page"), 1000),
     })
@@ -4986,6 +5113,8 @@ def reserve_slot():
     attribution.update({
         "fbclid": _safe_text(data.get("fbclid"), 500),
         "gclid": _safe_text(data.get("gclid"), 500),
+        "gbraid": _safe_text(data.get("gbraid"), 500),
+        "wbraid": _safe_text(data.get("wbraid"), 500),
         "referrer": _safe_text(data.get("referrer") or request.headers.get("Referer"), 500),
         "landing_url": _safe_text(data.get("landing_url") or request.headers.get("Referer"), 1000),
     })
@@ -5173,9 +5302,9 @@ def reserve_slot():
                  event_id, confirmation_token, deposit_amount, full_price, selected_addons_json,
                  addons_total, marketing_consent, agreement_name, agreement_accepted_at, terms_version,
                  visitor_id, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
-                 fbclid, gclid, referrer, landing_url,
+                 fbclid, gclid, gbraid, wbraid, referrer, landing_url,
                  referral_code, referral_discount)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type,
             expires.isoformat(), ev["id"], token, _deposit_amt, _full_price,
@@ -5184,7 +5313,8 @@ def reserve_slot():
             visitor_id,
             attribution.get("utm_source"), attribution.get("utm_medium"), attribution.get("utm_campaign"),
             attribution.get("utm_content"), attribution.get("utm_term"), attribution.get("fbclid"),
-            attribution.get("gclid"), attribution.get("referrer"), attribution.get("landing_url"),
+            attribution.get("gclid"), attribution.get("gbraid"), attribution.get("wbraid"),
+            attribution.get("referrer"), attribution.get("landing_url"),
             referral_code, referral_discount,
         ))
 
@@ -5758,12 +5888,7 @@ button{{margin-top:18px;background:#1c1917;color:#fff;border:0;border-radius:12p
 @app.route("/privacy")
 @app.route("/privacy-policy")
 def privacy():
-    """Plain-language privacy and browser storage disclosure for clients.
-
-    We intentionally avoid a cookie-consent popup because the public booking
-    flow does not set advertising/analytics cookies. This page keeps the site
-    transparent without adding conversion friction.
-    """
+    """Plain-language privacy, advertising measurement, and storage disclosure."""
     return render_template("privacy.html")
 
 
@@ -6424,6 +6549,159 @@ def _send_package_capi(session_obj, metadata, amount_paid):
         return 200 <= int(status) < 300
 
 
+def _upsert_package_order(stripe_session_id, metadata, deposit_amount=0, status="checkout_created", currency="CAD"):
+    """Persist a package checkout without inventing a scheduled booking.
+
+    Stripe can deliver the same webhook more than once. The unique session id
+    and the returned `first_paid_transition` make downstream email/CRM actions
+    exactly-once while still allowing a webhook to create a missing ledger row.
+    """
+    metadata = metadata or {}
+    session_id = _safe_text(stripe_session_id, 255)
+    if not session_id:
+        raise ValueError("stripe_session_id is required")
+    status = "paid" if str(status).lower() == "paid" else "checkout_created"
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        package_price = round(float(metadata.get("package_price") or 0), 2)
+    except (TypeError, ValueError):
+        package_price = 0.0
+    try:
+        deposit = round(float(deposit_amount or 0), 2)
+    except (TypeError, ValueError):
+        deposit = 0.0
+
+    values = {
+        "package_slug": _safe_text(metadata.get("package_slug"), 120),
+        "package_name": _safe_text(metadata.get("package_name"), 200),
+        "package_price": package_price,
+        "deposit_amount": deposit,
+        "currency": _safe_text(currency or "CAD", 10).upper(),
+        "client_name": _safe_text(metadata.get("client_name"), 120),
+        "client_email": _safe_text(metadata.get("client_email"), 200).lower(),
+        "client_phone": _safe_text(metadata.get("client_phone"), 40),
+        "preferred_date": _safe_text(metadata.get("preferred_date"), 10),
+        "notes": _safe_text(metadata.get("notes"), 500),
+        "visitor_id": _safe_text(metadata.get("visitor_id"), 200),
+        "utm_source": _safe_text(metadata.get("utm_source"), 200),
+        "utm_medium": _safe_text(metadata.get("utm_medium"), 200),
+        "utm_campaign": _safe_text(metadata.get("utm_campaign"), 200),
+        "utm_content": _safe_text(metadata.get("utm_content"), 200),
+        "utm_term": _safe_text(metadata.get("utm_term"), 200),
+        "fbclid": _safe_text(metadata.get("fbclid"), 200),
+        "gclid": _safe_text(metadata.get("gclid"), 200),
+        "gbraid": _safe_text(metadata.get("gbraid"), 200),
+        "wbraid": _safe_text(metadata.get("wbraid"), 200),
+        "referrer": _safe_text(metadata.get("referrer"), 500),
+        "landing_url": _safe_text(metadata.get("landing_url"), 500),
+    }
+    conn = db_conn()
+    previous = conn.execute(
+        "SELECT status FROM package_orders WHERE stripe_session_id=?", (session_id,)
+    ).fetchone()
+    first_paid_transition = status == "paid" and (not previous or previous["status"] != "paid")
+    columns = list(values.keys())
+    conn.execute(
+        f"""
+        INSERT INTO package_orders (
+            stripe_session_id, {', '.join(columns)}, status, created_at, updated_at, paid_at
+        ) VALUES (?, {', '.join('?' for _ in columns)}, ?, ?, ?, ?)
+        ON CONFLICT(stripe_session_id) DO UPDATE SET
+            package_slug=excluded.package_slug,
+            package_name=excluded.package_name,
+            package_price=excluded.package_price,
+            deposit_amount=CASE WHEN excluded.deposit_amount > 0 THEN excluded.deposit_amount ELSE package_orders.deposit_amount END,
+            currency=excluded.currency,
+            client_name=excluded.client_name,
+            client_email=excluded.client_email,
+            client_phone=excluded.client_phone,
+            preferred_date=excluded.preferred_date,
+            notes=excluded.notes,
+            visitor_id=excluded.visitor_id,
+            utm_source=excluded.utm_source,
+            utm_medium=excluded.utm_medium,
+            utm_campaign=excluded.utm_campaign,
+            utm_content=excluded.utm_content,
+            utm_term=excluded.utm_term,
+            fbclid=excluded.fbclid,
+            gclid=excluded.gclid,
+            gbraid=excluded.gbraid,
+            wbraid=excluded.wbraid,
+            referrer=excluded.referrer,
+            landing_url=excluded.landing_url,
+            status=CASE WHEN package_orders.status='paid' THEN 'paid' ELSE excluded.status END,
+            updated_at=excluded.updated_at,
+            paid_at=COALESCE(package_orders.paid_at, excluded.paid_at)
+        """,
+        (
+            session_id,
+            *(values[column] for column in columns),
+            status,
+            now,
+            now,
+            now if status == "paid" else None,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM package_orders WHERE stripe_session_id=?", (session_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row), first_paid_transition
+
+
+def _sync_package_client(order):
+    """Expose package leads/payments in the existing human-operated CRM."""
+    if not order or not order.get("client_email"):
+        return
+    sync_client(
+        order["client_email"],
+        order.get("client_name") or "Package client",
+        order.get("client_phone") or "",
+    )
+    conn = db_conn()
+    client = conn.execute(
+        "SELECT id, tags FROM clients WHERE LOWER(email)=LOWER(?)", (order["client_email"],)
+    ).fetchone()
+    if not client:
+        conn.close()
+        return
+    tags = {tag.strip() for tag in str(client["tags"] or "").split(",") if tag.strip()}
+    tags.add("package-paid" if order.get("status") == "paid" else "package-lead")
+    if order.get("status") == "paid":
+        tags.discard("package-lead")
+    conn.execute("UPDATE clients SET tags=? WHERE id=?", (", ".join(sorted(tags)), client["id"]))
+    if order.get("status") == "paid":
+        marker = f"Stripe package order {order['stripe_session_id']}"
+        existing = conn.execute(
+            "SELECT 1 FROM client_notes WHERE client_id=? AND text LIKE ? LIMIT 1",
+            (client["id"], f"{marker}%"),
+        ).fetchone()
+        if not existing:
+            note = (
+                f"{marker}: {order.get('package_name') or order.get('package_slug')} deposit "
+                f"${float(order.get('deposit_amount') or 0):.2f} CAD paid. "
+                f"Preferred date: {order.get('preferred_date') or 'not set'}."
+            )
+            conn.execute("INSERT INTO client_notes (client_id, text) VALUES (?, ?)", (client["id"], note))
+    conn.commit()
+    conn.close()
+
+
+def _mark_package_order_action(stripe_session_id, column):
+    """Mark one retryable package side effect complete (whitelisted columns)."""
+    allowed = {"admin_notified", "client_email_sent", "meta_capi_sent", "n8n_emitted"}
+    if column not in allowed:
+        raise ValueError("unsupported package order action")
+    conn = db_conn()
+    conn.execute(
+        f"UPDATE package_orders SET {column}=1, updated_at=? WHERE stripe_session_id=?",
+        (datetime.now(timezone.utc).isoformat(), _safe_text(stripe_session_id, 255)),
+    )
+    conn.commit()
+    conn.close()
+
+
 @app.route("/book/package/<slug>")
 def package_booking_page(slug):
     """Landing-page package -> pre-selected booking step with deposit checkout."""
@@ -6483,6 +6761,20 @@ def package_checkout():
     deposit_cents = int(round(pkg["deposit"] * 100))
     base_url = BASE_URL or CANONICAL_SITE_URL
     date_note = f" · preferred date {preferred_date}" if preferred_date else ""
+    stripe_metadata = {
+        "payment_type":   "package_deposit",
+        "package_slug":   slug,
+        "package_name":   pkg["name"],
+        "package_price":  f"{pkg['price']:.2f}",
+        "client_name":    name,
+        "client_email":   email,
+        "client_phone":   phone,
+        "preferred_date": preferred_date,
+        "notes":          notes,
+        "client_ip_address": client_ip_address,
+        "client_user_agent": client_user_agent,
+        **attribution,
+    }
     try:
         session = _stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -6504,22 +6796,19 @@ def package_checkout():
             customer_email=email,
             success_url=f"{base_url}/payment/package/success?pkg={slug}&sid={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{base_url}/book/package/{slug}",
-            metadata={
-                "payment_type":   "package_deposit",
-                "package_slug":   slug,
-                "package_name":   pkg["name"],
-                "package_price":  f"{pkg['price']:.2f}",
-                "client_name":    name,
-                "client_email":   email,
-                "client_phone":   phone,
-                "preferred_date": preferred_date,
-                "notes":          notes,
-                "client_ip_address": client_ip_address,
-                "client_user_agent": client_user_agent,
-                **attribution,
-            },
+            metadata=stripe_metadata,
             billing_address_collection="auto",
         )
+        try:
+            order, _ = _upsert_package_order(
+                session.id, stripe_metadata, pkg["deposit"], "checkout_created", "CAD"
+            )
+            _sync_package_client(order)
+            _emit_n8n_event("package.checkout_created", package_order=order)
+        except Exception as ledger_error:
+            # The Stripe URL is already valid; a local CRM outage must not make
+            # the client pay twice. The webhook can recreate this row later.
+            log.error(f"[stripe] Package order ledger error for {session.id}: {ledger_error}")
         log.info(f"[stripe] Package deposit session created: {slug} for {email}: {session.id}")
         return jsonify({"checkout_url": session.url, "session_id": session.id})
     except Exception as e:
@@ -6674,8 +6963,33 @@ def stripe_webhook():
             p_date  = metadata.get("preferred_date", "")
             p_notes = metadata.get("notes", "")
             p_price = metadata.get("package_price", "")
+            session_id = _safe_text(session_obj.get("id"), 255)
+            package_order = {
+                "stripe_session_id": session_id,
+                "package_slug": metadata.get("package_slug", ""),
+                "package_name": p_name,
+                "deposit_amount": amount_paid,
+                "status": "paid",
+                "client_name": c_name,
+                "client_email": c_email,
+                "client_phone": c_phone,
+                "preferred_date": p_date,
+            }
+            first_paid_transition = True
             try:
-                _notify_admin(
+                package_order, first_paid_transition = _upsert_package_order(
+                    session_id,
+                    metadata,
+                    amount_paid,
+                    "paid",
+                    session_obj.get("currency") or "CAD",
+                )
+                _sync_package_client(package_order)
+            except Exception as ledger_error:
+                log.error(f"[stripe-webhook] Package order ledger error for {session_id}: {ledger_error}")
+            if not package_order.get("admin_notified"):
+                try:
+                    _notify_admin(
                     f"💍 <b>Package Deposit Paid</b>\n\n"
                     f"📦 {_tg_escape(p_name)} (${p_price} + GST)\n"
                     f"💰 Deposit: <b>${amount_paid:.2f} CAD</b>\n"
@@ -6684,10 +6998,11 @@ def stripe_webhook():
                     f"📅 Preferred date: {_tg_escape(p_date or 'not set')}\n"
                     f"📝 {_tg_escape(p_notes or '—')}\n\n"
                     f"⚠️ Contact the client within 24h to confirm the date."
-                )
-            except Exception as e:
-                log.error(f"[stripe-webhook] Telegram package notify error: {e}")
-            if c_email:
+                    )
+                    _mark_package_order_action(session_id, "admin_notified")
+                except Exception as e:
+                    log.error(f"[stripe-webhook] Telegram package notify error: {e}")
+            if c_email and not package_order.get("client_email_sent"):
                 try:
                     subj = f"Deposit received — {p_name} 🌸"
                     plain = (
@@ -6701,13 +7016,24 @@ def stripe_webhook():
                         f"Questions? Just reply to this email.\n\n"
                         f"Warmly,\nIryna\n@pashynska.photo"
                     )
-                    _smtp_send_email(c_email, c_name or "Client", subj, plain, plain.replace("\n", "<br>"))
+                    email_ok = _smtp_send_email(
+                        c_email, c_name or "Client", subj, plain, plain.replace("\n", "<br>")
+                    )
+                    if email_ok:
+                        _mark_package_order_action(session_id, "client_email_sent")
                 except Exception as e:
                     log.error(f"[stripe-webhook] Package client email error: {e}")
-            try:
-                _send_package_capi(session_obj, metadata, amount_paid)
-            except Exception as e:
-                log.error(f"[stripe-webhook] Package CAPI error: {e}")
+            if not package_order.get("meta_capi_sent"):
+                try:
+                    if _send_package_capi(session_obj, metadata, amount_paid):
+                        _mark_package_order_action(session_id, "meta_capi_sent")
+                except Exception as e:
+                    log.error(f"[stripe-webhook] Package CAPI error: {e}")
+            if not package_order.get("n8n_emitted"):
+                if _emit_n8n_event("package.deposit_paid", package_order=package_order):
+                    _mark_package_order_action(session_id, "n8n_emitted")
+            if not first_paid_transition:
+                log.info(f"[stripe-webhook] Retried incomplete package side effects: {session_id}")
             log.info(f"[stripe-webhook] Package deposit completed: {p_name} ${amount_paid:.2f} from {c_email}")
             return jsonify({"ok": True})
 

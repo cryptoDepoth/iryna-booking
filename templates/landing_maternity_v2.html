@@ -12,6 +12,8 @@
   s.parentNode.insertBefore(t,s)}(window, document,'script',
   'https://connect.facebook.net/en_US/fbevents.js');
   window.__META_PIXEL_ID = '{{ meta_pixel_id }}';
+  window.__GOOGLE_ADS_ID = {{ google_ads_id|tojson }};
+  window.__GOOGLE_ADS_BOOKING_SEND_TO = {{ google_ads_booking_send_to|tojson }};
   fbq('init', '{{ meta_pixel_id }}');
   fbq('track', 'PageView');
   </script>
@@ -156,12 +158,12 @@
   <script src="/static/js/analytics.js"></script>
   <script src="/static/js/booking_events.js"></script>
   <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-610866068"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_ads_id }}"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'AW-610866068');
+    gtag('config', {{ google_ads_id|tojson }});
   </script>
   <!-- End Google tag -->
   <style>
@@ -242,6 +244,8 @@
     .cta-primary:hover{transform:translateY(-2px);box-shadow:0 18px 42px rgba(196,151,58,.55)}
     .cta-secondary{padding:16px 30px;border:1px solid var(--line);border-radius:40px;text-decoration:none;font-weight:600;color:var(--gold-deep);background:rgba(255,255,255,.65);transition:border-color .25s,background .25s}
     .cta-secondary:hover{border-color:var(--gold);background:#fff}
+    .hero-question{margin-top:12px;font-size:.86rem;color:var(--muted)}
+    .hero-question a{color:var(--gold-deep);font-weight:700;text-underline-offset:3px}
     .hero-trust{margin-top:24px;font-size:.88rem;color:#83705f}
     .hero-trust b{color:var(--gold-deep)}
     .hero-scroll{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);z-index:2;width:24px;height:40px;border:1px solid rgba(168,130,58,.5);border-radius:14px;display:flex;justify-content:center;padding-top:8px}
@@ -446,6 +450,7 @@
         <a class="cta-secondary" href="{{ PORTFOLIO_URL }}" rel="noopener" target="_blank">View Portfolio ↗</a>
       </div>
       <div class="hero-trust hi hi-6"><b>★ 4.9</b> · 145+ reviews · <b>120+</b> sessions delivered · from <b>$340</b> + GST</div>
+      <div class="hero-question hi hi-6">Not ready to pay yet? <a href="https://wa.me/13689977903?text=Hi%20Iryna%2C%20I%20have%20a%20question%20about%20a%20maternity%20photo%20session." target="_blank" rel="noopener" onclick="window.trackBookingEvent && window.trackBookingEvent('whatsapp_click',{page:'maternity'})">Ask in WhatsApp →</a></div>
     </div>
   </div>
   <div class="hero-scroll" aria-hidden="true"></div>

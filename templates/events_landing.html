@@ -23,6 +23,15 @@
     content_category: {{ (requested_type or 'all')|tojson }}
   });
   </script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_ads_id }}"></script>
+  <script>
+    window.__GOOGLE_ADS_ID = {{ google_ads_id|tojson }};
+    window.__GOOGLE_ADS_BOOKING_SEND_TO = {{ google_ads_booking_send_to|tojson }};
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', window.__GOOGLE_ADS_ID);
+  </script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{

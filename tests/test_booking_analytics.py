@@ -83,6 +83,8 @@ def test_track_endpoint_persists_visitor_session_and_funnel_event(client):
             "content": "creative_a",
         },
         "fbclid": "fb123",
+        "gbraid": "gbraid123",
+        "wbraid": "wbraid123",
         "metadata": {"slot_count": 3},
     }, headers={"Referer": "https://instagram.com/"})
 
@@ -99,6 +101,8 @@ def test_track_endpoint_persists_visitor_session_and_funnel_event(client):
     assert session["utm_campaign"] == "site_ab"
     assert session["utm_content"] == "creative_a"
     assert session["fbclid"] == "fb123"
+    assert session["gbraid"] == "gbraid123"
+    assert session["wbraid"] == "wbraid123"
     assert session["referrer"] == "https://instagram.com/"
     assert event["event_name"] == "drawer_open"
     assert event["event_id"] == "family-mini"
@@ -125,6 +129,8 @@ def test_reserve_links_booking_to_visitor_and_attribution(client):
         utm_campaign="dm_vs_site",
         utm_content="winning_post",
         fbclid="fb456",
+        gbraid="gbraid456",
+        wbraid="wbraid456",
         landing_url="https://book.pashynskaphoto.com/?utm_source=meta&utm_campaign=dm_vs_site&utm_content=winning_post&fbclid=fb456",
     ))
 
@@ -143,6 +149,8 @@ def test_reserve_links_booking_to_visitor_and_attribution(client):
     assert booking["utm_campaign"] == "dm_vs_site"
     assert booking["utm_content"] == "winning_post"
     assert booking["fbclid"] == "fb456"
+    assert booking["gbraid"] == "gbraid456"
+    assert booking["wbraid"] == "wbraid456"
     assert reserved_event is not None
     assert reserved_event["visitor_id"] == "v_booking_456"
 
