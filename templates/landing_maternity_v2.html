@@ -183,7 +183,7 @@
     ::selection{background:rgba(233,201,188,.6)}
 
     /* ═══ Pill nav ═══ */
-    .pill-nav{position:fixed;top:22px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:10px}
+    .pill-nav{position:fixed;top:22px;left:0;right:0;z-index:60;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;padding:0 16px}.pill-nav>*{flex:0 0 auto}
     .pn-logo{padding:11px 18px;border-radius:40px;background:rgba(255,255,255,.92);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
       font-family:var(--serif);font-size:1.5rem;font-weight:600;color:var(--gold-deep);text-decoration:none;transition:transform .35s ease;backdrop-filter:blur(10px);box-shadow:0 4px 18px rgba(120,70,55,.12)}
     .pn-logo:hover{transform:translateY(-2px)}

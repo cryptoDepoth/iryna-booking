@@ -194,7 +194,7 @@
     ::selection{background:rgba(201,162,75,.35)}
 
     /* ═══ Pill nav (desktop) ═══ */
-    .pill-nav{position:fixed;top:22px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:10px}
+    .pill-nav{position:fixed;top:22px;left:0;right:0;z-index:60;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;padding:0 16px}.pill-nav>*{flex:0 0 auto}
     .pn-logo{padding:11px 18px;border-radius:40px;background:rgba(27,22,17,.9);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
       font-family:var(--serif);font-size:1.5rem;font-weight:600;color:var(--gold-2);text-decoration:none;transition:transform .35s ease;backdrop-filter:blur(10px)}
     .pn-logo:hover{transform:translateY(-2px)}
@@ -498,45 +498,52 @@
 <section class="section" id="gallery">
   <span class="section-eyebrow rv">Recent work</span>
   <h2 class="section-title rv">Real Calgary weddings<span class="gline"></span></h2>
-  <div class="gal-grid">
-    <figure class="gal-card rv">
-      <div class="gal-frame"><img src="{{ gal1_url|default('/static/images/wedding-gallery-1.jpg') }}" alt="Bride and groom sharing a quiet first look — Calgary wedding photography" loading="lazy"></div>
-      <figcaption class="gal-cap"><span class="gal-num">01</span><span class="gal-txt">The first look</span></figcaption>
-    </figure>
-    <figure class="gal-card rv rv-d1">
-      <div class="gal-frame"><img src="{{ gal2_url|default('/static/images/wedding-gallery-2.jpg') }}" alt="Groom lifting the bride in a downtown arcade — Calgary elopement photography" loading="lazy"></div>
-      <figcaption class="gal-cap"><span class="gal-num">02</span><span class="gal-txt">Downtown elopement</span></figcaption>
-    </figure>
-    <figure class="gal-card rv rv-d2 gal-card--wide">
-      <div class="gal-frame"><img src="{{ gal3_url|default('/static/images/wedding-gallery-3.jpg') }}" alt="Bride embracing the groom at sunset — golden hour wedding portraits in Calgary" loading="lazy"></div>
-      <figcaption class="gal-cap"><span class="gal-num">03</span><span class="gal-txt">Golden hour vows</span></figcaption>
-    </figure>
-  </div>
-  <!-- ═══ PHOTO SLIDESHOW (added 2026-07-10 · Cowork · self-contained, namespaced .pxa-ss; existing gallery above untouched) ═══ -->
-  <div class="pxa-ss-wrap">
-    <span class="pxa-ss-eyebrow">A recent engagement in the Rockies</span>
-    <div class="pxa-ss pxa-ss--w" role="img" aria-label="Recent Calgary engagement session slideshow">
+  <div class="igss igss--w">
+    <div class="igss-stage" role="img" aria-label="Recent Calgary engagement session in the Rocky Mountains">
       <img src="/static/images/wedding-ss-1.jpg" alt="Couple embracing at golden hour with snowy Rocky Mountains — Banff engagement photographer" loading="lazy">
       <img src="/static/images/wedding-ss-2.jpg" alt="Couple holding hands by a turquoise Rocky Mountain lake — Calgary engagement" loading="lazy">
       <img src="/static/images/wedding-ss-3.jpg" alt="Engagement ring detail as a couple embrace by a mountain lake" loading="lazy">
       <img src="/static/images/wedding-ss-4.jpg" alt="Engaged couple laughing on a dock beside red canoes" loading="lazy">
       <img src="/static/images/wedding-ss-5.jpg" alt="Forehead kiss on a rock in the Canadian Rockies — Canmore engagement" loading="lazy">
-      <img src="/static/images/wedding-ss-6.jpg" alt="Groom lifting bride by Lake Minnewanka with snowy peaks" loading="lazy">
+      <img src="/static/images/wedding-ss-6.jpg" alt="Groom lifting his bride by Lake Minnewanka with snowy peaks" loading="lazy">
       <img src="/static/images/wedding-ss-7.jpg" alt="Playful couple portrait on a lake dock, Banff engagement session" loading="lazy">
+    </div>
+    <div class="igss-dots" aria-hidden="true">
+      <i></i>
+      <i></i>
+      <i></i>
+      <i></i>
+      <i></i>
+      <i></i>
+      <i></i>
     </div>
   </div>
   <style>
-    .pxa-ss-wrap{max-width:460px;margin:46px auto 0;text-align:center}
-    .pxa-ss-eyebrow{display:block;font-size:.8rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
-    .pxa-ss{position:relative;aspect-ratio:4/5;border-radius:6px;overflow:hidden;border:1px solid rgba(201,162,75,.35);background:var(--panel)}
-    .pxa-ss::after{content:"";position:absolute;inset:7px;border:1px solid rgba(232,196,95,.14);border-radius:3px;pointer-events:none;z-index:2}
-    .pxa-ss img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 32%;opacity:0}
-    .pxa-ss--w img{animation:pxaFade7 28s infinite}
-    .pxa-ss--w img:nth-child(2){animation-delay:4s}.pxa-ss--w img:nth-child(3){animation-delay:8s}
-    .pxa-ss--w img:nth-child(4){animation-delay:12s}.pxa-ss--w img:nth-child(5){animation-delay:16s}
-    .pxa-ss--w img:nth-child(6){animation-delay:20s}.pxa-ss--w img:nth-child(7){animation-delay:24s}
-    @keyframes pxaFade7{0%{opacity:0}3%{opacity:1}14.28%{opacity:1}17.28%{opacity:0}100%{opacity:0}}
-    @media(prefers-reduced-motion:reduce){.pxa-ss img{animation:none!important}.pxa-ss img:nth-child(1){opacity:1}}
+    .igss{max-width:600px;margin:44px auto 0}
+    .igss-stage{position:relative;aspect-ratio:4/5;border-radius:8px;overflow:hidden;border:1px solid rgba(201,162,75,.40);background:var(--panel,#1b1611)}
+    .igss-stage::after{content:"";position:absolute;inset:8px;border:1px solid rgba(232,196,95,.16);border-radius:4px;pointer-events:none;z-index:3}
+    .igss-stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 35%;opacity:0}
+    .igss-dots{display:flex;gap:8px;justify-content:center;margin-top:16px}
+    .igss-dots i{width:7px;height:7px;border-radius:50%;background:rgba(201,162,75,.28)}
+    .igss--w .igss-stage img{animation:igssFadew 28s infinite}
+    .igss--w .igss-stage img:nth-child(1){animation-delay:0s}
+    .igss--w .igss-stage img:nth-child(2){animation-delay:4s}
+    .igss--w .igss-stage img:nth-child(3){animation-delay:8s}
+    .igss--w .igss-stage img:nth-child(4){animation-delay:12s}
+    .igss--w .igss-stage img:nth-child(5){animation-delay:16s}
+    .igss--w .igss-stage img:nth-child(6){animation-delay:20s}
+    .igss--w .igss-stage img:nth-child(7){animation-delay:24s}
+    .igss--w .igss-dots i{animation:igssDotw 28s infinite}
+    .igss--w .igss-dots i:nth-child(1){animation-delay:0s}
+    .igss--w .igss-dots i:nth-child(2){animation-delay:4s}
+    .igss--w .igss-dots i:nth-child(3){animation-delay:8s}
+    .igss--w .igss-dots i:nth-child(4){animation-delay:12s}
+    .igss--w .igss-dots i:nth-child(5){animation-delay:16s}
+    .igss--w .igss-dots i:nth-child(6){animation-delay:20s}
+    .igss--w .igss-dots i:nth-child(7){animation-delay:24s}
+    @keyframes igssFadew{0%{opacity:0}3.0%{opacity:1}14.29%{opacity:1}17.29%{opacity:0}100%{opacity:0}}
+    @keyframes igssDotw{0%{background:rgba(201,162,75,.28);transform:scale(1)}3.0%{background:var(--gold-2,#e8c45f);transform:scale(1.3)}14.29%{background:var(--gold-2,#e8c45f);transform:scale(1.3)}17.29%{background:rgba(201,162,75,.28);transform:scale(1)}100%{background:rgba(201,162,75,.28);transform:scale(1)}}
+    @media(prefers-reduced-motion:reduce){.igss-stage img{animation:none}.igss-stage img:nth-child(1){opacity:1}.igss-dots i{animation:none}}
   </style>
 </section>
 
