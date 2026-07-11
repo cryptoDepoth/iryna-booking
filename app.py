@@ -3513,6 +3513,31 @@ def init_db():
         )
     ''')
 
+    # Durable short links for Instagram/WhatsApp outreach. Each link receives
+    # a random public code and carries that code in utm_term, so clicks,
+    # bookings and package deposits can be reconciled without storing a
+    # client's name in the public URL.
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS tracked_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT UNIQUE NOT NULL,
+            client_name TEXT DEFAULT '',
+            source_key TEXT NOT NULL,
+            utm_source TEXT NOT NULL,
+            utm_medium TEXT NOT NULL,
+            utm_campaign TEXT NOT NULL,
+            utm_content TEXT DEFAULT '',
+            landing_path TEXT DEFAULT '/',
+            campaign_label TEXT DEFAULT '',
+            ad_id TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            clicks INTEGER DEFAULT 0,
+            first_clicked_at TEXT,
+            last_clicked_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # Package checkouts have no confirmed session date yet, so they must not be
     # inserted into `bookings`. Keep them in a separate idempotent ledger until
     # Iryna confirms the date and converts the lead into a scheduled booking.
@@ -3647,6 +3672,8 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_analytics_visitor     ON analytics_events(visitor_id)",
         "CREATE INDEX IF NOT EXISTS idx_analytics_booking     ON analytics_events(booking_id)",
         "CREATE INDEX IF NOT EXISTS idx_analytics_event_time  ON analytics_events(event_name, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_tracked_links_code    ON tracked_links(code)",
+        "CREATE INDEX IF NOT EXISTS idx_tracked_links_created ON tracked_links(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_clients_email        ON clients(email)",
         "CREATE INDEX IF NOT EXISTS idx_package_orders_email ON package_orders(client_email)",
         "CREATE INDEX IF NOT EXISTS idx_package_orders_status ON package_orders(status)",
@@ -7832,11 +7859,156 @@ def admin_analytics():
 @app.route("/admin/link-generator")
 @admin_required
 def admin_link_generator():
-    """UTM link generator for tracking individual client outreach."""
+    """Tracked short-link generator for individual outreach and paid posts."""
+    conn = db_conn()
+    try:
+        tracked_links = [dict(row) for row in conn.execute("""
+            SELECT
+                t.*,
+                (SELECT COUNT(*) FROM bookings b WHERE b.utm_term=t.code) +
+                (SELECT COUNT(*) FROM package_orders p WHERE p.utm_term=t.code) AS bookings,
+                (SELECT COUNT(*) FROM bookings b
+                    WHERE b.utm_term=t.code AND (b.confirmed=1 OR b.paid=1 OR b.status='confirmed')) +
+                (SELECT COUNT(*) FROM package_orders p
+                    WHERE p.utm_term=t.code AND p.status='paid') AS confirmed_bookings
+            FROM tracked_links t
+            ORDER BY t.id DESC
+            LIMIT 100
+        """).fetchall()]
+    finally:
+        conn.close()
     return render_template(
         "admin_link_generator.html",
         CANONICAL_SITE_URL=CANONICAL_SITE_URL,
+        tracked_links=tracked_links,
     )
+
+
+_TRACKED_LINK_SOURCES = {
+    "ig_dm": ("instagram", "dm"),
+    "ig_story": ("instagram", "social"),
+    "whatsapp": ("whatsapp", "chat"),
+    "email": ("email", "email"),
+    "google": ("google", "organic"),
+    "referral": ("referral", "word_of_mouth"),
+    "facebook": ("facebook", "social"),
+    "tiktok": ("tiktok", "social"),
+    "other": ("direct", "link"),
+}
+_TRACKED_LINK_PATHS = {"/", "/wedding", "/family", "/maternity", "/book", "/private"}
+
+
+def _tracked_link_slug(value, fallback):
+    slug = re.sub(r"[^a-z0-9]+", "_", _safe_text(value, 120).lower()).strip("_")
+    return (slug or fallback)[:80]
+
+
+@app.route("/admin/api/tracked-links", methods=["POST"])
+@admin_required
+def admin_create_tracked_link():
+    """Create a durable short link for a client, post, or paid campaign."""
+    data = request.get_json(silent=True) or {}
+    client_name = _safe_text(data.get("client_name"), 120)
+    if not client_name:
+        return jsonify({"ok": False, "error": "client_name is required"}), 400
+
+    source_key = _safe_text(data.get("source_key"), 40)
+    if source_key not in _TRACKED_LINK_SOURCES:
+        source_key = "other"
+    utm_source, utm_medium = _TRACKED_LINK_SOURCES[source_key]
+
+    landing_path = _safe_text(data.get("landing_path") or "/", 80)
+    if landing_path not in _TRACKED_LINK_PATHS:
+        return jsonify({"ok": False, "error": "unsupported landing_path"}), 400
+
+    campaign_label = _safe_text(data.get("campaign_label"), 160)
+    ad_id = _safe_text(data.get("ad_id"), 120)
+    notes = _safe_text(data.get("notes"), 500)
+    campaign = _tracked_link_slug(campaign_label, "direct_client")
+    content = _tracked_link_slug(ad_id or campaign_label, "direct_message")
+
+    conn = db_conn()
+    try:
+        for _ in range(8):
+            code = secrets.token_urlsafe(7).replace("-", "").replace("_", "")[:9].lower()
+            try:
+                conn.execute("""
+                    INSERT INTO tracked_links
+                        (code, client_name, source_key, utm_source, utm_medium,
+                         utm_campaign, utm_content, landing_path, campaign_label,
+                         ad_id, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    code, client_name, source_key, utm_source, utm_medium,
+                    campaign, content, landing_path, campaign_label, ad_id, notes,
+                ))
+                conn.commit()
+                break
+            except sqlite3.IntegrityError:
+                continue
+        else:
+            return jsonify({"ok": False, "error": "could not allocate link code"}), 500
+    finally:
+        conn.close()
+
+    short_url = f"{CANONICAL_SITE_URL.rstrip('/')}/go/{code}"
+    return jsonify({
+        "ok": True,
+        "code": code,
+        "short_url": short_url,
+        "client_name": client_name,
+        "source": source_key,
+        "campaign_label": campaign_label,
+        "ad_id": ad_id,
+        "notes": notes,
+        "clicks": 0,
+        "bookings": 0,
+        "confirmed_bookings": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "utm": {
+            "source": utm_source,
+            "medium": utm_medium,
+            "campaign": campaign,
+            "content": content,
+            "term": code,
+        },
+    }), 201
+
+
+@app.route("/go/<code>")
+def tracked_outreach_link(code):
+    """Count a tracked-link click and redirect into the attributed booking flow."""
+    code = _safe_text(code, 32).lower()
+    conn = db_conn()
+    try:
+        row = conn.execute("SELECT * FROM tracked_links WHERE code=?", (code,)).fetchone()
+        if not row:
+            abort(404)
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute("""
+            UPDATE tracked_links
+            SET clicks=clicks+1,
+                first_clicked_at=COALESCE(first_clicked_at, ?),
+                last_clicked_at=?
+            WHERE code=?
+        """, (now, now, code))
+        conn.commit()
+        item = dict(row)
+    finally:
+        conn.close()
+
+    params = urllib.parse.urlencode({
+        "utm_source": item["utm_source"],
+        "utm_medium": item["utm_medium"],
+        "utm_campaign": item["utm_campaign"],
+        "utm_content": item["utm_content"],
+        "utm_term": item["code"],
+    })
+    target = f"{CANONICAL_SITE_URL.rstrip('/')}{item['landing_path']}?{params}"
+    response = redirect(target, code=302)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 @app.route("/admin/analytics.csv")

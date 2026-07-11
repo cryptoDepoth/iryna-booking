@@ -416,6 +416,16 @@
         </div>
         <div class="form-row">
             <div class="form-group">
+                <label>Campaign / post label</label>
+                <input type="text" id="campaignLabel" placeholder="e.g. canoe_dm, blossom_family, wedding_post">
+            </div>
+            <div class="form-group">
+                <label>Meta campaign or ad ID (optional)</label>
+                <input type="text" id="adId" placeholder="e.g. 120246459470790408">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
                 <label>Landing page (optional)</label>
                 <select id="pageSelect">
                     <option value="">📋 Main booking page (/)</option>
@@ -452,6 +462,7 @@
             <div class="utm-row"><span class="utm-key">utm_medium</span><span class="utm-val" id="utmMedium"></span></div>
             <div class="utm-row"><span class="utm-key">utm_campaign</span><span class="utm-val" id="utmCampaign"></span></div>
             <div class="utm-row"><span class="utm-key">utm_content</span><span class="utm-val" id="utmContent"></span></div>
+            <div class="utm-row"><span class="utm-key">utm_term</span><span class="utm-val" id="utmTerm"></span></div>
         </div>
     </div>
 
@@ -478,6 +489,7 @@ const SOURCE_MAP = {
 };
 
 let currentLink = '';
+let linkHistory = {{ tracked_links|tojson }};
 
 function applyPreset(key) {
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
@@ -485,17 +497,7 @@ function applyPreset(key) {
     document.getElementById('sourceSelect').value = key;
 }
 
-function slugify(text) {
-    return text.trim()
-        .toLowerCase()
-        .replace(/^@/, '')
-        .replace(/[^a-z0-9_]+/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '')
-        .substring(0, 40);
-}
-
-function generateLink() {
+async function generateLink() {
     const name = document.getElementById('clientName').value.trim();
     if (!name) {
         document.getElementById('clientName').style.borderColor = '#ef4444';
@@ -507,24 +509,44 @@ function generateLink() {
     const sourceKey = document.getElementById('sourceSelect').value;
     const page = document.getElementById('pageSelect').value;
     const notes = document.getElementById('clientNotes').value.trim();
-    const sm = SOURCE_MAP[sourceKey] || SOURCE_MAP.other;
-    const clientSlug = slugify(name);
+    const campaignLabel = document.getElementById('campaignLabel').value.trim();
+    const adId = document.getElementById('adId').value.trim();
+    const generateBtn = document.querySelector('.btn-generate');
+    generateBtn.disabled = true;
+    generateBtn.textContent = 'Creating…';
 
-    const params = new URLSearchParams({
-        utm_source: sm.source,
-        utm_medium: sm.medium,
-        utm_campaign: 'direct_client',
-        utm_content: clientSlug,
-    });
+    let data;
+    try {
+        const response = await fetch('/admin/api/tracked-links', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                client_name: name,
+                source_key: sourceKey,
+                landing_path: page || '/',
+                campaign_label: campaignLabel,
+                ad_id: adId,
+                notes,
+            }),
+        });
+        data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Could not create link');
+    } catch (error) {
+        alert(error.message || 'Could not create tracked link');
+        generateBtn.disabled = false;
+        generateBtn.textContent = '🔗 Generate Tracked Link';
+        return;
+    }
 
-    currentLink = BASE_URL + page + '?' + params.toString();
+    currentLink = data.short_url;
 
     // Show result
     document.getElementById('resultUrl').textContent = currentLink;
-    document.getElementById('utmSource').textContent = sm.source;
-    document.getElementById('utmMedium').textContent = sm.medium;
-    document.getElementById('utmCampaign').textContent = 'direct_client';
-    document.getElementById('utmContent').textContent = clientSlug;
+    document.getElementById('utmSource').textContent = data.utm.source;
+    document.getElementById('utmMedium').textContent = data.utm.medium;
+    document.getElementById('utmCampaign').textContent = data.utm.campaign;
+    document.getElementById('utmContent').textContent = data.utm.content;
+    document.getElementById('utmTerm').textContent = data.utm.term;
 
     // WhatsApp share
     const waText = encodeURIComponent('Hi! Here\'s the link to book your photo session: ' + currentLink);
@@ -538,13 +560,15 @@ function generateLink() {
     box.style.display = 'block';
 
     // Save to history
-    saveToHistory(name, sm.label, currentLink, notes);
+    linkHistory.unshift(data);
     loadHistory();
 
     // Reset copy button
     const copyBtn = document.getElementById('copyBtn');
     copyBtn.textContent = '📋 Copy Link';
     copyBtn.classList.remove('copied');
+    generateBtn.disabled = false;
+    generateBtn.textContent = '🔗 Generate Tracked Link';
 }
 
 function copyLink() {
@@ -559,41 +583,28 @@ function copyLink() {
     });
 }
 
-function saveToHistory(name, source, link, notes) {
-    const history = JSON.parse(localStorage.getItem('linkGenHistory') || '[]');
-    history.unshift({
-        name,
-        source,
-        link,
-        notes,
-        time: new Date().toISOString()
-    });
-    // Keep last 50
-    if (history.length > 50) history.length = 50;
-    localStorage.setItem('linkGenHistory', JSON.stringify(history));
-}
-
 function loadHistory() {
-    const history = JSON.parse(localStorage.getItem('linkGenHistory') || '[]');
     const card = document.getElementById('historyCard');
     const list = document.getElementById('historyList');
 
-    if (history.length === 0) {
+    if (linkHistory.length === 0) {
         card.style.display = 'none';
         return;
     }
     card.style.display = 'block';
-    list.innerHTML = history.slice(0, 20).map((item, i) => {
-        const timeAgo = getTimeAgo(new Date(item.time));
+    list.innerHTML = linkHistory.slice(0, 50).map((item, i) => {
+        const timeAgo = getTimeAgo(new Date(item.created_at));
+        const shortUrl = item.short_url || (BASE_URL.replace(/\/$/, '') + '/go/' + item.code);
+        const result = `${item.clicks || 0} clicks · ${item.bookings || 0} bookings · ${item.confirmed_bookings || 0} confirmed`;
         return `
             <div class="history-item">
                 <div class="history-meta">
-                    <div class="history-name">${escapeHtml(item.name)}</div>
-                    <div class="history-source">${escapeHtml(item.source)}${item.notes ? ' · ' + escapeHtml(item.notes) : ''}</div>
-                    <div class="history-time">${timeAgo}</div>
+                    <div class="history-name">${escapeHtml(item.client_name)}</div>
+                    <div class="history-source">${escapeHtml(item.campaign_label || item.source_key)}${item.ad_id ? ' · ' + escapeHtml(item.ad_id) : ''}${item.notes ? ' · ' + escapeHtml(item.notes) : ''}</div>
+                    <div class="history-time">${timeAgo} · ${result}</div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <a href="${escapeHtml(item.link)}" target="_blank" class="history-link">${escapeHtml(item.link)}</a>
+                    <a href="${escapeHtml(shortUrl)}" target="_blank" class="history-link">${escapeHtml(shortUrl)}</a>
                     <button class="btn-mini" onclick="reCopy(${i})">📋</button>
                 </div>
             </div>
@@ -602,9 +613,10 @@ function loadHistory() {
 }
 
 function reCopy(index) {
-    const history = JSON.parse(localStorage.getItem('linkGenHistory') || '[]');
-    if (history[index]) {
-        navigator.clipboard.writeText(history[index].link);
+    if (linkHistory[index]) {
+        const item = linkHistory[index];
+        const shortUrl = item.short_url || (BASE_URL.replace(/\/$/, '') + '/go/' + item.code);
+        navigator.clipboard.writeText(shortUrl);
     }
 }
 
