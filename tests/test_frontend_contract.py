@@ -125,6 +125,7 @@ def test_public_funnel_formats_money_and_offers_whatsapp_help():
     assert "$${money(total)}" in html
     assert "$${money(e.deposit || e.price || 0)}" in html
     assert "total: money(totalPrice)" in html
+    assert "total: money(e.full_price || 0)" in html
     assert "https://wa.me/13689977903" in html
     assert "whatsapp_click" in html
     assert '<main id="main-content">' in html

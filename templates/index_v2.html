@@ -2048,7 +2048,7 @@ async function openDrawer(id) {
       <div class="price-row">
         <div>
           <span class="p">$${e.deposit || 0}</span>
-          <small>${T('deposit_total_cad', {total: e.full_price || 0})}</small>
+          <small>${T('deposit_total_cad', {total: money(e.full_price || 0)})}</small>
         </div>
         <div style="text-align:right">
           <div id="drawerDateLabel" style="font-size:.78rem;color:var(--ink-3)">${fmtDate(selectedDate)}</div>
