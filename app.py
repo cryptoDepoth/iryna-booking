@@ -4049,27 +4049,137 @@ try:
 except Exception as _e:
     log.warning(f"[db] booking-date backfill skipped: {_e}")
 
+# Client cards are an operational dashboard, so their counters must reflect
+# the booking ledger even if an older payment path forgot to call sync_client.
+# This single correlated update is cheap at the current CRM size and repairs
+# historical $0-spend cards on every safe restart/deploy.
+def refresh_all_client_stats():
+    conn = db_conn()
+    conn.execute("""
+        UPDATE clients SET
+            total_bookings = (
+                SELECT COUNT(*) FROM bookings b
+                WHERE LOWER(b.email)=LOWER(clients.email)
+                  AND b.status NOT IN ('expired','cancelled')
+            ),
+            total_confirmed = (
+                SELECT COUNT(*) FROM bookings b
+                WHERE LOWER(b.email)=LOWER(clients.email)
+                  AND b.confirmed=1 AND b.status NOT IN ('expired','cancelled')
+            ),
+            total_paid = (
+                SELECT COALESCE(SUM(amount), 0) FROM (
+                    SELECT COALESCE(b.paid_amount, 0) AS amount
+                    FROM bookings b
+                    WHERE LOWER(b.email)=LOWER(clients.email)
+                      AND b.confirmed=1 AND b.status NOT IN ('expired','cancelled')
+                    UNION ALL
+                    SELECT COALESCE(p.deposit_amount, 0) AS amount
+                    FROM package_orders p
+                    WHERE LOWER(p.client_email)=LOWER(clients.email) AND p.status='paid'
+                )
+            ),
+            first_booking_at = (
+                SELECT MIN(b.date) FROM bookings b
+                WHERE LOWER(b.email)=LOWER(clients.email)
+                  AND b.status NOT IN ('expired','cancelled')
+            ),
+            last_booking_at = (
+                SELECT MAX(b.date) FROM bookings b
+                WHERE LOWER(b.email)=LOWER(clients.email)
+                  AND b.status NOT IN ('expired','cancelled')
+            )
+    """)
+    conn.commit()
+    conn.close()
+
+
+try:
+    refresh_all_client_stats()
+except Exception as _e:
+    log.warning(f"[db] client aggregate refresh skipped: {_e}")
+
 
 # ── BACKUP ───────────────────────────────────────────────────────────────────
 def create_backup(label: str = "auto") -> str:
-    """Copy the SQLite file to BACKUP_DIR with a timestamp.
-    Returns the backup file path."""
+    """Create a consistent SQLite snapshot and a portable recovery bundle.
+
+    SQLite's online backup API is safe while clients are actively booking;
+    copying the live database file byte-for-byte is not. The ZIP also carries
+    event configuration and the gift/referral database so a restore does not
+    silently lose part of the business state.
+    """
+    import zipfile
     import shutil
+    label = re.sub(r"[^a-zA-Z0-9_-]", "", str(label or "auto"))[:32] or "auto"
     ts = _local_now().strftime("%Y-%m-%d_%H-%M-%S")
     dest = os.path.join(BACKUP_DIR, f"bookings_{ts}_{label}.db")
-    shutil.copy2(DB_PATH, dest)
-    # Keep only the 30 most recent backups (prevent disk bloat)
-    all_bk = sorted(
-        [f for f in os.listdir(BACKUP_DIR) if f.endswith(".db")],
-        reverse=True
-    )
-    for old in all_bk[30:]:
-        try:
-            os.remove(os.path.join(BACKUP_DIR, old))
-        except OSError:
-            pass
-    log.info(f"[backup] Created: {dest}")
-    return dest
+    bundle = os.path.join(BACKUP_DIR, f"pashynska_backup_{ts}_{label}.zip")
+
+    source = sqlite3.connect(DB_PATH)
+    target = sqlite3.connect(dest)
+    try:
+        source.backup(target)
+        integrity = target.execute("PRAGMA integrity_check").fetchone()[0]
+        if integrity != "ok":
+            raise RuntimeError(f"Backup integrity check failed: {integrity}")
+        table_counts = {}
+        for table in ("bookings", "clients", "analytics_events"):
+            try:
+                table_counts[table] = target.execute(
+                    f'SELECT COUNT(*) FROM "{table}"'
+                ).fetchone()[0]
+            except sqlite3.Error:
+                pass
+    finally:
+        target.close()
+        source.close()
+
+    manifest = {
+        "created_at": _local_now().isoformat(),
+        "timezone": "America/Edmonton",
+        "format_version": 2,
+        "database": os.path.basename(dest),
+        "integrity_check": "ok",
+        "table_counts": table_counts,
+        "includes": ["bookings database"],
+    }
+    with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.write(dest, arcname="bookings.db")
+        if os.path.exists(_EVENTS_PATH):
+            archive.write(_EVENTS_PATH, arcname="events.yaml")
+            manifest["includes"].append("events configuration")
+        gift_db_path = getattr(gift_db, "DB_PATH", "")
+        if gift_db_path and os.path.exists(gift_db_path):
+            gift_snapshot = os.path.join(BACKUP_DIR, f"gift_{ts}_{label}.db")
+            gift_source = sqlite3.connect(gift_db_path)
+            gift_target = sqlite3.connect(gift_snapshot)
+            try:
+                gift_source.backup(gift_target)
+                gift_ok = gift_target.execute("PRAGMA integrity_check").fetchone()[0]
+                if gift_ok != "ok":
+                    raise RuntimeError(f"Gift backup integrity check failed: {gift_ok}")
+            finally:
+                gift_target.close()
+                gift_source.close()
+            archive.write(gift_snapshot, arcname="gift_referral.db")
+            manifest["includes"].append("gift and referral database")
+            os.remove(gift_snapshot)
+        archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+
+    # Keep 30 restore points of each type (in addition to Fly volume snapshots).
+    for suffix, prefix in ((".db", "bookings_"), (".zip", "pashynska_backup_")):
+        backups = sorted(
+            [f for f in os.listdir(BACKUP_DIR) if f.startswith(prefix) and f.endswith(suffix)],
+            reverse=True,
+        )
+        for old in backups[30:]:
+            try:
+                os.remove(os.path.join(BACKUP_DIR, old))
+            except OSError:
+                pass
+    log.info(f"[backup] Created and verified: {bundle}")
+    return bundle
 
 
 # Daily auto-backup on startup
@@ -4083,6 +4193,26 @@ try:
         create_backup("startup")
 except Exception as _be:
     log.warning(f"[backup] Startup backup failed: {_be}")
+
+
+def _daily_backup_worker():
+    """Keep daily backups running even when the app stays up for weeks."""
+    while True:
+        try:
+            today = _local_now().strftime("%Y-%m-%d")
+            has_today = any(
+                name.startswith(f"pashynska_backup_{today}")
+                for name in os.listdir(BACKUP_DIR)
+            )
+            if not has_today:
+                create_backup("daily")
+        except Exception as exc:
+            log.warning(f"[backup] Daily backup failed: {exc}")
+        time.sleep(6 * 60 * 60)
+
+
+if os.environ.get("FLASK_ENV") != "development" and not app.config.get("TESTING"):
+    threading.Thread(target=_daily_backup_worker, daemon=True, name="daily-backup").start()
 
 def _parse_reserved_until_utc(value):
     """Parse a reserved_until string to an aware UTC datetime.
@@ -4197,7 +4327,10 @@ def generate_slots(event=None):
     sl = ev.get("session_length", SESSION_LENGTH)
     slots = []
     current = start
-    while current < end:
+    # End time is the end of the working window, not merely the last allowed
+    # start. Never offer a session that visually runs past it (for example
+    # 18:50–19:20 when the event ends at 19:00).
+    while current + timedelta(minutes=sl) <= end:
         slot_str = current.strftime("%H:%M")
         session_end = current + timedelta(minutes=sl)
         slots.append({
@@ -4207,6 +4340,112 @@ def generate_slots(event=None):
         })
         current += timedelta(minutes=interval)
     return slots
+
+
+def _time_minutes(value):
+    """Convert a strict HH:MM value to minutes after midnight."""
+    try:
+        parsed = datetime.strptime(str(value or ""), "%H:%M")
+    except (TypeError, ValueError):
+        return None
+    return parsed.hour * 60 + parsed.minute
+
+
+def _booking_is_active(row, now=None):
+    """Return whether a booking still protects time on the calendar."""
+    data = dict(row) if not isinstance(row, dict) else row
+    if (data.get("status") or "") in ("cancelled", "expired"):
+        return False
+    if data.get("confirmed") or data.get("paid") or data.get("status") == "confirmed":
+        return True
+    raw_deadline = data.get("reserved_until")
+    if not raw_deadline:
+        return False
+    try:
+        deadline_local = datetime.fromisoformat(str(raw_deadline).replace(" ", "T", 1))
+    except ValueError:
+        return False
+    current = now or _local_now()
+    # Legacy rows (and a few admin tools) stored a naive local wall clock.
+    # Preserve that interpretation; current rows carry an explicit offset.
+    if deadline_local.tzinfo is None:
+        return deadline_local > current.replace(tzinfo=None)
+    return deadline_local.astimezone(timezone.utc) > current.astimezone(timezone.utc)
+
+
+def _booking_is_internal_block(row):
+    data = dict(row) if not isinstance(row, dict) else row
+    return (
+        (data.get("session_type") or "") == "internal_block"
+        or str(data.get("name") or "").startswith("⛔")
+    )
+
+
+def _slot_conflict_details(slot_time, event, booking):
+    """Describe an overlap between a proposed slot and an active booking.
+
+    A slot protects both the shooting time and the configured break following
+    it. This is intentionally interval-based rather than an exact HH:MM match:
+    changing an event's start time must never make a 14:40–15:10 session look
+    free when a client is already booked at 15:00.
+    """
+    row = dict(booking) if not isinstance(booking, dict) else booking
+    candidate_start = _time_minutes(slot_time)
+    booked_start = _time_minutes(row.get("time"))
+    if candidate_start is None or booked_start is None:
+        return None
+
+    # A manually closed grid position protects that exact position only. Real
+    # client bookings protect their complete session plus turnaround break.
+    if _booking_is_internal_block(row):
+        if candidate_start != booked_start:
+            return None
+        booked_event = event
+    else:
+        booked_event = get_event_by_id(row.get("event_id")) or event or {}
+
+    candidate_event = event or {}
+    candidate_session = int(candidate_event.get("session_length") or SESSION_LENGTH)
+    candidate_break = int(candidate_event.get("break_length") or 0)
+    booked_session = int(booked_event.get("session_length") or SESSION_LENGTH)
+    booked_break = int(booked_event.get("break_length") or 0)
+    candidate_end = candidate_start + candidate_session + candidate_break
+    booked_end = booked_start + booked_session + booked_break
+    if candidate_start >= booked_end or booked_start >= candidate_end:
+        return None
+    return {
+        "booking_id": row.get("id"),
+        "event_id": row.get("event_id"),
+        "time": row.get("time"),
+        "name": row.get("name") or "Existing booking",
+        "internal_block": _booking_is_internal_block(row),
+        "booked_end": f"{(booked_end // 60) % 24:02d}:{booked_end % 60:02d}",
+    }
+
+
+def _active_bookings_for_date(conn, date_value, now=None, exclude_booking_id=None):
+    rows = conn.execute(
+        """SELECT * FROM bookings
+           WHERE date=? AND status NOT IN ('cancelled','expired')""",
+        (date_value,),
+    ).fetchall()
+    return [
+        dict(row) for row in rows
+        if (exclude_booking_id is None or row["id"] != exclude_booking_id)
+        and _booking_is_active(row, now=now)
+    ]
+
+
+def _find_slot_conflict(conn, date_value, slot_time, event, now=None,
+                        exclude_booking_id=None):
+    for row in _active_bookings_for_date(
+        conn, date_value, now=now, exclude_booking_id=exclude_booking_id
+    ):
+        details = _slot_conflict_details(slot_time, event, row)
+        if details:
+            details["booking"] = row
+            return details
+    return None
 
 SLOTS = generate_slots()
 
@@ -4863,23 +5102,16 @@ def get_slots(date_str):
 
     # Single query instead of one per slot (N+1 → 1). Intentionally global by
     # date+time to prevent double-booking Iryna across different event cards.
-    c.execute("""
-        SELECT time, event_id FROM bookings
-        WHERE date=?
-          AND status NOT IN ('cancelled', 'expired')
-          AND (confirmed=1 OR reserved_until > ?)
-    """, (booking_date, now.isoformat()))
-    booked_rows = c.fetchall()
-    booked_times = {row["time"] for row in booked_rows}
+    booked_rows = _active_bookings_for_date(conn, booking_date, now=now)
     # Detect if any booking belongs to a different event (global cross-event block)
     foreign_booked = any(row["event_id"] != ev["id"] for row in booked_rows)
-    conn.close()
 
     available_slots = [
         {"time": s["time"], "label": s["label"]}
         for s in slots
-        if s["time"] not in booked_times
+        if not any(_slot_conflict_details(s["time"], ev, row) for row in booked_rows)
     ]
+    conn.close()
 
     return jsonify({
         "date": booking_date,
@@ -5304,13 +5536,7 @@ def reserve_slot():
         c.execute("BEGIN IMMEDIATE")
 
         # Slot is taken if there is a confirmed booking OR an active (non-expired) reservation
-        c.execute("""
-            SELECT id, event_id FROM bookings
-            WHERE date=? AND time=?
-              AND status NOT IN ('cancelled', 'expired')
-              AND (confirmed=1 OR reserved_until > ?)
-        """, (event_date, slot_time, now.isoformat()))
-        conflict = c.fetchone()
+        conflict = _find_slot_conflict(conn, event_date, slot_time, ev, now=now)
         if conflict:
             conn.rollback()
             conn.close()
@@ -7364,11 +7590,30 @@ def admin_health():
     }), 200 if overall_ok else 503
 
 
-def _admin_event_is_current(ev):
+def _admin_event_has_ended(ev, now=None):
+    now = now or _local_now()
+    if now.tzinfo is not None:
+        now = now.astimezone(_tz)
+    event_day = _admin_event_date_key(ev)
+    if event_day < now.date():
+        return True
+    if event_day > now.date():
+        return False
+    try:
+        end_clock = datetime.strptime(ev.get("end_time") or "23:59", "%H:%M").time()
+        return now.time().replace(tzinfo=None) >= end_clock
+    except (TypeError, ValueError):
+        return False
+
+
+def _admin_event_is_current(ev, now=None):
     """Admin organizer cards: show only actionable future/current sessions."""
     if not ev or ev.get("hidden"):
         return False
-    return (ev.get("status") or "").lower() in ("active", "upcoming")
+    return (
+        (ev.get("status") or "").lower() in ("active", "upcoming")
+        and not _admin_event_has_ended(ev, now=now)
+    )
 
 
 def _admin_event_date_key(ev):
@@ -7380,20 +7625,17 @@ def _admin_event_date_key(ev):
 
 
 def _admin_is_internal_block(row):
-    data = dict(row) if not isinstance(row, dict) else row
-    return (
-        (data.get("session_type") or "") == "internal_block"
-        or str(data.get("name") or "").startswith("⛔")
-    )
+    return _booking_is_internal_block(row)
 
 
-def _admin_event_summary(ev, conn=None, today=None):
+def _admin_event_summary(ev, conn=None, today=None, now=None):
     """Small event-first view model for /admin and /admin/event/<id>."""
     close_conn = False
     if conn is None:
         conn = db_conn()
         close_conn = True
-    today = today or _local_today()
+    now = now or _local_now()
+    today = today or now.date()
     event_id = ev.get("id") or ""
     event_date = ev.get("date") or ""
     slots = generate_slots(ev)
@@ -7419,7 +7661,7 @@ def _admin_event_summary(ev, conn=None, today=None):
             ).fetchall()
         if event_date:
             date_rows = conn.execute(
-                f"""SELECT time, name, session_type FROM bookings
+                f"""SELECT * FROM bookings
                     WHERE {active_status_filter} AND date=?""",
                 (event_date,),
             ).fetchall()
@@ -7427,12 +7669,22 @@ def _admin_event_summary(ev, conn=None, today=None):
         if close_conn:
             conn.close()
 
+    # Admin reporting keeps unresolved rows visible even when an old hold has
+    # no/expired deadline; only collision protection below uses active rows.
     booking_rows = [dict(r) for r in rows]
-    taken_times = {r["time"] for r in date_rows if r["time"]}
+    active_date_rows = [dict(r) for r in date_rows if _booking_is_active(r)]
     total_slots = len(slots)
-    blocked_rows = [b for b in booking_rows if _admin_is_internal_block(b)]
+    generated_times = {slot["time"] for slot in slots}
+    blocked_rows = [
+        b for b in booking_rows
+        if _admin_is_internal_block(b) and (not generated_times or b.get("time") in generated_times)
+    ]
     client_rows = [b for b in booking_rows if not _admin_is_internal_block(b)]
-    occupied_slots = len(taken_times) if total_slots else len(booking_rows)
+    conflicted_slots = [
+        slot for slot in slots
+        if any(_slot_conflict_details(slot["time"], ev, row) for row in active_date_rows)
+    ]
+    occupied_slots = len(conflicted_slots) if total_slots else len(booking_rows)
     booked_slots = len(client_rows)
     confirmed = sum(1 for b in client_rows if b.get("confirmed") or b.get("status") == "confirmed")
     pending = sum(
@@ -7443,6 +7695,7 @@ def _admin_event_summary(ev, conn=None, today=None):
     free = max(total_slots - occupied_slots, 0) if total_slots else 0
     paid_total = sum(float(b.get("paid_amount") or 0) for b in client_rows)
     event_day = _admin_event_date_key(ev)
+    has_ended = _admin_event_has_ended(ev, now=now)
 
     return {
         "id": event_id,
@@ -7464,17 +7717,18 @@ def _admin_event_summary(ev, conn=None, today=None):
         "free": free,
         "paid_total": paid_total,
         "attention_count": pending,
-        "is_future": event_day >= today,
-        "is_past": event_day < today,
-        "is_today": event_day == today,
+        "is_future": not has_ended,
+        "is_past": has_ended,
+        "is_today": event_day == today and not has_ended,
         "is_sold_out": total_slots > 0 and free == 0,
         "occupancy": int((occupied_slots / total_slots) * 100) if total_slots else 0,
     }
 
 
 def _admin_event_summaries():
-    today = _local_today()
-    current_events = [ev for ev in EVENTS if _admin_event_is_current(ev)]
+    now = _local_now()
+    today = now.date()
+    current_events = [ev for ev in EVENTS if _admin_event_is_current(ev, now=now)]
     # Sort: today first, then future by date, then past by date desc
     current_events.sort(key=lambda ev: (
         _admin_event_date_key(ev) < today,   # future/today first (False < True)
@@ -7482,7 +7736,7 @@ def _admin_event_summaries():
     ))
     conn = db_conn()
     try:
-        summaries = [_admin_event_summary(ev, conn=conn, today=today) for ev in current_events]
+        summaries = [_admin_event_summary(ev, conn=conn, today=today, now=now) for ev in current_events]
         # Only include past events if they still have pending bookings needing attention
         return [s for s in summaries if not s["is_past"] or s["attention_count"] > 0]
     finally:
@@ -7685,7 +7939,10 @@ def admin():
     c = conn.cursor()
 
     # Build WHERE clause
-    conditions = []
+    # Internal slot guards are implementation details, not clients. They stay
+    # visible on each event's slot board but never pollute the CRM table,
+    # revenue metrics or actionable payment counts.
+    conditions = ["COALESCE(session_type, '') != 'internal_block'"]
     params = []
 
     if date_from:
@@ -7714,8 +7971,14 @@ def admin():
     c.execute(f"SELECT COUNT(*) as total FROM bookings WHERE {where_clause}", params)
     total_count = c.fetchone()["total"]
 
-    # Get filtered bookings
-    order_clause = "ORDER BY date DESC, time ASC"
+    # Operational order: the next appointment comes first, not a booking one
+    # year away. Once future work is exhausted, show the most recent past work.
+    today_key = _local_today().isoformat()
+    order_clause = (
+        f"ORDER BY CASE WHEN date >= '{today_key}' THEN 0 ELSE 1 END, "
+        f"CASE WHEN date >= '{today_key}' THEN date END ASC, "
+        f"CASE WHEN date < '{today_key}' THEN date END DESC, time ASC"
+    )
     sql = f"SELECT * FROM bookings WHERE {where_clause} {order_clause} LIMIT ? OFFSET ?"
     params_with_limit = params + [limit_num, offset]
     c.execute(sql, params_with_limit)
@@ -7743,7 +8006,8 @@ def admin():
               "SUM(CASE WHEN status IN ('pending_payment', 'reserved') THEN 1 ELSE 0 END) as pending, "
               "SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled, "
               "SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as expired, "
-              "SUM(CASE WHEN status = 'confirmed' THEN paid_amount ELSE 0 END) as total_expected FROM bookings")
+              "SUM(CASE WHEN status = 'confirmed' THEN paid_amount ELSE 0 END) as total_expected "
+              "FROM bookings WHERE COALESCE(session_type, '') != 'internal_block'")
     overall_row = c.fetchone()
     overall_stats = {
         "total": overall_row["total"] or 0,
@@ -7758,7 +8022,9 @@ def admin():
     # Get unique session types for dropdown
     conn = db_conn()
     c = conn.cursor()
-    c.execute("SELECT DISTINCT session_type FROM bookings WHERE session_type IS NOT NULL AND session_type != '' ORDER BY session_type")
+    c.execute("SELECT DISTINCT session_type FROM bookings "
+              "WHERE session_type IS NOT NULL AND session_type != '' "
+              "AND session_type != 'internal_block' ORDER BY session_type")
     session_types = [row["session_type"] for row in c.fetchall()]
     conn.close()
 
@@ -7766,6 +8032,14 @@ def admin():
     next_event = next((ev for ev in event_summaries if ev.get("is_future")), None)
     today_local = _local_today()
     event_names = {ev.get("id"): ev.get("title", "") for ev in EVENTS if ev.get("id")}
+    show_all_events = request.args.get("show_all_events") == "1"
+    managed_events = list(EVENTS) if show_all_events else [
+        ev for ev in EVENTS
+        if not ev.get("hidden") and not str(ev.get("id") or "").startswith("private-")
+        and (ev.get("status") or "").lower() in ("active", "upcoming")
+        and str(ev.get("date") or "") >= today_local.isoformat()
+    ]
+    hidden_event_count = max(len(EVENTS) - len(managed_events), 0)
 
     # Classic admin remains the default (full feature set); new design is opt-in via ?v=2.
     template_name = "admin_pro.html" if request.args.get("v") == "2" else "admin.html"
@@ -7773,7 +8047,9 @@ def admin():
                            bookings=rows,
                            filtered_stats=filtered_stats,
                            overall_stats=overall_stats,
-                           events=EVENTS,
+                           events=managed_events,
+                           show_all_events=show_all_events,
+                           hidden_event_count=hidden_event_count,
                            event_summaries=event_summaries,
                            next_event=next_event,
                            now=_local_now(),
@@ -7806,7 +8082,7 @@ def admin_export():
     conn = db_conn()
     c = conn.cursor()
 
-    conditions = []
+    conditions = ["COALESCE(session_type, '') != 'internal_block'"]
     params = []
 
     if date_from:
@@ -9079,14 +9355,10 @@ def admin_reschedule():
             return jsonify({"success": True, "no_change": True})
 
         # Conflict check on target slot — excluding this booking itself
-        c.execute("""
-            SELECT id, event_id FROM bookings
-            WHERE date=? AND time=?
-              AND id <> ?
-              AND status NOT IN ('cancelled', 'expired')
-              AND (confirmed=1 OR reserved_until > ?)
-        """, (new_date, new_time, booking_id, now.isoformat()))
-        conflict = c.fetchone()
+        conflict = _find_slot_conflict(
+            conn, new_date, new_time, new_ev, now=now,
+            exclude_booking_id=booking_id,
+        )
         if conflict:
             conn.rollback()
             conn.close()
@@ -9400,8 +9672,29 @@ def admin_update_event(event_id):
         updated_event = next((e for e in EVENTS if e["id"] == event_id), event)
         slots_preview = generate_slots(updated_event)
 
+    schedule_health = {"off_grid": 0, "protected_overlaps": 0}
+    event_date = updated_event.get("date")
+    if event_date:
+        health_conn = db_conn()
+        try:
+            active_rows = _active_bookings_for_date(health_conn, event_date)
+            generated_times = {slot["time"] for slot in slots_preview}
+            real_rows = [row for row in active_rows if not _booking_is_internal_block(row)]
+            schedule_health["off_grid"] = sum(
+                1 for row in real_rows
+                if row.get("event_id") == event_id and row.get("time") not in generated_times
+            )
+            schedule_health["protected_overlaps"] = sum(
+                1 for slot in slots_preview
+                if slot["time"] not in {row.get("time") for row in active_rows}
+                and any(_slot_conflict_details(slot["time"], updated_event, row) for row in active_rows)
+            )
+        finally:
+            health_conn.close()
+
     log.info(f"[admin] Event {event_id} settings updated: {data}")
-    return jsonify({"success": True, "slots_count": len(slots_preview), "event": {
+    return jsonify({"success": True, "slots_count": len(slots_preview),
+        "schedule_health": schedule_health, "event": {
         "id": updated_event["id"],
         "start_time": updated_event.get("start_time"),
         "end_time": updated_event.get("end_time"),
@@ -10212,25 +10505,63 @@ def admin_event_slots(event_id):
     ).fetchall()
     summary = _admin_event_summary(ev, conn=conn)
     conn.close()
-    by_time = {r["time"]: dict(r) for r in rows}
+    display_rows = [dict(r) for r in rows]
+    active_rows = [r for r in display_rows if _booking_is_active(r)]
+    by_time = {r["time"]: r for r in display_rows}
+    base_times = {s["time"] for s in base}
     out = []
     for s in base:
         b = by_time.get(s["time"])
         is_block = bool(b and _admin_is_internal_block(b))
+        conflict = None
+        if not b:
+            for row in active_rows:
+                conflict = _slot_conflict_details(s["time"], ev, row)
+                if conflict:
+                    break
         out.append({
             "time": s["time"],
             "label": s["label"],
             "state": (
                 "blocked" if is_block else
                 "confirmed" if (b and b.get("confirmed")) else
-                ("pending" if b else "free")
+                "pending" if b else
+                "conflict" if conflict else "free"
             ),
             "booking_id": b["id"] if b else None,
             "client": ("Closed" if is_block else (b.get("name") if b else None)),
+            "grid_slot": True,
+            "off_grid": False,
+            "conflict_time": conflict.get("time") if conflict else None,
+            "conflict_booking_id": conflict.get("booking_id") if conflict else None,
         })
+
+    # A schedule edit can move the generated grid without moving existing
+    # bookings. Always show those real bookings in the board instead of making
+    # them disappear from the owner's view.
+    for b in display_rows:
+        if b.get("time") in base_times or _admin_is_internal_block(b):
+            continue
+        booked_event = get_event_by_id(b.get("event_id")) or ev
+        start_min = _time_minutes(b.get("time")) or 0
+        duration = int(booked_event.get("session_length") or SESSION_LENGTH)
+        end_min = start_min + duration
+        out.append({
+            "time": b.get("time"),
+            "label": f"{b.get('time')} – {(end_min // 60) % 24:02d}:{end_min % 60:02d}",
+            "state": "confirmed" if b.get("confirmed") else "pending",
+            "booking_id": b.get("id"),
+            "client": b.get("name") or "Client booking",
+            "grid_slot": False,
+            "off_grid": True,
+            "conflict_time": None,
+            "conflict_booking_id": None,
+        })
+    out.sort(key=lambda item: (_time_minutes(item.get("time")) or 0, not item.get("grid_slot")))
+    summary["conflicts"] = sum(1 for slot in out if slot.get("state") == "conflict")
+    summary["off_grid"] = sum(1 for slot in out if slot.get("off_grid"))
     event_roster = []
-    for row in rows:
-        b = dict(row)
+    for b in display_rows:
         if b.get("event_id") and b.get("event_id") != ev.get("id"):
             continue
         if _admin_is_internal_block(b):
@@ -10249,6 +10580,7 @@ def admin_event_slots(event_id):
             "paid_amount": float(b.get("paid_amount") or 0),
             "deposit_amount": float(b.get("deposit_amount") or ev.get("deposit") or 0),
             "full_price": float(b.get("full_price") or ev.get("full_price") or 0),
+            "off_grid": b.get("time") not in base_times,
             "selected_addons": _booking_addons(b),
             "addons_total": _booking_addons_total(b),
         })
@@ -10260,6 +10592,11 @@ def admin_event_slots(event_id):
             "location": ev.get("location"),
             "deposit": float(ev.get("deposit") or 0),
             "full_price": float(ev.get("full_price") or 0),
+            "start_time": ev.get("start_time"),
+            "end_time": ev.get("end_time"),
+            "session_length": int(ev.get("session_length") or SESSION_LENGTH),
+            "break_length": int(ev.get("break_length") or 0),
+            "slot_interval": int(ev.get("slot_interval") or SLOT_INTERVAL),
         },
         "summary": summary,
         "slots": out,
@@ -10298,14 +10635,7 @@ def admin_event_block_slot(event_id):
     c = conn.cursor()
     try:
         c.execute("BEGIN IMMEDIATE")
-        c.execute(
-            """SELECT id FROM bookings
-               WHERE date=? AND time=?
-                 AND status NOT IN ('cancelled','expired')
-                 AND (confirmed=1 OR reserved_until > ?)""",
-            (event_date, slot_time, now.isoformat()),
-        )
-        if c.fetchone():
+        if _find_slot_conflict(conn, event_date, slot_time, ev, now=now):
             conn.rollback()
             conn.close()
             return jsonify({"success": False, "error": "Slot already taken"}), 409
@@ -10447,16 +10777,12 @@ def admin_event_block_day(event_id):
     already = 0
     try:
         c.execute("BEGIN IMMEDIATE")
-        # Find which of these slots already have an active booking on this date.
-        placeholders = ",".join("?" for _ in all_slots)
-        c.execute(
-            f"""SELECT time FROM bookings
-                WHERE date=? AND time IN ({placeholders})
-                  AND status NOT IN ('cancelled','expired')
-                  AND (confirmed=1 OR reserved_until > ?)""",
-            [event_date] + all_slots + [now.isoformat()],
-        )
-        taken = {r["time"] for r in c.fetchall()}
+        # Treat interval overlaps as taken, including bookings that were left
+        # off-grid by a schedule edit.
+        taken = {
+            slot_time for slot_time in all_slots
+            if _find_slot_conflict(conn, event_date, slot_time, ev, now=now)
+        }
         already = len(taken)
 
         for slot_time in all_slots:
@@ -10548,14 +10874,7 @@ def admin_event_manual_book(event_id):
     c = conn.cursor()
     try:
         c.execute("BEGIN IMMEDIATE")
-        c.execute(
-            """SELECT id FROM bookings
-               WHERE date=? AND time=?
-                 AND status NOT IN ('cancelled', 'expired')
-                 AND (confirmed=1 OR reserved_until > ?)""",
-            (event_date, slot_time, now.isoformat()),
-        )
-        if c.fetchone():
+        if _find_slot_conflict(conn, event_date, slot_time, ev, now=now):
             conn.rollback()
             conn.close()
             return jsonify({"success": False, "error": "Slot already taken"}), 409
@@ -10964,12 +11283,8 @@ def api_private_session():
     try:
         c = conn.cursor()
         c.execute("BEGIN IMMEDIATE")
-        # UNIQUE(date,time) guards against a real double-book on the same slot.
-        taken = c.execute(
-            "SELECT id FROM bookings WHERE date=? AND time=? "
-            "AND status NOT IN ('cancelled','expired')",
-            (date, start_time),
-        ).fetchone()
+        # Protect the entire requested interval, not only its start time.
+        taken = _find_slot_conflict(conn, date, start_time, event, now=_local_now())
         if taken:
             conn.rollback()
             return jsonify({"error": "На эту дату и время уже есть бронь"}), 409
@@ -11080,13 +11395,25 @@ def admin_manual_backup():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/admin/backup-center")
+@admin_required
+def admin_backup_center():
+    return render_template("admin_backup_center.html")
+
+
 @app.route("/admin/backups")
 @admin_required
 def admin_list_backups():
     """List available database backups."""
     import glob as _glob
-    pattern = os.path.join(BACKUP_DIR, "bookings_*.db")
-    files = sorted(_glob.glob(pattern), reverse=True)
+    patterns = (
+        os.path.join(BACKUP_DIR, "pashynska_backup_*.zip"),
+        os.path.join(BACKUP_DIR, "bookings_*.db"),
+    )
+    files = sorted(
+        [path for pattern in patterns for path in _glob.glob(pattern)],
+        reverse=True,
+    )
     result = []
     for f in files[:50]:
         try:
@@ -11095,10 +11422,28 @@ def admin_list_backups():
                 "filename": os.path.basename(f),
                 "size_kb": round(stat.st_size / 1024, 1),
                 "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "download_url": (
+                    f"/admin/backups/download/{urllib.parse.quote(os.path.basename(f))}"
+                    if f.endswith(".zip") else None
+                ),
             })
         except OSError:
             pass
     return jsonify(result)
+
+
+@app.route("/admin/backups/download/<path:filename>")
+@admin_required
+def admin_download_backup(filename):
+    """Download a verified portable bundle for independent off-site storage."""
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or not safe_name.startswith("pashynska_backup_") or not safe_name.endswith(".zip"):
+        abort(404)
+    path = os.path.join(BACKUP_DIR, safe_name)
+    if not os.path.isfile(path):
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=safe_name,
+                     mimetype="application/zip")
 
 
 @app.route("/admin/api/clients/export")

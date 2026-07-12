@@ -137,6 +137,22 @@ def test_admin_event_slots_include_client_roster(admin_client):
     assert any(slot["booking_id"] == booking_id for slot in body["slots"])
 
 
+def test_admin_dashboard_hides_internal_slot_guards_from_client_table(admin_client):
+    c, db_path = admin_client
+    _insert_booking(
+        db_path,
+        name="TECHNICAL SLOT GUARD",
+        session_type="internal_block",
+        status="reserved",
+    )
+
+    response = c.get("/admin", headers=_headers())
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "TECHNICAL SLOT GUARD" not in html
+    assert '<option value="internal_block">' not in html
+
+
 def test_contact_edit_requires_admin(admin_client):
     c, db_path = admin_client
     booking_id = _insert_booking(db_path)

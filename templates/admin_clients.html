@@ -335,6 +335,22 @@
   @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
   @media (max-width: 768px) {
+    .topbar { padding: 0 8px; gap: 5px; }
+    .topbar-brand { font-size: 0; width: 26px; }
+    .topbar-brand::after {
+      content: "P"; font-size: 13px; font-weight: 800; color: #fff;
+      width: 24px; height: 24px; border-radius: 7px; background: var(--accent);
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .topbar-nav { gap: 1px; }
+    .topbar-nav a { padding: 6px 7px; font-size: 11px; }
+    .topbar-spacer { display: none; }
+    .backup-btn, .export-btn {
+      width: 37px; min-width: 37px; height: 36px; padding: 0; font-size: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .backup-btn::after { content: "SAVE"; font-size: 9px; color: #fff; font-weight: 800; }
+    .export-btn::after { content: "⬇"; font-size: 17px; }
     .layout { grid-template-columns: 1fr; }
     .detail-panel { display: none; }
     .detail-panel.mobile-show { display: block; }
@@ -368,8 +384,8 @@
     <a href="/admin/transfers">💸 Interac</a>
   </nav>
   <span class="topbar-spacer"></span>
-  <button class="backup-btn" onclick="triggerBackup()">💾 Backup Now</button>
-  <a class="export-btn" href="/admin/api/clients/export">⬇ Export CSV</a>
+  <button class="backup-btn" onclick="triggerBackup()" title="Create backup" aria-label="Create backup">💾 Backup Now</button>
+  <a class="export-btn" href="/admin/api/clients/export" title="Export clients CSV" aria-label="Export clients CSV">⬇ Export CSV</a>
 </header>
 
 <!-- MAIN LAYOUT -->

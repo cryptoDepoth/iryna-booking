@@ -70,6 +70,15 @@
   .legend-swatch.pending { background: var(--warn-bg); border-color: var(--warn-bg); }
   .legend-swatch.confirmed { background: var(--success-bg); border-color: var(--success-bg); }
   .legend-swatch.blocked { background: var(--danger-bg); border-color: var(--danger-bg); }
+  .legend-swatch.conflict { background: #ede9fe; border-color: #c4b5fd; }
+
+  .schedule-health {
+    display: none; margin-bottom: 16px; padding: 14px 16px; border-radius: var(--radius-sm);
+    border: 1px solid #c4b5fd; background: #f5f3ff; color: #4c1d95;
+  }
+  .schedule-health.show { display: block; }
+  .schedule-health strong { display: block; font-size: 14px; margin-bottom: 3px; }
+  .schedule-health p { font-size: 12px; margin: 0; }
 
   .session-stats {
     display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -114,6 +123,8 @@
   .slot.pending { background: var(--warn-bg); border-color: var(--warn-bg); cursor: default; }
   .slot.confirmed { background: var(--success-bg); border-color: var(--success-bg); cursor: default; }
   .slot.blocked { background: var(--danger-bg); border-color: #fecaca; cursor: default; }
+  .slot.conflict { background: #f5f3ff; border-color: #c4b5fd; cursor: default; }
+  .slot.off-grid { border-style: dashed; box-shadow: inset 4px 0 0 #7c3aed; }
   .slot-time { font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
   .slot-label { font-size: 11px; color: var(--text-2); margin-top: 2px; font-variant-numeric: tabular-nums; }
   .slot-status { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-top: 6px; display: inline-block; }
@@ -121,6 +132,12 @@
   .slot.pending .slot-status { color: var(--warn); }
   .slot.confirmed .slot-status { color: var(--success); }
   .slot.blocked .slot-status { color: var(--danger); }
+  .slot.conflict .slot-status { color: #6d28d9; }
+  .slot-note { font-size: 11px; line-height: 1.35; color: #5b21b6; margin-top: 7px; }
+  .off-grid-tag {
+    display: inline-block; margin-top: 7px; padding: 3px 7px; border-radius: 999px;
+    background: #ede9fe; color: #5b21b6; font-size: 10px; font-weight: 800;
+  }
   .slot-client {
     font-size: 12px; color: var(--text); margin-top: 6px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -223,6 +240,14 @@
     .session-stats { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 560px) {
+    .page { padding: 16px 12px 40px; }
+    .event-hero { padding: 17px 16px; }
+    .event-hero h1 { font-size: 19px; }
+    .board-card, .roster-card { padding: 13px; }
+    .slot-grid { grid-template-columns: 1fr; }
+    .slot { padding: 15px; }
+    .slot-time { font-size: 18px; }
+    .mini-btn { min-height: 38px; padding: 8px 11px; }
     .roster-contact { grid-template-columns: 1fr; }
     .topbar { padding: 0 16px; }
     .topbar-nav { display: none; }
@@ -254,6 +279,8 @@
     </div>
   </section>
 
+  <div id="scheduleHealth" class="schedule-health" role="status" aria-live="polite"></div>
+
   <div class="session-stats" aria-live="polite">
     <div class="stat-card"><div class="num" id="statBooked">—</div><div class="lbl">Booked</div></div>
     <div class="stat-card"><div class="num" id="statConfirmed">—</div><div class="lbl">Paid</div></div>
@@ -275,6 +302,7 @@
         <span class="legend-item"><span class="legend-swatch pending"></span>Reserved</span>
         <span class="legend-item"><span class="legend-swatch confirmed"></span>Confirmed / paid</span>
         <span class="legend-item"><span class="legend-swatch blocked"></span>Closed</span>
+        <span class="legend-item"><span class="legend-swatch conflict"></span>Protected overlap</span>
       </div>
       <div id="slotGrid" class="slot-grid" aria-live="polite">
         <div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-2);">Loading slots…</div>
@@ -403,8 +431,28 @@
     }
     const data = await res.json();
     renderStats(data.summary || {});
+    renderScheduleHealth(data.event || {}, data.summary || {});
     renderGrid(data.slots || []);
     renderRoster(data.bookings || []);
+  }
+
+  function renderScheduleHealth(event, summary) {
+    const box = document.getElementById('scheduleHealth');
+    const session = Number(event.session_length || 0);
+    const pause = Number(event.break_length || 0);
+    const interval = Number(event.slot_interval || session + pause);
+    const conflicts = Number(summary.conflicts || 0);
+    const offGrid = Number(summary.off_grid || 0);
+    if (!conflicts && !offGrid) {
+      box.className = 'schedule-health';
+      box.innerHTML = '';
+      return;
+    }
+    box.className = 'schedule-health show';
+    box.innerHTML = `<strong>Schedule protected — existing clients are safe</strong>
+      <p>${session}-min session + ${pause}-min break = ${interval}-min spacing. ` +
+      `${conflicts} generated time${conflicts === 1 ? '' : 's'} cannot be opened because they overlap a booking. ` +
+      `${offGrid ? `${offGrid} existing booking${offGrid === 1 ? '' : 's'} sit outside the current grid and are shown below.` : ''}</p>`;
   }
 
   function renderStats(summary) {
@@ -423,8 +471,9 @@
     gridEl.innerHTML = slots.map(s => {
       const state = s.state;
       const clientLine = s.client ? `<div class="slot-client">${esc(s.client)}</div>` : '';
-      const openLink = s.booking_id
-        ? `<a class="slot-link" href="/admin/booking/${s.booking_id}" onclick="event.stopPropagation();">Open #${s.booking_id} →</a>`
+      const linkedBooking = s.booking_id || s.conflict_booking_id;
+      const openLink = linkedBooking
+        ? `<a class="slot-link" href="/admin/booking/${linkedBooking}" onclick="event.stopPropagation();">Open booking #${linkedBooking} →</a>`
         : '';
       const freeActions = state === 'free'
         ? `<div class="slot-actions">
@@ -437,13 +486,21 @@
         : '';
       const statusLabel = state === 'free'
         ? 'Free'
-        : (state === 'blocked' ? 'Closed' : (state === 'confirmed' ? 'Confirmed' : 'Reserved'));
+        : (state === 'blocked' ? 'Closed' : (state === 'confirmed' ? 'Confirmed' : (state === 'conflict' ? 'Protected overlap' : 'Reserved')));
+      const conflictNote = state === 'conflict'
+        ? `<div class="slot-note">Cannot open: overlaps the existing ${esc(s.conflict_time || '')} booking and its required break.</div>`
+        : '';
+      const offGridTag = s.off_grid
+        ? '<span class="off-grid-tag">EXISTING BOOKING · OUTSIDE CURRENT GRID</span>'
+        : '';
       return `
-        <div class="slot ${state}">
+        <div class="slot ${state}${s.off_grid ? ' off-grid' : ''}">
           <div class="slot-time">${esc(s.time)}</div>
           <div class="slot-label">${esc(s.label)}</div>
           <div class="slot-status">${statusLabel}</div>
+          ${offGridTag}
           ${clientLine}
+          ${conflictNote}
           ${openLink}
           ${freeActions}
           ${blockedActions}

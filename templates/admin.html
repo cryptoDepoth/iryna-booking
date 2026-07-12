@@ -1232,6 +1232,7 @@
         <a href="/admin/analytics" class="topbar-link" style="font-size:13px;">📊 Analytics</a>
         <a href="/admin/link-generator" class="topbar-link" style="font-size:13px;">🔗 Links</a>
         <a href="/admin/clients" class="topbar-link" style="font-size:13px;">👥 Clients</a>
+        <a href="/admin/backup-center" class="topbar-link" style="font-size:13px;">💾 Backups</a>
         <a href="/admin/transfers" class="topbar-link" style="font-size:13px;">💸 Interac</a>
         <a href="/admin/health" class="topbar-link" style="font-size:13px;">Health</a>
         <span class="topbar-badge">Admin</span>
@@ -1266,7 +1267,7 @@
                     <div class="meta">
                         <span>📅 {{ next_event.date }}{% if next_event.start_time %} · {{ next_event.start_time }}{% endif %}</span>
                         {% if next_event.location %}<span>📍 {{ next_event.location.split(',')[0] }}</span>{% endif %}
-                        <span>{{ next_event.booked }} / {{ next_event.total_slots }} booked</span>
+                        <span>{{ next_event.free }} free · {{ next_event.booked }} booked{% if next_event.blocked %} · {{ next_event.blocked }} closed{% endif %}</span>
                     </div>
                     {% else %}
                     <h2>No active or upcoming sessions</h2>
@@ -1307,6 +1308,9 @@
                         <div class="session-metric"><b>{{ ev.free }}</b><span>Free</span></div>
                     </div>
                     <div class="session-progress" aria-label="{{ ev.occupancy }}% booked"><span style="width: {{ ev.occupancy }}%"></span></div>
+                    {% if ev.blocked %}
+                    <div style="font-size:11px;color:var(--text-3);margin-top:7px;">🔒 {{ ev.blocked }} slot{{ '' if ev.blocked == 1 else 's' }} closed manually</div>
+                    {% endif %}
                     <div class="session-actions">
                         <a class="btn-save" href="/admin/event/{{ ev.id }}" style="text-decoration:none;">Open session</a>
                         <a class="btn-outline" href="/?event={{ ev.id }}" target="_blank">View public</a>
@@ -1627,6 +1631,11 @@
                 <p>Create, edit and manage shooting events — slots are computed automatically</p>
             </div>
             <div class="page-actions">
+                {% if show_all_events %}
+                <a class="btn-outline" href="/admin#events-section" style="text-decoration:none;">Hide private/hidden</a>
+                {% elif hidden_event_count %}
+                <a class="btn-outline" href="/admin?show_all_events=1#events-section" style="text-decoration:none;">Show {{ hidden_event_count }} archived/private</a>
+                {% endif %}
                 <button class="btn-save" onclick="openCreateModal()" style="display:inline-flex;align-items:center;gap:6px;">
                     ✦ New event
                 </button>
@@ -2784,7 +2793,12 @@
             if (errors.length) {
                 toast('Error: ' + errors.join(' | '), 'error');
             } else {
-                toast(`✅ Saved — ${schedData.slots_count} slots`, 'success');
+                const health = schedData.schedule_health || {};
+                if (health.off_grid || health.protected_overlaps) {
+                    toast(`⚠️ Saved safely — ${health.protected_overlaps || 0} overlapping time(s) protected, ${health.off_grid || 0} booking(s) outside the new grid`, 'success');
+                } else {
+                    toast(`✅ Saved — ${schedData.slots_count} slots`, 'success');
+                }
                 updateSlotsPreview(eventId);
 
                 // Update displayed title in card header

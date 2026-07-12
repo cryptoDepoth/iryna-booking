@@ -155,6 +155,26 @@ def test_admin_api_clients_returns_array_with_expected_fields(client):
     assert row["tags"] != "[]"
 
 
+def test_refresh_all_client_stats_repairs_stale_paid_totals(client):
+    email = "stale-total@example.com"
+    _insert_booking(email, "2026-08-01", "15:00", paid_amount=120.75)
+    booking_app.sync_client(email, "Stale Total")
+    conn = booking_app.db_conn()
+    conn.execute("UPDATE clients SET total_paid=0, total_confirmed=0 WHERE email=?", (email,))
+    conn.commit()
+    conn.close()
+
+    booking_app.refresh_all_client_stats()
+
+    conn = booking_app.db_conn()
+    row = conn.execute(
+        "SELECT total_paid, total_confirmed FROM clients WHERE email=?", (email,)
+    ).fetchone()
+    conn.close()
+    assert row["total_paid"] == pytest.approx(120.75)
+    assert row["total_confirmed"] == 1
+
+
 def test_canonical_site_url_constant_matches_csp(client):
     """If the canonical host ever changes, CSP frame-ancestors needs to follow.
     Catch the drift early."""

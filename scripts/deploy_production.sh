@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-EXPECTED_DIR="/Users/andrzej/Iryna-Master/01-Booking-System"
+EXPECTED_DIR="/Users/andrzej/business/iryna/iryna-booking"
 APP="iryna-booking"
 FLY="/Users/andrzej/.fly/bin/flyctl"
 
@@ -24,7 +24,7 @@ fi
 python3 -m pytest -q
 "$FLY" deploy --remote-only --yes -a "$APP"
 
-python - <<'PY'
+python3 - <<'PY'
 import urllib.request, re, sys
 checks = [
     ('https://book.pashynskaphoto.com/healthz', 'ok'),
