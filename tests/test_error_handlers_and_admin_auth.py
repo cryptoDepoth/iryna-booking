@@ -157,6 +157,13 @@ def test_unauthorised_admin_api_returns_json_401(client, monkeypatch):
     assert resp.get_json() == {"error": "Unauthorized"}
 
 
+def test_admin_key_in_query_string_is_rejected(client):
+    """Secrets in URLs leak into history/referrers; only headers/body are valid."""
+    response = client.get("/admin/api/clients?key=test-admin-key")
+    assert response.status_code == 401
+    assert response.get_json() == {"error": "Unauthorized"}
+
+
 # ── portfolio URL wiring ─────────────────────────────────────────────────────
 
 def test_portfolio_url_rendered_in_home(client):

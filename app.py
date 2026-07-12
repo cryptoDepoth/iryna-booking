@@ -751,7 +751,6 @@ def _admin_key_from_request():
     body = request.get_json(silent=True) if request.is_json else None
     return (
         request.headers.get("X-Admin-Key")
-        or request.args.get("key")
         or ((body or {}).get("key") if isinstance(body, dict) else None)
         or ""
     )
@@ -760,14 +759,16 @@ def _admin_authorized():
     # Browser session (logged in via /admin/login)
     if session.get("admin_authenticated"):
         return True
-    # Programmatic API access via X-Admin-Key header or ?key= param
+    # Programmatic API access via header/body only. Admin secrets must never
+    # be accepted in a URL where browser history, analytics and referrers can
+    # persist them.
     if ADMIN_KEY and _admin_key_from_request() == ADMIN_KEY:
         return True
     # SECURITY: never allow open access — admin MUST have credentials set
     return False
 
 def admin_required(f):
-    """Require a browser login, X-Admin-Key header, or ?key= query param.
+    """Require a browser login or X-Admin-Key authentication.
 
     Behaviour when unauthorised:
     - GET an HTML admin page (e.g. /admin, /admin/clients, /admin/booking/<id>)
@@ -804,7 +805,10 @@ TELEGRAM_ALLOWED_ADMIN_USERNAMES = os.environ.get(
     "TELEGRAM_ALLOWED_ADMIN_USERNAMES",
     "pashynskaphoto",
 )
-TELEGRAM_ALLOWED_ADMIN_USER_IDS = os.environ.get("TELEGRAM_ALLOWED_ADMIN_USER_IDS", "")
+TELEGRAM_ALLOWED_ADMIN_USER_IDS = os.environ.get(
+    "TELEGRAM_ALLOWED_ADMIN_USER_IDS",
+    "792920251,938104602",  # Andrzej + Iryna (@pashynskaphoto)
+)
 # Secret token for the Telegram webhook (set when calling setWebhook). When set,
 # every incoming POST /telegram/webhook must carry the matching value in the
 # X-Telegram-Bot-Api-Secret-Token header — otherwise the request is rejected.
@@ -7983,6 +7987,22 @@ def admin():
     params_with_limit = params + [limit_num, offset]
     c.execute(sql, params_with_limit)
     rows = [dict(r) for r in c.fetchall()]
+
+    # Event detail links back here with ?reschedule_id=. Resolve the target
+    # independently of pagination/filters so the reschedule dialog always
+    # opens, even when that booking is not among the 50 visible rows.
+    reschedule_target = None
+    try:
+        reschedule_id = int(request.args.get("reschedule_id") or 0)
+    except (TypeError, ValueError):
+        reschedule_id = 0
+    if reschedule_id > 0:
+        target_row = c.execute(
+            "SELECT id, name, date, time, event_id FROM bookings WHERE id=?",
+            (reschedule_id,),
+        ).fetchone()
+        if target_row:
+            reschedule_target = dict(target_row)
     conn.close()
     for row in rows:
         row["selected_addons"] = _booking_addons(row)
@@ -8032,6 +8052,18 @@ def admin():
     next_event = next((ev for ev in event_summaries if ev.get("is_future")), None)
     today_local = _local_today()
     event_names = {ev.get("id"): ev.get("title", "") for ev in EVENTS if ev.get("id")}
+    reschedule_events = [
+        {
+            "id": ev.get("id"),
+            "title": ev.get("title") or ev.get("id"),
+            "date": ev.get("date") or "",
+            "booking_type": _booking_type(ev),
+        }
+        for ev in EVENTS
+        if ev.get("id")
+        and not ev.get("hidden")
+        and (ev.get("status") or "").lower() in ("active", "upcoming")
+    ]
     show_all_events = request.args.get("show_all_events") == "1"
     managed_events = list(EVENTS) if show_all_events else [
         ev for ev in EVENTS
@@ -8050,6 +8082,8 @@ def admin():
                            events=managed_events,
                            show_all_events=show_all_events,
                            hidden_event_count=hidden_event_count,
+                           reschedule_target=reschedule_target,
+                           reschedule_events=reschedule_events,
                            event_summaries=event_summaries,
                            next_event=next_event,
                            now=_local_now(),

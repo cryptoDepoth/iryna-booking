@@ -1208,6 +1208,55 @@
         .preset-chip:active {
             transform: scale(0.96);
         }
+
+        /* Professional visual layer: quiet Apple-like depth with only subtle
+           motion inspired by kinetics.colorion.co. Functional markup/JS stay
+           untouched, so every workflow remains keyboard and mobile safe. */
+        .topbar{position:sticky;top:0;z-index:50}
+        *:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+        .btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-delete,.filter-btn{
+          transition:transform .06s ease,box-shadow .12s ease,background .12s ease,border-color .12s ease
+        }
+        .btn-outline:active,.btn-confirm:active,.btn-cancel:active,.btn-save:active,.btn-done:active,.btn-delete:active,.filter-btn:active{transform:translateY(1px)}
+        .status-pill,.badge{letter-spacing:.02em}
+
+        :root{
+          --bg:#f5f5f7;--surface:#ffffff;--surface-2:#fbfbfd;
+          --border:rgba(0,0,0,.09);--border-strong:rgba(0,0,0,.16);
+          --text:#1d1d1f;--text-2:#6e6e73;--text-3:#8e8e93;
+          --accent:#0071e3;--accent-light:#eaf3ff;
+          --green:#30b350;--green-light:#e7f8ec;--green-text:#1a7f37;
+          --red:#ff3b30;--red-light:#ffecec;--red-text:#c1272d;
+          --yellow:#ff9f0a;--yellow-light:#fff3e0;--yellow-text:#8a5a00;
+          --blue:#0071e3;--blue-light:#eaf3ff;--blue-text:#0a5bb8;
+          --gray-light:#f0f0f3;--gray-text:#6e6e73;--radius:14px;
+        }
+        body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+        .topbar{background:rgba(255,255,255,.78);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--border)}
+        .topbar-brand{color:var(--text)}
+        .card,.ops-card,.bookings-card,.session-card,.attention-panel,.event-settings-card{border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 34px -22px rgba(0,0,0,.18)}
+        .btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-mark-paid,.btn-balance,.btn-reschedule,.filter-btn{border-radius:980px;font-weight:600}
+        .filter-btn.active{background:var(--text);color:#fff;border-color:var(--text)}
+        .badge,.status-pill{border-radius:980px;letter-spacing:.01em}
+        .session-metric,.stat{border-radius:12px}
+        .ev-tabbar{background:var(--gray-light);padding:3px;border-radius:12px;display:inline-flex;gap:3px}
+        .ev-tab{border:none;background:transparent;border-radius:9px;font-weight:600}
+        .ev-tab.active{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.07)}
+        .search-input,.form-group input,.form-group select,.form-group textarea{border-radius:10px}
+        .search-input:focus,.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-light);outline:none}
+
+        /* Operational bookings list: one visual group per shoot day;
+           individual sessions are distinct without looking alarming. */
+        .day-sep td{background:var(--gray-light);font-weight:700;font-size:12px;color:var(--text-2);padding:9px 14px;letter-spacing:.02em}
+        .row-individual{background:#f3eefc}
+        .row-individual:hover{background:#ece4fb}
+        .row-individual .cell-time,.row-individual .cell-name a{color:#6b3fa0}
+        .row-individual td:first-child{box-shadow:inset 3px 0 0 #8b5cf6}
+        @media(max-width:640px){
+          .btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-delete,.filter-btn{min-height:40px}
+          .day-sep td{position:sticky;left:0}
+        }
+        @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
     </style>
 </head>
 <body>
@@ -1516,8 +1565,13 @@
                 </tr>
             </thead>
             <tbody id="tbody">
+                {% set daygrp = namespace(prev='') %}
                 {% for b in bookings %}
-                <tr class="brow row-{{ b.status }}"
+                {% if b.date != daygrp.prev %}
+                <tr class="day-sep"><td colspan="9">📅 {{ b.date }}</td></tr>
+                {% set daygrp.prev = b.date %}
+                {% endif %}
+                <tr class="brow row-{{ b.status }}{% if b.session_type in ('individual', 'private') %} row-individual{% endif %}"
                     data-status="{{ b.status }}"
                     data-search="{{ (b.name or '') | lower }} {{ (b.email or '') | lower }} {{ (b.instagram or '') | lower }} {{ (b.phone or '') | lower }}">
 
@@ -2371,6 +2425,7 @@
     /* ══════════════════════════════════════════════════════════
        RESCHEDULE — move a booking to another event / date / time
     ══════════════════════════════════════════════════════════ */
+    const adminRescheduleEvents = {{ (reschedule_events or []) | tojson }};
     let _reschedState = {
         bookingId: null,
         clientName: '',
@@ -2383,6 +2438,10 @@
 
     async function _loadEventsList() {
         if (_reschedState.eventsCache) return _reschedState.eventsCache;
+        if (Array.isArray(adminRescheduleEvents) && adminRescheduleEvents.length) {
+            _reschedState.eventsCache = adminRescheduleEvents;
+            return _reschedState.eventsCache;
+        }
         try {
             const r = await fetch('/events');
             const j = await r.json();
@@ -2436,6 +2495,19 @@
         document.getElementById('resched-modal').classList.remove('open');
         document.body.style.overflow = '';
         _reschedState.bookingId = null;
+    }
+
+    const autoRescheduleTarget = {{ (reschedule_target or none) | tojson }};
+    if (autoRescheduleTarget) {
+        window.addEventListener('DOMContentLoaded', () => {
+            openRescheduleModal(
+                autoRescheduleTarget.id,
+                autoRescheduleTarget.name || '',
+                autoRescheduleTarget.date || '',
+                autoRescheduleTarget.time || '',
+                autoRescheduleTarget.event_id || ''
+            );
+        });
     }
 
     async function _onReschedEventChange() {
@@ -2692,7 +2764,9 @@
         const end = eh * 60 + em;
         const interval = sessionLen + breakLen;
         if (interval <= 0 || cur >= end) return slots;
-        while (cur < end) {
+        // Match backend generate_slots(): the working-window end is a real
+        // cutoff, so never preview a session that finishes after it.
+        while (cur + sessionLen <= end) {
             const h = String(Math.floor(cur / 60)).padStart(2, '0');
             const m = String(cur % 60).padStart(2, '0');
             const cur2 = cur + sessionLen;
@@ -2945,7 +3019,10 @@
         document.body.style.overflow = 'hidden';
         // Set default date to next week
         const d = new Date(); d.setDate(d.getDate() + 7);
-        const iso = d.toISOString().split('T')[0];
+        // Format the browser's local calendar day. toISOString() converts to
+        // UTC and made evening Calgary users see tomorrow + 7 by mistake.
+        const localMs = d.getTime() - d.getTimezoneOffset() * 60000;
+        const iso = new Date(localMs).toISOString().split('T')[0];
         document.getElementById('new-date').value = iso;
         toggleCreateBookingTypeFields();
         setTimeout(() => document.getElementById('new-title').focus(), 100);
@@ -3542,7 +3619,8 @@
     }
 
     function openPrivateSessionModal() {
-        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
         document.getElementById('private-date').value = today;
         document.getElementById('private-date').min = today;
         document.getElementById('private-firstname').value = '';

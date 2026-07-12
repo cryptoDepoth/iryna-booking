@@ -446,6 +446,7 @@ def test_check_single_email_reconciles_late_interac_amount_for_confirmed_booking
     Yulia Levitskaya
     """
     monkeypatch.setattr(checker, "DB_PATH", str(db_path))
+    monkeypatch.setattr(checker, "_utc_now", lambda: now.replace(tzinfo=timezone.utc))
     monkeypatch.setattr(checker, "read_message_body", lambda message_id: body)
     monkeypatch.setattr(checker, "_notify_admin_reconciled", lambda *a, **k: None)
 
@@ -506,6 +507,7 @@ def test_check_single_email_reconciles_previously_processed_orphan_interac(tmp_p
     Yulia Levitskaya
     """
     monkeypatch.setattr(checker, "DB_PATH", str(db_path))
+    monkeypatch.setattr(checker, "_utc_now", lambda: now.replace(tzinfo=timezone.utc))
     monkeypatch.setattr(checker, "read_message_body", lambda message_id: body)
     monkeypatch.setattr(checker, "_notify_admin_reconciled", lambda *a, **k: None)
 

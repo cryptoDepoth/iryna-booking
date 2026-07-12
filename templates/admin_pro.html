@@ -301,7 +301,7 @@ function _pvCollect(){
 function togglePrivatePaid(){const paid=document.getElementById('private-already-paid').checked,sb=document.getElementById('private-send-email');sb.disabled=paid;sb.checked=!paid}
 async function copyPaymentLink(){const link=document.getElementById('private-payment-link').value;if(!link){_pvStatus('Сначала создайте сессию — ссылка появится автоматически.','error');return}try{await navigator.clipboard.writeText(link);_pvStatus('📋 Ссылка скопирована.','success')}catch(e){const ta=document.getElementById('private-payment-link');ta.focus();ta.select();document.execCommand('copy');_pvStatus('📋 Ссылка скопирована.','success')}}
 function openPrivateSessionModal(){
-  const today=new Date().toISOString().split('T')[0];
+  const now=new Date(),today=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().split('T')[0];
   document.getElementById('private-date').value=today;document.getElementById('private-date').min=today;
   ['private-firstname','private-lastname','private-email','private-instagram'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('private-start-time').value='10:00';document.getElementById('private-end-time').value='11:00';
@@ -391,7 +391,7 @@ async function submitPrivateSession(){
 
 <script>
 /* ===== Create event (reused payload/collectors from classic) ===== */
-function openCreateModal(){const d=new Date();d.setDate(d.getDate()+7);document.getElementById('new-date').value=d.toISOString().split('T')[0];toggleCreateBookingTypeFields();document.getElementById('create-modal').classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('new-title').focus(),100)}
+function openCreateModal(){const d=new Date();d.setDate(d.getDate()+7);const localMs=d.getTime()-d.getTimezoneOffset()*60000;document.getElementById('new-date').value=new Date(localMs).toISOString().split('T')[0];toggleCreateBookingTypeFields();document.getElementById('create-modal').classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('new-title').focus(),100)}
 function closeCreateModal(){document.getElementById('create-modal').classList.remove('open');document.body.style.overflow=''}
 function closeCreateModalOutside(e){if(e.target===document.getElementById('create-modal'))closeCreateModal()}
 function toggleCreateBookingTypeFields(){const bt=document.getElementById('new-booking-type').value,hg=document.getElementById('new-horizon-group'),bg=document.getElementById('new-blackout-group');const show=bt==='rolling_availability';if(hg)hg.style.display=show?'':'none';if(bg)bg.style.display=show?'':'none'}

@@ -69,6 +69,20 @@ def test_telegram_callback_allows_pashynskaphoto_username(monkeypatch):
     })
 
 
+def test_telegram_callback_allows_iryna_stable_user_id(monkeypatch):
+    """Username can change; Iryna's numeric Telegram ID is the durable grant."""
+    monkeypatch.setattr(booking_app, "TELEGRAM_ALLOWED_ADMIN_USERNAMES", "")
+    monkeypatch.setattr(
+        booking_app,
+        "TELEGRAM_ALLOWED_ADMIN_USER_IDS",
+        "792920251,938104602",
+    )
+
+    assert booking_app._is_telegram_admin_callback({
+        "from": {"id": 938104602, "username": "renamed_later"}
+    })
+
+
 def test_telegram_admin_chat_ids_include_extra_admins(monkeypatch):
     monkeypatch.setattr(booking_app, "TELEGRAM_CHAT_ID", "100")
     monkeypatch.setattr(booking_app, "TELEGRAM_ADMIN_CHAT_ID", "200")

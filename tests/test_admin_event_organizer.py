@@ -6,6 +6,7 @@ import tempfile
 import types
 import yaml
 from datetime import datetime as real_datetime
+from pathlib import Path
 
 import pytest
 
@@ -80,7 +81,7 @@ def _patch_events_yaml(monkeypatch, tmp_path, events):
 
 def _insert_booking(db_path, **overrides):
     fields = {
-        "date": "2026-06-07",
+        "date": overrides.get("date", "2026-06-07"),
         "time": overrides.get("time", "15:30"),
         "name": overrides.get("name", "Organizer Client"),
         "email": overrides.get("email", "organizer@example.com"),
@@ -151,6 +152,92 @@ def test_admin_dashboard_hides_internal_slot_guards_from_client_table(admin_clie
     html = response.get_data(as_text=True)
     assert "TECHNICAL SLOT GUARD" not in html
     assert '<option value="internal_block">' not in html
+
+
+def test_admin_bookings_are_grouped_by_day_and_individuals_are_distinct(admin_client):
+    c, db_path = admin_client
+    _insert_booking(
+        db_path,
+        date="2026-08-23",
+        time="15:00",
+        name="Photo Day One",
+        status="confirmed",
+        confirmed=1,
+    )
+    _insert_booking(
+        db_path,
+        date="2026-08-23",
+        time="16:00",
+        name="Photo Day Two",
+        status="confirmed",
+        confirmed=1,
+    )
+    _insert_booking(
+        db_path,
+        date="2026-09-19",
+        time="12:00",
+        name="Individual Client",
+        session_type="individual",
+        status="confirmed",
+        confirmed=1,
+    )
+
+    response = c.get("/admin", headers=_headers())
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert html.count('📅 2026-08-23') == 1
+    assert html.count('📅 2026-09-19') == 1
+    assert 'row-confirmed row-individual' in html
+
+
+def test_reschedule_deep_link_embeds_target_even_outside_visible_filters(admin_client):
+    c, db_path = admin_client
+    booking_id = _insert_booking(
+        db_path,
+        date="2027-12-31",
+        time="17:40",
+        name="Deep Link Client",
+        status="confirmed",
+        confirmed=1,
+    )
+
+    response = c.get(
+        f"/admin?reschedule_id={booking_id}&date_to=2026-01-01",
+        headers=_headers(),
+    )
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert f'"id": {booking_id}' in html
+    assert '"name": "Deep Link Client"' in html
+    assert 'const autoRescheduleTarget' in html
+
+
+def test_reschedule_event_list_includes_admin_event_without_public_photos(
+    admin_client, monkeypatch, tmp_path
+):
+    c, _db_path = admin_client
+    event = _yaml_event(
+        id="no-photo-admin-event",
+        title="No Photo Admin Event",
+        date="2026-10-10",
+        photos=[],
+        status="active",
+    )
+    _patch_events_yaml(monkeypatch, tmp_path, [event])
+
+    response = c.get("/admin", headers=_headers())
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert 'const adminRescheduleEvents' in html
+    assert '"id": "no-photo-admin-event"' in html
+    assert '"title": "No Photo Admin Event"' in html
+
+
+def test_admin_browser_schedule_preview_matches_backend_and_local_calendar():
+    html = Path("templates/admin.html").read_text(encoding="utf-8")
+    assert "while (cur + sessionLen <= end)" in html
+    assert "getTimezoneOffset() * 60000" in html
+    assert "new Date().toISOString().split('T')[0]" not in html
 
 
 def test_contact_edit_requires_admin(admin_client):
