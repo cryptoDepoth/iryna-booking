@@ -32,6 +32,7 @@
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', {{ google_ads_id|tojson }});
+    gtag('config', {{ google_analytics_id|tojson }});
   </script>
   {% if booking and (booking.confirmed or booking.status == 'confirmed') %}
   <script>

@@ -53,7 +53,7 @@ _tz = _ZoneInfo('America/Edmonton')
 # ===== CONFIG =====
 # Load from .env or use defaults
 META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '1335137335347797')  # Pashynska Photography Pixel (Events Manager canonical). Single source of truth — injected into every template via context processor. Override with env/fly secret only to switch pixels.
-GOOGLE_ANALYTICS_ID = os.environ.get('GOOGLE_ANALYTICS_ID', '')
+GOOGLE_ANALYTICS_ID = os.environ.get('GOOGLE_ANALYTICS_ID', 'G-XZWNM9CQCN')
 # Google Ads measurement is centralized for the same reason as Meta Pixel:
 # moving from the legacy PLN account to a Calgary CAD account must be a single
 # environment change, not a hunt through templates and JavaScript files.
@@ -504,6 +504,7 @@ def _inject_site_links():
         # {{ meta_pixel_id }} so the id can never drift between pages again.
         "meta_pixel_id": META_PIXEL_ID,
         "google_ads_id": GOOGLE_ADS_ID,
+        "google_analytics_id": GOOGLE_ANALYTICS_ID,
         "google_ads_booking_send_to": GOOGLE_ADS_BOOKING_SEND_TO,
     }
 
@@ -2248,7 +2249,7 @@ _CSP = (
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "font-src 'self' https://fonts.gstatic.com data:; "
     "img-src 'self' data: https: https://www.facebook.com https://www.googleadservices.com https://www.google.com https://googleads.g.doubleclick.net; "
-    "connect-src 'self' https://api.stripe.com https://www.facebook.com https://connect.facebook.net https://us.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.google.com https://googleads.g.doubleclick.net; "
+    "connect-src 'self' https://api.stripe.com https://www.facebook.com https://connect.facebook.net https://us.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.google.com https://googleads.g.doubleclick.net https://ad.doubleclick.net; "
     # frame-src: Stripe iframes + reCAPTCHA challenge iframe (when score is low)
     "frame-src https://js.stripe.com https://hooks.stripe.com https://www.google.com; "
     "frame-ancestors 'self' https://*.wfolio.com https://pashynska.agency https://www.pashynska.agency https://book.pashynskaphoto.com; "

@@ -114,3 +114,41 @@ def test_admin_photo_upload_accepts_batch_not_only_first_file():
     assert "Upload up to 5 photos at a time" in admin_html
     assert "files.forEach(file => fd.append('photos', file));" in admin_html
     assert "const file = input.files[0];" not in admin_html
+
+
+def test_public_funnel_formats_money_and_offers_whatsapp_help():
+    """Customer-facing prices should always show cents and questions need a low-friction path."""
+    html = TEMPLATE.read_text()
+
+    assert "'%.2f'|format(hero_event.deposit" in html
+    assert "$${money(deposit)}" in html
+    assert "$${money(total)}" in html
+    assert "https://wa.me/13689977903" in html
+    assert "whatsapp_click" in html
+    assert '<main id="main-content">' in html
+    assert "window.__GOOGLE_ANALYTICS_ID" in html
+    assert "gtag('config', window.__GOOGLE_ANALYTICS_ID)" in html
+
+
+def test_public_funnel_server_renders_current_inventory_for_crawlers():
+    """The initial event cards must exist in HTML before client-side JavaScript runs."""
+    html = TEMPLATE.read_text()
+
+    assert "for event in initial_events[:6]" in html
+    assert 'class="event-card' in html
+    assert 'href="/?event={{ event.id }}"' in html
+
+
+def test_live_landing_pages_use_compressed_images_and_real_review_attribution():
+    templates = TEMPLATE.parent
+    family = (templates / "landing_family_v2.html").read_text()
+    maternity = (templates / "landing_maternity_v2.html").read_text()
+    wedding = (templates / "landing_wedding_v5.html").read_text()
+
+    assert "family-ss-9.webp" in family
+    assert "wedding-ss-1.webp" in wedding
+    assert "Sarah M." not in family + maternity + wedding
+    assert "Michelle T." not in family + maternity + wedding
+    assert "James &amp; Priya" not in wedding
+    assert "Kateryna" in wedding
+    assert "Nivi Varghese" in maternity

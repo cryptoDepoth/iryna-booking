@@ -14,6 +14,7 @@
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', {{ google_ads_id|tojson }});
+    gtag('config', {{ google_analytics_id|tojson }});
     {% if payment_verified and purchase_event_id %}
     gtag('event', 'conversion', {
       send_to: {{ google_ads_booking_send_to|tojson }},

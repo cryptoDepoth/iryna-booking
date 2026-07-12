@@ -136,6 +136,10 @@ def test_csp_allows_recaptcha_script_and_frame_hosts(client):
     frame_clause = next((p for p in csp.split(";") if p.strip().startswith("frame-src")), "")
     assert "https://www.google.com" in frame_clause, f"frame-src missing www.google.com: {frame_clause}"
 
+    # Google Ads conversion/remarketing beacons must not be blocked after checkout.
+    connect_clause = next((p for p in csp.split(";") if p.strip().startswith("connect-src")), "")
+    assert "https://ad.doubleclick.net" in connect_clause, f"connect-src missing ad.doubleclick.net: {connect_clause}"
+
 
 def test_healthz_returns_ok(client):
     """Fly.io HTTP health-checks need /healthz returning 200."""
@@ -143,6 +147,10 @@ def test_healthz_returns_ok(client):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["ok"] is True
+
+
+def test_booking_uses_the_shared_ga4_property_by_default():
+    assert booking_app.GOOGLE_ANALYTICS_ID == "G-XZWNM9CQCN"
 
 
 def test_meta_threads_oauth_and_compliance_callbacks_are_valid(client):

@@ -28,6 +28,7 @@
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', {{ google_ads_id|tojson }});
+    gtag('config', {{ google_analytics_id|tojson }});
   </script>
   <script>
     // Checkout is a funnel signal, not a completed Booking Purchase.
