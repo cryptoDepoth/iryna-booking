@@ -4887,25 +4887,24 @@ def _public_events_payload():
                     day = (today_d + timedelta(days=offset)).isoformat()
                     if _rolling_date_unavailable_reason(ev, day):
                         continue
-                    c.execute("""
-                        SELECT time FROM bookings
-                        WHERE date=?
-                          AND event_id=?
-                          AND status NOT IN ('cancelled', 'expired')
-                          AND (confirmed=1 OR reserved_until > ?)
-                    """, (day, ev["id"], now.isoformat()))
-                    booked_times = {row["time"] for row in c.fetchall()}
-                    available_spots += len([s for s in slots if s["time"] not in booked_times])
+                    booked_rows = _active_bookings_for_date(conn, day, now=now)
+                    available_spots += len([
+                        slot for slot in slots
+                        if not any(
+                            _slot_conflict_details(slot["time"], ev, row)
+                            for row in booked_rows
+                        )
+                    ])
                 total_spots = len(slots) * (horizon + 1)
             else:
-                c.execute("""
-                    SELECT time FROM bookings
-                    WHERE date=?
-                      AND status NOT IN ('cancelled', 'expired')
-                      AND (confirmed=1 OR reserved_until > ?)
-                """, (ev["date"], now.isoformat()))
-                booked_times = {row["time"] for row in c.fetchall()}
-                available_spots = len([s for s in slots if s["time"] not in booked_times])
+                booked_rows = _active_bookings_for_date(conn, ev["date"], now=now)
+                available_spots = len([
+                    slot for slot in slots
+                    if not any(
+                        _slot_conflict_details(slot["time"], ev, row)
+                        for row in booked_rows
+                    )
+                ])
 
             # Get first photo URL
             photos = ev.get("photos", [])

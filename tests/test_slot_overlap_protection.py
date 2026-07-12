@@ -46,6 +46,7 @@ def _event():
         "booking_type": "fixed_slots",
         "status": "active",
         "hidden": False,
+        "photos": ["/images/overlap-regression.jpg"],
     }
 
 
@@ -82,6 +83,21 @@ def test_public_slots_hide_interval_that_overlaps_off_grid_booking(
     assert "14:00" in available
     assert "14:40" not in available  # 14:40–15:10 overlaps the 15:00 client
     assert "15:20" not in available  # and the required 10-minute break
+
+
+def test_public_event_card_uses_same_overlap_aware_availability(
+    admin_client, monkeypatch
+):
+    event = _event()
+    monkeypatch.setattr(booking_app, "EVENTS", [event])
+    _insert_confirmed_booking(event)
+
+    response = admin_client.get("/events")
+
+    assert response.status_code == 200
+    card = response.get_json()["events"][0]
+    assert card["total_spots"] == 3
+    assert card["spots_left"] == 1
 
 
 def test_reserve_and_manual_book_reject_overlapping_time(admin_client, monkeypatch):
