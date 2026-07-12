@@ -803,7 +803,7 @@ TELEGRAM_ALLOWED_ADMIN_USERNAMES = os.environ.get(
     "TELEGRAM_ALLOWED_ADMIN_USERNAMES",
     "pashynskaphoto",
 )
-TELEGRAM_ALLOWED_ADMIN_USER_IDS = os.environ.get("TELEGRAM_ALLOWED_ADMIN_USER_IDS", "")
+TELEGRAM_ALLOWED_ADMIN_USER_IDS = os.environ.get("TELEGRAM_ALLOWED_ADMIN_USER_IDS", "938104602")
 # Secret token for the Telegram webhook (set when calling setWebhook). When set,
 # every incoming POST /telegram/webhook must carry the matching value in the
 # X-Telegram-Bot-Api-Secret-Token header — otherwise the request is rejected.
@@ -7714,7 +7714,7 @@ def admin():
     total_count = c.fetchone()["total"]
 
     # Get filtered bookings
-    order_clause = "ORDER BY date DESC, time ASC"
+    order_clause = "ORDER BY (date < date('now','localtime')) ASC, date ASC, time ASC"
     sql = f"SELECT * FROM bookings WHERE {where_clause} {order_clause} LIMIT ? OFFSET ?"
     params_with_limit = params + [limit_num, offset]
     c.execute(sql, params_with_limit)

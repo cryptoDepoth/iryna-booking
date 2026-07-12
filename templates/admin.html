@@ -1243,6 +1243,14 @@
         .search-input,.form-group input,.form-group select,.form-group textarea{border-radius:10px}
         .search-input:focus,.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-light);outline:none}
         /* apple redesign end */
+
+        /* ── bookings: day grouping + individual sessions ── */
+        .day-sep td{background:var(--gray-light);font-weight:700;font-size:12px;color:var(--text-2);padding:9px 14px;letter-spacing:.02em}
+        .row-individual{background:#f3eefc}
+        .row-individual:hover{background:#ece4fb}
+        .row-individual .cell-time,.row-individual .cell-name a{color:#6b3fa0}
+        .row-individual td:first-child{box-shadow:inset 3px 0 0 #8b5cf6}
+        /* bookings grouping end */
     </style>
 </head>
 <body>
@@ -1547,8 +1555,13 @@
                 </tr>
             </thead>
             <tbody id="tbody">
+                {% set daygrp = namespace(prev='') %}
                 {% for b in bookings %}
-                <tr class="brow row-{{ b.status }}"
+                {% if b.date != daygrp.prev %}
+                <tr class="day-sep"><td colspan="9">📅 {{ b.date }}</td></tr>
+                {% set daygrp.prev = b.date %}
+                {% endif %}
+                <tr class="brow row-{{ b.status }}{% if b.session_type == 'individual' %} row-individual{% endif %}"
                     data-status="{{ b.status }}"
                     data-search="{{ (b.name or '') | lower }} {{ (b.email or '') | lower }} {{ (b.instagram or '') | lower }} {{ (b.phone or '') | lower }}">
 
