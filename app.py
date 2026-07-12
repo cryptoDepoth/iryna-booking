@@ -2823,6 +2823,11 @@ NOTION_HEADERS = {
     "Notion-Version": "2022-06-28",
     "Content-Type": "application/json"
 }
+_notion_state = {
+    "last_sync_at": None,
+    "last_sync_booking_id": None,
+    "last_error": None,
+}
 
 # ===== STRIPE CONFIG =====
 STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -2869,16 +2874,17 @@ def sync_to_notion(booking_id):
     """Sync a single SQLite booking to the Bookings v2 Notion DB.
     Stores the Notion page_id back in SQLite so subsequent calls patch in place."""
     if not NOTION_API_KEY:
-        return  # silently skip when no key configured
+        return False
+    conn = None
     try:
         conn = db_conn()
         c = conn.cursor()
         c.execute("SELECT * FROM bookings WHERE id=?", (booking_id,))
         row = c.fetchone()
         if not row:
-            conn.close()
-            return
+            return False
         booking = dict(row)
+        event = get_event_by_id(booking.get("event_id")) or {}
 
         if booking["confirmed"]:
             status_name = "Confirmed"
@@ -2889,10 +2895,14 @@ def sync_to_notion(booking_id):
             "Client Name": {"title": [{"text": {"content": booking["name"] or "(awaiting details)"}}]},
             "Status": {"select": {"name": status_name}},
             "Date": {"date": {"start": booking["date"]}},
-            "Time Slot": {"rich_text": [{"text": {"content": _slot_label(booking["time"])}}]},
+            "Time Slot": {"rich_text": [{"text": {"content": _slot_label(booking["time"], event)}}]},
             "Instagram": {"rich_text": [{"text": {"content": booking.get("instagram") or ""}}]},
-            "Deposit (CAD)": {"number": booking.get("paid_amount") or SESSION_PRICE},
-            "Total (CAD)": {"number": SESSION_TOTAL},
+            "Deposit (CAD)": {"number": float(
+                booking.get("deposit_amount") or event.get("deposit") or SESSION_PRICE
+            )},
+            "Total (CAD)": {"number": float(
+                booking.get("full_price") or event.get("full_price") or SESSION_TOTAL
+            )},
             "Paid": {"checkbox": bool(booking["paid"])},
             "Booking ID (legacy)": {"number": booking["id"]},
         }
@@ -2916,7 +2926,7 @@ def sync_to_notion(booking_id):
                                headers=NOTION_HEADERS,
                                json={"properties": properties}, timeout=15)
             if r.status_code >= 400:
-                print(f"Notion patch failed ({r.status_code}): {r.text[:200]}")
+                raise RuntimeError(f"Notion patch failed ({r.status_code}): {r.text[:200]}")
         else:
             r = requests.post("https://api.notion.com/v1/pages",
                               headers=NOTION_HEADERS,
@@ -2927,10 +2937,20 @@ def sync_to_notion(booking_id):
                 c.execute("UPDATE bookings SET notion_page_id=? WHERE id=?", (page_id, booking_id))
                 conn.commit()
             else:
-                print(f"Notion create failed ({r.status_code}): {r.text[:200]}")
-        conn.close()
+                raise RuntimeError(f"Notion create failed ({r.status_code}): {r.text[:200]}")
+        _notion_state.update({
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            "last_sync_booking_id": booking_id,
+            "last_error": None,
+        })
+        return True
     except Exception as e:
-        print(f"Notion sync error: {e}")
+        _notion_state["last_error"] = str(e)
+        log.error(f"[notion] sync failed for booking #{booking_id}: {e}")
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 # ===== GOOGLE CALENDAR CONFIG =====
@@ -7567,9 +7587,48 @@ def admin_health():
     sched_alive = any(t.name == "email-scheduler" and t.is_alive() for t in threading.enumerate())
     status["email_scheduler"] = {"ok": sched_alive}
 
-    # Notion (optional)
+    # Notion: a configured-but-revoked token used to look healthy while every
+    # sync silently failed. Verify the credential and expose ledger coverage.
     notion_configured = bool(NOTION_API_KEY)
-    status["notion"] = {"ok": notion_configured, "warning": None if notion_configured else "NOTION_API_KEY not set — Notion sync disabled"}
+    notion_linked = 0
+    notion_unlinked = 0
+    try:
+        _c = db_conn()
+        notion_linked, notion_unlinked = _c.execute("""
+            SELECT
+              SUM(CASE WHEN notion_page_id IS NOT NULL AND notion_page_id != '' THEN 1 ELSE 0 END),
+              SUM(CASE WHEN notion_page_id IS NULL OR notion_page_id = '' THEN 1 ELSE 0 END)
+            FROM bookings
+        """).fetchone()
+        _c.close()
+        notion_linked = int(notion_linked or 0)
+        notion_unlinked = int(notion_unlinked or 0)
+    except Exception as e:
+        log.warning(f"[health] Notion coverage query failed: {e}")
+
+    notion_ok = False
+    notion_warning = "NOTION_API_KEY not set — Notion sync disabled"
+    if notion_configured:
+        try:
+            probe = requests.get(
+                f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}",
+                headers=NOTION_HEADERS,
+                timeout=5,
+            )
+            notion_ok = probe.status_code < 300
+            notion_warning = None if notion_ok else f"Notion API rejected credentials ({probe.status_code})"
+        except Exception as e:
+            notion_warning = f"Notion API unavailable: {type(e).__name__}"
+    status["notion"] = {
+        "ok": notion_ok,
+        "configured": notion_configured,
+        "linked_bookings": notion_linked,
+        "unlinked_bookings": notion_unlinked,
+        "last_sync_at": _notion_state.get("last_sync_at"),
+        "last_sync_booking_id": _notion_state.get("last_sync_booking_id"),
+        "last_error": _notion_state.get("last_error"),
+        "warning": notion_warning,
+    }
 
     # Events loaded
     events_ok = bool(EVENTS)
@@ -7583,7 +7642,7 @@ def admin_health():
     overall_ok = all(
         v.get("ok", True)
         for k, v in status.items()
-        if k not in ("notion",)  # Notion is optional
+        if k != "notion" or notion_configured
     )
 
     return jsonify({
