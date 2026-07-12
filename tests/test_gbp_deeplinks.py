@@ -91,3 +91,21 @@ def test_short_alias_resolver_chooses_next_matching_event(monkeypatch):
 
     assert ev is not None
     assert ev["id"] == "boho-swing-mini-sessions-2026-07-12"
+
+
+def test_boho_event_copy_and_included_duration_are_consistent():
+    event = {
+        "id": "boho-swing-mini-sessions-2026-07-12",
+        "title": "Boho Swing Mini Sessions",
+        "date": "2026-07-12",
+        "session_length": 20,
+        "subtitle": "Perfect for families, maternity, couples, children, or",
+        "included": ["⏱ 30-minute photo session", "📸 All original photos included"],
+        "total_spots": 12,
+    }
+
+    enriched = booking_app._enrich_event_for_landing(event)
+
+    assert enriched["subtitle"].endswith("children.")
+    assert "⏱ 20-minute photo session" in enriched["included"]
+    assert "⏱ 30-minute photo session" not in enriched["included"]

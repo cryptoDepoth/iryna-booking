@@ -1869,7 +1869,7 @@ function renderGrid() {
           <span>📍 ${(e.location || 'Calgary').split(',')[0]}</span>
         </div>
         <div class="price-bar">
-          <div class="price">$${e.deposit || e.price || 0}<small>${T('deposit_caption', {total: totalPrice})}</small></div>
+          <div class="price">$${money(e.deposit || e.price || 0)}<small>${T('deposit_caption', {total: money(totalPrice)})}</small></div>
           <button class="cta">${isSold ? T('join_waitlist_btn') : T('view_dates_btn')}</button>
         </div>
       </div>

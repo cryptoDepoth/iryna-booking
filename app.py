@@ -4230,6 +4230,21 @@ def _enrich_event_for_landing(ev):
     e.setdefault("type", "mini")
     e.setdefault("featured", False)
     e.setdefault("subtitle", "")
+    if e.get("id") == "boho-swing-mini-sessions-2026-07-12":
+        complete_copy = (
+            "A relaxed summer mini session with a handcrafted boho swing and natural textures. "
+            "Perfect for families, maternity, couples and children."
+        )
+        e["subtitle"] = complete_copy
+        e["description"] = complete_copy
+    session_length = int(e.get("session_length") or 0)
+    if session_length and isinstance(e.get("included"), list):
+        e["included"] = [
+            f"⏱ {session_length}-minute photo session"
+            if "minute photo session" in str(item).lower()
+            else item
+            for item in e["included"]
+        ]
     try:
         d = datetime.strptime(ev["date"], "%Y-%m-%d").date()
         e["date_pretty"] = d.strftime("%a, %B %-d, %Y") if hasattr(d, "strftime") else str(d)
