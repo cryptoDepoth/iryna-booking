@@ -1217,6 +1217,32 @@
         .status-pill,.badge{letter-spacing:.02em}
         @media(max-width:640px){.btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-delete,.filter-btn{min-height:40px}}
         /* pxa polish end */
+
+        /* ═══ Apple redesign 2026-07-11 (tokens + components; markup/JS unchanged) ═══ */
+        :root{
+          --bg:#f5f5f7;--surface:#ffffff;--surface-2:#fbfbfd;
+          --border:rgba(0,0,0,.09);--border-strong:rgba(0,0,0,.16);
+          --text:#1d1d1f;--text-2:#6e6e73;--text-3:#8e8e93;
+          --accent:#0071e3;--accent-light:#eaf3ff;
+          --green:#30b350;--green-light:#e7f8ec;--green-text:#1a7f37;
+          --red:#ff3b30;--red-light:#ffecec;--red-text:#c1272d;
+          --yellow:#ff9f0a;--yellow-light:#fff3e0;--yellow-text:#8a5a00;
+          --blue:#0071e3;--blue-light:#eaf3ff;--blue-text:#0a5bb8;
+          --gray-light:#f0f0f3;--gray-text:#6e6e73;--radius:14px;
+        }
+        body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+        .topbar{background:rgba(255,255,255,.72);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--border)}
+        .card,.ops-card,.bookings-card,.session-card,.attention-panel,.event-settings-card{border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 34px -22px rgba(0,0,0,.18)}
+        .btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-mark-paid,.btn-balance,.btn-reschedule,.filter-btn{border-radius:980px;font-weight:600}
+        .filter-btn.active{background:var(--text);color:#fff;border-color:var(--text)}
+        .badge,.status-pill{border-radius:980px;letter-spacing:.01em}
+        .session-metric,.stat{border-radius:12px}
+        .ev-tabbar{background:var(--gray-light);padding:3px;border-radius:12px;display:inline-flex;gap:3px}
+        .ev-tab{border:none;background:transparent;border-radius:9px;font-weight:600}
+        .ev-tab.active{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.07)}
+        .search-input,.form-group input,.form-group select,.form-group textarea{border-radius:10px}
+        .search-input:focus,.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-light);outline:none}
+        /* apple redesign end */
     </style>
 </head>
 <body>
