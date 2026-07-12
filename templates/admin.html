@@ -1208,6 +1208,15 @@
         .preset-chip:active {
             transform: scale(0.96);
         }
+
+        /* ── Cowork polish 2026-07-11 (additive, safe to remove) ── */
+        .topbar{position:sticky;top:0;z-index:50}
+        *:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+        .btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-delete,.filter-btn{transition:transform .06s ease,box-shadow .12s ease,background .12s ease,border-color .12s ease}
+        .btn-outline:active,.btn-confirm:active,.btn-cancel:active,.btn-save:active,.btn-done:active,.btn-delete:active,.filter-btn:active{transform:translateY(1px)}
+        .status-pill,.badge{letter-spacing:.02em}
+        @media(max-width:640px){.btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-delete,.filter-btn{min-height:40px}}
+        /* pxa polish end */
     </style>
 </head>
 <body>

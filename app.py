@@ -751,7 +751,6 @@ def _admin_key_from_request():
     body = request.get_json(silent=True) if request.is_json else None
     return (
         request.headers.get("X-Admin-Key")
-        or request.args.get("key")
         or ((body or {}).get("key") if isinstance(body, dict) else None)
         or ""
     )
