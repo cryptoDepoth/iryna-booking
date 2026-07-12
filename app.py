@@ -4223,13 +4223,9 @@ def _public_visible_events():
         out.append(ev)
     return out
 
-def _enrich_event_for_landing(ev):
-    """Add computed fields used by the landing template (date_pretty, days_until, spots)."""
-    from datetime import date as _date
+def _normalize_public_event_copy(ev):
+    """Return customer-facing event copy with duration and offer text reconciled."""
     e = dict(ev)
-    e.setdefault("type", "mini")
-    e.setdefault("featured", False)
-    e.setdefault("subtitle", "")
     if e.get("id") == "boho-swing-mini-sessions-2026-07-12":
         complete_copy = (
             "A relaxed summer mini session with a handcrafted boho swing and natural textures. "
@@ -4245,6 +4241,16 @@ def _enrich_event_for_landing(ev):
             else item
             for item in e["included"]
         ]
+    return e
+
+
+def _enrich_event_for_landing(ev):
+    """Add computed fields used by the landing template (date_pretty, days_until, spots)."""
+    from datetime import date as _date
+    e = _normalize_public_event_copy(ev)
+    e.setdefault("type", "mini")
+    e.setdefault("featured", False)
+    e.setdefault("subtitle", "")
     try:
         d = datetime.strptime(ev["date"], "%Y-%m-%d").date()
         e["date_pretty"] = d.strftime("%a, %B %-d, %Y") if hasattr(d, "strftime") else str(d)
@@ -4622,6 +4628,7 @@ def _public_events_payload():
             and str(ev.get("date", "")) >= today
             and ev.get("photos")  # Must have at least one photo to show publicly
         ):
+            ev = _normalize_public_event_copy(ev)
             # Calculate total and available spots
             booking_type = _booking_type(ev)
             slots = generate_slots(ev)
