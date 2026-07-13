@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>System health · Pashynska Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
+  <style>
+    :root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--muted:#6e6e73;--line:#e5e5e7;--blue:#0071e3;--ok:#16823b;--ok-bg:#e9f8ee;--bad:#c5221f;--bad-bg:#fff0ef}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,-apple-system,sans-serif}
+    main{max-width:1080px;margin:0 auto;padding:30px 20px 70px}.hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:22px}.hero h1{font-size:28px;letter-spacing:-.03em;margin:0}.hero p{color:var(--muted);margin:5px 0 0}.refresh{border:0;border-radius:10px;padding:10px 15px;background:var(--blue);color:#fff;font:700 13px Inter;cursor:pointer}.refresh:disabled{opacity:.55}
+    .overall{display:flex;gap:13px;align-items:center;padding:18px 20px;border-radius:16px;margin-bottom:18px;border:1px solid var(--line);background:#fff}.overall.ok{background:var(--ok-bg);border-color:#cdebd6}.overall.bad{background:var(--bad-bg);border-color:#f4cfcc}.overall-icon{font-size:26px}.overall strong{display:block;font-size:16px}.overall small{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px 18px;box-shadow:0 2px 12px rgba(0,0,0,.035)}.card-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}.card h2{margin:0;font-size:15px}.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:750}.pill:before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}.pill.ok{color:var(--ok);background:var(--ok-bg)}.pill.bad{color:var(--bad);background:var(--bad-bg)}.details{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}.details dt{color:var(--muted);font-size:12px}.details dd{margin:0;text-align:right;font-weight:650;overflow-wrap:anywhere}.warning{color:var(--bad);font-size:12px;margin-top:8px}.backup-row{display:flex;justify-content:space-between;gap:14px;align-items:center}.backup-link{color:var(--blue);font-weight:700;text-decoration:none}.loading{color:var(--muted)}
+    @media(max-width:720px){main{padding:22px 12px 50px}.hero{align-items:center}.hero h1{font-size:23px}.grid{grid-template-columns:1fr}.details dd{max-width:210px}.overall{padding:15px}}
+  </style>
+</head>
+<body>
+  {% include '_admin_shell.html' %}
+  <main>
+    <div class="hero"><div><h1>System health</h1><p>A practical live check of booking data and every integration.</p></div><button class="refresh" id="refreshBtn" onclick="loadHealth()">↻ Refresh</button></div>
+    <section class="overall" id="overall"><div class="overall-icon">◌</div><div><strong>Checking systems…</strong><small>Reading live production state.</small></div></section>
+    <section class="grid" id="healthGrid"><div class="card loading">Loading system details…</div></section>
+  </main>
+<script>
+const labels={database:'Database',email_himalaya:'Gmail / Interac',email_scheduler:'Email scheduler',watcher_thread:'Payment watcher',notion:'Notion sync',telegram:'Telegram admin',events:'Events configuration'};
+const preferred=['database','email_himalaya','email_scheduler','watcher_thread','notion','telegram','events'];
+const esc=value=>String(value??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pretty=value=>typeof value==='boolean'?(value?'Yes':'No'):value==null?'—':String(value);
+function detailsFor(key,item){
+  const keys={database:['path','size_kb'],email_himalaya:['last_scan_at','last_scan_email_count','last_auto_confirmed_booking_id'],email_scheduler:[],watcher_thread:[],notion:['linked_bookings','unlinked_bookings','last_sync_at'],telegram:['webhook_secret_set'],events:['active_or_upcoming','total']}[key]||[];
+  return keys.map(k=>`<dt>${esc(k.replaceAll('_',' '))}</dt><dd>${esc(pretty(item[k]))}</dd>`).join('');
+}
+async function loadHealth(){
+  const btn=document.getElementById('refreshBtn'),overall=document.getElementById('overall'),grid=document.getElementById('healthGrid');btn.disabled=true;
+  try{
+    const [healthResponse,backupResponse]=await Promise.all([fetch('/admin/health',{headers:{Accept:'application/json'}}),fetch('/admin/backups',{headers:{Accept:'application/json'}})]);
+    const health=await healthResponse.json(),backups=backupResponse.ok?await backupResponse.json():[];
+    overall.className='overall '+(health.healthy?'ok':'bad');
+    overall.innerHTML=`<div class="overall-icon">${health.healthy?'✓':'!'}</div><div><strong>${health.healthy?'All operational systems are healthy':'One or more systems need attention'}</strong><small>Last checked ${esc(new Date(health.timestamp).toLocaleString())}</small></div>`;
+    grid.innerHTML=preferred.map(key=>{const item=health.checks[key]||{ok:false,warning:'No status returned'};return `<article class="card"><div class="card-head"><h2>${esc(labels[key]||key)}</h2><span class="pill ${item.ok?'ok':'bad'}">${item.ok?'Healthy':'Attention'}</span></div><dl class="details">${detailsFor(key,item)}</dl>${item.warning||item.error?`<div class="warning">${esc(item.warning||item.error)}</div>`:''}</article>`}).join('')+`<article class="card"><div class="card-head"><h2>Recovery copies</h2><span class="pill ${backups.length?'ok':'bad'}">${backups.length?'Available':'Missing'}</span></div><div class="backup-row"><div><strong>${backups.length} recovery points</strong><div style="color:var(--muted);font-size:12px">${backups[0]?esc(new Date(backups[0].modified).toLocaleString()):'No backup returned'}</div></div><a class="backup-link" href="/admin/backup-center">Open backups →</a></div></article>`;
+  }catch(error){overall.className='overall bad';overall.innerHTML='<div class="overall-icon">!</div><div><strong>Health check could not load</strong><small>Refresh the page or open Backups to protect current data.</small></div>';grid.innerHTML=`<div class="card warning">${esc(error.message)}</div>`}
+  finally{btn.disabled=false}
+}
+loadHealth();
+</script>
+</body>
+</html>

@@ -2828,6 +2828,43 @@ _notion_state = {
     "last_sync_booking_id": None,
     "last_error": None,
 }
+_notion_health_cache = {
+    "checked_at": 0.0,
+    "token_marker": None,
+    "ok": False,
+    "warning": None,
+}
+
+
+def _probe_notion_health():
+    """Verify Notion credentials without making every admin navigation wait on Notion."""
+    if not NOTION_API_KEY:
+        return False, "NOTION_API_KEY not set — Notion sync disabled"
+    marker = hashlib.sha256(NOTION_API_KEY.encode("utf-8")).hexdigest()[:12]
+    now = time.monotonic()
+    if (
+        _notion_health_cache.get("token_marker") == marker
+        and now - float(_notion_health_cache.get("checked_at") or 0) < 60
+    ):
+        return bool(_notion_health_cache.get("ok")), _notion_health_cache.get("warning")
+    try:
+        probe = requests.get(
+            f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}",
+            headers=NOTION_HEADERS,
+            timeout=5,
+        )
+        ok = probe.status_code < 300
+        warning = None if ok else f"Notion API rejected credentials ({probe.status_code})"
+    except Exception as e:
+        ok = False
+        warning = f"Notion API unavailable: {type(e).__name__}"
+    _notion_health_cache.update({
+        "checked_at": now,
+        "token_marker": marker,
+        "ok": ok,
+        "warning": warning,
+    })
+    return ok, warning
 
 # ===== STRIPE CONFIG =====
 STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -7609,16 +7646,7 @@ def admin_health():
     notion_ok = False
     notion_warning = "NOTION_API_KEY not set — Notion sync disabled"
     if notion_configured:
-        try:
-            probe = requests.get(
-                f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}",
-                headers=NOTION_HEADERS,
-                timeout=5,
-            )
-            notion_ok = probe.status_code < 300
-            notion_warning = None if notion_ok else f"Notion API rejected credentials ({probe.status_code})"
-        except Exception as e:
-            notion_warning = f"Notion API unavailable: {type(e).__name__}"
+        notion_ok, notion_warning = _probe_notion_health()
     status["notion"] = {
         "ok": notion_ok,
         "configured": notion_configured,
@@ -7650,6 +7678,13 @@ def admin_health():
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z",
         "checks": status,
     }), 200 if overall_ok else 503
+
+
+@app.route("/admin/health-center")
+@admin_required
+def admin_health_center():
+    """Human-friendly operational status page; /admin/health remains the JSON API."""
+    return render_template("admin_health.html")
 
 
 def _admin_event_has_ended(ev, now=None):

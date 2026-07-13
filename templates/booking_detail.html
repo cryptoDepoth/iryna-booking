@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Booking #{{ booking.id }} · Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
 <style>
   /* Mirrors admin.html / admin_clients.html so the three admin pages feel
      like one consistent product, not three different prototypes. */
@@ -202,15 +203,10 @@
 </head>
 <body>
 
-<header class="topbar">
-  <span class="topbar-brand"><span class="dot"></span>📸 Pashynska Studio</span>
-  <nav class="topbar-nav">
-    <a href="/admin">Dashboard</a>
-    <a href="/admin/clients">👥 Clients</a>
-  </nav>
-  <span class="topbar-spacer"></span>
+{% include '_admin_shell.html' %}
+<div class="admin-shell-action-row">
   <span class="booking-id-chip">Booking #{{ booking.id }}</span>
-</header>
+</div>
 
 <main class="page">
   <a class="back-link" href="/admin/clients">← Back to client database</a>

@@ -1,0 +1,154 @@
+.admin-shell {
+  --admin-blue: #0071e3;
+  --admin-ink: #1d1d1f;
+  --admin-muted: #6e6e73;
+  position: sticky;
+  top: 0;
+  z-index: 1200;
+  width: 100%;
+  color: var(--admin-ink);
+  background: rgba(250, 250, 252, .92);
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
+  box-shadow: 0 1px 10px rgba(0, 0, 0, .04);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.admin-shell__inner {
+  width: 100%;
+  max-width: 1480px;
+  min-height: 58px;
+  margin: 0 auto;
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-shell__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  color: var(--admin-ink) !important;
+  text-decoration: none !important;
+  font-size: 14px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.admin-shell__brand-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff6b00;
+  box-shadow: 0 0 0 4px rgba(255, 107, 0, .11);
+}
+
+.admin-shell__brand small {
+  color: var(--admin-muted);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.admin-shell__links {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+
+.admin-shell__links::-webkit-scrollbar { display: none; }
+
+.admin-shell__link {
+  min-height: 36px;
+  padding: 8px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 9px;
+  color: #515154 !important;
+  text-decoration: none !important;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: background .15s ease, color .15s ease;
+}
+
+.admin-shell__link:hover { background: rgba(0, 0, 0, .055); color: var(--admin-ink) !important; }
+.admin-shell__link.is-active { background: rgba(0, 113, 227, .1); color: var(--admin-blue) !important; }
+.admin-shell__link--external { color: var(--admin-blue) !important; }
+
+.admin-shell__status {
+  min-height: 30px;
+  padding: 5px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 0, 0, .08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .78);
+  color: var(--admin-muted) !important;
+  text-decoration: none !important;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-shell__status-dot { width: 7px; height: 7px; border-radius: 50%; background: #9ca3af; }
+.admin-shell__status.is-ok .admin-shell__status-dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.12); }
+.admin-shell__status.is-warn .admin-shell__status-dot { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
+.admin-shell__status.is-active { border-color: rgba(0,113,227,.25); color: var(--admin-blue) !important; }
+
+.admin-shell-action-row {
+  padding: 10px 18px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, .7);
+  border-bottom: 1px solid rgba(0, 0, 0, .06);
+}
+
+.admin-shell-action-row .backup-btn,
+.admin-shell-action-row .export-btn,
+.admin-shell-action-row .booking-id-chip {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 36px;
+  height: auto !important;
+  padding: 8px 12px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, .1) !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  color: #1d1d1f !important;
+  font-size: 12px !important;
+  font-weight: 700;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.admin-shell-action-row .export-btn { background: #0071e3 !important; color: #fff !important; border-color: #0071e3 !important; }
+.admin-shell-action-row .backup-btn::after,
+.admin-shell-action-row .export-btn::after { display: none !important; content: none !important; }
+
+@media (max-width: 860px) {
+  .admin-shell__inner { display: grid; grid-template-columns: 1fr auto; gap: 7px 10px; padding: 8px 12px 7px; }
+  .admin-shell__links { grid-column: 1 / -1; width: 100%; padding-bottom: 1px; }
+  .admin-shell__brand small { display: none; }
+  .admin-shell__link { min-height: 34px; padding: 7px 9px; }
+  .admin-shell-action-row { padding: 8px 12px; justify-content: flex-start; overflow-x: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell__link { transition: none; }
+}

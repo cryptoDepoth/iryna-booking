@@ -81,6 +81,12 @@ def test_notion_sync_uses_booking_event_duration_and_prices(notion_db, monkeypat
 
 
 def test_admin_health_detects_rejected_notion_token(notion_db, monkeypatch):
+    booking_app._notion_health_cache.update({
+        "checked_at": 0.0,
+        "token_marker": None,
+        "ok": False,
+        "warning": None,
+    })
     monkeypatch.setattr(
         booking_app.requests,
         "get",
@@ -97,3 +103,22 @@ def test_admin_health_detects_rejected_notion_token(notion_db, monkeypatch):
     assert notion["configured"] is True
     assert notion["warning"] == "Notion API rejected credentials (401)"
 
+
+def test_notion_health_probe_is_cached_for_admin_navigation(notion_db, monkeypatch):
+    booking_app._notion_health_cache.update({
+        "checked_at": 0.0,
+        "token_marker": None,
+        "ok": False,
+        "warning": None,
+    })
+    calls = {"count": 0}
+
+    def fake_get(*args, **kwargs):
+        calls["count"] += 1
+        return _Response(200)
+
+    monkeypatch.setattr(booking_app.requests, "get", fake_get)
+
+    assert booking_app._probe_notion_health() == (True, None)
+    assert booking_app._probe_notion_health() == (True, None)
+    assert calls["count"] == 1

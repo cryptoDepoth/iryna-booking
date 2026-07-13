@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Link Generator · Admin · Pashynska Photography</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
     <style>
         :root {
             --bg: #f0f2f5;
@@ -352,20 +353,7 @@
 </head>
 <body>
 
-<!-- ── TOP BAR ── -->
-<div class="topbar">
-    <div class="topbar-brand">
-        <span class="dot"></span>
-        <span>Admin</span>
-    </div>
-    <div class="topbar-right">
-        <a href="/admin" class="topbar-link">← Dashboard</a>
-        <a href="/admin/analytics" class="topbar-link">📊 Analytics</a>
-        <a href="/admin/link-generator" class="topbar-link active">🔗 Links</a>
-        <a href="/admin/clients" class="topbar-link">👥 Clients</a>
-        <a href="/admin/transfers" class="topbar-link">💸 Interac</a>
-    </div>
-</div>
+{% include '_admin_shell.html' %}
 
 <div class="container">
 

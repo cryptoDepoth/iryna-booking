@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Client Database · Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
 <style>
   /* Palette mirrors templates/admin.html so the two pages feel like one app. */
   :root {
@@ -375,18 +376,11 @@
 </head>
 <body>
 
-<!-- TOP BAR -->
-<header class="topbar">
-  <span class="topbar-brand">📸 Pashynska Studio</span>
-  <nav class="topbar-nav">
-    <a href="/admin">Dashboard</a>
-    <a href="/admin/clients" class="active">👥 Clients</a>
-    <a href="/admin/transfers">💸 Interac</a>
-  </nav>
-  <span class="topbar-spacer"></span>
+{% include '_admin_shell.html' %}
+<div class="admin-shell-action-row" aria-label="Client database actions">
   <button class="backup-btn" onclick="triggerBackup()" title="Create backup" aria-label="Create backup">💾 Backup Now</button>
   <a class="export-btn" href="/admin/api/clients/export" title="Export clients CSV" aria-label="Export clients CSV">⬇ Export CSV</a>
-</header>
+</div>
 
 <!-- MAIN LAYOUT -->
 <div class="layout" id="layout">

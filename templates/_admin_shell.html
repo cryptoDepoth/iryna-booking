@@ -1,0 +1,41 @@
+{% set admin_path = request.path %}
+<header class="admin-shell" aria-label="Administration navigation">
+  <div class="admin-shell__inner">
+    <a class="admin-shell__brand" href="/admin" aria-label="Pashynska administration dashboard">
+      <span class="admin-shell__brand-dot" aria-hidden="true"></span>
+      <span>Pashynska Admin</span>
+      <small>Calgary</small>
+    </a>
+    <nav class="admin-shell__links" aria-label="Admin sections">
+      <a class="admin-shell__link {% if admin_path == '/admin' %}is-active{% endif %}" href="/admin">⌂ Dashboard</a>
+      <a class="admin-shell__link {% if admin_path.startswith('/admin/event/') %}is-active{% endif %}" href="/admin#events-section">◫ Sessions</a>
+      <a class="admin-shell__link {% if admin_path.startswith('/admin/clients') %}is-active{% endif %}" href="/admin/clients">♙ Clients</a>
+      <a class="admin-shell__link {% if admin_path.startswith('/admin/transfers') %}is-active{% endif %}" href="/admin/transfers">$ Interac</a>
+      <a class="admin-shell__link {% if admin_path.startswith('/admin/analytics') %}is-active{% endif %}" href="/admin/analytics">↗ Analytics</a>
+      <a class="admin-shell__link {% if admin_path.startswith('/admin/link-generator') %}is-active{% endif %}" href="/admin/link-generator">⌁ Links</a>
+      <a class="admin-shell__link {% if admin_path.startswith('/admin/backup') %}is-active{% endif %}" href="/admin/backup-center">⛁ Backups</a>
+    </nav>
+    <a class="admin-shell__status {% if admin_path == '/admin/health-center' %}is-active{% endif %}" id="adminSystemStatus" href="/admin/health-center" title="Open system health">
+      <span class="admin-shell__status-dot" aria-hidden="true"></span>
+      <span class="admin-shell__status-text">Checking</span>
+    </a>
+    <a class="admin-shell__link admin-shell__link--external" href="/" target="_blank" rel="noopener">Booking ↗</a>
+    <a class="admin-shell__link" href="/admin/logout" title="Sign out of administration">Sign out</a>
+  </div>
+</header>
+<script>
+(() => {
+  const badge = document.getElementById('adminSystemStatus');
+  if (!badge) return;
+  fetch('/admin/health', {headers: {'Accept': 'application/json'}})
+    .then(async response => ({ok: response.ok, data: await response.json()}))
+    .then(({ok, data}) => {
+      badge.classList.add(ok && data.healthy ? 'is-ok' : 'is-warn');
+      badge.querySelector('.admin-shell__status-text').textContent = ok && data.healthy ? 'All systems' : 'Needs attention';
+    })
+    .catch(() => {
+      badge.classList.add('is-warn');
+      badge.querySelector('.admin-shell__status-text').textContent = 'Check system';
+    });
+})();
+</script>

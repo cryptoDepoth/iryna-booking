@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin · Pashynska Photography</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
     <style>
         :root {
             --bg: #f0f2f5;
@@ -1268,26 +1269,7 @@
     {{ url_for('admin', **params) }}
 {% endmacro %}
 
-<!-- TOP BAR -->
-<nav class="topbar">
-    <div class="topbar-brand">
-        <div class="dot"></div>
-        Pashynska Photography
-        <span style="color:#4b5563; font-weight:400;">/ Admin</span>
-    </div>
-    <div class="topbar-right">
-        <a href="#bookings-section" class="topbar-link" style="font-size:13px;">All bookings</a>
-        <a href="#events-section" class="topbar-link" style="font-size:13px;">Events & slots</a>
-        <a href="/admin/analytics" class="topbar-link" style="font-size:13px;">📊 Analytics</a>
-        <a href="/admin/link-generator" class="topbar-link" style="font-size:13px;">🔗 Links</a>
-        <a href="/admin/clients" class="topbar-link" style="font-size:13px;">👥 Clients</a>
-        <a href="/admin/backup-center" class="topbar-link" style="font-size:13px;">💾 Backups</a>
-        <a href="/admin/transfers" class="topbar-link" style="font-size:13px;">💸 Interac</a>
-        <a href="/admin/health" class="topbar-link" style="font-size:13px;">Health</a>
-        <span class="topbar-badge">Admin</span>
-        <a href="/" class="topbar-link" target="_blank">↗ Booking site</a>
-    </div>
-</nav>
+{% include '_admin_shell.html' %}
 
 <div class="page">
 

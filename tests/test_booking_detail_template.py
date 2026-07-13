@@ -80,7 +80,8 @@ def test_booking_detail_renders_template_not_stub(admin_client):
     # Hallmarks of the full template, not the stub.
     assert "booking-hero" in body
     assert "card-title" in body
-    assert "📸 Pashynska Studio" in body  # topbar brand
+    assert "Pashynska Admin" in body  # shared administration shell brand
+    assert "Administration navigation" in body
     assert len(body) > 5000, "stub was ~400 chars; full template is ~15k"
 
 

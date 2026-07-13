@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Analytics · Pashynska Photography</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
   <style>
     :root {
       --bg:#f0f2f5; --surface:#fff; --border:#e4e7ec; --text:#111827;
@@ -39,14 +40,7 @@
   </style>
 </head>
 <body>
-  <nav class="topbar">
-    <div class="brand"><span class="dot"></span>Pashynska Admin</div>
-    <div class="toplinks">
-      <a href="/admin">Bookings</a>
-      <a href="/admin/clients">Clients</a>
-      <a href="/">Booking site</a>
-    </div>
-  </nav>
+  {% include '_admin_shell.html' %}
   <main class="page">
     <div class="header">
       <div>

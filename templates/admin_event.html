@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>{{ event.title|e }} · Admin Event</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
 <style>
   /* Same palette as admin.html / admin_clients.html / booking_detail.html
      so the four admin pages feel like one coherent product. */
@@ -256,14 +257,7 @@
 </head>
 <body>
 
-<header class="topbar">
-  <span class="topbar-brand"><span class="dot"></span>📸 Pashynska Studio</span>
-  <nav class="topbar-nav">
-    <a href="/admin">Dashboard</a>
-    <a href="/admin/clients">👥 Clients</a>
-  </nav>
-  <span class="topbar-spacer"></span>
-</header>
+{% include '_admin_shell.html' %}
 
 <main class="page">
   <a class="back-link" href="/admin">← Back to dashboard</a>
