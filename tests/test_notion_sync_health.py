@@ -122,3 +122,40 @@ def test_notion_health_probe_is_cached_for_admin_navigation(notion_db, monkeypat
     assert booking_app._probe_notion_health() == (True, None)
     assert booking_app._probe_notion_health() == (True, None)
     assert calls["count"] == 1
+
+
+def test_notion_health_coverage_excludes_admin_slot_blocks(notion_db, monkeypatch):
+    booking_app._notion_health_cache.update({
+        "checked_at": 0.0,
+        "token_marker": None,
+        "ok": False,
+        "warning": None,
+    })
+    monkeypatch.setattr(
+        booking_app.requests, "get", lambda *args, **kwargs: _Response(200)
+    )
+    conn = booking_app.db_conn()
+    conn.execute(
+        """INSERT INTO bookings
+             (date,time,name,email,phone,session_type,status,confirmed)
+           VALUES ('2026-08-01','12:00','Real Client','real@example.com','',
+                   'mini','reserved',0)"""
+    )
+    conn.execute(
+        """INSERT INTO bookings
+             (date,time,name,email,phone,session_type,status,confirmed)
+           VALUES ('2026-08-01','12:40','⛔ Closed by admin','','',
+                   'internal_block','reserved',0)"""
+    )
+    conn.commit()
+    conn.close()
+
+    booking_app.app.config["TESTING"] = True
+    with booking_app.app.test_client() as client:
+        response = client.get(
+            "/admin/health", headers={"X-Admin-Key": "test-admin-key"}
+        )
+
+    notion = response.get_json()["checks"]["notion"]
+    assert notion["linked_bookings"] == 0
+    assert notion["unlinked_bookings"] == 1

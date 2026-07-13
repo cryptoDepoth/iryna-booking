@@ -7636,6 +7636,8 @@ def admin_health():
               SUM(CASE WHEN notion_page_id IS NOT NULL AND notion_page_id != '' THEN 1 ELSE 0 END),
               SUM(CASE WHEN notion_page_id IS NULL OR notion_page_id = '' THEN 1 ELSE 0 END)
             FROM bookings
+            WHERE COALESCE(session_type, '') != 'internal_block'
+              AND COALESCE(name, '') NOT LIKE '⛔%'
         """).fetchone()
         _c.close()
         notion_linked = int(notion_linked or 0)
