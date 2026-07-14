@@ -152,6 +152,10 @@ def test_paid_mini_landing_matches_summer_ad_and_shows_bookable_date_first(clien
     assert 'loading="lazy"' in html
     assert "IntersectionObserver" in html
     assert '<main id="main-content">' in html
+    assert "Ask in WhatsApp" in html
+    assert "trackLandingEvent('whatsapp_click'" in html
+    assert "trackLandingEvent('page_view'" in html
+    assert "fetch('/track'" in html
 
 
 def test_individual_uses_requested_calendar_date_and_one_booking_does_not_sell_out_event(client):

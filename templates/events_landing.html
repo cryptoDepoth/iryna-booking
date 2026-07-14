@@ -58,8 +58,11 @@
     .hero h1{font-family:var(--font-d);font-size:clamp(2.2rem,5vw,3.4rem);font-weight:300;line-height:1.05;letter-spacing:-.005em}
     .hero h1 em{font-style:italic;color:var(--rose)}
     .hero p{margin-top:14px;color:var(--ink-3);font-size:1rem}
-    .hero-jump{display:inline-flex;margin-top:20px;padding:12px 22px;border-radius:12px;background:var(--ink);color:#fff;text-decoration:none;font-size:.86rem;font-weight:600;letter-spacing:.02em;box-shadow:0 8px 24px rgba(28,25,23,.14)}
+    .hero-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:20px}
+    .hero-jump{display:inline-flex;padding:12px 22px;border-radius:12px;background:var(--ink);color:#fff;text-decoration:none;font-size:.86rem;font-weight:600;letter-spacing:.02em;box-shadow:0 8px 24px rgba(28,25,23,.14)}
     .hero-jump:hover{background:var(--ink-2)}
+    .hero-whatsapp{display:inline-flex;padding:12px 20px;border-radius:12px;background:#fff;color:#285a3a;border:1px solid rgba(40,90,58,.2);text-decoration:none;font-size:.86rem;font-weight:600}
+    .hero-whatsapp:hover{border-color:#285a3a}
 
     /* SOCIAL PROOF */
     .proof{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;padding:14px 28px 0;font-size:.82rem;color:var(--ink-3);max-width:760px;margin:0 auto}
@@ -160,7 +163,10 @@
   {% elif requested_type == 'mini' %}
   <h1>Hold on to<br><em>this summer</em></h1>
   <p>Calgary family mini sessions · July &amp; August dates from $180 + GST. Choose your setup and reserve in about 2 minutes.</p>
-  <a class="hero-jump" href="#featured-session">See available times →</a>
+  <div class="hero-actions">
+    <a class="hero-jump" href="#featured-session">See available times →</a>
+    <a class="hero-whatsapp" href="https://wa.me/13689977903?text=Hi%20Iryna%2C%20I%20have%20a%20question%20about%20a%20Calgary%20summer%20mini%20session." target="_blank" rel="noopener" onclick="trackLandingEvent('whatsapp_click', '', {placement:'summer_mini_hero'})">Ask in WhatsApp</a>
+  </div>
   {% else %}
   <h1>Soft, sunlit moments<br>among <em>blooming flowers</em></h1>
   <p>Pick a session below — booking takes about 2 minutes.</p>
@@ -311,6 +317,37 @@
   const filters = document.getElementById('filters');
   const todayMonth = new Date().toISOString().slice(0,7);
 
+  function landingVisitorId() {
+    try {
+      let id = localStorage.getItem('pp_visitor_id');
+      if (!id) {
+        id = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('pp_visitor_id', id);
+      }
+      return id;
+    } catch (_error) {
+      if (!window.__ppVisitorId) window.__ppVisitorId = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+      return window.__ppVisitorId;
+    }
+  }
+
+  function trackLandingEvent(eventName, eventId, metadata) {
+    const attribution = window.PashynskaAttribution ? window.PashynskaAttribution.get() : {};
+    fetch('/track', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      keepalive: true,
+      body: JSON.stringify({
+        visitor_id: landingVisitorId(),
+        event_name: eventName,
+        event_id: eventId || '',
+        page: window.location.pathname + window.location.search,
+        metadata: metadata || {},
+        ...attribution
+      })
+    }).catch(() => {});
+  }
+
   /* Native lazy loading may still fetch images several screens away. Keep
      below-the-fold cards off the network until they are close to view. */
   const lazyPhotos = Array.from(document.querySelectorAll('.js-lazy-photo[data-src]'));
@@ -357,7 +394,9 @@
 
   if (grid) grid.addEventListener('click', (e) => {
     const card = e.target.closest('.event-card');
-    if (!card || !window.fbq) return;
+    if (!card) return;
+    trackLandingEvent('session_view', card.dataset.event || '', {placement: 'filtered_booking_grid'});
+    if (!window.fbq) return;
     try {
       fbq('track', 'ViewContent', {
         content_name: card.querySelector('h3')?.textContent?.trim() || 'Photo Session',
@@ -366,6 +405,8 @@
       });
     } catch (_error) {}
   });
+
+  trackLandingEvent('page_view', '', {requested_type: {{ (requested_type or 'all')|tojson }}});
 </script>
 
 </body>
