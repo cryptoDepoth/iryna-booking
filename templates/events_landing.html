@@ -9,13 +9,15 @@
   {% if featured and featured.photos %}<link rel="preload" as="image" href="{{ featured.photos[0] }}" fetchpriority="high">{% endif %}
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
   <script src="/static/js/attribution.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script>
   !function(f,b,e,v,n,t,s)
   {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
   n.callMethod.apply(n,arguments):n.queue.push(arguments)};
   if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-  n.queue=[];t=b.createElement(e);t.async=!0;
+  n.queue=[];t=b.createElement(e);t.async=!0;t.fetchPriority='low';
   t.src=v;s=b.getElementsByTagName(e)[0];
   s.parentNode.insertBefore(t,s)}(window, document,'script',
   'https://connect.facebook.net/en_US/fbevents.js');
@@ -26,7 +28,7 @@
     content_category: {{ (requested_type or 'all')|tojson }}
   });
   </script>
-  <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_ads_id }}"></script>
+  <script async fetchpriority="low" src="https://www.googletagmanager.com/gtag/js?id={{ google_ads_id }}"></script>
   <script>
     window.__GOOGLE_ADS_ID = {{ google_ads_id|tojson }};
     window.__GOOGLE_ADS_BOOKING_SEND_TO = {{ google_ads_booking_send_to|tojson }};
@@ -248,7 +250,10 @@
          data-type="{{ ev.type }}"
          data-month="{{ ev.date[:7] }}">
         <div class="photo">
-          {% if ev.photos %}<img class="photo-img" src="{{ ev.photos[0] }}" alt="{{ ev.title }} in {{ ev.location or 'Calgary' }}" loading="lazy" decoding="async">{% endif %}
+          {% if ev.photos %}
+          <img class="photo-img js-lazy-photo" data-src="{{ ev.photos[0] }}" alt="{{ ev.title }} in {{ ev.location or 'Calgary' }}" loading="lazy" decoding="async">
+          <noscript><img class="photo-img" src="{{ ev.photos[0] }}" alt="{{ ev.title }} in {{ ev.location or 'Calgary' }}"></noscript>
+          {% endif %}
           {% set s = ev.spots %}
           {% if s.left == 0 %}
             <div class="status sold"><span class="dot"></span>Sold out</div>
@@ -305,6 +310,27 @@
   const countEl = document.getElementById('count');
   const filters = document.getElementById('filters');
   const todayMonth = new Date().toISOString().slice(0,7);
+
+  /* Native lazy loading may still fetch images several screens away. Keep
+     below-the-fold cards off the network until they are close to view. */
+  const lazyPhotos = Array.from(document.querySelectorAll('.js-lazy-photo[data-src]'));
+  const loadPhoto = (img) => {
+    if (!img.dataset.src) return;
+    img.src = img.dataset.src;
+    img.removeAttribute('data-src');
+  };
+  if ('IntersectionObserver' in window) {
+    const photoObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        loadPhoto(entry.target);
+        observer.unobserve(entry.target);
+      });
+    }, {rootMargin: '300px 0px'});
+    lazyPhotos.forEach((img) => photoObserver.observe(img));
+  } else {
+    lazyPhotos.forEach(loadPhoto);
+  }
 
   /* Auto-select filter from URL ?type= parameter */
   const urlType = new URLSearchParams(location.search).get('type');

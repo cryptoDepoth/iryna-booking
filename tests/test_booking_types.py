@@ -147,8 +147,10 @@ def test_paid_mini_landing_matches_summer_ad_and_shows_bookable_date_first(clien
     assert 'rel="preload" as="image"' in html
     assert 'class="featured-photo"' in html
     assert 'fetchpriority="high"' in html
-    assert 'class="photo-img"' in html
+    assert 'class="photo-img js-lazy-photo"' in html
+    assert 'data-src="/static/images/placeholder.jpg"' in html
     assert 'loading="lazy"' in html
+    assert "IntersectionObserver" in html
     assert '<main id="main-content">' in html
 
 
