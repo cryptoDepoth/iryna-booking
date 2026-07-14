@@ -6,7 +6,7 @@
   <title>{% if requested_type == 'mini' %}Calgary Summer Mini Sessions{% else %}Sessions{% endif %} | Pashynska Photography</title>
   <meta name="description" content="{% if requested_type == 'mini' %}Calgary summer family mini sessions from $180 + GST. See live July and August dates, available time slots, and reserve online.{% else %}Browse available Calgary photography sessions, see live time slots, and reserve online with Pashynska Photography.{% endif %}">
   <link rel="canonical" href="https://book.pashynskaphoto.com/book{% if requested_type %}?type={{ requested_type }}{% endif %}">
-  {% if featured and featured.photos %}<link rel="preload" as="image" href="{{ featured.photos[0] }}" fetchpriority="high">{% endif %}
+  {% if featured and featured.photos %}<link rel="preload" as="image" href="{{ featured.photos[0] }}{% if featured.photos[0].startswith('/images/') %}?w=720{% endif %}" fetchpriority="high">{% endif %}
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
   <script src="/static/js/attribution.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -178,7 +178,7 @@
 {% if featured %}
 <div class="featured-wrap" id="featured-session">
   <a class="featured" href="{{ url_for('index') }}?event={{ featured.id }}">
-    {% if featured.photos %}<img class="featured-photo" src="{{ featured.photos[0] }}" alt="{{ featured.title }} in {{ featured.location or 'Calgary' }}" fetchpriority="high" decoding="async">{% endif %}
+    {% if featured.photos %}<img class="featured-photo" src="{{ featured.photos[0] }}{% if featured.photos[0].startswith('/images/') %}?w=720{% endif %}" alt="{{ featured.title }} in {{ featured.location or 'Calgary' }}" fetchpriority="high" decoding="async">{% endif %}
     <div class="featured-tag">★ Featured</div>
     <div class="featured-countdown">
       {% if featured.days_until <= 0 %}Today
@@ -251,7 +251,7 @@
          data-month="{{ ev.date[:7] }}">
         <div class="photo">
           {% if ev.photos %}
-          <img class="photo-img js-lazy-photo" data-src="{{ ev.photos[0] }}" alt="{{ ev.title }} in {{ ev.location or 'Calgary' }}" loading="lazy" decoding="async">
+          <img class="photo-img js-lazy-photo" data-src="{{ ev.photos[0] }}{% if ev.photos[0].startswith('/images/') %}?w=720{% endif %}" alt="{{ ev.title }} in {{ ev.location or 'Calgary' }}" loading="lazy" decoding="async">
           <noscript><img class="photo-img" src="{{ ev.photos[0] }}" alt="{{ ev.title }} in {{ ev.location or 'Calgary' }}"></noscript>
           {% endif %}
           {% set s = ev.spots %}

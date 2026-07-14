@@ -2804,7 +2804,7 @@ def _uncaught(e):
 
 
 # Serve uploaded photos: try persistent volume first, then bundled static.
-def _optimized_image_cache_path(source_path):
+def _optimized_image_cache_path(source_path, target_width=None):
     """Return a cached WebP for legacy large jpg/png/webp images, or None.
 
     Existing admin uploads are already optimized. This keeps public /images URLs
@@ -2817,12 +2817,21 @@ def _optimized_image_cache_path(source_path):
         if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
             return None
         source_size = os.path.getsize(source_path)
-        if source_size < _IMAGE_CACHE_MIN_BYTES:
+        if not target_width and source_size < _IMAGE_CACHE_MIN_BYTES:
             return None
+
+        if target_width:
+            # Keep the public cache bounded to three responsive variants rather
+            # than allowing arbitrary query-string dimensions.
+            target_width = next(
+                (width for width in (480, 720, 960) if int(target_width) <= width),
+                960,
+            )
 
         mtime = int(os.path.getmtime(source_path))
         basename = os.path.basename(source_path)
-        cache_name = f"{basename}.{source_size}.{mtime}.webp"
+        variant = f".w{target_width}" if target_width else ""
+        cache_name = f"{basename}.{source_size}.{mtime}{variant}.webp"
         os.makedirs(_IMAGE_CACHE_DIR, exist_ok=True)
         cache_path = os.path.join(_IMAGE_CACHE_DIR, cache_name)
         if os.path.isfile(cache_path):
@@ -2833,7 +2842,10 @@ def _optimized_image_cache_path(source_path):
         resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
         with Image.open(source_path) as image:
             image = ImageOps.exif_transpose(image)
-            image.thumbnail((_IMAGE_CACHE_MAX_DIMENSION, _IMAGE_CACHE_MAX_DIMENSION), resampling)
+            if target_width:
+                image.thumbnail((target_width, target_width * 2), resampling)
+            else:
+                image.thumbnail((_IMAGE_CACHE_MAX_DIMENSION, _IMAGE_CACHE_MAX_DIMENSION), resampling)
             if image.mode in ("RGBA", "LA") or "transparency" in image.info:
                 rgba = image.convert("RGBA")
                 flattened = Image.new("RGB", rgba.size, (255, 255, 255))
@@ -2842,7 +2854,8 @@ def _optimized_image_cache_path(source_path):
             else:
                 image = image.convert("RGB")
             tmp_path = f"{cache_path}.tmp"
-            image.save(tmp_path, "WEBP", quality=_IMAGE_CACHE_WEBP_QUALITY, method=6)
+            quality = min(_IMAGE_CACHE_WEBP_QUALITY, 76) if target_width else _IMAGE_CACHE_WEBP_QUALITY
+            image.save(tmp_path, "WEBP", quality=quality, method=6)
             os.replace(tmp_path, cache_path)
         return cache_path
     except Exception as exc:
@@ -2853,7 +2866,11 @@ def _optimized_image_cache_path(source_path):
 def serve_image(filename):
     persistent_path = os.path.join(PHOTOS_DIR, filename)
     source_path = persistent_path if os.path.isfile(persistent_path) else os.path.join(_BUNDLED_IMAGES_DIR, filename)
-    cached_path = _optimized_image_cache_path(source_path)
+    requested_width = request.args.get("w", type=int)
+    cached_path = _optimized_image_cache_path(
+        source_path,
+        target_width=requested_width if requested_width and requested_width > 0 else None,
+    )
     if cached_path:
         response = send_file(cached_path, mimetype="image/webp", conditional=True)
     elif os.path.isfile(persistent_path):
