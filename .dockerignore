@@ -25,6 +25,11 @@ FLY_API_TOKEN.txt
 qa/nightly/logs/
 qa/nightly/reports/
 
+# Source screenshots used to prepare the compressed landing-page galleries.
+# Runtime templates reference the optimized .webp/.jpg assets, not these
+# 50+ MB PNG originals.
+static/images/*2026-05-17*.png
+
 # Local agent / Wfolio scratch artifacts — never needed in Fly image
 CLAUDE_CODE_TASKS.md
 .wfolio-*

@@ -4903,6 +4903,16 @@ def booking_page():
                 featured = e
     events.sort(key=lambda x: x.get("date", ""))
 
+    # A filtered booking landing should put a real, bookable session above the
+    # fold even when the operator did not explicitly mark an event as featured.
+    # Paid mini-session traffic was otherwise seeing three generic instruction
+    # cards before the first date, which created an avoidable funnel drop-off.
+    if type_filter and not featured:
+        featured = next(
+            (event for event in events if int(event.get("spots_left") or 0) > 0),
+            events[0] if events else None,
+        )
+
     inquiry_mode = type_filter in {"wedding", "custom"} and not events
     inquiry_subject = "Wedding inquiry" if type_filter == "wedding" else "Custom photography inquiry"
     inquiry_body = (
@@ -4916,7 +4926,7 @@ def booking_page():
     )
 
     stats = {
-        "reviews": "80+",
+        "reviews": "150+",
         "delivered": "120+",
     }
     settings = {

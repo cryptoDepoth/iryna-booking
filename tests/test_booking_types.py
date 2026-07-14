@@ -126,6 +126,25 @@ def test_mini_session_keeps_fixed_event_date_slots(client):
     assert [s["time"] for s in data["slots"]] == ["10:00", "10:30"]
 
 
+def test_paid_mini_landing_matches_summer_ad_and_shows_bookable_date_first(client):
+    c, _, _ = client
+
+    response = c.get(
+        "/book?type=mini&utm_source=meta&utm_medium=paid"
+        "&utm_campaign=summer_minis_2026&utm_content=cr_summer_heart_v6"
+    )
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Hold on to" in html
+    assert "this summer" in html
+    assert "July &amp; August dates from $180 + GST" in html
+    assert 'id="featured-session"' in html
+    assert "QA Mini Session" in html
+    assert html.index('id="featured-session"') < html.index('class="how"')
+    assert "150+ client reviews" in html
+
+
 def test_individual_uses_requested_calendar_date_and_one_booking_does_not_sell_out_event(client):
     c, _, events = client
     individual = events[1]

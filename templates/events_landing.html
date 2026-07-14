@@ -53,6 +53,8 @@
     .hero h1{font-family:var(--font-d);font-size:clamp(2.2rem,5vw,3.4rem);font-weight:300;line-height:1.05;letter-spacing:-.005em}
     .hero h1 em{font-style:italic;color:var(--rose)}
     .hero p{margin-top:14px;color:var(--ink-3);font-size:1rem}
+    .hero-jump{display:inline-flex;margin-top:20px;padding:12px 22px;border-radius:12px;background:var(--ink);color:#fff;text-decoration:none;font-size:.86rem;font-weight:600;letter-spacing:.02em;box-shadow:0 8px 24px rgba(28,25,23,.14)}
+    .hero-jump:hover{background:var(--ink-2)}
 
     /* SOCIAL PROOF */
     .proof{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;padding:14px 28px 0;font-size:.82rem;color:var(--ink-3);max-width:760px;margin:0 auto}
@@ -147,6 +149,10 @@
   {% if inquiry_mode %}
   <h1>Wedding photography<br>planned <em>personally</em></h1>
   <p>Share your date and vision — Iryna will confirm availability, coverage options, and next steps.</p>
+  {% elif requested_type == 'mini' %}
+  <h1>Hold on to<br><em>this summer</em></h1>
+  <p>Calgary family mini sessions · July &amp; August dates from $180 + GST. Choose your setup and reserve in about 2 minutes.</p>
+  <a class="hero-jump" href="#featured-session">See available times →</a>
   {% else %}
   <h1>Soft, sunlit moments<br>among <em>blooming flowers</em></h1>
   <p>Pick a session below — booking takes about 2 minutes.</p>
@@ -154,27 +160,15 @@
 </div>
 
 <div class="proof">
-  <span><strong>★ 4.9</strong> · {{ stats.reviews if stats and stats.reviews else '80+' }} reviews</span>
+  <span><strong>★ 4.9</strong> · {{ stats.reviews if stats and stats.reviews else '150+' }} client reviews</span>
   <span class="sep">·</span>
   <span><strong>{{ stats.delivered if stats and stats.delivered else '120+' }}</strong> sessions delivered</span>
   <span class="sep">·</span>
   <span><strong>Calgary</strong> local pick</span>
 </div>
 
-<div class="how">
-  {% if inquiry_mode %}
-  <div class="step"><div class="num">1</div><div><h4>Send your date</h4><p>Share the wedding date, location, guest count, and the kind of coverage you need.</p></div></div>
-  <div class="step"><div class="num">2</div><div><h4>Get availability</h4><p>Iryna replies with availability, package direction, and any travel/location notes.</p></div></div>
-  <div class="step"><div class="num">3</div><div><h4>Plan the coverage</h4><p>Finalize timeline, portraits, previews, and gallery delivery before anything is confirmed.</p></div></div>
-  {% else %}
-  <div class="step"><div class="num">1</div><div><h4>Pick a session</h4><p>Browse upcoming dates and choose what fits — dress code & exact spot come with confirmation.</p></div></div>
-  <div class="step"><div class="num">2</div><div><h4>Reserve in 2 min</h4><p>Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
-  <div class="step"><div class="num">3</div><div><h4>Pay deposit by e-Transfer</h4><p>Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
-  {% endif %}
-</div>
-
 {% if featured %}
-<div class="featured-wrap">
+<div class="featured-wrap" id="featured-session">
   <a class="featured" href="{{ url_for('index') }}?event={{ featured.id }}"
      style="background-image:url('{{ (featured.photos[0] if featured.photos else '') }}')">
     <div class="featured-tag">★ Featured</div>
@@ -191,6 +185,18 @@
   </a>
 </div>
 {% endif %}
+
+<div class="how">
+  {% if inquiry_mode %}
+  <div class="step"><div class="num">1</div><div><h4>Send your date</h4><p>Share the wedding date, location, guest count, and the kind of coverage you need.</p></div></div>
+  <div class="step"><div class="num">2</div><div><h4>Get availability</h4><p>Iryna replies with availability, package direction, and any travel/location notes.</p></div></div>
+  <div class="step"><div class="num">3</div><div><h4>Plan the coverage</h4><p>Finalize timeline, portraits, previews, and gallery delivery before anything is confirmed.</p></div></div>
+  {% else %}
+  <div class="step"><div class="num">1</div><div><h4>Pick a session</h4><p>Browse upcoming dates and choose what fits — dress code & exact spot come with confirmation.</p></div></div>
+  <div class="step"><div class="num">2</div><div><h4>Reserve in 2 min</h4><p>Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
+  <div class="step"><div class="num">3</div><div><h4>Pay deposit by e-Transfer</h4><p>Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
+  {% endif %}
+</div>
 
 <div class="filters" id="filters">
   <button class="chip on" data-filter="all">All</button>
