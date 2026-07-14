@@ -3179,6 +3179,7 @@ def create_calendar_event_for_booking(booking_id):
         result = _sp.run(
             [helper, "create",
              "--calendar", CALENDAR_ID,
+             "--booking-id", str(booking_id),
              "--summary", summary,
              "--start", start_dt.isoformat(),
              "--end", end_dt.isoformat(),
@@ -7918,6 +7919,77 @@ def admin_health():
 def admin_health_center():
     """Human-friendly operational status page; /admin/health remains the JSON API."""
     return render_template("admin_health.html")
+
+
+@app.route("/admin/calendar/backfill", methods=["POST"])
+@admin_required
+def admin_calendar_backfill():
+    """Idempotently restore missing future Calendar events in small batches."""
+    data = request.get_json(silent=True) or {}
+    if data.get("confirm") != "BACKFILL":
+        return jsonify({"error": "Explicit BACKFILL confirmation required"}), 400
+    try:
+        limit = max(1, min(int(data.get("limit") or 10), 20))
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer from 1 to 20"}), 400
+
+    conn = db_conn()
+    rows = conn.execute("""
+        SELECT id, date, time, name
+        FROM bookings
+        WHERE date >= ?
+          AND (COALESCE(status, '') = 'confirmed' OR COALESCE(confirmed, 0) = 1)
+          AND (calendar_event_id IS NULL OR calendar_event_id = '')
+          AND COALESCE(session_type, '') != 'internal_block'
+          AND COALESCE(name, '') NOT LIKE '⛔%'
+        ORDER BY date, time, id
+        LIMIT ?
+    """, (_local_now().date().isoformat(), limit)).fetchall()
+    conn.close()
+
+    synced = []
+    failed = []
+    for row in rows:
+        booking_id = int(row["id"])
+        event_url = create_calendar_event_for_booking(booking_id)
+        if event_url:
+            synced.append({
+                "booking_id": booking_id,
+                "date": row["date"],
+                "time": row["time"],
+                "calendar_event_url": event_url,
+            })
+        else:
+            failed.append({
+                "booking_id": booking_id,
+                "date": row["date"],
+                "time": row["time"],
+            })
+
+    conn = db_conn()
+    remaining = conn.execute("""
+        SELECT COUNT(*)
+        FROM bookings
+        WHERE date >= ?
+          AND (COALESCE(status, '') = 'confirmed' OR COALESCE(confirmed, 0) = 1)
+          AND (calendar_event_id IS NULL OR calendar_event_id = '')
+          AND COALESCE(session_type, '') != 'internal_block'
+          AND COALESCE(name, '') NOT LIKE '⛔%'
+    """, (_local_now().date().isoformat(),)).fetchone()[0]
+    conn.close()
+
+    return jsonify({
+        "ok": not failed,
+        "attempted": len(rows),
+        "synced": synced,
+        "failed": failed,
+        "remaining": int(remaining or 0),
+        "message": (
+            "No missing future Calendar events."
+            if not rows else
+            f"Synced {len(synced)}; failed {len(failed)}; {int(remaining or 0)} remaining."
+        ),
+    }), 200 if not failed else 502
 
 
 def _admin_event_has_ended(ev, now=None):

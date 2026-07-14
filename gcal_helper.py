@@ -15,6 +15,7 @@ which prints a single JSON line: {"id": "...", "htmlLink": "..."}
 import argparse
 import json
 import os
+import re
 import sys
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
@@ -81,8 +82,51 @@ def cmd_probe(args):
     }))
 
 
+def _find_booking_event(svc, calendar_id, booking_id):
+    """Find a prior sync before inserting, including legacy events without metadata."""
+    if not booking_id:
+        return None
+
+    # New events carry a private property, which is the most reliable and
+    # cheapest idempotency lookup.
+    response = svc.events().list(
+        calendarId=calendar_id,
+        privateExtendedProperty=f"booking_id={booking_id}",
+        singleEvents=True,
+        maxResults=1,
+    ).execute()
+    items = response.get("items") or []
+    if items:
+        return items[0]
+
+    # Events created before the private property was introduced still include
+    # "Booking #<id>" in their description. Search and verify the exact marker
+    # so a database repair cannot create a duplicate calendar entry.
+    marker = f"Booking #{booking_id}"
+    response = svc.events().list(
+        calendarId=calendar_id,
+        q=marker,
+        singleEvents=True,
+        maxResults=10,
+    ).execute()
+    marker_pattern = re.compile(rf"(?m)^{re.escape(marker)}(?:\s|$)")
+    for event in response.get("items") or []:
+        if marker_pattern.search(event.get("description") or ""):
+            return event
+    return None
+
+
 def cmd_create(args):
     svc = _service()
+    existing = _find_booking_event(svc, args.calendar, args.booking_id)
+    if existing:
+        print(json.dumps({
+            "id": existing.get("id"),
+            "htmlLink": existing.get("htmlLink"),
+            "existing": True,
+        }))
+        return
+
     body = {
         "summary": args.summary,
         "description": args.description or "",
@@ -94,8 +138,15 @@ def cmd_create(args):
             {"method": "popup", "minutes": 60},
         ]},
     }
+    if args.booking_id:
+        body["extendedProperties"] = {
+            "private": {
+                "booking_id": str(args.booking_id),
+                "source": "pashynska-booking",
+            }
+        }
     ev = svc.events().insert(calendarId=args.calendar, body=body).execute()
-    print(json.dumps({"id": ev.get("id"), "htmlLink": ev.get("htmlLink")}))
+    print(json.dumps({"id": ev.get("id"), "htmlLink": ev.get("htmlLink"), "existing": False}))
 
 
 def main():
@@ -106,6 +157,7 @@ def main():
     probe.add_argument("--calendar", required=True)
     cr = sub.add_parser("create")
     cr.add_argument("--calendar", required=True)
+    cr.add_argument("--booking-id")
     cr.add_argument("--summary", required=True)
     cr.add_argument("--start", required=True)
     cr.add_argument("--end", required=True)

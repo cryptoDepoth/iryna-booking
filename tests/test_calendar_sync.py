@@ -166,3 +166,71 @@ def test_admin_health_exposes_missing_future_calendar_events(monkeypatch):
             os.unlink(db_path)
         except OSError:
             pass
+
+
+def test_admin_calendar_backfill_requires_confirmation_and_updates_missing(monkeypatch):
+    fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    os.unlink(db_path)
+    monkeypatch.setattr(booking_app, "DB_PATH", db_path)
+    monkeypatch.setattr(booking_app, "ADMIN_KEY", "test-admin-key")
+    monkeypatch.setattr(booking_app, "ADMIN_PASSWORD", "test-admin-key")
+    booking_app.init_db()
+    future = (date.today() + timedelta(days=30)).isoformat()
+    conn = booking_app.db_conn()
+    cur = conn.execute(
+        """INSERT INTO bookings
+             (date,time,name,email,phone,session_type,status,confirmed,paid)
+           VALUES (?,?,?,?,?,'mini','confirmed',1,1)""",
+        (future, "17:20", "Backfill Client", "backfill@example.com", ""),
+    )
+    booking_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    calls = []
+
+    def fake_create(target_id):
+        calls.append(target_id)
+        conn = booking_app.db_conn()
+        conn.execute(
+            "UPDATE bookings SET calendar_event_id=?, calendar_event_url=? WHERE id=?",
+            (
+                f"calendar-{target_id}",
+                f"https://calendar.example/{target_id}",
+                target_id,
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return f"https://calendar.example/{target_id}"
+
+    monkeypatch.setattr(booking_app, "create_calendar_event_for_booking", fake_create)
+    booking_app.app.config["TESTING"] = True
+    try:
+        with booking_app.app.test_client() as client:
+            denied = client.post(
+                "/admin/calendar/backfill",
+                headers={"X-Admin-Key": "test-admin-key"},
+                json={"limit": 10},
+            )
+            assert denied.status_code == 400
+
+            response = client.post(
+                "/admin/calendar/backfill",
+                headers={"X-Admin-Key": "test-admin-key"},
+                json={"confirm": "BACKFILL", "limit": 10},
+            )
+
+        assert response.status_code == 200
+        result = response.get_json()
+        assert result["ok"] is True
+        assert result["attempted"] == 1
+        assert result["remaining"] == 0
+        assert result["synced"][0]["booking_id"] == booking_id
+        assert calls == [booking_id]
+    finally:
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass

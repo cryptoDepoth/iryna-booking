@@ -75,3 +75,61 @@ def test_probe_is_read_only_and_reports_calendar(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert '"ok": true' in output
     assert '"time_zone": "America/Edmonton"' in output
+
+
+def test_find_booking_event_prefers_private_idempotency_marker():
+    calls = []
+
+    class Request:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def execute(self):
+            return self.payload
+
+    class Events:
+        def list(self, **kwargs):
+            calls.append(kwargs)
+            return Request({"items": [{"id": "existing-42", "htmlLink": "https://calendar/existing-42"}]})
+
+    class Service:
+        def events(self):
+            return Events()
+
+    event = gcal_helper._find_booking_event(Service(), "iryna@example.com", "42")
+    assert event["id"] == "existing-42"
+    assert calls == [{
+        "calendarId": "iryna@example.com",
+        "privateExtendedProperty": "booking_id=42",
+        "singleEvents": True,
+        "maxResults": 1,
+    }]
+
+
+def test_find_booking_event_falls_back_to_legacy_description():
+    calls = []
+
+    class Request:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def execute(self):
+            return self.payload
+
+    class Events:
+        def list(self, **kwargs):
+            calls.append(kwargs)
+            if "privateExtendedProperty" in kwargs:
+                return Request({"items": []})
+            return Request({"items": [
+                {"id": "wrong", "description": "Booking #420"},
+                {"id": "legacy-42", "description": "Client details\nBooking #42\nLocation"},
+            ]})
+
+    class Service:
+        def events(self):
+            return Events()
+
+    event = gcal_helper._find_booking_event(Service(), "iryna@example.com", "42")
+    assert event["id"] == "legacy-42"
+    assert calls[1]["q"] == "Booking #42"
