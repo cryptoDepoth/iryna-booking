@@ -30,11 +30,13 @@ def _service():
     from googleapiclient.discovery import build
 
     creds = None
+    loaded_from_env = False
     # Production: token comes from env vars (no browser, no token.json file)
     refresh_token = os.environ.get("GOOGLE_CALENDAR_REFRESH_TOKEN")
     client_id = os.environ.get("GOOGLE_CLIENT_ID")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
     if refresh_token and client_id and client_secret:
+        loaded_from_env = True
         creds = Credentials(
             token=None,
             refresh_token=refresh_token,
@@ -46,13 +48,20 @@ def _service():
     elif os.path.exists(TOKEN_PATH):
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+        # Credentials assembled from a refresh token have no access token or
+        # expiry yet, so ``expired`` can be False even though ``valid`` is
+        # also False. Refresh whenever a refresh token is available instead
+        # of incorrectly falling back to an interactive browser flow.
+        if creds and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(CRED_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
-        with open(TOKEN_PATH, "w") as f:
-            f.write(creds.to_json())
+        # Environment credentials are Fly secrets; do not copy them into a
+        # token file in the application filesystem.
+        if not loaded_from_env:
+            with open(TOKEN_PATH, "w") as f:
+                f.write(creds.to_json())
     return build("calendar", "v3", credentials=creds)
 
 

@@ -115,7 +115,20 @@ log = logging.getLogger(__name__)
 # app emits structured business events to n8n. It is deliberately fire-and-forget:
 # n8n downtime must never block bookings, payments, admin actions, or emails.
 N8N_WEBHOOK_URL = os.environ.get("N8N_WEBHOOK_URL", "").strip()
+_N8N_SECRET_FILE = os.path.expanduser(
+    os.environ.get("N8N_WEBHOOK_SECRET_FILE", "~/.hermes/n8n/relay-secret")
+)
 N8N_WEBHOOK_SECRET = os.environ.get("N8N_WEBHOOK_SECRET", "").strip()
+if not N8N_WEBHOOK_SECRET and os.path.isfile(_N8N_SECRET_FILE):
+    try:
+        with open(_N8N_SECRET_FILE, encoding="utf-8") as _secret_file:
+            N8N_WEBHOOK_SECRET = _secret_file.read().strip()
+    except OSError as _secret_error:
+        logging.warning("[n8n-relay] cannot read secret file: %s", _secret_error)
+N8N_LOCAL_FORWARD_URL = os.environ.get(
+    "N8N_LOCAL_FORWARD_URL",
+    "http://127.0.0.1:5678/webhook/pashynska-automation",
+).strip()
 
 
 def _emit_n8n_event(action, booking=None, **payload):
@@ -2291,6 +2304,42 @@ def healthz():
     return jsonify({"ok": True, "service": "iryna-booking"}), 200
 
 
+@app.route('/webhook/pashynska-automation', methods=['POST'])
+def pashynska_automation_relay():
+    """Expose only the signed automation webhook through the named tunnel.
+
+    The local n8n editor is intentionally not published. Fly sends signed
+    business events to this route on pashynska.agency; the Mac-hosted Booking
+    process validates the shared secret and forwards the JSON to localhost.
+    """
+    if not N8N_WEBHOOK_SECRET:
+        logging.error("[n8n-relay] N8N_WEBHOOK_SECRET is not configured")
+        return jsonify({"ok": False, "error": "relay unavailable"}), 503
+
+    provided = request.headers.get("X-Webhook-Secret", "")
+    if not provided or not secrets.compare_digest(provided, N8N_WEBHOOK_SECRET):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not payload.get("action"):
+        return jsonify({"ok": False, "error": "invalid payload"}), 400
+
+    try:
+        upstream = requests.post(
+            N8N_LOCAL_FORWARD_URL,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        upstream.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        logging.error("[n8n-relay] forward failed: %s", exc)
+        return jsonify({"ok": False, "error": "automation unavailable"}), 502
+
+    content_type = upstream.headers.get("Content-Type", "application/json")
+    return Response(upstream.content, status=upstream.status_code, content_type=content_type)
+
+
 _REVIEW_AI_RATE: dict[str, list[float]] = {}
 _REVIEW_STYLE_LABELS = {
     "family": "family photo session",
@@ -3016,7 +3065,10 @@ def create_calendar_event_for_booking(booking_id):
 
         start_dt = datetime.strptime(f"{b['date']} {b['time']}", "%Y-%m-%d %H:%M")
         end_dt = start_dt + timedelta(minutes=SESSION_LENGTH)
-        summary = f"📸 {b['name'] or 'Mini Session'} — {EVENT_TITLE}"
+        event = get_event_by_id(b.get("event_id")) if b.get("event_id") else None
+        event_title = event.get("title", EVENT_TITLE) if event else EVENT_TITLE
+        location = event.get("location", "") if event else ""
+        summary = f"📸 {b['name'] or 'Mini Session'} — {event_title}"
         description = (
             f"Mini Photo Session ({SESSION_LENGTH} min)\n"
             f"Client: {b['name']}\n"
@@ -3025,11 +3077,8 @@ def create_calendar_event_for_booking(booking_id):
             f"Instagram: {b.get('instagram') or ''}\n"
             f"Session type: {b.get('session_type') or ''}\n"
             f"Booking #{b['id']}\n"
-            f"Location: {ev.get('location') if ev else 'TBD'}"
+            f"Location: {location or 'TBD'}"
         )
-        # Get event details for location
-        event = get_event_by_id(b.get('event_id')) if b.get('event_id') else None
-        location = event.get('location', '') if event else ''
         
         import subprocess as _sp
         result = _sp.run(

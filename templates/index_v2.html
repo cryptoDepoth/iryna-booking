@@ -736,7 +736,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 "location":{"@type":"Place","name":"{{ (e.location or 'Calgary')|e }}","address":{"@type":"PostalAddress","addressLocality":"Calgary","addressRegion":"AB","addressCountry":"CA"}},
 "image":"https://book.pashynskaphoto.com{{ (e.photos[0] if e.photos else '/static/og-image.jpg') }}",
 "organizer":{"@id":"https://book.pashynskaphoto.com/#organization"},
-"offers":{"@type":"Offer","price":"{{ e.deposit or e.price or 0 }}","priceCurrency":"CAD","availability":"{% if e.spots_left and e.spots_left > 0 %}https://schema.org/InStock{% else %}https://schema.org/SoldOut{% endif %}","url":"https://book.pashynskaphoto.com/?event={{ e.id }}","validFrom":"{{ e.date }}"}}
+"offers":{"@type":"Offer","price":"{{ e.full_price or e.price or 0 }}","priceCurrency":"CAD","availability":"{% if e.spots_left and e.spots_left > 0 %}https://schema.org/InStock{% else %}https://schema.org/SoldOut{% endif %}","url":"https://book.pashynskaphoto.com/?event={{ e.id }}","validFrom":"{{ e.date }}"}}
 {% if not loop.last %},{% endif %}
 {% endfor %}
 ]}
@@ -970,6 +970,8 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
       {# Server-render current offers for search engines and no-JS visitors. #}
       {% for event in initial_events[:6] %}
       {% set sold = (event.spots_left|default(0)|int) <= 0 %}
+      {% set card_deposit = event.deposit|default(event.price|default(0), true)|float %}
+      {% set card_total = event.full_price|default(event.price|default(0), true)|float %}
       <article class="event-card{% if sold %} sold{% endif %}" data-event-id="{{ event.id }}" onclick="openDrawer('{{ event.id }}')">
         <div class="photo">
           {% if event.photos %}<div class="photo-bg" style="background-image:url('{{ event.photos[0] }}')"></div>{% endif %}
@@ -981,7 +983,7 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
           {% if event.subtitle %}<div class="subtitle">{{ event.subtitle }}</div>{% endif %}
           <div class="meta"><span>Calgary, AB</span><span>{{ event.date_pretty|default(event.date) }}</span></div>
           <div class="price-bar">
-            <div class="price">${{ '%.2f'|format(event.price|default(0)|float) }}<small>CAD total</small></div>
+            <div class="price">${{ '%.2f'|format(card_deposit) }}<small>deposit today · ${{ '%.2f'|format(card_total) }} CAD total</small></div>
             <a class="cta" href="/?event={{ event.id }}" onclick="event.preventDefault();openDrawer('{{ event.id }}')">{{ 'Sold out' if sold else 'View times' }}</a>
           </div>
         </div>

@@ -140,6 +140,11 @@ def test_public_funnel_server_renders_current_inventory_for_crawlers():
     assert "for event in initial_events[:6]" in html
     assert 'class="event-card' in html
     assert 'href="/?event={{ event.id }}"' in html
+    assert "card_deposit = event.deposit" in html
+    assert "card_total = event.full_price" in html
+    assert "deposit today · ${{ '%.2f'|format(card_total) }} CAD total" in html
+    assert '"price":"{{ e.full_price or e.price or 0 }}"' in html
+    assert '<small>CAD total</small>' not in html
 
 
 def test_live_landing_pages_use_compressed_images_and_real_review_attribution():

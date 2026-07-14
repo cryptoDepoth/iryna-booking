@@ -94,6 +94,9 @@ export DB_PATH=/data/bookings.db
 export BACKUP_DIR=/data/backups
 export EVENTS_YAML_PATH=/data/events.yaml
 export ASSISTANT_KNOWLEDGE_PATH="${ASSISTANT_KNOWLEDGE_PATH:-/data/assistant_knowledge.jsonl}"
+# Calendar credentials are provided through Fly secrets; point the app at the
+# bundled CLI wrapper so confirmed bookings can actually create events.
+export GCAL_HELPER="${GCAL_HELPER:-/app/gcal_helper.py}"
 # PHOTOS_DIR keeps admin-uploaded photos on the persistent volume so they
 # survive container restarts and redeploys (the bundled /app/static/images
 # directory is wiped on every deploy).
@@ -104,6 +107,7 @@ echo "[start] DB_PATH=$DB_PATH"
 echo "[start] EVENTS_YAML_PATH=$EVENTS_YAML_PATH"
 echo "[start] PHOTOS_DIR=$PHOTOS_DIR"
 echo "[start] ASSISTANT_KNOWLEDGE_PATH=$ASSISTANT_KNOWLEDGE_PATH"
+echo "[start] GCAL_HELPER=$GCAL_HELPER"
 
 # ── Launch Gunicorn ────────────────────────────────────────────────────────────
 # 1 worker × 4 threads keeps memory under 256MB while letting slow Notion /
