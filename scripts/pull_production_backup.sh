@@ -39,7 +39,7 @@ fi
 # already exists.
 /usr/bin/python3 "$VERIFY_SCRIPT" "$target" >/dev/null
 
-# Ninety days off-site is long enough to recover accidental deletions while
+# Ninety days on the secondary Mac copy is long enough to recover accidental deletions while
 # keeping the photographer's client data footprint bounded.
 find "$DEST_DIR" -type f -name 'pashynska_backup_*.zip' -mtime +90 -delete
-print "Verified off-site backup: $target"
+print "Verified secondary backup: $target"
