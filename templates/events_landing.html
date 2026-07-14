@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sessions | Pashynska Photography</title>
+  <title>{% if requested_type == 'mini' %}Calgary Summer Mini Sessions{% else %}Sessions{% endif %} | Pashynska Photography</title>
+  <meta name="description" content="{% if requested_type == 'mini' %}Calgary summer family mini sessions from $180 + GST. See live July and August dates, available time slots, and reserve online.{% else %}Browse available Calgary photography sessions, see live time slots, and reserve online with Pashynska Photography.{% endif %}">
+  <link rel="canonical" href="https://book.pashynskaphoto.com/book{% if requested_type %}?type={{ requested_type }}{% endif %}">
+  {% if featured and featured.photos %}<link rel="preload" as="image" href="{{ featured.photos[0] }}" fetchpriority="high">{% endif %}
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪻%3C/text%3E%3C/svg%3E">
   <script src="/static/js/attribution.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -66,13 +69,14 @@
     @media(max-width:720px){.how{grid-template-columns:1fr}}
     .how .step{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}
     .how .step .num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:var(--rose);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-weight:600;font-size:1rem}
-    .how .step h4{font-family:var(--font-d);font-size:1.2rem;font-weight:500;margin-bottom:2px}
+    .how .step h3{font-family:var(--font-d);font-size:1.2rem;font-weight:500;margin-bottom:2px}
     .how .step p{font-size:.82rem;color:var(--ink-3);line-height:1.45}
 
     /* FEATURED */
     .featured-wrap{max-width:1200px;margin:46px auto 0;padding:0 28px}
-    .featured{position:relative;border-radius:22px;overflow:hidden;min-height:280px;display:flex;align-items:flex-end;color:#fff;background:#dbcfca center/cover;box-shadow:0 14px 40px rgba(0,0,0,.08);text-decoration:none}
-    .featured::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(28,25,23,.78) 0%,rgba(28,25,23,.15) 55%,transparent 100%)}
+    .featured{position:relative;border-radius:22px;overflow:hidden;min-height:280px;display:flex;align-items:flex-end;color:#fff;background:#dbcfca;box-shadow:0 14px 40px rgba(0,0,0,.08);text-decoration:none}
+    .featured-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .featured::after{content:"";position:absolute;z-index:1;inset:0;background:linear-gradient(to top,rgba(28,25,23,.78) 0%,rgba(28,25,23,.15) 55%,transparent 100%)}
     .featured .featured-tag{position:absolute;top:18px;left:18px;background:rgba(255,255,255,.92);color:var(--ink);padding:6px 14px;border-radius:20px;font:600 .68rem var(--font-b);text-transform:uppercase;letter-spacing:.1em;z-index:2}
     .featured .featured-countdown{position:absolute;top:18px;right:18px;background:var(--rose);color:#fff;padding:6px 14px;border-radius:20px;font:600 .72rem var(--font-b);z-index:2}
     .featured .featured-content{position:relative;z-index:2;padding:28px 32px}
@@ -92,13 +96,14 @@
     .events{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}
     .event-card{background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.04);display:flex;flex-direction:column;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;position:relative;text-decoration:none;color:inherit}
     .event-card:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,.08)}
-    .event-card .photo{aspect-ratio:4/3;background:#dbcfca center/cover;position:relative}
-    .event-card .photo .status{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:5px 11px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+    .event-card .photo{aspect-ratio:4/3;background:#dbcfca;position:relative;overflow:hidden}
+    .event-card .photo-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .event-card .photo .status{position:absolute;z-index:1;top:12px;left:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:5px 11px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
     .event-card .photo .status.open{color:var(--green)}
     .event-card .photo .status.low{color:var(--amber)}
     .event-card .photo .status.sold{color:var(--red)}
     .event-card .photo .status .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:middle}
-    .event-card .photo .countdown{position:absolute;top:12px;right:12px;background:rgba(28,25,23,.78);color:#fff;padding:5px 11px;border-radius:20px;font:600 .7rem var(--font-b);backdrop-filter:blur(8px)}
+    .event-card .photo .countdown{position:absolute;z-index:1;top:12px;right:12px;background:rgba(28,25,23,.78);color:#fff;padding:5px 11px;border-radius:20px;font:600 .7rem var(--font-b);backdrop-filter:blur(8px)}
     .event-card .photo .featured-mark{position:absolute;bottom:12px;left:12px;background:var(--rose);color:#fff;padding:4px 10px;border-radius:6px;font:600 .65rem var(--font-b);text-transform:uppercase;letter-spacing:.08em}
     .event-card .body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
     .event-card .type-tag{font:600 .65rem var(--font-b);letter-spacing:.1em;text-transform:uppercase;color:var(--rose)}
@@ -144,6 +149,7 @@
 <noscript><img height="1" width="1" style="display:none" alt=""
   src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"></noscript>
 
+<main id="main-content">
 <div class="hero">
   <div class="kicker">Pashynska Photography · Calgary</div>
   {% if inquiry_mode %}
@@ -169,8 +175,8 @@
 
 {% if featured %}
 <div class="featured-wrap" id="featured-session">
-  <a class="featured" href="{{ url_for('index') }}?event={{ featured.id }}"
-     style="background-image:url('{{ (featured.photos[0] if featured.photos else '') }}')">
+  <a class="featured" href="{{ url_for('index') }}?event={{ featured.id }}">
+    {% if featured.photos %}<img class="featured-photo" src="{{ featured.photos[0] }}" alt="{{ featured.title }} in {{ featured.location or 'Calgary' }}" fetchpriority="high" decoding="async">{% endif %}
     <div class="featured-tag">★ Featured</div>
     <div class="featured-countdown">
       {% if featured.days_until <= 0 %}Today
@@ -188,13 +194,13 @@
 
 <div class="how">
   {% if inquiry_mode %}
-  <div class="step"><div class="num">1</div><div><h4>Send your date</h4><p>Share the wedding date, location, guest count, and the kind of coverage you need.</p></div></div>
-  <div class="step"><div class="num">2</div><div><h4>Get availability</h4><p>Iryna replies with availability, package direction, and any travel/location notes.</p></div></div>
-  <div class="step"><div class="num">3</div><div><h4>Plan the coverage</h4><p>Finalize timeline, portraits, previews, and gallery delivery before anything is confirmed.</p></div></div>
+  <div class="step"><div class="num">1</div><div><h3>Send your date</h3><p>Share the wedding date, location, guest count, and the kind of coverage you need.</p></div></div>
+  <div class="step"><div class="num">2</div><div><h3>Get availability</h3><p>Iryna replies with availability, package direction, and any travel/location notes.</p></div></div>
+  <div class="step"><div class="num">3</div><div><h3>Plan the coverage</h3><p>Finalize timeline, portraits, previews, and gallery delivery before anything is confirmed.</p></div></div>
   {% else %}
-  <div class="step"><div class="num">1</div><div><h4>Pick a session</h4><p>Browse upcoming dates and choose what fits — dress code & exact spot come with confirmation.</p></div></div>
-  <div class="step"><div class="num">2</div><div><h4>Reserve in 2 min</h4><p>Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
-  <div class="step"><div class="num">3</div><div><h4>Pay deposit by e-Transfer</h4><p>Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
+  <div class="step"><div class="num">1</div><div><h3>Pick a session</h3><p>Browse upcoming dates and choose what fits — dress code & exact spot come with confirmation.</p></div></div>
+  <div class="step"><div class="num">2</div><div><h3>Reserve in 2 min</h3><p>Pick a time slot, fill in your details. Slot is held for you for 15 minutes.</p></div></div>
+  <div class="step"><div class="num">3</div><div><h3>Pay deposit by e-Transfer</h3><p>Send the deposit — auto-confirmed. Final balance only on session day.</p></div></div>
   {% endif %}
 </div>
 
@@ -241,7 +247,8 @@
          data-event="{{ ev.id }}"
          data-type="{{ ev.type }}"
          data-month="{{ ev.date[:7] }}">
-        <div class="photo" style="background-image:url('{{ (ev.photos[0] if ev.photos else '') }}')">
+        <div class="photo">
+          {% if ev.photos %}<img class="photo-img" src="{{ ev.photos[0] }}" alt="{{ ev.title }} in {{ ev.location or 'Calgary' }}" loading="lazy" decoding="async">{% endif %}
           {% set s = ev.spots %}
           {% if s.left == 0 %}
             <div class="status sold"><span class="dot"></span>Sold out</div>
@@ -276,6 +283,7 @@
     </div>
   {% endif %}
 </div>
+</main>
 
 <div class="faq">
   <h2>Quick answers</h2>

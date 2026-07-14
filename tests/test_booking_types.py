@@ -143,6 +143,13 @@ def test_paid_mini_landing_matches_summer_ad_and_shows_bookable_date_first(clien
     assert "QA Mini Session" in html
     assert html.index('id="featured-session"') < html.index('class="how"')
     assert "150+ client reviews" in html
+    assert '<meta name="description"' in html
+    assert 'rel="preload" as="image"' in html
+    assert 'class="featured-photo"' in html
+    assert 'fetchpriority="high"' in html
+    assert 'class="photo-img"' in html
+    assert 'loading="lazy"' in html
+    assert '<main id="main-content">' in html
 
 
 def test_individual_uses_requested_calendar_date_and_one_booking_does_not_sell_out_event(client):
