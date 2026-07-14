@@ -829,6 +829,7 @@ TELEGRAM_ALLOWED_ADMIN_USER_IDS = os.environ.get(
 # confirm/cancel callback_query payloads.
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 BASE_URL = os.environ.get("BOOKING_BASE_URL", "")
+DEFAULT_GOOGLE_REVIEW_URL = "https://review.pashynskaphoto.com"
 # CANONICAL_SITE_URL / CANONICAL_SITE_HOST live near the top of this module so
 # _canonical_redirect (which runs before this point) can use them too.
 
@@ -2043,7 +2044,7 @@ def _send_review_email(booking):
         return False
 
     insta_url = "https://instagram.com/pashynska.photo"
-    google_review_destination = os.environ.get("GOOGLE_REVIEW_URL", "https://review.pashynskaphoto.com")
+    google_review_destination = os.environ.get("GOOGLE_REVIEW_URL", DEFAULT_GOOGLE_REVIEW_URL)
     google_review_url = google_review_destination
     if booking.get("id") and booking.get("confirmation_token"):
         base_url = (BASE_URL or CANONICAL_SITE_URL).rstrip("/")
@@ -2119,7 +2120,7 @@ def _send_review_email(booking):
 @app.route("/review/<int:booking_id>")
 def tracked_review_link(booking_id):
     """Count a valid review-email click, then send the client to Google."""
-    destination = os.environ.get("GOOGLE_REVIEW_URL", "https://review.pashynskaphoto.com")
+    destination = os.environ.get("GOOGLE_REVIEW_URL", DEFAULT_GOOGLE_REVIEW_URL)
     token = _safe_text(request.args.get("token"), 255)
     if token:
         conn = db_conn()
@@ -2526,7 +2527,7 @@ def review_helper():
         "newborn": "Iryna was patient, gentle, and thoughtful during our newborn session. She created a calm experience and captured beautiful details and family moments we will treasure forever. The photos feel warm, natural, and timeless.",
     }
     review_text = request.args.get("text") or review_by_style.get(style, review_by_style["family"])
-    google_review_url = os.environ.get("GOOGLE_REVIEW_URL", "https://g.page/r/CenY1x2zXYc_EAE/review")
+    google_review_url = os.environ.get("GOOGLE_REVIEW_URL", DEFAULT_GOOGLE_REVIEW_URL)
 
     # Multi-variant review texts by style
     reviews_family = [
@@ -3070,6 +3071,73 @@ CALENDAR_ID = os.environ.get("BOOKING_CALENDAR_ID", "iryna.pashynska@gmail.com")
 CALENDAR_TZ = os.environ.get("BOOKING_CALENDAR_TZ", "America/Edmonton")
 # Filled in by run-calendar-helper.py via env at runtime; left empty here so import never fails
 _calendar_helper = None  # type: ignore
+_calendar_state = {
+    "last_sync_at": None,
+    "last_sync_booking_id": None,
+    "last_error": None,
+}
+_calendar_health_cache = {
+    "checked_at": 0.0,
+    "config_marker": None,
+    "ok": False,
+    "warning": None,
+}
+
+
+def _calendar_is_configured():
+    """Return whether the app has a helper that can reach Google Calendar."""
+    return bool(os.environ.get("GCAL_HELPER"))
+
+
+def _probe_calendar_health():
+    """Read-only credential/access probe, cached to keep admin navigation fast."""
+    helper = os.environ.get("GCAL_HELPER")
+    if not helper:
+        return False, "GCAL_HELPER not set — Google Calendar sync disabled"
+
+    # Include only one-way markers for credentials so rotating a Fly secret
+    # invalidates the cache without ever exposing the secret to the UI/logs.
+    marker_source = "|".join((
+        helper,
+        CALENDAR_ID,
+        os.environ.get("GOOGLE_CLIENT_ID", ""),
+        os.environ.get("GOOGLE_CALENDAR_REFRESH_TOKEN", ""),
+    ))
+    marker = hashlib.sha256(marker_source.encode("utf-8")).hexdigest()[:12]
+    now = time.monotonic()
+    if (
+        _calendar_health_cache.get("config_marker") == marker
+        and now - float(_calendar_health_cache.get("checked_at") or 0) < 60
+    ):
+        return (
+            bool(_calendar_health_cache.get("ok")),
+            _calendar_health_cache.get("warning"),
+        )
+
+    try:
+        import subprocess as _sp
+        result = _sp.run(
+            [helper, "probe", "--calendar", CALENDAR_ID],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        ok = result.returncode == 0
+        warning = None if ok else "Google Calendar OAuth credentials were rejected or are unavailable"
+    except _sp.TimeoutExpired:
+        ok = False
+        warning = "Google Calendar health check timed out"
+    except Exception as e:
+        ok = False
+        warning = f"Google Calendar health check failed: {type(e).__name__}"
+
+    _calendar_health_cache.update({
+        "checked_at": now,
+        "config_marker": marker,
+        "ok": ok,
+        "warning": warning,
+    })
+    return ok, warning
 
 
 def create_calendar_event_for_booking(booking_id):
@@ -3078,6 +3146,7 @@ def create_calendar_event_for_booking(booking_id):
     Falls back gracefully if no helper is configured."""
     helper = os.environ.get("GCAL_HELPER")  # path to a CLI that wraps create_event
     if not helper:
+        _calendar_state["last_error"] = "GCAL_HELPER not set"
         return None
     try:
         conn = db_conn()
@@ -3120,6 +3189,7 @@ def create_calendar_event_for_booking(booking_id):
         )
         if result.returncode != 0:
             print(f"GCal helper failed: {result.stderr[:200]}")
+            _calendar_state["last_error"] = "Google Calendar helper rejected the create request"
             conn.close()
             return None
         out = json.loads(result.stdout.strip())
@@ -3129,9 +3199,15 @@ def create_calendar_event_for_booking(booking_id):
                   (event_id, event_url, booking_id))
         conn.commit()
         conn.close()
+        _calendar_state.update({
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            "last_sync_booking_id": booking_id,
+            "last_error": None,
+        })
         return event_url
     except Exception as e:
         print(f"Calendar error: {e}")
+        _calendar_state["last_error"] = f"{type(e).__name__}: calendar event was not created"
         return None
 
 # ===== EVENTS CONFIG (YAML) =====
@@ -7732,6 +7808,50 @@ def admin_health():
     sched_alive = any(t.name == "email-scheduler" and t.is_alive() for t in threading.enumerate())
     status["email_scheduler"] = {"ok": sched_alive}
 
+    # Google Calendar: verify the OAuth credential with a read-only API call
+    # and surface confirmed future bookings that still need to be backfilled.
+    calendar_configured = _calendar_is_configured()
+    calendar_linked = 0
+    calendar_missing = 0
+    try:
+        _c = db_conn()
+        calendar_linked, calendar_missing = _c.execute("""
+            SELECT
+              SUM(CASE WHEN calendar_event_id IS NOT NULL AND calendar_event_id != '' THEN 1 ELSE 0 END),
+              SUM(CASE WHEN calendar_event_id IS NULL OR calendar_event_id = '' THEN 1 ELSE 0 END)
+            FROM bookings
+            WHERE date >= ?
+              AND (COALESCE(status, '') = 'confirmed' OR COALESCE(confirmed, 0) = 1)
+              AND COALESCE(session_type, '') != 'internal_block'
+              AND COALESCE(name, '') NOT LIKE '⛔%'
+        """, (_local_now().date().isoformat(),)).fetchone()
+        _c.close()
+        calendar_linked = int(calendar_linked or 0)
+        calendar_missing = int(calendar_missing or 0)
+    except Exception as e:
+        log.warning(f"[health] Calendar coverage query failed: {e}")
+
+    calendar_probe_ok = False
+    calendar_warning = "GCAL_HELPER not set — Google Calendar sync disabled"
+    if calendar_configured:
+        calendar_probe_ok, calendar_warning = _probe_calendar_health()
+    if calendar_probe_ok and calendar_missing:
+        calendar_warning = (
+            f"{calendar_missing} confirmed future booking(s) are missing "
+            "Google Calendar events"
+        )
+    status["calendar"] = {
+        "ok": calendar_probe_ok and calendar_missing == 0,
+        "configured": calendar_configured,
+        "calendar_id": CALENDAR_ID,
+        "linked_future_bookings": calendar_linked,
+        "missing_future_bookings": calendar_missing,
+        "last_sync_at": _calendar_state.get("last_sync_at"),
+        "last_sync_booking_id": _calendar_state.get("last_sync_booking_id"),
+        "last_error": _calendar_state.get("last_error"),
+        "warning": calendar_warning,
+    }
+
     # Notion: a configured-but-revoked token used to look healthy while every
     # sync silently failed. Verify the credential and expose ledger coverage.
     notion_configured = bool(NOTION_API_KEY)
@@ -7780,7 +7900,10 @@ def admin_health():
     overall_ok = all(
         v.get("ok", True)
         for k, v in status.items()
-        if k != "notion" or notion_configured
+        if not (
+            (k == "notion" and not notion_configured)
+            or (k == "calendar" and not calendar_configured)
+        )
     )
 
     return jsonify({
@@ -9133,7 +9256,7 @@ def admin_booking_send_review(booking_id):
     booking = _admin_booking_row_or_404(booking_id)
     if not booking:
         return jsonify({"error": "Booking not found"}), 404
-    review_url = os.environ.get("GOOGLE_REVIEW_URL", "https://review.pashynskaphoto.com")
+    review_url = os.environ.get("GOOGLE_REVIEW_URL", DEFAULT_GOOGLE_REVIEW_URL)
     sent = _send_review_email(dict(booking))
     if sent:
         conn = db_conn()

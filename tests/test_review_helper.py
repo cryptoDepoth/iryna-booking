@@ -11,8 +11,8 @@ def test_review_helper_family_en_is_public_and_contains_copy_button(client):
     assert "Copy review text" in text or "Copy" in text
     # Should now contain the regenerate button
     assert "New version" in text or "&#8635;" in text or "rotate" in text.lower() or "New version" in text
-    # Should link to direct Google Review page
-    assert "g.page/r/" in text, "Should link to direct Google Review page, not search"
+    # Uses our stable first-party short URL, which 301s to the direct GBP form.
+    assert "https://review.pashynskaphoto.com" in text
 
 
 def test_review_helper_uses_ai_generation_endpoint(client):
@@ -43,8 +43,7 @@ def test_review_helper_direct_google_review_link(client):
     text = resp.data.decode()
     # Should NOT link to search anymore
     assert "google.com/search?q=Pashynska" not in text
-    # Should link to g.page direct review URL
-    assert "https://g.page/r/" in text
+    assert "https://review.pashynskaphoto.com" in text
 
 
 def test_review_helper_russian_labels(client):

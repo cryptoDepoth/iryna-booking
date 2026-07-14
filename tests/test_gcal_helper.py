@@ -1,5 +1,6 @@
 import sys
 import types
+from argparse import Namespace
 
 import gcal_helper
 
@@ -48,3 +49,29 @@ def test_env_refresh_token_is_refreshed_without_interactive_oauth(monkeypatch):
 
     assert gcal_helper._service() == "calendar-service"
     assert calls == {"refresh": 1, "flow": 0, "build": 1}
+
+
+def test_probe_is_read_only_and_reports_calendar(monkeypatch, capsys):
+    calls = {"get": 0}
+
+    class FakeRequest:
+        def execute(self):
+            return {"id": "iryna@example.com", "timeZone": "America/Edmonton"}
+
+    class FakeCalendars:
+        def get(self, calendarId):
+            calls["get"] += 1
+            assert calendarId == "iryna@example.com"
+            return FakeRequest()
+
+    class FakeService:
+        def calendars(self):
+            return FakeCalendars()
+
+    monkeypatch.setattr(gcal_helper, "_service", lambda: FakeService())
+    gcal_helper.cmd_probe(Namespace(calendar="iryna@example.com"))
+
+    assert calls["get"] == 1
+    output = capsys.readouterr().out
+    assert '"ok": true' in output
+    assert '"time_zone": "America/Edmonton"' in output

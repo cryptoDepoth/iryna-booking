@@ -50,6 +50,6 @@ def test_health_center_is_authenticated_and_human_readable(client):
     html = response.get_data(as_text=True)
     assert "System health" in html
     assert "Gmail / Interac" in html
+    assert "Google Calendar" in html
     assert "Notion sync" in html
     assert "Recovery copies" in html
-

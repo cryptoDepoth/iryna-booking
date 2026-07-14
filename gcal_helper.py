@@ -70,6 +70,17 @@ def cmd_auth():
     print("OK — credentials cached in token.json")
 
 
+def cmd_probe(args):
+    """Verify OAuth and read access without creating or changing an event."""
+    svc = _service()
+    calendar = svc.calendars().get(calendarId=args.calendar).execute()
+    print(json.dumps({
+        "ok": True,
+        "calendar_id": calendar.get("id") or args.calendar,
+        "time_zone": calendar.get("timeZone"),
+    }))
+
+
 def cmd_create(args):
     svc = _service()
     body = {
@@ -91,6 +102,8 @@ def main():
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("auth")
+    probe = sub.add_parser("probe")
+    probe.add_argument("--calendar", required=True)
     cr = sub.add_parser("create")
     cr.add_argument("--calendar", required=True)
     cr.add_argument("--summary", required=True)
@@ -102,6 +115,8 @@ def main():
     args = p.parse_args()
     if args.cmd == "auth":
         cmd_auth()
+    elif args.cmd == "probe":
+        cmd_probe(args)
     elif args.cmd == "create":
         cmd_create(args)
 

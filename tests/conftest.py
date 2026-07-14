@@ -21,6 +21,10 @@ for _var in (
     "N8N_WEBHOOK_URL",
     "RECAPTCHA_SECRET_KEY",
     "NOTION_API_KEY",
+    "GCAL_HELPER",
+    "GOOGLE_CALENDAR_REFRESH_TOKEN",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
 ):
     os.environ[_var] = ""
 

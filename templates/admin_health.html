@@ -23,12 +23,12 @@
     <section class="grid" id="healthGrid"><div class="card loading">Loading system details…</div></section>
   </main>
 <script>
-const labels={database:'Database',email_himalaya:'Gmail / Interac',email_scheduler:'Email scheduler',watcher_thread:'Payment watcher',notion:'Notion sync',telegram:'Telegram admin',events:'Events configuration'};
-const preferred=['database','email_himalaya','email_scheduler','watcher_thread','notion','telegram','events'];
+const labels={database:'Database',email_himalaya:'Gmail / Interac',email_scheduler:'Email scheduler',watcher_thread:'Payment watcher',calendar:'Google Calendar',notion:'Notion sync',telegram:'Telegram admin',events:'Events configuration'};
+const preferred=['database','email_himalaya','email_scheduler','watcher_thread','calendar','notion','telegram','events'];
 const esc=value=>String(value??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pretty=value=>typeof value==='boolean'?(value?'Yes':'No'):value==null?'—':String(value);
 function detailsFor(key,item){
-  const keys={database:['path','size_kb'],email_himalaya:['last_scan_at','last_scan_email_count','last_auto_confirmed_booking_id'],email_scheduler:[],watcher_thread:[],notion:['linked_bookings','unlinked_bookings','last_sync_at'],telegram:['webhook_secret_set'],events:['active_or_upcoming','total']}[key]||[];
+  const keys={database:['path','size_kb'],email_himalaya:['last_scan_at','last_scan_email_count','last_auto_confirmed_booking_id'],email_scheduler:[],watcher_thread:[],calendar:['linked_future_bookings','missing_future_bookings','last_sync_at'],notion:['linked_bookings','unlinked_bookings','last_sync_at'],telegram:['webhook_secret_set'],events:['active_or_upcoming','total']}[key]||[];
   return keys.map(k=>`<dt>${esc(k.replaceAll('_',' '))}</dt><dd>${esc(pretty(item[k]))}</dd>`).join('');
 }
 async function loadHealth(){
