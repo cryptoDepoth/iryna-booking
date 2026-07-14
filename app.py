@@ -2853,10 +2853,19 @@ def _optimized_image_cache_path(source_path, target_width=None):
                 image = flattened
             else:
                 image = image.convert("RGB")
-            tmp_path = f"{cache_path}.tmp"
-            quality = min(_IMAGE_CACHE_WEBP_QUALITY, 76) if target_width else _IMAGE_CACHE_WEBP_QUALITY
-            image.save(tmp_path, "WEBP", quality=quality, method=6)
-            os.replace(tmp_path, cache_path)
+            # Preload + <img> (or a burst of ad clicks after deploy) may request
+            # the same uncached variant concurrently. A shared `.tmp` filename
+            # let one request replace the other's file and made the loser fall
+            # back to the full-size JPEG. Unique temp files keep first-hit
+            # responses deterministic; atomic replace makes either writer safe.
+            tmp_path = f"{cache_path}.{os.getpid()}.{threading.get_ident()}.tmp"
+            try:
+                quality = min(_IMAGE_CACHE_WEBP_QUALITY, 76) if target_width else _IMAGE_CACHE_WEBP_QUALITY
+                image.save(tmp_path, "WEBP", quality=quality, method=6)
+                os.replace(tmp_path, cache_path)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
         return cache_path
     except Exception as exc:
         log.warning(f"[images] optimized cache skipped for {source_path}: {exc}")

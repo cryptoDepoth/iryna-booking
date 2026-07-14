@@ -23,3 +23,4 @@ def test_responsive_image_variant_is_bounded_cached_webp(tmp_path, monkeypatch):
 
     # Repeated requests must reuse the stable cache file.
     assert booking_app._optimized_image_cache_path(str(source), target_width=700) == variant
+    assert not list(cache.glob("*.tmp"))
