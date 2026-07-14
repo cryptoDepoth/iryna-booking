@@ -13,9 +13,9 @@ GIFT_PACKAGES = {
         "icon": "M",
     },
     "family": {
-        "label": "Individual / Family Session",
+        "label": "Family Session",
         "short_label": "Family Session",
-        "amount": 320.00,
+        "amount": 340.00,
         "duration": "1 hour",
         "photos": "25 edited photos",
         "details": "1 hour · 25 edited photos · all original photos included",
@@ -24,7 +24,7 @@ GIFT_PACKAGES = {
     "maternity": {
         "label": "Maternity Session",
         "short_label": "Maternity Session",
-        "amount": 320.00,
+        "amount": 340.00,
         "duration": "1 hour",
         "photos": "25 edited photos",
         "details": "1 hour · 25 edited photos · all original photos included",
@@ -57,9 +57,9 @@ CUSTOM_BASES = {
         "details": "A flexible short session with all original photos included",
     },
     "custom_60": {
-        "label": "1-hour personalized session",
+        "label": "1-hour individual portrait session",
         "amount": 320.00,
-        "details": "A full individual, family, maternity, or creative session",
+        "details": "A full individual portrait or creative session",
     },
     "custom_newborn": {
         "label": "Newborn lifestyle base",

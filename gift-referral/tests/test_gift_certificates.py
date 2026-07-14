@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import gift_referral_db as db
+from gift_referral_catalog import CUSTOM_BASES, GIFT_PACKAGES, public_catalog
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -236,3 +237,18 @@ def test_gst_calculation_rounds_correctly():
 
 def test_gst_rate_is_five_percent():
     assert db.GST_RATE == 0.05
+
+
+def test_public_gift_prices_match_current_session_prices():
+    assert GIFT_PACKAGES["family"]["amount"] == 340.00
+    assert GIFT_PACKAGES["maternity"]["amount"] == 340.00
+    assert public_catalog()["packages"]["family"]["amount_with_gst"] == 357.00
+    assert public_catalog()["packages"]["maternity"]["amount_with_gst"] == 357.00
+
+
+def test_custom_individual_base_does_not_underprice_family_or_maternity():
+    base = CUSTOM_BASES["custom_60"]
+    assert base["amount"] == 320.00
+    description = f"{base['label']} {base['details']}".lower()
+    assert "family" not in description
+    assert "maternity" not in description

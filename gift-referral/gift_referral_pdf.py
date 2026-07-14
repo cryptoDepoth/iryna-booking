@@ -21,8 +21,8 @@ GREY_DARK  = colors.HexColor("#666666")
 
 SESSION_LABELS = {
     "mini":       "Mini Session (20 min · 15 edited photos)",
-    "family":     "Individual / Family Session (1 hour · 25 edited photos)",
-    "individual": "Individual / Family Session (1 hour · 25 edited photos)",
+    "family":     "Family Session (1 hour · 25 edited photos)",
+    "individual": "Individual Session (1 hour · 25 edited photos)",
     "maternity":  "Maternity Session (1 hour · 25 edited photos)",
     "newborn":    "Newborn Lifestyle Session (1 hour · 30 edited photos)",
     "custom":     "Custom Gift Certificate",
