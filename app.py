@@ -4583,6 +4583,57 @@ def _find_slot_conflict(conn, date_value, slot_time, event, now=None,
             return details
     return None
 
+
+def _event_availability_counts(event, conn=None, now=None):
+    """Return ``(total_spots, available_spots)`` using booking conflict rules.
+
+    Every customer-facing surface must agree with ``/slots``. Counting booking
+    rows is not sufficient because one longer booking from another event can
+    overlap two or more mini-session starts on the same date.
+    """
+    now = now or _local_now()
+    own_connection = conn is None
+    if own_connection:
+        conn = db_conn()
+    try:
+        booking_type = _booking_type(event)
+        slots = generate_slots(event)
+        total_spots = len(slots)
+
+        if booking_type == "inquiry_only":
+            return total_spots, 1
+
+        if booking_type == "rolling_availability":
+            horizon = _rolling_horizon_days(event)
+            available_spots = 0
+            today = now.date()
+            for offset in range(horizon + 1):
+                day = (today + timedelta(days=offset)).isoformat()
+                if _rolling_date_unavailable_reason(event, day):
+                    continue
+                booked_rows = _active_bookings_for_date(conn, day, now=now)
+                available_spots += sum(
+                    1 for slot in slots
+                    if not any(
+                        _slot_conflict_details(slot["time"], event, row)
+                        for row in booked_rows
+                    )
+                )
+            return total_spots * (horizon + 1), available_spots
+
+        booked_rows = _active_bookings_for_date(conn, event["date"], now=now)
+        available_spots = sum(
+            1 for slot in slots
+            if not any(
+                _slot_conflict_details(slot["time"], event, row)
+                for row in booked_rows
+            )
+        )
+        return total_spots, available_spots
+    finally:
+        if own_connection:
+            conn.close()
+
 SLOTS = generate_slots()
 
 # ===== ROUTES =====
@@ -4633,21 +4684,22 @@ def _enrich_event_for_landing(ev):
     except Exception:
         e["date_pretty"] = ev.get("date", "")
         e["days_until"] = 0
-    # spots accounting from the actual DB
-    total = int(ev.get("total_spots") or len(generate_slots(ev)))
-    booked = 0
+    # Use the exact same interval-aware availability rules as /slots. A longer
+    # private session on the same date may consume several mini-session starts.
+    total = 0
+    available = 0
     try:
-        conn = db_conn()
-        c = conn.cursor()
-        c.execute("""
-            SELECT COUNT(*) FROM bookings
-            WHERE date=? AND status NOT IN ('cancelled','expired')
-        """, (ev["date"],))
-        booked = c.fetchone()[0] or 0
-        conn.close()
-    except Exception:
-        pass
-    e["spots"] = {"total": total, "booked": booked, "left": max(0, total - booked)}
+        total, available = _event_availability_counts(ev)
+    except Exception as exc:
+        log.warning(f"[landing] Availability failed for {ev.get('id')}: {exc}")
+        total = int(ev.get("total_spots") or len(generate_slots(ev)))
+        # Fail closed: never advertise a selectable spot when the authoritative
+        # conflict-aware availability query could not be completed.
+        available = 0
+    booked = max(0, total - available)
+    e["spots"] = {"total": total, "booked": booked, "left": available}
+    e["total_spots"] = total
+    e["spots_left"] = available
     return e
 
 def _select_booking_flow_variant(query_value=None, cookie_value=None):
@@ -5014,39 +5066,10 @@ def _public_events_payload():
             and ev.get("photos")  # Must have at least one photo to show publicly
         ):
             ev = _normalize_public_event_copy(ev)
-            # Calculate total and available spots
+            # Calculate total and available spots with the same interval-aware
+            # conflict rules used by /slots and the paid-traffic landing.
             booking_type = _booking_type(ev)
-            slots = generate_slots(ev)
-            total_spots = len(slots)
-
-            if booking_type == "inquiry_only":
-                available_spots = 1
-            elif booking_type == "rolling_availability":
-                horizon = _rolling_horizon_days(ev)
-                available_spots = 0
-                today_d = now.date()
-                for offset in range(horizon + 1):
-                    day = (today_d + timedelta(days=offset)).isoformat()
-                    if _rolling_date_unavailable_reason(ev, day):
-                        continue
-                    booked_rows = _active_bookings_for_date(conn, day, now=now)
-                    available_spots += len([
-                        slot for slot in slots
-                        if not any(
-                            _slot_conflict_details(slot["time"], ev, row)
-                            for row in booked_rows
-                        )
-                    ])
-                total_spots = len(slots) * (horizon + 1)
-            else:
-                booked_rows = _active_bookings_for_date(conn, ev["date"], now=now)
-                available_spots = len([
-                    slot for slot in slots
-                    if not any(
-                        _slot_conflict_details(slot["time"], ev, row)
-                        for row in booked_rows
-                    )
-                ])
+            total_spots, available_spots = _event_availability_counts(ev, conn=conn, now=now)
 
             # Get first photo URL
             photos = ev.get("photos", [])

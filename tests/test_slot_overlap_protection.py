@@ -100,6 +100,73 @@ def test_public_event_card_uses_same_overlap_aware_availability(
     assert card["spots_left"] == 1
 
 
+def test_paid_traffic_landing_never_features_a_false_last_slot(
+    admin_client, monkeypatch
+):
+    sold_out = _event() | {
+        "id": "sold-out-by-cross-event-overlap",
+        "title": "Sold Out Cross Event",
+        "start_time": "14:00",
+        "end_time": "16:00",
+        "session_length": 20,
+        "break_length": 10,
+        "slot_interval": 30,
+    }
+    available = sold_out | {
+        "id": "actually-bookable-event",
+        "title": "Actually Bookable Event",
+        "date": "2026-08-02",
+    }
+    monkeypatch.setattr(booking_app, "EVENTS", [sold_out, available])
+
+    conn = booking_app.db_conn()
+    # Exact internal blocks close two of the four generated starts.
+    for slot_time in ("14:00", "14:30"):
+        conn.execute(
+            """INSERT INTO bookings
+                 (date,time,name,email,phone,instagram,session_type,status,event_id,confirmed,paid,reserved_until)
+               VALUES (?,?,?,?,?,?,'internal_block','reserved',?,0,0,'2099-01-01T00:00:00+00:00')""",
+            (
+                sold_out["date"], slot_time, "⛔ Closed", "", "", "",
+                sold_out["id"],
+            ),
+        )
+    # A real 60-minute booking belonging to another event overlaps both the
+    # 15:00 and 15:30 mini starts. Three rows for four starts would make the old
+    # row-count arithmetic falsely claim one spot left.
+    private_event = sold_out | {
+        "id": "private-overlap",
+        "session_length": 60,
+        "break_length": 0,
+        "session_type": "private",
+        "hidden": True,
+    }
+    monkeypatch.setattr(booking_app, "EVENTS", [sold_out, available, private_event])
+    conn.execute(
+        """INSERT INTO bookings
+             (date,time,name,email,phone,instagram,session_type,status,event_id,confirmed,paid)
+           VALUES (?,?,?,?,?,?,'private','confirmed',?,1,1)""",
+        (
+            sold_out["date"], "15:00", "Private Client", "private@example.com",
+            "", "", private_event["id"],
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    response = admin_client.get("/book?type=mini")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Sold Out Cross Event" in html
+    assert "Actually Bookable Event" in html
+    assert '<div class="status sold"><span class="dot"></span>Sold out</div>' in html
+
+    # The featured block must advance to the next actually bookable event.
+    featured = html.split('<div class="featured-wrap"', 1)[1].split('</a>\n</div>', 1)[0]
+    assert "Actually Bookable Event" in featured
+    assert "Sold Out Cross Event" not in featured
+
+
 def test_reserve_and_manual_book_reject_overlapping_time(admin_client, monkeypatch):
     event = _event()
     monkeypatch.setattr(booking_app, "EVENTS", [event])
