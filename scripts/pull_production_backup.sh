@@ -4,6 +4,7 @@ set -euo pipefail
 APP="iryna-booking"
 FLYCTL="/Users/andrzej/.fly/bin/flyctl"
 TOKEN_FILE="/Users/andrzej/.fly/token.txt"
+VERIFY_SCRIPT="/Users/andrzej/business/iryna/iryna-booking/scripts/verify_backup_bundle.py"
 # LaunchAgents do not inherit the interactive app's macOS iCloud permission.
 # Keep the automated copy in a private local folder (a separate failure domain
 # from Fly); verified bundles can additionally be copied to iCloud manually.
@@ -11,6 +12,7 @@ DEST_DIR="/Users/andrzej/Pashynska-Booking-Backups"
 
 [[ -x "$FLYCTL" ]] || { print -u2 "flyctl is unavailable"; exit 1; }
 [[ -s "$TOKEN_FILE" ]] || { print -u2 "Fly access token is unavailable"; exit 1; }
+[[ -f "$VERIFY_SCRIPT" ]] || { print -u2 "Backup verifier is unavailable"; exit 1; }
 mkdir -p "$DEST_DIR"
 export FLY_API_TOKEN="$(tr -d '\n' < "$TOKEN_FILE")"
 
@@ -27,10 +29,15 @@ if [[ ! -f "$target" ]]; then
   temp="$target.partial"
   rm -f "$temp"
   "$FLYCTL" ssh sftp get -q -a "$APP" "$remote" "$temp"
-  unzip -tq "$temp" >/dev/null
+  /usr/bin/python3 "$VERIFY_SCRIPT" "$temp" >/dev/null
   mv "$temp" "$target"
   chmod 600 "$target"
 fi
+
+# Re-verify an existing file too. A local disk error or accidental replacement
+# must not be reported as a successful daily backup merely because the filename
+# already exists.
+/usr/bin/python3 "$VERIFY_SCRIPT" "$target" >/dev/null
 
 # Ninety days off-site is long enough to recover accidental deletions while
 # keeping the photographer's client data footprint bounded.

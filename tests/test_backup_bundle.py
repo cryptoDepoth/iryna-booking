@@ -1,8 +1,13 @@
 import json
 import sqlite3
+import sys
 import zipfile
+from pathlib import Path
 
 import app as booking_app
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from verify_backup_bundle import verify_backup  # noqa: E402
 
 
 def test_backup_bundle_is_consistent_and_complete(tmp_path, monkeypatch):
@@ -43,3 +48,19 @@ def test_backup_bundle_is_consistent_and_complete(tmp_path, monkeypatch):
     assert restored.execute("SELECT COUNT(*) FROM bookings").fetchone()[0] == 1
     restored.close()
 
+    verified = verify_backup(Path(bundle))
+    assert verified["verified"] is True
+    assert verified["bookings"] == 1
+
+
+def test_backup_verifier_rejects_incomplete_bundle(tmp_path):
+    bundle = tmp_path / "incomplete.zip"
+    with zipfile.ZipFile(bundle, "w") as archive:
+        archive.writestr("manifest.json", json.dumps({"integrity_check": "ok", "table_counts": {}}))
+
+    try:
+        verify_backup(bundle)
+    except ValueError as exc:
+        assert "missing" in str(exc).lower()
+    else:
+        raise AssertionError("incomplete backup unexpectedly passed verification")
