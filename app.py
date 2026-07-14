@@ -3158,14 +3158,19 @@ def create_calendar_event_for_booking(booking_id):
             return None
         b = dict(row)
 
-        start_dt = datetime.strptime(f"{b['date']} {b['time']}", "%Y-%m-%d %H:%M")
-        end_dt = start_dt + timedelta(minutes=SESSION_LENGTH)
         event = get_event_by_id(b.get("event_id")) if b.get("event_id") else None
+        session_minutes = int(
+            b.get("booking_session_length")
+            or (event or {}).get("session_length")
+            or SESSION_LENGTH
+        )
+        start_dt = datetime.strptime(f"{b['date']} {b['time']}", "%Y-%m-%d %H:%M")
+        end_dt = start_dt + timedelta(minutes=session_minutes)
         event_title = event.get("title", EVENT_TITLE) if event else EVENT_TITLE
         location = event.get("location", "") if event else ""
         summary = f"📸 {b['name'] or 'Mini Session'} — {event_title}"
         description = (
-            f"Mini Photo Session ({SESSION_LENGTH} min)\n"
+            f"Mini Photo Session ({session_minutes} min)\n"
             f"Client: {b['name']}\n"
             f"Phone: {b['phone']}\n"
             f"Email: {b['email']}\n"
@@ -3849,6 +3854,11 @@ def init_db():
         ("bookings",  "landing_url",       "ALTER TABLE bookings ADD COLUMN landing_url TEXT"),
         # Stripe payment-link URL for manually-created private sessions
         ("bookings",  "payment_link",      "ALTER TABLE bookings ADD COLUMN payment_link TEXT"),
+        # Snapshot slot timing so custom/back-to-back bookings stay safe even
+        # if the event grid is edited later.
+        ("bookings",  "booking_session_length", "ALTER TABLE bookings ADD COLUMN booking_session_length INTEGER"),
+        ("bookings",  "booking_break_length", "ALTER TABLE bookings ADD COLUMN booking_break_length INTEGER"),
+        ("bookings",  "allow_back_to_back", "ALTER TABLE bookings ADD COLUMN allow_back_to_back INTEGER DEFAULT 0"),
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
@@ -4530,7 +4540,7 @@ def expire_reservations():
 
 # Generate time slots for a specific event
 def generate_slots(event=None):
-    """Generate time slots based on event config."""
+    """Generate regular slots plus durable admin-defined custom openings."""
     ev = event or _active
     if not ev:
         return []
@@ -4549,10 +4559,63 @@ def generate_slots(event=None):
         slots.append({
             "time": slot_str,
             "label": f"{slot_str} – {session_end.strftime('%H:%M')}",
-            "reserved_until": None
+            "reserved_until": None,
+            "session_length": int(sl),
+            "break_length": int(ev.get("break_length") or 0),
+            "custom": False,
+            "allow_back_to_back": False,
         })
         current += timedelta(minutes=interval)
-    return slots
+
+    # A custom slot may add an off-grid time or override one regular grid
+    # position (for example 15:30 with no turnaround buffer). Invalid legacy
+    # YAML is ignored here and rejected by the admin API when written.
+    by_time = {slot["time"]: slot for slot in slots}
+    for raw in ev.get("custom_slots") or []:
+        if not isinstance(raw, dict):
+            continue
+        custom_time = str(raw.get("time") or "").strip()
+        custom_start = _time_minutes(custom_time)
+        try:
+            custom_session = int(raw.get("session_length") or sl)
+            custom_break = int(raw.get("break_length") if raw.get("break_length") is not None else ev.get("break_length") or 0)
+        except (TypeError, ValueError):
+            continue
+        if custom_start is None or not (5 <= custom_session <= 180) or not (0 <= custom_break <= 60):
+            continue
+        if custom_start + custom_session > 24 * 60:
+            continue
+        custom_end = custom_start + custom_session
+        allow_back_to_back = bool(raw.get("allow_back_to_back"))
+        by_time[custom_time] = {
+            "time": custom_time,
+            "label": f"{custom_time} – {(custom_end // 60) % 24:02d}:{custom_end % 60:02d}",
+            "reserved_until": None,
+            "session_length": custom_session,
+            "break_length": 0 if allow_back_to_back else custom_break,
+            "custom": True,
+            "allow_back_to_back": allow_back_to_back,
+        }
+    return sorted(by_time.values(), key=lambda slot: _time_minutes(slot.get("time")) or 0)
+
+
+def _slot_definition(event, slot_time):
+    """Return the authoritative slot record, including a custom override."""
+    return next(
+        (slot for slot in generate_slots(event) if slot.get("time") == slot_time),
+        None,
+    )
+
+
+def _event_for_slot(event, slot_time):
+    """Overlay per-slot duration/buffer rules on an event for conflict checks."""
+    effective = dict(event or {})
+    slot = _slot_definition(event, slot_time)
+    if slot:
+        effective["session_length"] = int(slot.get("session_length") or effective.get("session_length") or SESSION_LENGTH)
+        effective["break_length"] = int(slot.get("break_length") or 0)
+        effective["_allow_back_to_back"] = bool(slot.get("allow_back_to_back"))
+    return effective
 
 
 def _time_minutes(value):
@@ -4617,13 +4680,38 @@ def _slot_conflict_details(slot_time, event, booking):
     else:
         booked_event = get_event_by_id(row.get("event_id")) or event or {}
 
-    candidate_event = event or {}
+    candidate_event = _event_for_slot(event or {}, slot_time)
     candidate_session = int(candidate_event.get("session_length") or SESSION_LENGTH)
     candidate_break = int(candidate_event.get("break_length") or 0)
-    booked_session = int(booked_event.get("session_length") or SESSION_LENGTH)
-    booked_break = int(booked_event.get("break_length") or 0)
-    candidate_end = candidate_start + candidate_session + candidate_break
-    booked_end = booked_start + booked_session + booked_break
+    booked_session = int(row.get("booking_session_length") or booked_event.get("session_length") or SESSION_LENGTH)
+    booked_break = int(row.get("booking_break_length") if row.get("booking_break_length") is not None else booked_event.get("break_length") or 0)
+    candidate_hard_end = candidate_start + candidate_session
+    booked_hard_end = booked_start + booked_session
+
+    # Shooting-time collisions are never overridable.
+    hard_overlap = not (
+        candidate_start >= booked_hard_end or booked_start >= candidate_hard_end
+    )
+    if hard_overlap:
+        conflict_kind = "session_overlap"
+        candidate_end = candidate_hard_end
+        booked_end = booked_hard_end
+    else:
+        # An explicitly back-to-back custom slot may touch a neighbour at the
+        # exact session boundary. It bypasses turnaround buffers only; it does
+        # not bypass the hard overlap check above.
+        ignore_buffers = bool(
+            candidate_event.get("_allow_back_to_back")
+            or row.get("allow_back_to_back")
+        )
+        if ignore_buffers:
+            return None
+        candidate_end = candidate_hard_end + candidate_break
+        booked_end = booked_hard_end + booked_break
+        if candidate_start >= booked_end or booked_start >= candidate_end:
+            return None
+        conflict_kind = "buffer_overlap"
+
     if candidate_start >= booked_end or booked_start >= candidate_end:
         return None
     return {
@@ -4632,6 +4720,9 @@ def _slot_conflict_details(slot_time, event, booking):
         "time": row.get("time"),
         "name": row.get("name") or "Existing booking",
         "internal_block": _booking_is_internal_block(row),
+        "conflict_kind": conflict_kind,
+        "buffer_only": conflict_kind == "buffer_overlap",
+        "overridable": conflict_kind == "buffer_overlap",
         "booked_end": f"{(booked_end // 60) % 24:02d}:{booked_end % 60:02d}",
     }
 
@@ -5716,6 +5807,7 @@ def reserve_slot():
     elif requested_date and requested_date != ev.get("date"):
         return jsonify({"success": False, "error": "Selected date does not match this event"}), 400
 
+    slot_config = _slot_definition(ev, slot_time)
     valid_slot_times = {s["time"] for s in generate_slots(ev)}
     if slot_time not in valid_slot_times:
         return jsonify({"success": False, "error": "Selected time is not available for this event"}), 400
@@ -5824,8 +5916,9 @@ def reserve_slot():
                  addons_total, marketing_consent, agreement_name, agreement_accepted_at, terms_version,
                  visitor_id, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
                  fbclid, gclid, gbraid, wbraid, referrer, landing_url,
-                 referral_code, referral_discount)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 referral_code, referral_discount, booking_session_length,
+                 booking_break_length, allow_back_to_back)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             event_date, slot_time, client_name, client_email, client_phone, client_ig, session_type,
             expires.isoformat(), ev["id"], token, _deposit_amt, _full_price,
@@ -5837,6 +5930,9 @@ def reserve_slot():
             attribution.get("gclid"), attribution.get("gbraid"), attribution.get("wbraid"),
             attribution.get("referrer"), attribution.get("landing_url"),
             referral_code, referral_discount,
+            int((slot_config or {}).get("session_length") or ev.get("session_length") or SESSION_LENGTH),
+            int((slot_config or {}).get("break_length") or 0),
+            1 if (slot_config or {}).get("allow_back_to_back") else 0,
         ))
 
         if c.rowcount == 0:
@@ -9751,7 +9847,8 @@ def admin_reschedule():
     if not new_ev:
         return jsonify({"error": "Target event not found"}), 404
 
-    # Validate that new_time is among the event's generated slots
+    # Validate that new_time is among regular or custom event slots.
+    new_slot_config = _slot_definition(new_ev, new_time)
     valid_slot_times = {s["time"] for s in generate_slots(new_ev)}
     if new_time not in valid_slot_times:
         return jsonify({"error": "Selected time is not a valid slot for this event"}), 400
@@ -9812,14 +9909,32 @@ def admin_reschedule():
         if old_status in ("reserved", "pending_payment"):
             new_reserved_until = (now + timedelta(minutes=RESERVATION_MINUTES)).isoformat()
             c.execute(
-                "UPDATE bookings SET date=?, time=?, event_id=?, reserved_until=? WHERE id=?",
-                (new_date, new_time, new_event_id, new_reserved_until, booking_id)
+                """UPDATE bookings
+                   SET date=?, time=?, event_id=?, reserved_until=?,
+                       booking_session_length=?, booking_break_length=?, allow_back_to_back=?
+                   WHERE id=?""",
+                (
+                    new_date, new_time, new_event_id, new_reserved_until,
+                    int((new_slot_config or {}).get("session_length") or new_ev.get("session_length") or SESSION_LENGTH),
+                    int((new_slot_config or {}).get("break_length") or 0),
+                    1 if (new_slot_config or {}).get("allow_back_to_back") else 0,
+                    booking_id,
+                )
             )
         else:
             # confirmed / paid / other — keep status as is, no timer
             c.execute(
-                "UPDATE bookings SET date=?, time=?, event_id=? WHERE id=?",
-                (new_date, new_time, new_event_id, booking_id)
+                """UPDATE bookings
+                   SET date=?, time=?, event_id=?, booking_session_length=?,
+                       booking_break_length=?, allow_back_to_back=?
+                   WHERE id=?""",
+                (
+                    new_date, new_time, new_event_id,
+                    int((new_slot_config or {}).get("session_length") or new_ev.get("session_length") or SESSION_LENGTH),
+                    int((new_slot_config or {}).get("break_length") or 0),
+                    1 if (new_slot_config or {}).get("allow_back_to_back") else 0,
+                    booking_id,
+                )
             )
 
         if c.rowcount == 0:
@@ -10930,7 +11045,8 @@ def admin_event_slots(event_id):
         """SELECT id, date, time, name, email, phone, instagram, status,
                   confirmed, paid, paid_amount, deposit_amount, full_price,
                   event_id, reserved_until, session_type, selected_addons_json,
-                  addons_total
+                  addons_total, booking_session_length, booking_break_length,
+                  allow_back_to_back
            FROM bookings
            WHERE date=? AND status NOT IN ('cancelled','expired')""",
         (target_date,),
@@ -10964,8 +11080,15 @@ def admin_event_slots(event_id):
             "client": ("Closed" if is_block else (b.get("name") if b else None)),
             "grid_slot": True,
             "off_grid": False,
+            "custom": bool(s.get("custom")),
+            "allow_back_to_back": bool(s.get("allow_back_to_back")),
+            "session_length": int(s.get("session_length") or ev.get("session_length") or SESSION_LENGTH),
+            "break_length": int(s.get("break_length") or 0),
             "conflict_time": conflict.get("time") if conflict else None,
             "conflict_booking_id": conflict.get("booking_id") if conflict else None,
+            "conflict_kind": conflict.get("conflict_kind") if conflict else None,
+            "buffer_only": bool(conflict and conflict.get("buffer_only")),
+            "overridable": bool(conflict and conflict.get("overridable")),
         })
 
     # A schedule edit can move the generated grid without moving existing
@@ -10986,11 +11109,22 @@ def admin_event_slots(event_id):
             "client": b.get("name") or "Client booking",
             "grid_slot": False,
             "off_grid": True,
+            "custom": False,
+            "allow_back_to_back": bool(b.get("allow_back_to_back")),
+            "session_length": duration,
+            "break_length": int(b.get("booking_break_length") or booked_event.get("break_length") or 0),
             "conflict_time": None,
             "conflict_booking_id": None,
+            "conflict_kind": None,
+            "buffer_only": False,
+            "overridable": False,
         })
     out.sort(key=lambda item: (_time_minutes(item.get("time")) or 0, not item.get("grid_slot")))
     summary["conflicts"] = sum(1 for slot in out if slot.get("state") == "conflict")
+    summary["buffer_conflicts"] = sum(
+        1 for slot in out if slot.get("state") == "conflict" and slot.get("buffer_only")
+    )
+    summary["hard_conflicts"] = summary["conflicts"] - summary["buffer_conflicts"]
     summary["off_grid"] = sum(1 for slot in out if slot.get("off_grid"))
     event_roster = []
     for b in display_rows:
@@ -11029,11 +11163,169 @@ def admin_event_slots(event_id):
             "session_length": int(ev.get("session_length") or SESSION_LENGTH),
             "break_length": int(ev.get("break_length") or 0),
             "slot_interval": int(ev.get("slot_interval") or SLOT_INTERVAL),
+            "custom_slots_count": sum(1 for slot in base if slot.get("custom")),
         },
         "summary": summary,
         "slots": out,
         "bookings": event_roster,
     })
+
+
+def _custom_slot_payload(ev, data):
+    """Validate one admin-defined opening and return its canonical YAML form."""
+    slot_time = str(data.get("time") or "").strip()
+    start = _time_minutes(slot_time)
+    if start is None:
+        raise ValueError("Time must use HH:MM")
+    try:
+        session_length = int(data.get("session_length") or ev.get("session_length") or SESSION_LENGTH)
+        break_length = int(
+            data.get("break_length")
+            if data.get("break_length") is not None
+            else ev.get("break_length") or 0
+        )
+    except (TypeError, ValueError):
+        raise ValueError("Duration and break must be whole minutes")
+    if not (5 <= session_length <= 180):
+        raise ValueError("Session duration must be 5–180 minutes")
+    if not (0 <= break_length <= 60):
+        raise ValueError("Break must be 0–60 minutes")
+    if start + session_length > 24 * 60:
+        raise ValueError("Session must finish before midnight")
+    allow_back_to_back = bool(data.get("allow_back_to_back"))
+    return {
+        "time": slot_time,
+        "session_length": session_length,
+        "break_length": 0 if allow_back_to_back else break_length,
+        "allow_back_to_back": allow_back_to_back,
+    }
+
+
+@app.route("/admin/api/event/<event_id>/custom-slot", methods=["POST", "DELETE"])
+@admin_required
+def admin_event_custom_slot(event_id):
+    """Add/override or remove one public slot without rebuilding the event grid.
+
+    Back-to-back mode may bypass turnaround buffers, but never an overlap of
+    the actual shooting intervals.
+    """
+    ev = get_event_by_id(event_id)
+    if not ev:
+        return jsonify({"success": False, "error": "Event not found"}), 404
+    data = request.get_json(silent=True) or {}
+    slot_time = str(data.get("time") or "").strip()
+    if _time_minutes(slot_time) is None:
+        return jsonify({"success": False, "error": "Time must use HH:MM"}), 400
+
+    event_date = ev.get("date")
+    if not event_date:
+        return jsonify({"success": False, "error": "Event has no date"}), 400
+
+    conn = db_conn()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        if request.method == "DELETE":
+            active_exact = next(
+                (
+                    row for row in _active_bookings_for_date(conn, event_date)
+                    if row.get("time") == slot_time
+                ),
+                None,
+            )
+            if active_exact:
+                conn.rollback()
+                return jsonify({
+                    "success": False,
+                    "error": "This custom slot has an active booking/closure and cannot be removed",
+                    "booking_id": active_exact.get("id"),
+                }), 409
+
+            with _EVENTS_YAML_LOCK:
+                yaml_data = _load_events_yaml_doc()
+                event_data = _event_yaml_record(yaml_data, event_id)
+                if not event_data:
+                    conn.rollback()
+                    return jsonify({"success": False, "error": "Event not found"}), 404
+                before = list(event_data.get("custom_slots") or [])
+                after = [
+                    item for item in before
+                    if not isinstance(item, dict) or str(item.get("time") or "") != slot_time
+                ]
+                if len(after) == len(before):
+                    conn.rollback()
+                    return jsonify({"success": False, "error": "Custom slot not found"}), 404
+                if after:
+                    event_data["custom_slots"] = after
+                else:
+                    event_data.pop("custom_slots", None)
+                _write_events_yaml_doc(yaml_data)
+                _reload_events_globals()
+            conn.commit()
+            log.info(f"[admin] Removed custom slot {event_id} {event_date} {slot_time}")
+            return jsonify({"success": True, "removed": slot_time})
+
+        try:
+            custom = _custom_slot_payload(ev, data)
+        except ValueError as exc:
+            conn.rollback()
+            return jsonify({"success": False, "error": str(exc)}), 400
+
+        # Evaluate the prospective override before making it public. An actual
+        # session collision is always rejected; a buffer-only collision is
+        # accepted only when the admin deliberately enabled back-to-back mode.
+        candidate_event = dict(ev)
+        prospective = [
+            item for item in (ev.get("custom_slots") or [])
+            if not isinstance(item, dict) or str(item.get("time") or "") != slot_time
+        ]
+        prospective.append(custom)
+        candidate_event["custom_slots"] = prospective
+        conflict = _find_slot_conflict(
+            conn, event_date, slot_time, candidate_event, now=_local_now()
+        )
+        if conflict:
+            conn.rollback()
+            return jsonify({
+                "success": False,
+                "error": (
+                    "The actual photo session would overlap an existing booking"
+                    if conflict.get("conflict_kind") == "session_overlap"
+                    else "The slot only conflicts with a turnaround break; enable back-to-back mode to open it"
+                ),
+                "conflict_kind": conflict.get("conflict_kind"),
+                "buffer_only": bool(conflict.get("buffer_only")),
+                "can_open_back_to_back": bool(conflict.get("buffer_only")),
+                "conflict_booking_id": conflict.get("booking_id"),
+                "conflict_time": conflict.get("time"),
+            }), 409
+
+        with _EVENTS_YAML_LOCK:
+            yaml_data = _load_events_yaml_doc()
+            event_data = _event_yaml_record(yaml_data, event_id)
+            if not event_data:
+                conn.rollback()
+                return jsonify({"success": False, "error": "Event not found"}), 404
+            saved = [
+                item for item in (event_data.get("custom_slots") or [])
+                if not isinstance(item, dict) or str(item.get("time") or "") != slot_time
+            ]
+            saved.append(custom)
+            saved.sort(key=lambda item: _time_minutes(item.get("time")) or 0)
+            event_data["custom_slots"] = saved
+            _write_events_yaml_doc(yaml_data)
+            _reload_events_globals()
+        conn.commit()
+        log.info(
+            f"[admin] Saved custom slot {event_id} {event_date} {slot_time} "
+            f"duration={custom['session_length']} back_to_back={custom['allow_back_to_back']}"
+        )
+        return jsonify({"success": True, "slot": custom})
+    except Exception as exc:
+        conn.rollback()
+        log.exception(f"[admin_event_custom_slot] {exc}")
+        return jsonify({"success": False, "error": "Could not update custom slot"}), 500
+    finally:
+        conn.close()
 
 
 @app.route("/admin/api/event/<event_id>/block-slot", methods=["POST"])
@@ -11050,6 +11342,7 @@ def admin_event_block_slot(event_id):
     if not slot_time:
         return jsonify({"success": False, "error": "Slot time is required"}), 400
 
+    slot_config = _slot_definition(ev, slot_time)
     valid_times = {s["time"] for s in generate_slots(ev)}
     if slot_time not in valid_times:
         return jsonify({"success": False, "error": "Slot is not part of this event"}), 400
@@ -11084,11 +11377,15 @@ def admin_event_block_slot(event_id):
             """INSERT INTO bookings
                  (date, time, name, email, phone, instagram, session_type,
                   status, reserved_until, event_id, confirmation_token,
-                  deposit_amount, full_price, confirmed, paid, paid_amount)
+                  deposit_amount, full_price, confirmed, paid, paid_amount,
+                  booking_session_length, booking_break_length, allow_back_to_back)
                VALUES (?, ?, ?, '', '', '', 'internal_block',
-                       'reserved', ?, ?, ?, ?, ?, 0, 0, 0)""",
+                       'reserved', ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?)""",
             (event_date, slot_time, f"⛔ {reason}", expires, ev["id"],
-             token, deposit_amt, full_price),
+             token, deposit_amt, full_price,
+             int((slot_config or {}).get("session_length") or ev.get("session_length") or SESSION_LENGTH),
+             int((slot_config or {}).get("break_length") or 0),
+             1 if (slot_config or {}).get("allow_back_to_back") else 0),
         )
         booking_id = c.lastrowid
         conn.commit()
@@ -11199,7 +11496,8 @@ def admin_event_block_day(event_id):
     expires = (now + timedelta(days=365)).isoformat()
     deposit_amt = float(ev.get("deposit") or 0)
     full_price = float(ev.get("full_price") or 0) or (deposit_amt * 2)
-    all_slots = [s["time"] for s in generate_slots(ev)]
+    slot_definitions = {slot["time"]: slot for slot in generate_slots(ev)}
+    all_slots = list(slot_definitions)
     if not all_slots:
         return jsonify({"success": False, "error": "Event has no slots"}), 400
 
@@ -11229,15 +11527,20 @@ def admin_event_block_day(event_id):
                 (event_date, slot_time, now.isoformat()),
             )
             token = secrets.token_urlsafe(16)
+            slot_config = slot_definitions.get(slot_time) or {}
             c.execute(
                 """INSERT INTO bookings
                      (date, time, name, email, phone, instagram, session_type,
                       status, reserved_until, event_id, confirmation_token,
-                      deposit_amount, full_price, confirmed, paid, paid_amount)
+                      deposit_amount, full_price, confirmed, paid, paid_amount,
+                      booking_session_length, booking_break_length, allow_back_to_back)
                    VALUES (?, ?, ?, '', '', '', 'internal_block',
-                           'reserved', ?, ?, ?, ?, ?, 0, 0, 0)""",
+                           'reserved', ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?)""",
                 (event_date, slot_time, f"⛔ {reason}", expires, ev["id"],
-                 token, deposit_amt, full_price),
+                 token, deposit_amt, full_price,
+                 int(slot_config.get("session_length") or ev.get("session_length") or SESSION_LENGTH),
+                 int(slot_config.get("break_length") or 0),
+                 1 if slot_config.get("allow_back_to_back") else 0),
             )
             blocked += 1
         conn.commit()
@@ -11290,6 +11593,7 @@ def admin_event_manual_book(event_id):
         return jsonify({"success": False, "error": "Client name is required"}), 400
 
     # Validate slot belongs to this event.
+    slot_config = _slot_definition(ev, slot_time)
     valid_times = {s["time"] for s in generate_slots(ev)}
     if slot_time not in valid_times:
         return jsonify({"success": False, "error": "Slot is not part of this event"}), 400
@@ -11332,14 +11636,18 @@ def admin_event_manual_book(event_id):
             """INSERT INTO bookings
                  (date, time, name, email, phone, instagram, session_type, status,
                   reserved_until, event_id, confirmation_token, deposit_amount,
-                  full_price, confirmed, paid, paid_amount)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                  full_price, confirmed, paid, paid_amount, booking_session_length,
+                  booking_break_length, allow_back_to_back)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 event_date, slot_time, name, email, phone, instagram,
                 ev.get("session_type") or "manual",
                 status_val, reserved_until, ev["id"], token,
                 deposit_amt, full_price,
                 confirmed_val, paid_val, paid_amount,
+                int((slot_config or {}).get("session_length") or ev.get("session_length") or SESSION_LENGTH),
+                int((slot_config or {}).get("break_length") or 0),
+                1 if (slot_config or {}).get("allow_back_to_back") else 0,
             ),
         )
         booking_id = c.lastrowid
@@ -11723,12 +12031,14 @@ def api_private_session():
         c.execute(
             """INSERT INTO bookings
                  (date, time, name, email, phone, instagram, session_type, status,
-                  event_id, confirmation_token, deposit_amount, full_price,
-                  confirmed, paid, paid_amount, payment_link, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                 event_id, confirmation_token, deposit_amount, full_price,
+                  confirmed, paid, paid_amount, payment_link, booking_session_length,
+                  booking_break_length, allow_back_to_back, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
             (date, start_time, client_name, email, "", instagram,
              status_val, event_id, token, deposit, price,
-             1 if paid else 0, 1 if paid else 0, paid_amount, payment_link or None),
+             1 if paid else 0, 1 if paid else 0, paid_amount, payment_link or None,
+             session_minutes, 0, 0),
         )
         booking_id = c.lastrowid
         conn.commit()

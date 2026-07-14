@@ -2,10 +2,12 @@
 
 from datetime import datetime, timezone
 import os
+from pathlib import Path
 import tempfile
 
 import app as booking_app
 import pytest
+import yaml
 
 
 @pytest.fixture()
@@ -237,3 +239,166 @@ def test_same_day_event_is_not_next_after_its_end_time():
     now = datetime(2026, 7, 12, 5, 30, tzinfo=timezone.utc)  # 23:30 Edmonton
     assert booking_app._admin_event_has_ended(event, now=now)
     assert not booking_app._admin_event_is_current(event, now=now)
+
+
+def test_admin_can_open_1530_and_1630_back_to_back_without_session_overlap(
+    admin_client, monkeypatch, tmp_path
+):
+    """Owner request 2026-07-14: override breaks, never shooting-time collisions."""
+    event = _event() | {
+        "start_time": "14:00",
+        "end_time": "18:00",
+        "session_length": 30,
+        "break_length": 10,
+        "slot_interval": 40,
+    }
+    events_path = tmp_path / "events.yaml"
+    events_path.write_text(
+        yaml.safe_dump({"events": [event], "settings": {}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(booking_app, "_EVENTS_PATH", str(events_path))
+    monkeypatch.setattr(booking_app, "EVENTS_YAML_PATH", str(events_path))
+    monkeypatch.setattr(booking_app, "EVENTS", [event])
+
+    conn = booking_app.db_conn()
+    for slot_time, name in (("16:00", "Adele"), ("17:00", "Najma")):
+        conn.execute(
+            """INSERT INTO bookings
+                 (date,time,name,email,phone,instagram,session_type,status,
+                  event_id,deposit_amount,full_price,confirmed,paid,paid_amount,
+                  booking_session_length,booking_break_length,allow_back_to_back)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                event["date"], slot_time, name, f"{name.lower()}@example.com",
+                "", "", "mini", "confirmed", event["id"], 100, 250,
+                1, 1, 250, 30, 10, 0,
+            ),
+        )
+    conn.commit()
+    conn.close()
+
+    headers = {"X-Admin-Key": "test-admin-key"}
+
+    # Without explicit back-to-back consent, 15:30 only touches the 16:00
+    # turnaround boundary and returns an actionable buffer warning.
+    blocked_by_buffer = admin_client.post(
+        f"/admin/api/event/{event['id']}/custom-slot",
+        headers=headers,
+        json={"time": "15:30", "session_length": 30, "break_length": 10},
+    )
+    assert blocked_by_buffer.status_code == 409
+    assert blocked_by_buffer.get_json()["buffer_only"] is True
+    assert blocked_by_buffer.get_json()["can_open_back_to_back"] is True
+
+    for slot_time in ("15:30", "16:30"):
+        opened = admin_client.post(
+            f"/admin/api/event/{event['id']}/custom-slot",
+            headers=headers,
+            json={
+                "time": slot_time,
+                "session_length": 30,
+                "break_length": 10,
+                "allow_back_to_back": True,
+            },
+        )
+        assert opened.status_code == 200, opened.get_json()
+
+    # The hard guard remains: 15:45–16:15 overlaps the actual 16:00 session.
+    hard_overlap = admin_client.post(
+        f"/admin/api/event/{event['id']}/custom-slot",
+        headers=headers,
+        json={
+            "time": "15:45",
+            "session_length": 30,
+            "allow_back_to_back": True,
+        },
+    )
+    assert hard_overlap.status_code == 409
+    assert hard_overlap.get_json()["conflict_kind"] == "session_overlap"
+
+    public_slots = admin_client.get(
+        f"/slots/{event['date']}?event_id={event['id']}"
+    ).get_json()
+    available = {slot["time"] for slot in public_slots["slots"]}
+    assert {"15:30", "16:30"} <= available
+
+    # A booking snapshots the custom duration/no-buffer rule in SQLite, so a
+    # later event-grid edit cannot accidentally reintroduce the old conflict.
+    manual = admin_client.post(
+        f"/admin/api/event/{event['id']}/manual-book",
+        headers=headers,
+        json={"time": "15:30", "name": "Back To Back Client", "mark_paid": True},
+    )
+    assert manual.status_code == 200, manual.get_json()
+    conn = booking_app.db_conn()
+    stored = conn.execute(
+        """SELECT booking_session_length, booking_break_length, allow_back_to_back
+           FROM bookings WHERE id=?""",
+        (manual.get_json()["booking_id"],),
+    ).fetchone()
+    conn.close()
+    assert tuple(stored) == (30, 0, 1)
+
+    still_available = admin_client.get(
+        f"/slots/{event['date']}?event_id={event['id']}"
+    ).get_json()
+    assert "16:30" in {slot["time"] for slot in still_available["slots"]}
+
+    cannot_remove_booked = admin_client.delete(
+        f"/admin/api/event/{event['id']}/custom-slot",
+        headers=headers,
+        json={"time": "15:30"},
+    )
+    assert cannot_remove_booked.status_code == 409
+
+    removed = admin_client.delete(
+        f"/admin/api/event/{event['id']}/custom-slot",
+        headers=headers,
+        json={"time": "16:30"},
+    )
+    assert removed.status_code == 200
+
+    # Reopen the second requested time and exercise the real client funnel,
+    # not only the admin/manual-book path.
+    reopened = admin_client.post(
+        f"/admin/api/event/{event['id']}/custom-slot",
+        headers=headers,
+        json={
+            "time": "16:30",
+            "session_length": 30,
+            "break_length": 10,
+            "allow_back_to_back": True,
+        },
+    )
+    assert reopened.status_code == 200
+    public_booking = admin_client.post(
+        "/reserve",
+        json={
+            "event_id": event["id"],
+            "date": event["date"],
+            "time": "16:30",
+            "name": "Public Back To Back Client",
+            "email": "public-back-to-back@example.com",
+            "phone": "4035550101",
+            "instagram": "",
+        },
+    )
+    assert public_booking.status_code == 200, public_booking.get_json()
+    conn = booking_app.db_conn()
+    public_stored = conn.execute(
+        """SELECT booking_session_length, booking_break_length, allow_back_to_back
+           FROM bookings WHERE id=?""",
+        (public_booking.get_json()["booking_id"],),
+    ).fetchone()
+    conn.close()
+    assert tuple(public_stored) == (30, 0, 1)
+
+
+def test_admin_event_template_exposes_custom_slot_controls():
+    source = Path(__file__).resolve().parents[1] / "templates" / "admin_event.html"
+    html = source.read_text(encoding="utf-8")
+    assert "+ Custom time" in html
+    assert "Allow back-to-back" in html
+    assert "open-back-to-back" in html
+    assert "remove-custom" in html

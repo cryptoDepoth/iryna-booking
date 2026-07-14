@@ -108,6 +108,7 @@
   }
   .section-head h2 { font-size: 16px; margin: 0 0 2px; }
   .section-head p { font-size: 12px; color: var(--text-2); margin: 0; }
+  .section-head .mini-btn { flex: 0 0 auto; }
 
   /* Slot grid */
   .slot-grid {
@@ -125,6 +126,7 @@
   .slot.confirmed { background: var(--success-bg); border-color: var(--success-bg); cursor: default; }
   .slot.blocked { background: var(--danger-bg); border-color: #fecaca; cursor: default; }
   .slot.conflict { background: #f5f3ff; border-color: #c4b5fd; cursor: default; }
+  .slot.buffer-conflict { background: #fffbeb; border-color: #fcd34d; }
   .slot.off-grid { border-style: dashed; box-shadow: inset 4px 0 0 #7c3aed; }
   .slot-time { font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
   .slot-label { font-size: 11px; color: var(--text-2); margin-top: 2px; font-variant-numeric: tabular-nums; }
@@ -134,10 +136,15 @@
   .slot.confirmed .slot-status { color: var(--success); }
   .slot.blocked .slot-status { color: var(--danger); }
   .slot.conflict .slot-status { color: #6d28d9; }
+  .slot.buffer-conflict .slot-status, .slot.buffer-conflict .slot-note { color: #92400e; }
   .slot-note { font-size: 11px; line-height: 1.35; color: #5b21b6; margin-top: 7px; }
   .off-grid-tag {
     display: inline-block; margin-top: 7px; padding: 3px 7px; border-radius: 999px;
     background: #ede9fe; color: #5b21b6; font-size: 10px; font-weight: 800;
+  }
+  .custom-slot-tag {
+    display: inline-block; margin-top: 7px; margin-right: 5px; padding: 3px 7px; border-radius: 999px;
+    background: var(--blue-bg); color: var(--blue); font-size: 10px; font-weight: 800;
   }
   .slot-client {
     font-size: 12px; color: var(--text); margin-top: 6px;
@@ -203,7 +210,8 @@
 
   .field { margin-bottom: 14px; }
   .field label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); margin-bottom: 6px; display: block; }
-  .field input[type=text], .field input[type=email], .field input[type=tel] {
+  .field input[type=text], .field input[type=email], .field input[type=tel],
+  .field input[type=time], .field input[type=number] {
     width: 100%; background: var(--surface); border: 1px solid var(--border);
     color: var(--text); font-size: 14px; padding: 9px 12px; border-radius: 6px;
     outline: none; font-family: inherit;
@@ -213,6 +221,8 @@
   .field .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface2); border-radius: 6px; }
   .field .checkbox-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
   .field .checkbox-row label { margin: 0; letter-spacing: 0; text-transform: none; font-size: 13px; color: var(--text); font-weight: 500; }
+  .field-help { margin-top: 6px; color: var(--text-2); font-size: 11px; line-height: 1.4; }
+  .slot-preview { padding: 11px 12px; border-radius: 8px; background: var(--blue-bg); color: #1e3a8a; font-size: 12px; margin-bottom: 14px; }
 
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
   .btn {
@@ -252,6 +262,7 @@
     .roster-contact { grid-template-columns: 1fr; }
     .topbar { padding: 0 16px; }
     .topbar-nav { display: none; }
+    .modal { max-height: calc(100vh - 24px); overflow-y: auto; padding: 22px 18px; }
   }
 </style>
 </head>
@@ -288,8 +299,9 @@
       <div class="section-head">
         <div>
           <h2>Slot Board</h2>
-          <p>Free slots can be booked manually or closed from this board.</p>
+          <p>Open any custom time, book a client manually, or close a slot.</p>
         </div>
+        <button class="mini-btn primary" type="button" onclick="openCustomSlotModal()">+ Custom time</button>
       </div>
       <div class="legend">
         <span class="legend-item"><span class="legend-swatch free"></span>Free</span>
@@ -353,6 +365,38 @@
   </form>
 </div>
 
+<!-- Modal: custom public slot -->
+<div id="customSlotModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="customSlotTitle">
+  <form class="modal" id="customSlotForm" onsubmit="saveCustomSlot(event)">
+    <h2 id="customSlotTitle">Open a custom time</h2>
+    <p class="sub">Add one public booking time without changing the whole session grid.</p>
+    <div class="field">
+      <label for="customTime">Start time *</label>
+      <input id="customTime" type="time" required step="300" oninput="updateCustomPreview()" />
+    </div>
+    <div class="field">
+      <label for="customDuration">Photo session duration (minutes)</label>
+      <input id="customDuration" type="number" min="5" max="180" step="5" required oninput="updateCustomPreview()" />
+    </div>
+    <div class="field">
+      <label for="customBreak">Turnaround break after it (minutes)</label>
+      <input id="customBreak" type="number" min="0" max="60" step="5" required oninput="updateCustomPreview()" />
+    </div>
+    <div class="field">
+      <div class="checkbox-row">
+        <input id="customBackToBack" type="checkbox" onchange="updateCustomPreview()" />
+        <label for="customBackToBack">Allow back-to-back: ignore breaks next to this slot</label>
+      </div>
+      <div class="field-help">Safe for 15:30–16:00 next to a 16:00 booking. An actual overlap such as 15:45–16:15 is always blocked.</div>
+    </div>
+    <div id="customSlotPreview" class="slot-preview">Choose a start time.</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" type="button" onclick="closeCustomSlotModal()">Cancel</button>
+      <button class="btn btn-accent" type="submit">Open this time</button>
+    </div>
+  </form>
+</div>
+
 <!-- Modal: Edit contact -->
 <div id="contactModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
   <form class="modal" id="contactForm" onsubmit="submitContact(event)">
@@ -384,10 +428,12 @@
   const toastEl = document.getElementById('toast');
   const modalEl = document.getElementById('modal');
   const contactModalEl = document.getElementById('contactModal');
+  const customSlotModalEl = document.getElementById('customSlotModal');
   const gridEl  = document.getElementById('slotGrid');
   const rosterEl = document.getElementById('rosterList');
   let pendingSlot = null;
   let contactBooking = null;
+  let currentEvent = {};
   let toastTimer;
 
   function showToast(msg, type) {
@@ -424,6 +470,7 @@
       return;
     }
     const data = await res.json();
+    currentEvent = data.event || {};
     renderStats(data.summary || {});
     renderScheduleHealth(data.event || {}, data.summary || {});
     renderGrid(data.slots || []);
@@ -436,6 +483,8 @@
     const pause = Number(event.break_length || 0);
     const interval = Number(event.slot_interval || session + pause);
     const conflicts = Number(summary.conflicts || 0);
+    const bufferConflicts = Number(summary.buffer_conflicts || 0);
+    const hardConflicts = Number(summary.hard_conflicts || 0);
     const offGrid = Number(summary.off_grid || 0);
     if (!conflicts && !offGrid) {
       box.className = 'schedule-health';
@@ -445,7 +494,8 @@
     box.className = 'schedule-health show';
     box.innerHTML = `<strong>Schedule protected — existing clients are safe</strong>
       <p>${session}-min session + ${pause}-min break = ${interval}-min spacing. ` +
-      `${conflicts} generated time${conflicts === 1 ? '' : 's'} cannot be opened because they overlap a booking. ` +
+      `${hardConflicts ? `${hardConflicts} time${hardConflicts === 1 ? '' : 's'} overlap an actual photo session and stay locked. ` : ''}` +
+      `${bufferConflicts ? `${bufferConflicts} time${bufferConflicts === 1 ? '' : 's'} touch only a break and can be opened back-to-back. ` : ''}` +
       `${offGrid ? `${offGrid} existing booking${offGrid === 1 ? '' : 's'} sit outside the current grid and are shown below.` : ''}</p>`;
   }
 
@@ -469,35 +519,47 @@
       const openLink = linkedBooking
         ? `<a class="slot-link" href="/admin/booking/${linkedBooking}" onclick="event.stopPropagation();">Open booking #${linkedBooking} →</a>`
         : '';
+      const customRemove = s.custom
+        ? `<button class="mini-btn slot-close" type="button" data-slot-action="remove-custom" data-time="${esc(s.time)}">Remove custom</button>`
+        : '';
       const freeActions = state === 'free'
         ? `<div class="slot-actions">
              <button class="mini-btn primary" type="button" data-slot-action="book" data-time="${esc(s.time)}" data-label="${esc(s.label)}">Book</button>
              <button class="mini-btn slot-close" type="button" data-slot-action="close" data-time="${esc(s.time)}" data-label="${esc(s.label)}">× Close</button>
+             ${customRemove}
            </div>`
         : '';
       const blockedActions = state === 'blocked' && s.booking_id
         ? `<div class="slot-actions"><button class="mini-btn slot-close" type="button" data-slot-action="reopen" data-booking-id="${Number(s.booking_id)}" data-time="${esc(s.time)}">Reopen</button></div>`
         : '';
+      const bufferActions = state === 'conflict' && s.buffer_only
+        ? `<div class="slot-actions"><button class="mini-btn primary" type="button" data-slot-action="open-back-to-back" data-time="${esc(s.time)}">Open back-to-back</button>${customRemove}</div>`
+        : '';
       const statusLabel = state === 'free'
         ? 'Free'
-        : (state === 'blocked' ? 'Closed' : (state === 'confirmed' ? 'Confirmed' : (state === 'conflict' ? 'Protected overlap' : 'Reserved')));
+        : (state === 'blocked' ? 'Closed' : (state === 'confirmed' ? 'Confirmed' : (state === 'conflict' ? (s.buffer_only ? 'Break only · can override' : 'Protected overlap') : 'Reserved')));
       const conflictNote = state === 'conflict'
-        ? `<div class="slot-note">Cannot open: overlaps the existing ${esc(s.conflict_time || '')} booking and its required break.</div>`
+        ? `<div class="slot-note">${s.buffer_only ? `Only the turnaround break touches the ${esc(s.conflict_time || '')} booking. You may deliberately open it back-to-back.` : `Cannot open: the actual photo session overlaps the ${esc(s.conflict_time || '')} booking.`}</div>`
         : '';
       const offGridTag = s.off_grid
         ? '<span class="off-grid-tag">EXISTING BOOKING · OUTSIDE CURRENT GRID</span>'
         : '';
+      const customTag = s.custom
+        ? `<span class="custom-slot-tag">CUSTOM${s.allow_back_to_back ? ' · NO BUFFER' : ''}</span>`
+        : '';
       return `
-        <div class="slot ${state}${s.off_grid ? ' off-grid' : ''}">
+        <div class="slot ${state}${s.buffer_only ? ' buffer-conflict' : ''}${s.off_grid ? ' off-grid' : ''}">
           <div class="slot-time">${esc(s.time)}</div>
           <div class="slot-label">${esc(s.label)}</div>
           <div class="slot-status">${statusLabel}</div>
           ${offGridTag}
+          ${customTag}
           ${clientLine}
           ${conflictNote}
           ${openLink}
           ${freeActions}
           ${blockedActions}
+          ${bufferActions}
         </div>
       `;
     }).join('');
@@ -555,6 +617,8 @@
     if (action === 'book') openModal(time, label);
     if (action === 'close') closeSlot(time, label);
     if (action === 'reopen') unblockSlot(Number(button.dataset.bookingId || 0), time);
+    if (action === 'open-back-to-back') openCustomSlotModal(time, true);
+    if (action === 'remove-custom') removeCustomSlot(time);
   });
 
   rosterEl.addEventListener('click', (e) => {
@@ -590,10 +654,12 @@
   }
   modalEl.addEventListener('click', (e) => { if (e.target === modalEl) closeModal(); });
   contactModalEl.addEventListener('click', (e) => { if (e.target === contactModalEl) closeContactModal(); });
+  customSlotModalEl.addEventListener('click', (e) => { if (e.target === customSlotModalEl) closeCustomSlotModal(); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeModal();
       closeContactModal();
+      closeCustomSlotModal();
     }
   });
 
@@ -610,6 +676,64 @@
   function closeContactModal() {
     contactBooking = null;
     contactModalEl.classList.remove('show');
+  }
+
+  function openCustomSlotModal(time, backToBack) {
+    document.getElementById('customSlotForm').reset();
+    document.getElementById('customTime').value = time || '';
+    document.getElementById('customDuration').value = Number(currentEvent.session_length || 30);
+    document.getElementById('customBreak').value = Number(currentEvent.break_length || 0);
+    document.getElementById('customBackToBack').checked = Boolean(backToBack);
+    customSlotModalEl.classList.add('show');
+    updateCustomPreview();
+    setTimeout(() => document.getElementById(time ? 'customDuration' : 'customTime').focus(), 50);
+  }
+
+  function closeCustomSlotModal() { customSlotModalEl.classList.remove('show'); }
+
+  function updateCustomPreview() {
+    const time = document.getElementById('customTime').value;
+    const duration = Number(document.getElementById('customDuration').value || 0);
+    const pause = Number(document.getElementById('customBreak').value || 0);
+    const backToBack = document.getElementById('customBackToBack').checked;
+    const preview = document.getElementById('customSlotPreview');
+    if (!time || !duration) { preview.textContent = 'Choose a start time.'; return; }
+    const [hours, minutes] = time.split(':').map(Number);
+    const end = hours * 60 + minutes + duration;
+    const endLabel = String(Math.floor(end / 60) % 24).padStart(2, '0') + ':' + String(end % 60).padStart(2, '0');
+    preview.textContent = `${time}–${endLabel} · ${duration} min session · ${backToBack ? 'no neighbour buffer' : pause + ' min break'}`;
+  }
+
+  async function saveCustomSlot(ev) {
+    ev.preventDefault();
+    const body = {
+      time: document.getElementById('customTime').value,
+      session_length: Number(document.getElementById('customDuration').value),
+      break_length: Number(document.getElementById('customBreak').value),
+      allow_back_to_back: document.getElementById('customBackToBack').checked,
+    };
+    showToast('Opening custom time…');
+    const res = await fetch('/admin/api/event/' + encodeURIComponent(eventId) + '/custom-slot', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.success) {
+      showToast('Custom time is open ✓', 'ok');
+      closeCustomSlotModal();
+      loadSlots();
+    } else {
+      showToast((data && data.error) || ('HTTP ' + res.status), 'err');
+    }
+  }
+
+  async function removeCustomSlot(time) {
+    if (!confirm(`Remove custom time ${time}?\n\nA slot with an active booking cannot be removed.`)) return;
+    const res = await fetch('/admin/api/event/' + encodeURIComponent(eventId) + '/custom-slot', {
+      method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({time}),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && data.success) { showToast('Custom time removed ✓', 'ok'); loadSlots(); }
+    else showToast((data && data.error) || ('HTTP ' + res.status), 'err');
   }
 
   async function submitContact(ev) {
