@@ -2286,9 +2286,11 @@ def add_security_headers(response):
     if (
         request.endpoint == "static"
         and request.args.get("v")
-        and response.status_code == 200
+        and response.status_code in (200, 304)
     ):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    if response.status_code == 200 and response.mimetype == "text/html":
+        response.headers["Cache-Control"] = "no-cache"
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     # frame-ancestors in CSP supersedes X-Frame-Options; keep XFO for old browsers
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")

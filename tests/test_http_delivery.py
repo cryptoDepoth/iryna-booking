@@ -98,6 +98,32 @@ def test_only_versioned_static_assets_receive_immutable_caching():
     assert "immutable" not in html_response.headers.get("Cache-Control", "")
 
 
+def test_versioned_static_conditional_304_retains_immutable_caching():
+    """Browser revalidation must not downgrade the versioned asset cache policy."""
+    path = "/static/brand/pashynska-logo-wfolio-dark.png?v=dark-20260518"
+    with booking_app.app.test_client() as client:
+        initial_response = client.get(path)
+        conditional_response = client.get(
+            path,
+            headers={"If-None-Match": initial_response.headers["ETag"]},
+        )
+
+    assert initial_response.status_code == 200
+    assert conditional_response.status_code == 304
+    assert conditional_response.headers["Cache-Control"] == (
+        "public, max-age=31536000, immutable"
+    )
+
+
+def test_public_html_requires_revalidation():
+    """Public HTML must not become a stale shared cache entry."""
+    with booking_app.app.test_client() as client:
+        response = client.get("/", headers={"Accept-Encoding": "identity"})
+
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-cache"
+
+
 def test_conventional_favicon_returns_a_valid_image():
     with booking_app.app.test_client() as client:
         response = client.get("/favicon.ico")

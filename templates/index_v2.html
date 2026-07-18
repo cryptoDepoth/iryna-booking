@@ -675,6 +675,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 .event-card .photo{overflow:hidden}
 .event-card .photo .card-kb{position:absolute;inset:0;border-radius:0}
 .event-card .photo .photo-bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .55s ease;will-change:transform}
+.event-card .photo img.photo-bg{width:100%;height:100%;object-fit:cover;object-position:center}
 .event-card:hover .photo .photo-bg{transform:scale(1.07)}
 
 /* ── MOBILE BOTTOM SHEET DRAWER ── */
@@ -974,7 +975,14 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
       {% set card_total = event.full_price|default(event.price|default(0), true)|float %}
       <article class="event-card{% if sold %} sold{% endif %}" data-event-id="{{ event.id }}" onclick="openDrawer('{{ event.id }}')">
         <div class="photo">
-          {% if event.photos %}<div class="photo-bg" data-bg="{{ event.photos[0] }}{% if event.photos[0].startswith('/images/') %}?w=720{% endif %}"></div>{% endif %}
+          {% if event.photos %}
+          {% set card_photo = event.photos[0] %}
+          {% if card_photo.startswith('/images/') %}
+          {% set card_photo = card_photo ~ ('&' if '?' in card_photo else '?') ~ 'w=720' %}
+          {% endif %}
+          <div class="photo-bg" data-bg="{{ card_photo }}"></div>
+          <noscript><img class="photo-bg" src="{{ card_photo }}" alt="" width="720" height="540" loading="lazy" decoding="async"></noscript>
+          {% endif %}
           <span class="status {{ 'sold' if sold else 'open' }}"><span class="dot"></span>{{ 'Sold out' if sold else 'Booking open' }}</span>
         </div>
         <div class="body">
