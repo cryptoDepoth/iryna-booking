@@ -5001,6 +5001,81 @@ def favicon():
     )
 
 
+_SITEMAP_CONTENT_REVISIONS = "sitemap_content_revisions.json"
+
+
+def _load_sitemap_content_revisions():
+    manifest_path = os.path.join(app.root_path, _SITEMAP_CONTENT_REVISIONS)
+    with open(manifest_path, encoding="utf-8") as manifest_file:
+        return json.load(manifest_file)
+
+
+def _sitemap_revision_date(value):
+    revision = datetime.strptime(str(value), "%Y-%m-%d").date()
+    return min(revision, datetime.now(timezone.utc).date()).isoformat()
+
+
+def _normalized_yaml_sha256(path):
+    with open(path, encoding="utf-8") as source_file:
+        content = yaml.safe_load(source_file)
+    normalized = yaml.safe_dump(
+        content,
+        allow_unicode=True,
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()
+
+
+def _events_revision_state_path(events_path=None):
+    return f"{events_path or _EVENTS_PATH}.revision.json"
+
+
+def _events_content_lastmod(revisions=None):
+    revisions = revisions or _load_sitemap_content_revisions()
+    bundled_revision = revisions["events.yaml"]
+    content_sha256 = _normalized_yaml_sha256(_EVENTS_PATH)
+    state_path = _events_revision_state_path()
+    state = {}
+    try:
+        with open(state_path, encoding="utf-8") as state_file:
+            state = json.load(state_file)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+
+    if state.get("sha256") == content_sha256:
+        try:
+            return _sitemap_revision_date(state["lastmod"])
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    if content_sha256 == bundled_revision["sha256"]:
+        return _sitemap_revision_date(bundled_revision["lastmod"])
+
+    source_mtime = min(
+        os.path.getmtime(_EVENTS_PATH),
+        datetime.now(timezone.utc).timestamp(),
+    )
+    lastmod = datetime.fromtimestamp(
+        source_mtime,
+        timezone.utc,
+    ).date().isoformat()
+
+    state = {"sha256": content_sha256, "lastmod": lastmod}
+    state_tmp_path = f"{state_path}.tmp"
+    try:
+        with open(state_tmp_path, "w", encoding="utf-8") as state_file:
+            json.dump(state, state_file, sort_keys=True)
+            state_file.write("\n")
+        os.replace(state_tmp_path, state_path)
+    except OSError as exc:
+        log.warning("[sitemap] Could not persist events revision: %s", exc)
+        try:
+            os.remove(state_tmp_path)
+        except OSError:
+            pass
+    return lastmod
+
+
 @app.route("/sitemap.xml")
 def sitemap_xml():
     """Serve canonical public URLs with content-source revision dates."""
@@ -5049,13 +5124,20 @@ def sitemap_xml():
         ),
     )
 
+    revisions = _load_sitemap_content_revisions()
+    with _EVENTS_YAML_LOCK:
+        events_lastmod = _events_content_lastmod(revisions)
+
     def source_lastmod(source_paths):
-        paths = [
-            path if os.path.isabs(path) else os.path.join(app.root_path, path)
-            for path in source_paths
-        ]
-        latest_mtime = min(max(os.path.getmtime(path) for path in paths), time.time())
-        return datetime.fromtimestamp(latest_mtime, timezone.utc).date().isoformat()
+        source_revisions = []
+        for source_path in source_paths:
+            if source_path == _EVENTS_PATH:
+                source_revisions.append(events_lastmod)
+            else:
+                source_revisions.append(
+                    _sitemap_revision_date(revisions[source_path]["lastmod"])
+                )
+        return max(source_revisions)
 
     lines = ['<?xml version="1.0" encoding="UTF-8"?>']
     lines.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
