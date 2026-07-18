@@ -5001,8 +5001,75 @@ def favicon():
 
 @app.route("/sitemap.xml")
 def sitemap_xml():
-    """Serve sitemap.xml for search engine crawlers."""
-    return send_from_directory(os.path.join(app.root_path, "static"), "sitemap.xml", mimetype="application/xml")
+    """Serve canonical public URLs with content-source revision dates."""
+    sitemap_entries = (
+        (
+            "https://book.pashynskaphoto.com/",
+            (
+                "templates/index_v2.html",
+                "static/css/booking-glass.css",
+                "static/reviews.json",
+                "static/og-image.jpg",
+                _EVENTS_PATH,
+            ),
+            "daily",
+            "1.0",
+        ),
+        (
+            "https://book.pashynskaphoto.com/book",
+            ("templates/events_landing.html", _EVENTS_PATH),
+            "daily",
+            "0.9",
+        ),
+        (
+            "https://book.pashynskaphoto.com/wedding",
+            ("templates/landing_wedding_v5.html",),
+            "weekly",
+            "0.8",
+        ),
+        (
+            "https://book.pashynskaphoto.com/family",
+            ("templates/landing_family_v2.html",),
+            "weekly",
+            "0.8",
+        ),
+        (
+            "https://book.pashynskaphoto.com/maternity",
+            ("templates/landing_maternity_v2.html",),
+            "weekly",
+            "0.8",
+        ),
+        (
+            "https://book.pashynskaphoto.com/privacy",
+            ("templates/privacy.html",),
+            "monthly",
+            "0.3",
+        ),
+    )
+
+    def source_lastmod(source_paths):
+        paths = [
+            path if os.path.isabs(path) else os.path.join(app.root_path, path)
+            for path in source_paths
+        ]
+        latest_mtime = min(max(os.path.getmtime(path) for path in paths), time.time())
+        return datetime.fromtimestamp(latest_mtime, timezone.utc).date().isoformat()
+
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>']
+    lines.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    for location, source_paths, changefreq, priority in sitemap_entries:
+        lines.extend(
+            (
+                "  <url>",
+                f"    <loc>{location}</loc>",
+                f"    <lastmod>{source_lastmod(source_paths)}</lastmod>",
+                f"    <priority>{priority}</priority>",
+                f"    <changefreq>{changefreq}</changefreq>",
+                "  </url>",
+            )
+        )
+    lines.append("</urlset>")
+    return Response("\n".join(lines) + "\n", mimetype="application/xml")
 
 
 # ── Service landing pages (SEO-optimized for each photography direction) ──
