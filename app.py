@@ -20,6 +20,7 @@ if _os.path.exists(_env_path):
     print(f"[env] Loaded {_env_path}")
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, send_file, Response, has_request_context, abort
+from flask_compress import Compress
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 import json
@@ -432,6 +433,8 @@ def _meta_capi_purchase(booking, value=None, currency="CAD"):
 
 
 app = Flask(__name__)
+app.config["COMPRESS_ALGORITHM"] = ["br", "gzip"]
+Compress(app)
 # Trust Cloudflare forwarded headers so request.host reflects the ORIGINAL
 # domain the visitor used (pashynska.agency) not the canonical one.
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -2280,6 +2283,12 @@ _PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(self)"
 
 @app.after_request
 def add_security_headers(response):
+    if (
+        request.endpoint == "static"
+        and request.args.get("v")
+        and response.status_code == 200
+    ):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     # frame-ancestors in CSP supersedes X-Frame-Options; keep XFO for old browsers
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
@@ -2805,6 +2814,20 @@ def _uncaught(e):
 
 
 # Serve uploaded photos: try persistent volume first, then bundled static.
+def _image_mimetype_from_file(path):
+    """Identify WebP/JPEG bytes without trusting a legacy filename extension."""
+    try:
+        with open(path, "rb") as image_file:
+            header = image_file.read(12)
+    except OSError:
+        return None
+    if header.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
 def _optimized_image_cache_path(source_path, target_width=None):
     """Return a cached WebP for legacy large jpg/png/webp images, or None.
 
@@ -2887,6 +2910,9 @@ def serve_image(filename):
         response = send_from_directory(PHOTOS_DIR, filename)
     else:
         response = send_from_directory(_BUNDLED_IMAGES_DIR, filename)
+    detected_mimetype = _image_mimetype_from_file(cached_path or source_path)
+    if detected_mimetype:
+        response.mimetype = detected_mimetype
     response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
@@ -4961,6 +4987,17 @@ def index():
 def robots_txt():
     """Serve robots.txt for search engine crawlers."""
     return send_from_directory(os.path.join(app.root_path, "static"), "robots.txt")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    """Serve the existing brand mark at the conventional browser favicon URL."""
+    return send_from_directory(
+        os.path.join(app.root_path, "static", "brand"),
+        "pashynska-logo-wfolio-dark.png",
+        mimetype="image/png",
+    )
+
 
 @app.route("/sitemap.xml")
 def sitemap_xml():
