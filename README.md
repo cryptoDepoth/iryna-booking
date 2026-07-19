@@ -4,8 +4,8 @@ Flask-based booking system for **Blossom Mini Sessions** (and future events).
 Live date: **May 3, 2026**
 
 ## 🌐 Live URLs
-- **Public:** `https://pashynska.agency`
-- **Public (www):** `https://www.pashynska.agency`
+- **Booking:** `https://book.pashynskaphoto.com`
+- **Portfolio:** `https://pashynskaphoto.com`
 - **Local:** `http://localhost:5001`
 
 ## 📁 Structure
@@ -45,26 +45,31 @@ NOTION_DATABASE_ID="355510b9-cc5b-818c-aec6-d764f116e2b2"
 ## 🚀 How to Run Locally
 
 ```bash
-cd ~/business/iryna/iryna-booking
-python3 -m venv venv
-source venv/bin/activate
-pip install flask requests
-export $(cat .env | xargs)
-python3 app.py
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+test -f .env || cp .env.example .env
+# Fill only the local values you need in .env.
+set -a; . ./.env; set +a
+DISABLE_BACKGROUND_THREADS=1 python app.py
 ```
 
 Server runs on `0.0.0.0:5001`.
 
-## 🌍 Public Tunnel (Cloudflare)
-
-Production runs through the named Cloudflare Tunnel `pashynska-booking`.
-Both `pashynska.agency` and `www.pashynska.agency` route to `http://127.0.0.1:5001`.
-
-Local launchd jobs:
+## ✅ Tests
 
 ```bash
-launchctl list | grep com.pashynska.booking
+source .venv/bin/activate
+python -m pip install -r requirements-test.txt
+python -m playwright install chromium
+DISABLE_BACKGROUND_THREADS=1 python -m pytest -q -p no:cacheprovider
 ```
+
+Verified July 19, 2026: **671 passed, 1 skipped**.
+
+## 🌍 Production Runtime
+
+Production runs on Fly.io. A reviewed fast-forward push to `main` triggers the repository's GitHub Actions deployment workflow.
 
 ## 🧠 Business Logic
 

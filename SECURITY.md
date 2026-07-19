@@ -22,6 +22,10 @@ Biggest assets: client PII in `/data/bookings.db`, Stripe keys, admin credential
 - **Bots**: reCAPTCHA v3 on reserve, rate limits on login/assistant/analytics endpoints.
 - **Dependencies**: `pip-audit` clean as of 2026-06-10.
 - **Tests**: 327 tests; conftest blanks live credentials so the suite can never hit prod APIs.
+- **Event persistence** (verified 2026-07-19): every runtime `events.yaml` read-modify-write
+  cycle uses the shared `_EVENTS_YAML_LOCK` and `_write_events_yaml_doc`, which writes and
+  fsyncs a same-directory temporary file before atomic replacement. Revision-sidecar
+  synchronization is part of the same operation and restores the prior YAML/sidecar on failure.
 
 ## Rules
 
@@ -38,5 +42,3 @@ Biggest assets: client PII in `/data/bookings.db`, Stripe keys, admin credential
 - `?key=` admin API access leaks the key into access logs — migrate external callers
   (n8n, cron) to the `X-Admin-Key` header, then remove the query-param path.
 - CSP allows `'unsafe-inline'` scripts (reCAPTCHA/inline handlers) — nonce migration pending.
-- `events.yaml` has no backend file lock; concurrent admin+cron writes can still race
-  (frontend race fixed 2026-06-10).

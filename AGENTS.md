@@ -28,11 +28,11 @@ Production mini-session photography booking platform for Pashynska Photography (
 - Do not rewrite working systems unless absolutely necessary.
 - Prioritize: reliability, simplicity, conversion rate, mobile UX, booking safety.
 - Private session button 🔒 is critical — if missing after rollback, patch `admin.html` + Flask routing.
-- Before deploying: `pytest` must pass 354 tests (was 352 before timezone fix).
+- Before deploying: the full suite must pass at least the verified current baseline of 671 tests, with only the one known skip.
 
 ## Verification
 
-- Run `pytest` before any deploy (target: 354 green)
+- Run `DISABLE_BACKGROUND_THREADS=1 /Users/andrzej/Iryna-Master/01-Booking-System/.venv/bin/python -m pytest -q -p no:cacheprovider` before any deploy (verified baseline: 671 passed, 1 skipped)
 - Run `hermes live-qa` smoke test after deploy
 - Check `book.pashynskaphoto.com` booking flow end-to-end after any templates/app.py changes
 
