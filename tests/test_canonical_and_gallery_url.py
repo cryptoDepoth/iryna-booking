@@ -33,7 +33,7 @@ def client(monkeypatch):
     monkeypatch.setattr(booking_app, "send_confirmation_email", lambda booking_id: True, raising=False)
     # Skip real email send during /wfolio test.
     monkeypatch.setattr(
-        booking_app, "_send_email_with_attachment", lambda *a, **k: True, raising=False
+        booking_app, "_send_gallery_email", lambda *a, **k: True, raising=False
     )
     booking_app._rate_limits.clear()
     booking_app._login_attempts.clear()
