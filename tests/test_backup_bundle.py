@@ -14,9 +14,21 @@ def test_backup_bundle_is_consistent_and_complete(tmp_path, monkeypatch):
     main_db = tmp_path / "bookings.db"
     backup_dir = tmp_path / "backups"
     events_path = tmp_path / "events.yaml"
+    events_revision_path = tmp_path / "events.yaml.revision.json"
     gift_db = tmp_path / "gift_referral.db"
     backup_dir.mkdir()
     events_path.write_text("events: []\n", encoding="utf-8")
+    revision_state = {
+        "lastmod": "2026-07-18",
+        "sha256": booking_app._normalized_yaml_sha256(str(events_path)),
+    }
+    events_revision_path.write_text(
+        json.dumps(
+            {**revision_state, "sha256": "0" * 64},
+            sort_keys=True,
+        ) + "\n",
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(booking_app, "DB_PATH", str(main_db))
     monkeypatch.setattr(booking_app, "BACKUP_DIR", str(backup_dir))
@@ -37,16 +49,39 @@ def test_backup_bundle_is_consistent_and_complete(tmp_path, monkeypatch):
     bundle = booking_app.create_backup("test")
     assert bundle.endswith(".zip")
     with zipfile.ZipFile(bundle) as archive:
-        assert {"bookings.db", "events.yaml", "gift_referral.db", "manifest.json"} <= set(archive.namelist())
+        assert {
+            "bookings.db",
+            "events.yaml",
+            "events.yaml.revision.json",
+            "gift_referral.db",
+            "manifest.json",
+        } <= set(archive.namelist())
+        archived_revision = json.loads(
+            archive.read("events.yaml.revision.json")
+        )
+        assert archived_revision["sha256"] == revision_state["sha256"]
+        assert archived_revision["lastmod"] >= revision_state["lastmod"]
         manifest = json.loads(archive.read("manifest.json"))
         assert manifest["integrity_check"] == "ok"
         assert manifest["table_counts"]["bookings"] == 1
-        archive.extract("bookings.db", tmp_path / "restore")
+        assert "events revision metadata" in manifest["includes"]
+        for name in (
+            "bookings.db",
+            "events.yaml",
+            "events.yaml.revision.json",
+        ):
+            archive.extract(name, tmp_path / "restore")
 
     restored = sqlite3.connect(tmp_path / "restore" / "bookings.db")
     assert restored.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     assert restored.execute("SELECT COUNT(*) FROM bookings").fetchone()[0] == 1
     restored.close()
+    monkeypatch.setattr(
+        booking_app,
+        "_EVENTS_PATH",
+        str(tmp_path / "restore" / "events.yaml"),
+    )
+    assert booking_app._events_content_lastmod() == archived_revision["lastmod"]
 
     verified = verify_backup(Path(bundle))
     assert verified["verified"] is True
@@ -64,3 +99,34 @@ def test_backup_verifier_rejects_incomplete_bundle(tmp_path):
         assert "missing" in str(exc).lower()
     else:
         raise AssertionError("incomplete backup unexpectedly passed verification")
+
+
+def test_backup_verifier_rejects_mismatched_event_revision(tmp_path):
+    bookings_db = tmp_path / "bookings.db"
+    gift_db = tmp_path / "gift_referral.db"
+    for path in (bookings_db, gift_db):
+        connection = sqlite3.connect(path)
+        connection.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+        connection.commit()
+        connection.close()
+
+    bundle = tmp_path / "mismatched-revision.zip"
+    with zipfile.ZipFile(bundle, "w") as archive:
+        archive.write(bookings_db, "bookings.db")
+        archive.write(gift_db, "gift_referral.db")
+        archive.writestr("events.yaml", "events: []\n")
+        archive.writestr(
+            "events.yaml.revision.json",
+            json.dumps({"lastmod": "2026-07-18", "sha256": "0" * 64}),
+        )
+        archive.writestr(
+            "manifest.json",
+            json.dumps({"integrity_check": "ok", "table_counts": {}}),
+        )
+
+    try:
+        verify_backup(bundle)
+    except ValueError as exc:
+        assert "does not match" in str(exc)
+    else:
+        raise AssertionError("mismatched event revision unexpectedly passed")

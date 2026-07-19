@@ -2,11 +2,15 @@
 """Verify a portable Pashynska production backup without restoring it."""
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import tempfile
 import zipfile
+from datetime import datetime
 from pathlib import Path, PurePosixPath
+
+import yaml
 
 
 REQUIRED_FILES = {"bookings.db", "events.yaml", "gift_referral.db", "manifest.json"}
@@ -51,6 +55,25 @@ def verify_backup(path: Path) -> dict:
             raise ValueError("Backup manifest is missing table counts")
         if archive.getinfo("events.yaml").file_size == 0:
             raise ValueError("events.yaml is empty")
+        revision_name = "events.yaml.revision.json"
+        if revision_name in names:
+            revision = json.loads(archive.read(revision_name))
+            try:
+                datetime.fromisoformat(revision["lastmod"]).date()
+                expected_sha256 = revision["sha256"]
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError("Event revision metadata is invalid") from exc
+            events_data = yaml.safe_load(archive.read("events.yaml"))
+            normalized = yaml.safe_dump(
+                events_data,
+                allow_unicode=True,
+                sort_keys=True,
+            ).encode("utf-8")
+            actual_sha256 = hashlib.sha256(normalized).hexdigest()
+            if expected_sha256 != actual_sha256:
+                raise ValueError(
+                    "Event revision metadata does not match events.yaml"
+                )
 
         with tempfile.TemporaryDirectory(prefix="pashynska-backup-verify-") as temp_dir:
             target = Path(temp_dir)

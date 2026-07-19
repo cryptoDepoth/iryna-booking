@@ -3464,14 +3464,161 @@ _EVENTS_PATH = (
     or os.path.join(os.path.dirname(__file__), "events.yaml")
 )
 _EVENTS_YAML_LOCK = threading.RLock()
+_SITEMAP_CONTENT_REVISIONS = "sitemap_content_revisions.json"
+
+
+def _load_sitemap_content_revisions():
+    manifest_path = os.path.join(app.root_path, _SITEMAP_CONTENT_REVISIONS)
+    with open(manifest_path, encoding="utf-8") as manifest_file:
+        return json.load(manifest_file)
+
+
+def _sitemap_revision_date(value):
+    revision = datetime.strptime(str(value), "%Y-%m-%d").date()
+    return min(revision, datetime.now(timezone.utc).date()).isoformat()
+
+
+def _normalized_yaml_sha256(path):
+    with open(path, encoding="utf-8") as source_file:
+        content = yaml.safe_load(source_file)
+    normalized = yaml.safe_dump(
+        content,
+        allow_unicode=True,
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()
+
+
+def _events_revision_state_path(events_path=None):
+    return f"{events_path or _EVENTS_PATH}.revision.json"
+
+
+def _load_events_revision_state(events_path=None):
+    state_path = _events_revision_state_path(events_path)
+    state = {}
+    try:
+        with open(state_path, encoding="utf-8") as state_file:
+            state = json.load(state_file)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+    return state
+
+
+def _atomic_write_bytes(path, data):
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    temp_path = os.path.join(
+        directory,
+        f".{os.path.basename(path)}.{os.getpid()}.{threading.get_ident()}.tmp",
+    )
+    try:
+        with open(temp_path, "wb") as target:
+            target.write(data)
+            target.flush()
+            os.fsync(target.fileno())
+        os.replace(temp_path, path)
+    finally:
+        try:
+            os.remove(temp_path)
+        except FileNotFoundError:
+            pass
+
+
+def _atomic_write_json(path, data):
+    content = (json.dumps(data, sort_keys=True) + "\n").encode("utf-8")
+    _atomic_write_bytes(path, content)
+
+
+def _event_revision_state_for_content(events_path, content_sha256, revisions=None):
+    revisions = revisions or _load_sitemap_content_revisions()
+    bundled_revision = revisions["events.yaml"]
+    state = _load_events_revision_state(events_path)
+
+    if state.get("sha256") == content_sha256:
+        try:
+            return {
+                "sha256": content_sha256,
+                "lastmod": _sitemap_revision_date(state["lastmod"]),
+            }
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    previous_lastmod = None
+    try:
+        previous_lastmod = _sitemap_revision_date(state["lastmod"])
+    except (KeyError, TypeError, ValueError):
+        pass
+
+    if content_sha256 == bundled_revision["sha256"] and previous_lastmod is None:
+        return {
+            "sha256": content_sha256,
+            "lastmod": _sitemap_revision_date(bundled_revision["lastmod"]),
+        }
+
+    source_mtime = min(
+        os.path.getmtime(events_path),
+        datetime.now(timezone.utc).timestamp(),
+    )
+    lastmod = datetime.fromtimestamp(
+        source_mtime,
+        timezone.utc,
+    ).date().isoformat()
+    if previous_lastmod is not None:
+        lastmod = max(previous_lastmod, lastmod)
+    return {"sha256": content_sha256, "lastmod": lastmod}
+
+
+def _sync_events_revision_state(events_path=None, revisions=None):
+    events_path = events_path or _EVENTS_PATH
+    content_sha256 = _normalized_yaml_sha256(events_path)
+    state = _event_revision_state_for_content(
+        events_path,
+        content_sha256,
+        revisions=revisions,
+    )
+    _atomic_write_json(_events_revision_state_path(events_path), state)
+    return state
+
+
+def _events_content_lastmod(revisions=None):
+    revisions = revisions or _load_sitemap_content_revisions()
+    content_sha256 = _normalized_yaml_sha256(_EVENTS_PATH)
+    existing_state = _load_events_revision_state(_EVENTS_PATH)
+    state = _event_revision_state_for_content(
+        _EVENTS_PATH,
+        content_sha256,
+        revisions=revisions,
+    )
+    if (
+        not existing_state
+        and content_sha256 == revisions["events.yaml"]["sha256"]
+    ):
+        return state["lastmod"]
+
+    try:
+        _atomic_write_json(_events_revision_state_path(), state)
+    except OSError as exc:
+        log.warning("[sitemap] Could not persist events revision: %s", exc)
+
+    return state["lastmod"]
 
 def _load_events():
     """Load events from YAML, return list of event dicts."""
-    with open(_EVENTS_PATH, "r") as f:
-        data = yaml.safe_load(f) or {}
+    with _EVENTS_YAML_LOCK:
+        with open(_EVENTS_PATH, "r") as f:
+            data = yaml.safe_load(f) or {}
     return data.get("events", []), data.get("settings", {})
 
 EVENTS, SETTINGS = _load_events()
+try:
+    with _EVENTS_YAML_LOCK:
+        if os.path.exists(_events_revision_state_path()):
+            _sync_events_revision_state(_EVENTS_PATH)
+except OSError as _event_revision_error:
+    log.warning(
+        "[events] Could not synchronize existing revision metadata: %s",
+        _event_revision_error,
+    )
 
 def get_active_event():
     """Return the first active event, or None."""
@@ -4618,9 +4765,18 @@ def create_backup(label: str = "auto") -> str:
     }
     with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.write(dest, arcname="bookings.db")
-        if os.path.exists(_EVENTS_PATH):
-            archive.write(_EVENTS_PATH, arcname="events.yaml")
-            manifest["includes"].append("events configuration")
+        with _EVENTS_YAML_LOCK:
+            if os.path.exists(_EVENTS_PATH):
+                archive.write(_EVENTS_PATH, arcname="events.yaml")
+                manifest["includes"].append("events configuration")
+                events_revision_path = f"{_EVENTS_PATH}.revision.json"
+                if os.path.exists(events_revision_path):
+                    _sync_events_revision_state(_EVENTS_PATH)
+                    archive.write(
+                        events_revision_path,
+                        arcname="events.yaml.revision.json",
+                    )
+                    manifest["includes"].append("events revision metadata")
         gift_db_path = getattr(gift_db, "DB_PATH", "")
         if gift_db_path and os.path.exists(gift_db_path):
             gift_snapshot = os.path.join(BACKUP_DIR, f"gift_{ts}_{label}.db")
@@ -5222,81 +5378,6 @@ def favicon():
         "pashynska-logo-wfolio-dark.png",
         mimetype="image/png",
     )
-
-
-_SITEMAP_CONTENT_REVISIONS = "sitemap_content_revisions.json"
-
-
-def _load_sitemap_content_revisions():
-    manifest_path = os.path.join(app.root_path, _SITEMAP_CONTENT_REVISIONS)
-    with open(manifest_path, encoding="utf-8") as manifest_file:
-        return json.load(manifest_file)
-
-
-def _sitemap_revision_date(value):
-    revision = datetime.strptime(str(value), "%Y-%m-%d").date()
-    return min(revision, datetime.now(timezone.utc).date()).isoformat()
-
-
-def _normalized_yaml_sha256(path):
-    with open(path, encoding="utf-8") as source_file:
-        content = yaml.safe_load(source_file)
-    normalized = yaml.safe_dump(
-        content,
-        allow_unicode=True,
-        sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(normalized).hexdigest()
-
-
-def _events_revision_state_path(events_path=None):
-    return f"{events_path or _EVENTS_PATH}.revision.json"
-
-
-def _events_content_lastmod(revisions=None):
-    revisions = revisions or _load_sitemap_content_revisions()
-    bundled_revision = revisions["events.yaml"]
-    content_sha256 = _normalized_yaml_sha256(_EVENTS_PATH)
-    state_path = _events_revision_state_path()
-    state = {}
-    try:
-        with open(state_path, encoding="utf-8") as state_file:
-            state = json.load(state_file)
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        pass
-
-    if state.get("sha256") == content_sha256:
-        try:
-            return _sitemap_revision_date(state["lastmod"])
-        except (KeyError, TypeError, ValueError):
-            pass
-
-    if content_sha256 == bundled_revision["sha256"]:
-        return _sitemap_revision_date(bundled_revision["lastmod"])
-
-    source_mtime = min(
-        os.path.getmtime(_EVENTS_PATH),
-        datetime.now(timezone.utc).timestamp(),
-    )
-    lastmod = datetime.fromtimestamp(
-        source_mtime,
-        timezone.utc,
-    ).date().isoformat()
-
-    state = {"sha256": content_sha256, "lastmod": lastmod}
-    state_tmp_path = f"{state_path}.tmp"
-    try:
-        with open(state_tmp_path, "w", encoding="utf-8") as state_file:
-            json.dump(state, state_file, sort_keys=True)
-            state_file.write("\n")
-        os.replace(state_tmp_path, state_path)
-    except OSError as exc:
-        log.warning("[sitemap] Could not persist events revision: %s", exc)
-        try:
-            os.remove(state_tmp_path)
-        except OSError:
-            pass
-    return lastmod
 
 
 @app.route("/sitemap.xml")
@@ -10462,12 +10543,63 @@ def _safe_photo_prefix(event_id):
     return prefix or "event"
 
 def _load_events_yaml_doc():
-    with open(EVENTS_YAML_PATH) as fh:
-        return yaml.safe_load(fh) or {"events": [], "settings": {}}
+    with _EVENTS_YAML_LOCK:
+        with open(EVENTS_YAML_PATH) as fh:
+            return yaml.safe_load(fh) or {"events": [], "settings": {}}
 
 def _write_events_yaml_doc(data):
-    with open(EVENTS_YAML_PATH, "w") as fh:
-        yaml.dump(data, fh, allow_unicode=True, sort_keys=False)
+    with _EVENTS_YAML_LOCK:
+        target_path = os.path.abspath(EVENTS_YAML_PATH)
+        revision_path = _events_revision_state_path(target_path)
+        directory = os.path.dirname(target_path)
+        os.makedirs(directory, exist_ok=True)
+        temp_path = os.path.join(
+            directory,
+            f".{os.path.basename(target_path)}.{os.getpid()}.{threading.get_ident()}.tmp",
+        )
+        original_yaml = None
+        original_revision = None
+        if os.path.exists(target_path):
+            with open(target_path, "rb") as source:
+                original_yaml = source.read()
+        if os.path.exists(revision_path):
+            with open(revision_path, "rb") as source:
+                original_revision = source.read()
+        try:
+            with open(temp_path, "w", encoding="utf-8") as fh:
+                yaml.dump(data, fh, allow_unicode=True, sort_keys=False)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temp_path, target_path)
+            try:
+                _sync_events_revision_state(target_path)
+            except Exception:
+                try:
+                    if original_yaml is None:
+                        os.remove(target_path)
+                    else:
+                        _atomic_write_bytes(target_path, original_yaml)
+                    if original_revision is None:
+                        try:
+                            os.remove(revision_path)
+                        except FileNotFoundError:
+                            pass
+                    else:
+                        _atomic_write_bytes(revision_path, original_revision)
+                except OSError as rollback_error:
+                    log.critical(
+                        "[events] Could not roll back YAML after revision sync failure: %s",
+                        rollback_error,
+                    )
+                    raise RuntimeError(
+                        "Event persistence failed and rollback was incomplete"
+                    ) from rollback_error
+                raise
+        finally:
+            try:
+                os.remove(temp_path)
+            except FileNotFoundError:
+                pass
 
 def _event_yaml_record(data, event_id):
     for ev_data in data.get("events", []):
@@ -10542,8 +10674,7 @@ def admin_update_event(event_id):
     data = request.json or {}
 
     with _EVENTS_YAML_LOCK:
-        with open(EVENTS_YAML_PATH) as fh:
-            yaml_data = yaml.safe_load(fh) or {}
+        yaml_data = _load_events_yaml_doc()
 
         event = next((e for e in yaml_data.get("events", []) if e["id"] == event_id), None)
         if not event:
@@ -10634,8 +10765,7 @@ def admin_update_event(event_id):
         except Exception:
             pass
 
-        with open(EVENTS_YAML_PATH, "w") as fh:
-            yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+        _write_events_yaml_doc(yaml_data)
 
         _reload_events_globals()
         updated_event = next((e for e in EVENTS if e["id"] == event_id), event)
@@ -10868,18 +10998,6 @@ def admin_create_event():
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:30]
     event_id = f"{slug}-{date_str}"
 
-    with open(EVENTS_YAML_PATH) as fh:
-        yaml_data = yaml.safe_load(fh) or {}
-
-    events_list = yaml_data.get("events", [])
-    # Ensure unique id
-    existing_ids = {e["id"] for e in events_list}
-    base_id = event_id
-    suffix = 2
-    while event_id in existing_ids:
-        event_id = f"{base_id}-{suffix}"
-        suffix += 1
-
     session_len = int(data.get("session_length", 20))
     break_len = int(data.get("break_length", 10))
     booking_type = str(data.get("booking_type") or "fixed_slots")
@@ -10938,13 +11056,21 @@ def admin_create_event():
     elif _is_instant_mini_event(new_event):
         new_event["agreement"] = dict(DEFAULT_MINI_AGREEMENT)
 
-    events_list.append(new_event)
-    yaml_data["events"] = events_list
+    with _EVENTS_YAML_LOCK:
+        yaml_data = _load_events_yaml_doc()
+        events_list = yaml_data.get("events", [])
+        existing_ids = {e["id"] for e in events_list}
+        base_id = event_id
+        suffix = 2
+        while event_id in existing_ids:
+            event_id = f"{base_id}-{suffix}"
+            suffix += 1
+        new_event["id"] = event_id
 
-    with open(EVENTS_YAML_PATH, "w") as fh:
-        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
-
-    _reload_events_globals()
+        events_list.append(new_event)
+        yaml_data["events"] = events_list
+        _write_events_yaml_doc(yaml_data)
+        _reload_events_globals()
     log.info(f"[admin] Event created: {event_id}")
     return jsonify({"success": True, "event_id": event_id})
 
@@ -10953,36 +11079,32 @@ def admin_create_event():
 @admin_required
 def admin_delete_event(event_id):
     """Delete an event from events.yaml. Refuses if there are active bookings."""
-    with open(EVENTS_YAML_PATH) as fh:
-        yaml_data = yaml.safe_load(fh) or {}
+    with _EVENTS_YAML_LOCK:
+        yaml_data = _load_events_yaml_doc()
+        events_list = yaml_data.get("events", [])
+        event = next((e for e in events_list if e["id"] == event_id), None)
+        if not event:
+            return jsonify({"error": "Event not found"}), 404
 
-    events_list = yaml_data.get("events", [])
-    event = next((e for e in events_list if e["id"] == event_id), None)
-    if not event:
-        return jsonify({"error": "Event not found"}), 404
+        # Check for active/pending bookings
+        conn = db_conn()
+        active_count = conn.execute(
+            "SELECT COUNT(*) FROM bookings WHERE event_id=? AND status NOT IN ('cancelled','expired')",
+            (event_id,)
+        ).fetchone()[0]
+        conn.close()
 
-    # Check for active/pending bookings
-    conn = db_conn()
-    active_count = conn.execute(
-        "SELECT COUNT(*) FROM bookings WHERE event_id=? AND status NOT IN ('cancelled','expired')",
-        (event_id,)
-    ).fetchone()[0]
-    conn.close()
+        if active_count > 0:
+            force = (request.json or {}).get("force", False)
+            if not force:
+                return jsonify({
+                    "error": f"Event has {active_count} active booking(s). Pass force=true to delete anyway.",
+                    "active_bookings": active_count
+                }), 409
 
-    if active_count > 0:
-        force = (request.json or {}).get("force", False)
-        if not force:
-            return jsonify({
-                "error": f"Event has {active_count} active booking(s). Pass force=true to delete anyway.",
-                "active_bookings": active_count
-            }), 409
-
-    yaml_data["events"] = [e for e in events_list if e["id"] != event_id]
-
-    with open(EVENTS_YAML_PATH, "w") as fh:
-        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
-
-    _reload_events_globals()
+        yaml_data["events"] = [e for e in events_list if e["id"] != event_id]
+        _write_events_yaml_doc(yaml_data)
+        _reload_events_globals()
     log.info(f"[admin] Event deleted: {event_id}")
     return jsonify({"success": True})
 
@@ -10991,38 +11113,34 @@ def admin_delete_event(event_id):
 @admin_required
 def admin_duplicate_event(event_id):
     """Duplicate an event with a new id, cleared photos and upcoming status."""
-    with open(EVENTS_YAML_PATH) as fh:
-        yaml_data = yaml.safe_load(fh) or {}
+    with _EVENTS_YAML_LOCK:
+        yaml_data = _load_events_yaml_doc()
+        events_list = yaml_data.get("events", [])
+        source = next((e for e in events_list if e["id"] == event_id), None)
+        if not source:
+            return jsonify({"error": "Event not found"}), 404
 
-    events_list = yaml_data.get("events", [])
-    source = next((e for e in events_list if e["id"] == event_id), None)
-    if not source:
-        return jsonify({"error": "Event not found"}), 404
+        import copy, re
+        new_event = copy.deepcopy(source)
+        new_event["status"] = "upcoming"
+        new_event["photos"] = []
+        new_event["featured"] = False
 
-    import copy, re
-    new_event = copy.deepcopy(source)
-    new_event["status"] = "upcoming"
-    new_event["photos"] = []
-    new_event["featured"] = False
+        # Generate new id
+        base_slug = re.sub(r"-\d{4}-\d{2}-\d{2}.*$", "", source["id"])
+        existing_ids = {e["id"] for e in events_list}
+        suffix = 2
+        new_id = f"{base_slug}-copy"
+        while new_id in existing_ids:
+            new_id = f"{base_slug}-copy-{suffix}"
+            suffix += 1
+        new_event["id"] = new_id
+        new_event["title"] = source["title"] + " (copy)"
 
-    # Generate new id
-    base_slug = re.sub(r"-\d{4}-\d{2}-\d{2}.*$", "", source["id"])
-    existing_ids = {e["id"] for e in events_list}
-    suffix = 2
-    new_id = f"{base_slug}-copy"
-    while new_id in existing_ids:
-        new_id = f"{base_slug}-copy-{suffix}"
-        suffix += 1
-    new_event["id"] = new_id
-    new_event["title"] = source["title"] + " (copy)"
-
-    events_list.append(new_event)
-    yaml_data["events"] = events_list
-
-    with open(EVENTS_YAML_PATH, "w") as fh:
-        yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
-
-    _reload_events_globals()
+        events_list.append(new_event)
+        yaml_data["events"] = events_list
+        _write_events_yaml_doc(yaml_data)
+        _reload_events_globals()
     log.info(f"[admin] Event duplicated: {event_id} → {new_id}")
     return jsonify({"success": True, "new_event_id": new_id})
 
@@ -11034,8 +11152,7 @@ def admin_update_event_meta(event_id):
     data = request.json or {}
 
     with _EVENTS_YAML_LOCK:
-        with open(EVENTS_YAML_PATH) as fh:
-            yaml_data = yaml.safe_load(fh) or {}
+        yaml_data = _load_events_yaml_doc()
 
         events_list = yaml_data.get("events", [])
         event = next((e for e in events_list if e["id"] == event_id), None)
@@ -11057,8 +11174,7 @@ def admin_update_event_meta(event_id):
         if "included" in data:
             event["included"] = [str(i).strip() for i in data["included"] if str(i).strip()]
 
-        with open(EVENTS_YAML_PATH, "w") as fh:
-            yaml.dump(yaml_data, fh, allow_unicode=True, sort_keys=False)
+        _write_events_yaml_doc(yaml_data)
 
         _reload_events_globals()
 
@@ -12610,13 +12726,9 @@ def api_private_session():
     # other events.yaml writers. In-memory EVENTS is updated after the file wins.
     try:
         with _EVENTS_YAML_LOCK:
-            with open(_EVENTS_PATH, "r") as f:
-                events_data = yaml.safe_load(f) or {"events": []}
+            events_data = _load_events_yaml_doc()
             events_data.setdefault("events", []).append(event)
-            tmp_path = _EVENTS_PATH + ".tmp"
-            with open(tmp_path, "w") as f:
-                yaml.safe_dump(events_data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-            os.replace(tmp_path, _EVENTS_PATH)
+            _write_events_yaml_doc(events_data)
             global EVENTS
             EVENTS.append(event)
     except Exception as e:
