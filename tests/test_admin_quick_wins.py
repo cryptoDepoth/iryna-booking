@@ -40,6 +40,7 @@ def _install_deferred_action_fetch(page):
             window.__adminActionRequests.push({
               url: String(url),
               method: options.method || 'GET',
+              jsonBody: options.body ? JSON.parse(options.body) : null,
             });
             return new Promise((resolve, reject) => {
               window.__adminActionPending.push({ resolve, reject });
@@ -62,6 +63,7 @@ def _assert_single_flight_failure_and_retry(
     success_text,
     success_class,
     success_payload,
+    expected_json_body=None,
 ):
     button = page.locator(button_selector)
     original_text = button.evaluate("element => element.textContent")
@@ -86,9 +88,12 @@ def _assert_single_flight_failure_and_retry(
         "ariaBusy": "true",
         "text": "Sending…",
     }
-    assert page.evaluate("() => window.__adminActionRequests") == [
-        {"url": request_url, "method": "POST"}
-    ]
+    expected_request = {
+        "url": request_url,
+        "method": "POST",
+        "jsonBody": expected_json_body,
+    }
+    assert page.evaluate("() => window.__adminActionRequests") == [expected_request]
 
     page.evaluate(
         """
@@ -152,8 +157,8 @@ def _assert_single_flight_failure_and_retry(
     assert success_text in toast.inner_text()
     assert success_class in toast.get_attribute("class").split()
     assert page.evaluate("() => window.__adminActionRequests") == [
-        {"url": request_url, "method": "POST"},
-        {"url": request_url, "method": "POST"},
+        expected_request,
+        expected_request,
     ]
 
 
@@ -579,6 +584,7 @@ def test_classic_dashboard_balance_request_is_single_flight_and_retries(admin_cl
             success_text="Balance request sent",
             success_class="success",
             success_payload={"success": True, "balance_due": 200.0},
+            expected_json_body={"booking_id": booking_id},
         )
         browser.close()
 
@@ -774,6 +780,7 @@ def test_event_roster_balance_request_is_single_flight_and_retries(
             success_text="Balance request sent",
             success_class="ok",
             success_payload={"success": True, "balance_due": 200.0},
+            expected_json_body={"booking_id": booking_id},
         )
         browser.close()
 
