@@ -8,6 +8,7 @@ import shlex
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_NAME_SEPARATORS = re.compile(r"[-_.]+")
 PACKAGE_NAME_PREFIX = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?")
+PROHIBITED_TEST_TOOLING_FAMILIES = ("playwright", "pytest")
 
 
 def _declared_requirements(filename):
@@ -70,6 +71,21 @@ def _resolved_requirement_names(requirements_path, visited=None):
     return package_names
 
 
+def _is_prohibited_test_tooling_name(package_name):
+    return any(
+        package_name == family or package_name.startswith(f"{family}-")
+        for family in PROHIBITED_TEST_TOOLING_FAMILIES
+    )
+
+
+def _prohibited_test_tooling_names(requirements_path):
+    return {
+        package_name
+        for package_name in _resolved_requirement_names(requirements_path)
+        if _is_prohibited_test_tooling_name(package_name)
+    }
+
+
 def test_browser_regression_dependencies_are_declared_and_pinned():
     assert _declared_requirements("requirements-test.txt") == {
         "-r requirements.txt",
@@ -104,9 +120,61 @@ def test_resolved_requirement_names_normalize_and_follow_nested_includes(tmp_pat
     }
 
 
+def test_test_tooling_families_require_an_exact_or_hyphen_boundary(tmp_path):
+    requirements = tmp_path / "requirements.txt"
+    requirements.write_text(
+        "\n".join(
+            (
+                "PyTeSt==9.0.3",
+                "PlayWright==1.60.0",
+                "PyTest_Xdist==3.8.0",
+                "pytest-cov==7.0.0",
+                "playwright-stealth==2.0.1",
+                "pytestability==1.0.0",
+                "playwrighting==1.0.0",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert _prohibited_test_tooling_names(requirements) == {
+        "playwright",
+        "playwright-stealth",
+        "pytest",
+        "pytest-cov",
+        "pytest-xdist",
+    }
+
+
+def test_nested_case_variant_test_tooling_family_is_prohibited(tmp_path):
+    requirements = tmp_path / "requirements.txt"
+    included_dir = tmp_path / "config"
+    nested_dir = included_dir / "nested"
+    nested_dir.mkdir(parents=True)
+
+    requirements.write_text(
+        "-r config/base.txt\n",
+        encoding="utf-8",
+    )
+    (included_dir / "base.txt").write_text(
+        "--requirement nested/tooling.txt\n",
+        encoding="utf-8",
+    )
+    (nested_dir / "tooling.txt").write_text(
+        "pLaYwRiGhT_StEaLtH==2.0.1\npYtEsT_CoV==7.0.0\n",
+        encoding="utf-8",
+    )
+
+    assert _prohibited_test_tooling_names(requirements) == {
+        "playwright-stealth",
+        "pytest-cov",
+    }
+
+
 def test_browser_tooling_stays_out_of_production_runtime():
-    runtime_requirement_names = _resolved_requirement_names(ROOT / "requirements.txt")
-    assert {"playwright", "pytest"}.isdisjoint(runtime_requirement_names)
+    prohibited_names = _prohibited_test_tooling_names(ROOT / "requirements.txt")
+    assert not prohibited_names
 
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8").lower()
     assert "requirements-test.txt" not in dockerfile
