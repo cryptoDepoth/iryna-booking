@@ -1,5 +1,6 @@
 import io
 import sqlite3
+from datetime import datetime, timezone
 
 import pytest
 
@@ -69,6 +70,40 @@ def _transfer_row(app, transfer_id):
     row = conn.execute("SELECT * FROM etransfers WHERE id=?", (transfer_id,)).fetchone()
     conn.close()
     return dict(row)
+
+
+def _set_transfer_payment_provenance(
+    app,
+    transfer_id,
+    *,
+    mutation,
+    prior_status,
+    prior_confirmed,
+    prior_paid,
+    prior_paid_amount,
+):
+    conn = app.db_conn()
+    conn.execute(
+        """
+        UPDATE etransfers
+           SET payment_mutation=?,
+               prior_booking_status=?,
+               prior_booking_confirmed=?,
+               prior_booking_paid=?,
+               prior_booking_paid_amount=?
+         WHERE id=?
+        """,
+        (
+            mutation,
+            prior_status,
+            prior_confirmed,
+            prior_paid,
+            prior_paid_amount,
+            transfer_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
 
 
 def _forbid_payment_hooks(monkeypatch, app, *, include_link=True):
@@ -159,7 +194,17 @@ def test_etransfer_archive_migration_is_idempotent(monkeypatch, tmp_path):
     ).fetchone()[0]
     conn.close()
 
-    assert {"archived_at", "restored_at"} <= columns
+    assert {
+        "archived_at",
+        "restored_at",
+        "unlinked_at",
+        "unlinked_booking_id",
+        "payment_mutation",
+        "prior_booking_status",
+        "prior_booking_confirmed",
+        "prior_booking_paid",
+        "prior_booking_paid_amount",
+    } <= columns
     assert row == (
         "legacy-ref",
         "legacy-message",
@@ -690,25 +735,524 @@ def test_matched_booking_and_gift_transfers_cannot_be_archived_or_restored(clien
     assert hook_calls == []
 
 
-def test_unlink_only_accepts_a_matched_booking_transfer(client):
-    c, app, _, _ = client
+def test_unlink_reverses_real_auto_payment_ownership_without_reuse(
+    client,
+    monkeypatch,
+):
+    c, app, db_path, _ = client
     _login(c)
-    matched_id = _insert_transfer(
-        app,
-        reference_number="unlink-matched-booking-ref",
-        message_id="unlink-matched-booking-message",
-        matched_booking_id=73,
-        status="matched",
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id,
+            created_at, reserved_until
+        ) VALUES (
+            '2026-08-10', '13:00', 'Original Auto Client',
+            'original-auto@example.com', '4035550200', '', 'Mission Mini',
+            'pending_payment', 0, 0, 0, 120.50, 241.00, 'mission-mini-10',
+            '2026-07-18 10:00:00', '2026-08-10 13:15:00'
+        )
+        """
+    )
+    original_booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.commit()
+    conn.close()
+
+    message_id = "unlink-real-auto-message"
+    scan_now = datetime(2026, 7, 18, 11, 0, tzinfo=timezone.utc).replace(tzinfo=None)
+    monkeypatch.setattr(checker, "_utc_now", lambda: scan_now)
+    body = (
+        "Interac e-Transfer: You've received $120.50 from Original Auto Client.\n"
+        "Reference Number: CA1234567890\n"
+        "Sent From: Original Auto Client"
+    )
+    monkeypatch.setattr(checker, "read_message_body", lambda _message_id: body)
+    monkeypatch.setattr(checker, "try_confirm_gift_etransfer", lambda *a, **k: False)
+    pending = checker.get_pending_bookings(within_minutes=30)
+
+    confirmed_id, ambiguous = checker.check_single_email(
+        {"id": message_id, "date": "2026-07-18 11:00:00+00:00"},
+        pending,
     )
 
-    response = c.post(f"/admin/transfers/{matched_id}/unlink", json={})
+    assert confirmed_id == original_booking_id
+    assert ambiguous is None
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id,
+            created_at, reserved_until
+        ) VALUES (
+            '2026-08-10', '13:30', 'Second Credit Target',
+            'second-credit@example.com', '4035550201', '', 'Mission Mini',
+            'pending_payment', 0, 0, 0, 120.50, 241.00, 'mission-mini-10',
+            '2026-07-18 10:00:00', '2026-08-10 13:45:00'
+        )
+        """
+    )
+    second_booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.commit()
+    conn.close()
+    conn = sqlite3.connect(db_path)
+    transfer_id = conn.execute(
+        "SELECT id FROM etransfers WHERE message_id=?",
+        (message_id,),
+    ).fetchone()[0]
+    conn.close()
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
 
     assert response.status_code == 200
     assert response.get_json()["success"] is True
-    row = _transfer_row(app, matched_id)
+    row = _transfer_row(app, transfer_id)
     assert row["matched_booking_id"] is None
     assert row["matched_gift_code"] is None
-    assert row["status"] == "unmatched"
+    assert row["status"] == "unlinked"
+    assert row["unlinked_booking_id"] == original_booking_id
+    assert row["unlinked_at"]
+    assert row["payment_mutation"] == "confirm"
+    assert row["prior_booking_status"] == "pending_payment"
+    assert row["prior_booking_confirmed"] == 0
+    assert row["prior_booking_paid"] == 0
+    assert float(row["prior_booking_paid_amount"] or 0) == 0
+    conn = sqlite3.connect(db_path)
+    original_booking = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (original_booking_id,),
+    ).fetchone()
+    processed = conn.execute(
+        "SELECT booking_id, amount FROM processed_emails WHERE message_id=?",
+        (message_id,),
+    ).fetchone()
+    conn.close()
+    assert original_booking == ("pending_payment", 0, 0, 0.0)
+    assert processed == (None, 120.50)
+
+    relink = c.post(
+        f"/admin/transfers/{transfer_id}/link",
+        json={"booking_id": second_booking_id},
+    )
+    assert relink.status_code == 400
+    conn = app.db_conn()
+    second_booking = tuple(
+        conn.execute(
+            "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+            (second_booking_id,),
+        ).fetchone()
+    )
+    conn.close()
+    assert second_booking == ("pending_payment", 0, 0, 0.0)
+    assert app._auto_link_etransfers() == 0
+    assert _transfer_row(app, transfer_id)["status"] == "unlinked"
+    rescanned_id, rescanned_ambiguous = checker.check_single_email(
+        {"id": message_id, "date": "2026-07-18 11:00:00+00:00"},
+        [
+            {
+                "id": second_booking_id,
+                "date": "2026-08-10",
+                "time": "13:30",
+                "name": "Second Credit Target",
+                "status": "pending_payment",
+                "confirmed": 0,
+                "paid": 0,
+                "paid_amount": 0.0,
+                "deposit_amount": 120.50,
+                "full_price": 241.00,
+                "event_id": "mission-mini-10",
+                "created_at": "2026-07-18 10:00:00",
+            }
+        ],
+    )
+    assert rescanned_id is None
+    assert rescanned_ambiguous is None
+    conn = sqlite3.connect(db_path)
+    assert conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (second_booking_id,),
+    ).fetchone() == ("pending_payment", 0, 0, 0.0)
+    conn.close()
+    history = c.get("/admin/transfers?status=unlinked")
+    assert history.status_code == 200
+    history_html = history.get_data(as_text=True)
+    assert "Unlinked history" in history_html
+    assert f"Previously #{original_booking_id}" in history_html
+    assert "Audit history only" in history_html
+
+
+@pytest.mark.parametrize(
+    ("mutation", "booking_state", "prior_state", "expected_after"),
+    [
+        (
+            "confirm",
+            ("confirmed", 1, 1, 80.00),
+            ("pending_payment", 0, 0, 0.0),
+            ("pending_payment", 0, 0, 0.0),
+        ),
+        (
+            "partial",
+            ("partial_payment", 0, 0, 80.00),
+            ("pending_payment", 0, 0, 0.0),
+            ("pending_payment", 0, 0, 0.0),
+        ),
+        (
+            "reconcile",
+            ("confirmed", 1, 1, 80.00),
+            ("confirmed", 1, 1, 40.00),
+            ("confirmed", 1, 1, 40.00),
+        ),
+    ],
+)
+def test_unlink_reverses_only_exact_auto_owned_booking_state(
+    client,
+    mutation,
+    booking_state,
+    prior_state,
+    expected_after,
+):
+    c, app, db_path, _ = client
+    _login(c)
+    status, confirmed, paid, paid_amount = booking_state
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status, confirmed, paid,
+            paid_amount, deposit_amount, full_price, event_id
+        ) VALUES (
+            '2026-08-11', '14:00', 'Exact Owner', 'exact-owner@example.com',
+            '4035550202', '',
+            'Mission Mini', ?, ?, ?, ?, 120.50, 241.00, 'mission-mini-11'
+        )
+        """,
+        (status, confirmed, paid, paid_amount),
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.execute(
+        """
+        INSERT INTO processed_emails (message_id, booking_id, amount)
+        VALUES ('unlink-exact-owner-message', ?, 80.00)
+        """,
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-exact-owner-ref-" + status,
+        message_id="unlink-exact-owner-message",
+        amount=80.00,
+        matched_booking_id=booking_id,
+        status="matched",
+        archived_at="2026-07-17 09:00:00",
+        restored_at="2026-07-17 10:00:00",
+    )
+    _set_transfer_payment_provenance(
+        app,
+        transfer_id,
+        mutation=mutation,
+        prior_status=prior_state[0],
+        prior_confirmed=prior_state[1],
+        prior_paid=prior_state[2],
+        prior_paid_amount=prior_state[3],
+    )
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 200
+    conn = sqlite3.connect(db_path)
+    booking_after = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    processed_after = conn.execute(
+        "SELECT booking_id, amount FROM processed_emails WHERE message_id=?",
+        ("unlink-exact-owner-message",),
+    ).fetchone()
+    conn.close()
+    assert booking_after == expected_after
+    assert processed_after == (None, 80.00)
+    transfer_after = _transfer_row(app, transfer_id)
+    assert transfer_after["status"] == "unlinked"
+    assert transfer_after["unlinked_booking_id"] == booking_id
+    assert transfer_after["unlinked_at"]
+    assert transfer_after["archived_at"] == "2026-07-17 09:00:00"
+    assert transfer_after["restored_at"] == "2026-07-17 10:00:00"
+
+
+def test_unlink_name_only_match_retires_ledger_without_payment_change(client):
+    c, app, db_path, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id
+        ) VALUES (
+            '2026-08-11', '14:30', 'Name Only Match',
+            'name-only@example.com', '4035550205', '', 'Mission Mini',
+            'pending_payment', 0, 0, 0, 120.50, 241.00, 'mission-mini-11'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-name-only-ref",
+        message_id="unlink-name-only-message",
+        sender_name="Name Only Match",
+    )
+    assert app._auto_link_etransfers() == 1
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 200
+    transfer = _transfer_row(app, transfer_id)
+    assert transfer["status"] == "unlinked"
+    assert transfer["matched_booking_id"] is None
+    assert transfer["unlinked_booking_id"] == booking_id
+    conn = sqlite3.connect(db_path)
+    booking = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    processed = conn.execute(
+        "SELECT 1 FROM processed_emails WHERE message_id=?",
+        ("unlink-name-only-message",),
+    ).fetchone()
+    conn.close()
+    assert booking == ("pending_payment", 0, 0, 0.0)
+    assert processed is None
+
+
+def test_unlink_restores_prior_amount_from_real_reconciliation_transaction(client):
+    c, app, db_path, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id
+        ) VALUES (
+            '2026-08-11', '15:00', 'Reconciled Owner',
+            'reconciled-owner@example.com', '4035550206', '', 'Mission Mini',
+            'confirmed', 1, 1, 40.00, 120.50, 241.00, 'mission-mini-11'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.commit()
+    conn.close()
+    message_id = "unlink-real-reconcile-message"
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-real-reconcile-ref",
+        message_id=message_id,
+        amount=80.00,
+    )
+
+    assert checker.reconcile_confirmed_payment(
+        booking_id,
+        80.00,
+        message_id,
+        ledger_id=transfer_id,
+    ) is True
+    claimed = _transfer_row(app, transfer_id)
+    assert claimed["payment_mutation"] == "reconcile"
+    assert claimed["prior_booking_status"] == "confirmed"
+    assert claimed["prior_booking_confirmed"] == 1
+    assert claimed["prior_booking_paid"] == 1
+    assert claimed["prior_booking_paid_amount"] == 40.00
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 200
+    conn = sqlite3.connect(db_path)
+    booking = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    processed = conn.execute(
+        "SELECT booking_id, amount FROM processed_emails WHERE message_id=?",
+        (message_id,),
+    ).fetchone()
+    conn.close()
+    assert booking == ("confirmed", 1, 1, 40.0)
+    assert processed == (None, 80.0)
+    assert _transfer_row(app, transfer_id)["status"] == "unlinked"
+
+
+@pytest.mark.parametrize(
+    "ownership_problem",
+    [
+        "missing_processed",
+        "different_processed_owner",
+        "changed_booking_amount",
+        "missing_provenance",
+    ],
+)
+def test_unlink_rejects_ambiguous_payment_ownership_without_mutation(
+    client,
+    ownership_problem,
+):
+    c, app, db_path, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status, confirmed, paid,
+            paid_amount, deposit_amount, full_price, event_id
+        ) VALUES (
+            '2026-08-12', '15:00', 'Ambiguous Owner',
+            'ambiguous-owner@example.com', '4035550203', '', 'Mission Mini',
+            'confirmed', 1, 1,
+            ?, 120.50, 241.00, 'mission-mini-12'
+        )
+        """,
+        (99.00 if ownership_problem == "changed_booking_amount" else 80.00,),
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    if ownership_problem != "missing_processed":
+        conn.execute(
+            """
+            INSERT INTO processed_emails (message_id, booking_id, amount)
+            VALUES ('unlink-ambiguous-owner-message', ?, 80.00)
+            """,
+            (999 if ownership_problem == "different_processed_owner" else booking_id,),
+        )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-ambiguous-owner-ref-" + ownership_problem,
+        message_id="unlink-ambiguous-owner-message",
+        amount=80.00,
+        matched_booking_id=booking_id,
+        status="matched",
+    )
+    if ownership_problem != "missing_provenance":
+        _set_transfer_payment_provenance(
+            app,
+            transfer_id,
+            mutation="confirm",
+            prior_status="pending_payment",
+            prior_confirmed=0,
+            prior_paid=0,
+            prior_paid_amount=0.0,
+        )
+    transfer_before = _transfer_row(app, transfer_id)
+    conn = sqlite3.connect(db_path)
+    booking_before = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    processed_before = conn.execute(
+        "SELECT booking_id, amount FROM processed_emails WHERE message_id=?",
+        ("unlink-ambiguous-owner-message",),
+    ).fetchone()
+    conn.close()
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 409
+    assert response.get_json()["success"] is False
+    assert _transfer_row(app, transfer_id) == transfer_before
+    conn = sqlite3.connect(db_path)
+    booking_after = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    processed_after = conn.execute(
+        "SELECT booking_id, amount FROM processed_emails WHERE message_id=?",
+        ("unlink-ambiguous-owner-message",),
+    ).fetchone()
+    conn.close()
+    assert booking_after == booking_before
+    assert processed_after == processed_before
+
+
+def test_unlink_rolls_back_all_ownership_when_terminal_ledger_update_fails(client):
+    c, app, db_path, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status, confirmed, paid,
+            paid_amount, deposit_amount, full_price, event_id
+        ) VALUES (
+            '2026-08-13', '16:00', 'Rollback Owner',
+            'rollback-owner@example.com', '4035550204', '', 'Mission Mini',
+            'confirmed', 1, 1,
+            80.00, 120.50, 241.00, 'mission-mini-13'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.execute(
+        """
+        INSERT INTO processed_emails (message_id, booking_id, amount)
+        VALUES ('unlink-rollback-message', ?, 80.00)
+        """,
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-rollback-ref",
+        message_id="unlink-rollback-message",
+        amount=80.00,
+        matched_booking_id=booking_id,
+        status="matched",
+    )
+    _set_transfer_payment_provenance(
+        app,
+        transfer_id,
+        mutation="confirm",
+        prior_status="pending_payment",
+        prior_confirmed=0,
+        prior_paid=0,
+        prior_paid_amount=0.0,
+    )
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        CREATE TRIGGER fail_terminal_unlink
+        BEFORE UPDATE OF status ON etransfers
+        WHEN NEW.status='unlinked'
+        BEGIN
+            SELECT RAISE(ABORT, 'injected unlink failure');
+        END
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 500
+    assert _transfer_row(app, transfer_id)["status"] == "matched"
+    conn = sqlite3.connect(db_path)
+    booking_after = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    processed_after = conn.execute(
+        "SELECT booking_id, amount FROM processed_emails WHERE message_id=?",
+        ("unlink-rollback-message",),
+    ).fetchone()
+    conn.close()
+    assert booking_after == ("confirmed", 1, 1, 80.0)
+    assert processed_after == (booking_id, 80.0)
 
 
 def test_unlink_rejects_archived_and_gift_linked_rows_without_mutation(client):
@@ -728,16 +1272,36 @@ def test_unlink_rejects_archived_and_gift_linked_rows_without_mutation(client):
         matched_gift_code="GIFT-TEST-UNLINK",
         status="matched",
     )
+    unmatched_id = _insert_transfer(
+        app,
+        reference_number="unlink-unmatched-ref",
+        message_id="unlink-unmatched-message",
+        status="unmatched",
+    )
+    outbound_id = _insert_transfer(
+        app,
+        reference_number="unlink-outbound-ref",
+        message_id="unlink-outbound-message",
+        direction="out",
+        matched_booking_id=91,
+        status="matched",
+    )
     before = {
         archived_id: _transfer_row(app, archived_id),
         gift_id: _transfer_row(app, gift_id),
+        unmatched_id: _transfer_row(app, unmatched_id),
+        outbound_id: _transfer_row(app, outbound_id),
     }
 
-    for transfer_id in (archived_id, gift_id):
+    for transfer_id in (archived_id, gift_id, unmatched_id, outbound_id):
         response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
         assert response.status_code == 409
         assert response.get_json()["success"] is False
         assert _transfer_row(app, transfer_id) == before[transfer_id]
+
+    missing = c.post("/admin/transfers/999999/unlink", json={})
+    assert missing.status_code == 404
+    assert missing.get_json()["success"] is False
 
 
 def test_unlink_requires_admin_authentication_without_mutation(client):

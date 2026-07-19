@@ -4250,10 +4250,17 @@ def init_db():
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
-        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, matched_gift_code TEXT, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP, archived_at TEXT, restored_at TEXT)"),
+        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, matched_gift_code TEXT, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP, archived_at TEXT, restored_at TEXT, unlinked_at TEXT, unlinked_booking_id INTEGER, payment_mutation TEXT, prior_booking_status TEXT, prior_booking_confirmed INTEGER, prior_booking_paid INTEGER, prior_booking_paid_amount REAL)"),
         ("etransfers", "matched_gift_code", "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT"),
         ("etransfers", "archived_at",      "ALTER TABLE etransfers ADD COLUMN archived_at TEXT"),
         ("etransfers", "restored_at",      "ALTER TABLE etransfers ADD COLUMN restored_at TEXT"),
+        ("etransfers", "unlinked_at",      "ALTER TABLE etransfers ADD COLUMN unlinked_at TEXT"),
+        ("etransfers", "unlinked_booking_id", "ALTER TABLE etransfers ADD COLUMN unlinked_booking_id INTEGER"),
+        ("etransfers", "payment_mutation", "ALTER TABLE etransfers ADD COLUMN payment_mutation TEXT"),
+        ("etransfers", "prior_booking_status", "ALTER TABLE etransfers ADD COLUMN prior_booking_status TEXT"),
+        ("etransfers", "prior_booking_confirmed", "ALTER TABLE etransfers ADD COLUMN prior_booking_confirmed INTEGER"),
+        ("etransfers", "prior_booking_paid", "ALTER TABLE etransfers ADD COLUMN prior_booking_paid INTEGER"),
+        ("etransfers", "prior_booking_paid_amount", "ALTER TABLE etransfers ADD COLUMN prior_booking_paid_amount REAL"),
     ]
     for _tbl, _col, _ddl in _migrations:
         try:
@@ -11210,7 +11217,14 @@ def _ensure_etransfers_table(conn=None):
             source TEXT DEFAULT 'email',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             archived_at TEXT,
-            restored_at TEXT
+            restored_at TEXT,
+            unlinked_at TEXT,
+            unlinked_booking_id INTEGER,
+            payment_mutation TEXT,
+            prior_booking_status TEXT,
+            prior_booking_confirmed INTEGER,
+            prior_booking_paid INTEGER,
+            prior_booking_paid_amount REAL
         )
     """)
     try:
@@ -11219,6 +11233,13 @@ def _ensure_etransfers_table(conn=None):
             "matched_gift_code": "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT",
             "archived_at": "ALTER TABLE etransfers ADD COLUMN archived_at TEXT",
             "restored_at": "ALTER TABLE etransfers ADD COLUMN restored_at TEXT",
+            "unlinked_at": "ALTER TABLE etransfers ADD COLUMN unlinked_at TEXT",
+            "unlinked_booking_id": "ALTER TABLE etransfers ADD COLUMN unlinked_booking_id INTEGER",
+            "payment_mutation": "ALTER TABLE etransfers ADD COLUMN payment_mutation TEXT",
+            "prior_booking_status": "ALTER TABLE etransfers ADD COLUMN prior_booking_status TEXT",
+            "prior_booking_confirmed": "ALTER TABLE etransfers ADD COLUMN prior_booking_confirmed INTEGER",
+            "prior_booking_paid": "ALTER TABLE etransfers ADD COLUMN prior_booking_paid INTEGER",
+            "prior_booking_paid_amount": "ALTER TABLE etransfers ADD COLUMN prior_booking_paid_amount REAL",
         }
         for column, ddl in migrations.items():
             if column not in cols:
@@ -11248,7 +11269,7 @@ def _clean_transfer_sender(raw):
 
 def _normalise_transfer_status(status):
     status = (status or "unmatched").strip().lower()
-    return status if status in {"unmatched", "matched", "ignored"} else "unmatched"
+    return status if status in {"unmatched", "matched", "ignored", "unlinked"} else "unmatched"
 
 
 def _mutate_transfer_archive_state(transfer_id, *, restore=False):
@@ -11675,34 +11696,328 @@ def admin_transfer_restore(transfer_id):
 @app.route("/admin/transfers/<int:transfer_id>/unlink", methods=["POST"])
 @admin_required
 def admin_transfer_unlink(transfer_id):
+    """Retire one booking link without leaving reusable payment ownership.
+
+    Financial links are reversible only when the ledger row, processed email,
+    and current booking state prove that this transfer is the sole owner. The
+    booking returns to the payment state recorded by the original atomic
+    claim, the processed email becomes an ownerless audit row, and the
+    transfer enters terminal ``unlinked`` history so neither the matcher nor
+    the manual link route can credit it again.
+    Name-only auto-links have no financial mutation to reverse and are retired
+    with the booking left unchanged. Ambiguous/manual/reconciled states fail
+    closed rather than guessing at a prior paid amount.
+    """
     conn = db_conn()
+    conn.row_factory = sqlite3.Row
     _ensure_etransfers_table(conn)
     try:
-        cursor = conn.execute(
+        conn.execute("BEGIN IMMEDIATE")
+        transfer = conn.execute(
             """
-            UPDATE etransfers
-               SET matched_booking_id=NULL, status='unmatched'
+            SELECT id, message_id, amount, direction, matched_booking_id,
+                   matched_gift_code, status, payment_mutation,
+                   prior_booking_status, prior_booking_confirmed,
+                   prior_booking_paid, prior_booking_paid_amount
+              FROM etransfers
              WHERE id=?
-               AND status='matched'
-               AND matched_booking_id IS NOT NULL
-               AND COALESCE(matched_gift_code, '')=''
-               AND COALESCE(direction, 'in')='in'
             """,
             (transfer_id,),
-        )
-        if cursor.rowcount != 1:
-            exists = conn.execute(
-                "SELECT 1 FROM etransfers WHERE id=?",
-                (transfer_id,),
-            ).fetchone()
+        ).fetchone()
+        if not transfer:
             conn.rollback()
-            if not exists:
-                return jsonify({"success": False, "error": "Transfer not found"}), 404
+            return jsonify({"success": False, "error": "Transfer not found"}), 404
+        if (
+            transfer["status"] != "matched"
+            or transfer["matched_booking_id"] is None
+            or transfer["matched_gift_code"]
+            or (transfer["direction"] or "in").lower() != "in"
+        ):
+            conn.rollback()
             return jsonify({
                 "success": False,
                 "error": "Only booking-linked matched transfers can be unlinked",
             }), 409
+
+        message_id = str(transfer["message_id"] or "").strip()
+        booking_id = transfer["matched_booking_id"]
+        booking = conn.execute(
+            """
+            SELECT id, status, confirmed, paid, paid_amount
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+        if not booking:
+            conn.rollback()
+            return jsonify({
+                "success": False,
+                "error": "Linked booking no longer exists",
+            }), 409
+
+        processed = None
+        ledger_owners = 1
+        if message_id:
+            ledger_owners = conn.execute(
+                "SELECT COUNT(*) FROM etransfers WHERE message_id=?",
+                (message_id,),
+            ).fetchone()[0]
+            processed = conn.execute(
+                """
+                SELECT id, booking_id, amount
+                  FROM processed_emails
+                 WHERE message_id=?
+                 LIMIT 1
+                """,
+                (message_id,),
+            ).fetchone()
+        ledger_booking_owners = conn.execute(
+            """
+            SELECT COUNT(*)
+              FROM etransfers
+             WHERE matched_booking_id=?
+               AND status='matched'
+            """,
+            (booking_id,),
+        ).fetchone()[0]
+        try:
+            current_paid_amount = float(booking["paid_amount"] or 0)
+        except (TypeError, ValueError):
+            current_paid_amount = None
+        if ledger_owners != 1 or ledger_booking_owners != 1:
+            conn.rollback()
+            return jsonify({
+                "success": False,
+                "error": "Transfer payment ownership cannot be safely reversed",
+            }), 409
+
+        no_financial_mutation = (
+            booking["status"] in {"reserved", "pending_payment"}
+            and booking["confirmed"] == 0
+            and booking["paid"] == 0
+            and current_paid_amount == 0
+            and processed is None
+        )
+        financial_reversal = False
+        if not no_financial_mutation:
+            try:
+                transfer_amount = float(transfer["amount"])
+                processed_amount = float(processed["amount"]) if processed else None
+                booking_paid_amount = float(booking["paid_amount"])
+            except (TypeError, ValueError):
+                transfer_amount = None
+                processed_amount = None
+                booking_paid_amount = None
+            processed_owners = conn.execute(
+                "SELECT COUNT(*) FROM processed_emails WHERE booking_id=?",
+                (booking_id,),
+            ).fetchone()[0]
+            has_exact_ownership = (
+                bool(message_id)
+                and transfer_amount is not None
+                and processed is not None
+                and processed["booking_id"] == booking_id
+                and processed_amount is not None
+                and abs(processed_amount - transfer_amount) < 0.01
+                and booking_paid_amount is not None
+                and abs(booking_paid_amount - transfer_amount) < 0.01
+                and processed_owners == 1
+            )
+            if not has_exact_ownership:
+                conn.rollback()
+                return jsonify({
+                    "success": False,
+                    "error": "Transfer payment ownership cannot be safely reversed",
+                }), 409
+            financial_reversal = True
+
+        mutation = transfer["payment_mutation"]
+        prior_status = transfer["prior_booking_status"]
+        prior_confirmed = transfer["prior_booking_confirmed"]
+        prior_paid = transfer["prior_booking_paid"]
+        prior_paid_amount = transfer["prior_booking_paid_amount"]
+        prior_paid_amount_valid = True
+        try:
+            prior_paid_numeric = (
+                float(prior_paid_amount)
+                if prior_paid_amount is not None
+                else None
+            )
+        except (TypeError, ValueError):
+            prior_paid_numeric = None
+            prior_paid_amount_valid = False
+        prior_is_unpaid_reservation = (
+            prior_status in {"reserved", "pending_payment"}
+            and prior_confirmed == 0
+            and prior_paid == 0
+            and prior_paid_amount_valid
+            and (
+                prior_paid_numeric is None
+                or abs(prior_paid_numeric) < 0.01
+            )
+        )
+        if (
+            financial_reversal
+            and mutation == "confirm"
+            and prior_is_unpaid_reservation
+            and booking["status"] == "confirmed"
+            and booking["confirmed"] == 1
+            and booking["paid"] == 1
+        ):
+            booking_cursor = conn.execute(
+                """
+                UPDATE bookings
+                   SET status=?,
+                       confirmed=?,
+                       paid=?,
+                       paid_amount=?
+                 WHERE id=?
+                   AND status='confirmed'
+                   AND confirmed=1
+                   AND paid=1
+                   AND ABS(COALESCE(paid_amount, -1) - ?) < 0.01
+                """,
+                (
+                    prior_status,
+                    prior_confirmed,
+                    prior_paid,
+                    prior_paid_amount,
+                    booking_id,
+                    transfer_amount,
+                ),
+            )
+        elif (
+            financial_reversal
+            and mutation == "partial"
+            and prior_is_unpaid_reservation
+            and booking["status"] == "partial_payment"
+            and booking["confirmed"] == 0
+            and booking["paid"] == 0
+        ):
+            booking_cursor = conn.execute(
+                """
+                UPDATE bookings
+                   SET status=?,
+                       confirmed=?,
+                       paid=?,
+                       paid_amount=?
+                 WHERE id=?
+                   AND status='partial_payment'
+                   AND confirmed=0
+                   AND paid=0
+                   AND ABS(COALESCE(paid_amount, -1) - ?) < 0.01
+                """,
+                (
+                    prior_status,
+                    prior_confirmed,
+                    prior_paid,
+                    prior_paid_amount,
+                    booking_id,
+                    transfer_amount,
+                ),
+            )
+        elif (
+            financial_reversal
+            and mutation == "reconcile"
+            and prior_status == "confirmed"
+            and prior_confirmed == 1
+            and prior_paid == 1
+            and prior_paid_amount_valid
+            and (
+                prior_paid_numeric is None
+                or prior_paid_numeric < transfer_amount - 0.009
+            )
+            and booking["status"] == "confirmed"
+            and booking["confirmed"] == 1
+            and booking["paid"] == 1
+        ):
+            booking_cursor = conn.execute(
+                """
+                UPDATE bookings
+                   SET status=?,
+                       confirmed=?,
+                       paid=?,
+                       paid_amount=?
+                 WHERE id=?
+                   AND status='confirmed'
+                   AND confirmed=1
+                   AND paid=1
+                   AND ABS(COALESCE(paid_amount, -1) - ?) < 0.01
+                """,
+                (
+                    prior_status,
+                    prior_confirmed,
+                    prior_paid,
+                    prior_paid_amount,
+                    booking_id,
+                    transfer_amount,
+                ),
+            )
+        elif financial_reversal:
+            conn.rollback()
+            return jsonify({
+                "success": False,
+                "error": "Booking payment state cannot be safely reversed",
+            }), 409
+        else:
+            booking_cursor = None
+        if booking_cursor is not None and booking_cursor.rowcount != 1:
+            conn.rollback()
+            return jsonify({
+                "success": False,
+                "error": "Booking payment state changed; reload and try again",
+            }), 409
+
+        if financial_reversal:
+            processed_cursor = conn.execute(
+                """
+                UPDATE processed_emails
+                   SET booking_id=NULL,
+                       processed_at=CURRENT_TIMESTAMP
+                 WHERE message_id=?
+                   AND booking_id=?
+                   AND ABS(COALESCE(amount, -1) - ?) < 0.01
+                """,
+                (message_id, booking_id, transfer_amount),
+            )
+            if processed_cursor.rowcount != 1:
+                conn.rollback()
+                return jsonify({
+                    "success": False,
+                    "error": "Processed email ownership changed; reload and try again",
+                }), 409
+
+        transfer_cursor = conn.execute(
+            """
+            UPDATE etransfers
+               SET matched_booking_id=NULL,
+                   status='unlinked',
+                   unlinked_booking_id=?,
+                   unlinked_at=COALESCE(unlinked_at, CURRENT_TIMESTAMP)
+             WHERE id=?
+               AND COALESCE(message_id, '')=?
+               AND status='matched'
+               AND matched_booking_id=?
+               AND COALESCE(matched_gift_code, '')=''
+               AND COALESCE(direction, 'in')='in'
+            """,
+            (booking_id, transfer_id, message_id, booking_id),
+        )
+        if transfer_cursor.rowcount != 1:
+            conn.rollback()
+            return jsonify({
+                "success": False,
+                "error": "Transfer ownership changed; reload and try again",
+            }), 409
         conn.commit()
+    except Exception:
+        conn.rollback()
+        log.exception("[transfers] unlink ownership reversal failed")
+        return jsonify({
+            "success": False,
+            "error": "Could not safely unlink transfer",
+        }), 500
     finally:
         conn.close()
     return jsonify({"success": True})

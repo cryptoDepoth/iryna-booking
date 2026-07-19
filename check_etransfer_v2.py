@@ -131,7 +131,14 @@ def _ensure_etransfer_claim_schema(conn):
             source TEXT DEFAULT 'email',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             archived_at TEXT,
-            restored_at TEXT
+            restored_at TEXT,
+            unlinked_at TEXT,
+            unlinked_booking_id INTEGER,
+            payment_mutation TEXT,
+            prior_booking_status TEXT,
+            prior_booking_confirmed INTEGER,
+            prior_booking_paid INTEGER,
+            prior_booking_paid_amount REAL
         )
         """
     )
@@ -142,6 +149,13 @@ def _ensure_etransfer_claim_schema(conn):
         "matched_gift_code": "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT",
         "archived_at": "ALTER TABLE etransfers ADD COLUMN archived_at TEXT",
         "restored_at": "ALTER TABLE etransfers ADD COLUMN restored_at TEXT",
+        "unlinked_at": "ALTER TABLE etransfers ADD COLUMN unlinked_at TEXT",
+        "unlinked_booking_id": "ALTER TABLE etransfers ADD COLUMN unlinked_booking_id INTEGER",
+        "payment_mutation": "ALTER TABLE etransfers ADD COLUMN payment_mutation TEXT",
+        "prior_booking_status": "ALTER TABLE etransfers ADD COLUMN prior_booking_status TEXT",
+        "prior_booking_confirmed": "ALTER TABLE etransfers ADD COLUMN prior_booking_confirmed INTEGER",
+        "prior_booking_paid": "ALTER TABLE etransfers ADD COLUMN prior_booking_paid INTEGER",
+        "prior_booking_paid_amount": "ALTER TABLE etransfers ADD COLUMN prior_booking_paid_amount REAL",
     }
     for column, ddl in migrations.items():
         if column not in columns:
@@ -327,14 +341,26 @@ def _resolve_active_ledger_id(conn, message_id, ledger_id=None):
     return resolved_id
 
 
-def _claim_etransfer_booking(conn, ledger_id, message_id, booking_id):
-    """Atomically move one active unmatched ledger row to a booking."""
+def _claim_etransfer_booking(
+    conn,
+    ledger_id,
+    message_id,
+    booking_id,
+    mutation,
+    prior_booking,
+):
+    """Atomically move one active ledger row and record reversible provenance."""
     cursor = conn.execute(
         """
         UPDATE etransfers
            SET matched_booking_id=?,
                matched_gift_code=NULL,
-               status='matched'
+               status='matched',
+               payment_mutation=?,
+               prior_booking_status=?,
+               prior_booking_confirmed=?,
+               prior_booking_paid=?,
+               prior_booking_paid_amount=?
          WHERE id=?
            AND message_id=?
            AND direction='in'
@@ -342,7 +368,16 @@ def _claim_etransfer_booking(conn, ledger_id, message_id, booking_id):
            AND matched_booking_id IS NULL
            AND COALESCE(matched_gift_code, '')=''
         """,
-        (booking_id, ledger_id, message_id),
+        (
+            booking_id,
+            mutation,
+            prior_booking["status"],
+            prior_booking["confirmed"],
+            prior_booking["paid"],
+            prior_booking["paid_amount"],
+            ledger_id,
+            message_id,
+        ),
     )
     return cursor.rowcount == 1
 
@@ -386,11 +421,24 @@ def _apply_booking_payment_transaction(
         if ledger_id is None:
             conn.rollback()
             return False
+        prior_booking = conn.execute(
+            """
+            SELECT status, confirmed, paid, paid_amount
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+        if prior_booking is None:
+            conn.rollback()
+            return False
         if not _claim_etransfer_booking(
             conn,
             ledger_id,
             message_id,
             booking_id,
+            mutation,
+            prior_booking,
         ):
             conn.rollback()
             return False
