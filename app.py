@@ -4101,14 +4101,24 @@ def init_db():
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
-        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, matched_gift_code TEXT, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
+        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, matched_gift_code TEXT, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP, archived_at TEXT, restored_at TEXT)"),
         ("etransfers", "matched_gift_code", "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT"),
+        ("etransfers", "archived_at",      "ALTER TABLE etransfers ADD COLUMN archived_at TEXT"),
+        ("etransfers", "restored_at",      "ALTER TABLE etransfers ADD COLUMN restored_at TEXT"),
     ]
     for _tbl, _col, _ddl in _migrations:
         try:
             c.execute(_ddl)
         except sqlite3.OperationalError:
             pass  # column already exists
+    try:
+        c.execute("""
+            UPDATE etransfers
+               SET archived_at=CURRENT_TIMESTAMP
+             WHERE status='ignored' AND archived_at IS NULL
+        """)
+    except sqlite3.OperationalError:
+        pass
 
     # ── Data-fix: legacy default DEFAULT '[]' for clients.tags created rows
     # with the literal string "[]" instead of an empty CSV. The rest of the
@@ -11080,15 +11090,27 @@ def _ensure_etransfers_table(conn=None):
             matched_gift_code TEXT,
             status TEXT DEFAULT 'unmatched',
             source TEXT DEFAULT 'email',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            archived_at TEXT,
+            restored_at TEXT
         )
     """)
     try:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(etransfers)").fetchall()}
-        if "matched_gift_code" not in cols:
-            conn.execute("ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT")
-            conn.commit()
-    except Exception:
+        migrations = {
+            "matched_gift_code": "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT",
+            "archived_at": "ALTER TABLE etransfers ADD COLUMN archived_at TEXT",
+            "restored_at": "ALTER TABLE etransfers ADD COLUMN restored_at TEXT",
+        }
+        for column, ddl in migrations.items():
+            if column not in cols:
+                conn.execute(ddl)
+        conn.execute("""
+            UPDATE etransfers
+               SET archived_at=CURRENT_TIMESTAMP
+             WHERE status='ignored' AND archived_at IS NULL
+        """)
+    except sqlite3.OperationalError:
         pass
     conn.commit()
     if own:
@@ -11109,6 +11131,92 @@ def _clean_transfer_sender(raw):
 def _normalise_transfer_status(status):
     status = (status or "unmatched").strip().lower()
     return status if status in {"unmatched", "matched", "ignored"} else "unmatched"
+
+
+def _mutate_transfer_archive_state(transfer_id, *, restore=False):
+    """Archive or restore one unlinked inbound transfer without payment effects."""
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    _ensure_etransfers_table(conn)
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        transfer = conn.execute(
+            """
+            SELECT id, direction, matched_booking_id, matched_gift_code, status,
+                   archived_at, restored_at
+              FROM etransfers
+             WHERE id=?
+            """,
+            (transfer_id,),
+        ).fetchone()
+        if not transfer:
+            conn.rollback()
+            return False, "Transfer not found", 404, {}
+        if transfer["matched_booking_id"] is not None or transfer["matched_gift_code"]:
+            conn.rollback()
+            return False, "Matched transfers cannot be archived or restored", 409, {}
+        if (transfer["direction"] or "in").lower() != "in":
+            conn.rollback()
+            return False, "Only inbound transfers can be archived or restored", 409, {}
+
+        status = str(transfer["status"] or "").strip().lower()
+        if status not in {"unmatched", "ignored"}:
+            conn.rollback()
+            return False, "Transfer has an invalid archive state", 409, {}
+        if restore:
+            if status == "unmatched":
+                conn.rollback()
+                return True, None, 200, {"already_active": True}
+            if status != "ignored":
+                conn.rollback()
+                return False, "Only archived unmatched transfers can be restored", 409, {}
+            conn.execute(
+                """
+                UPDATE etransfers
+                   SET status='unmatched',
+                       restored_at=COALESCE(restored_at, CURRENT_TIMESTAMP)
+                 WHERE id=?
+                   AND matched_booking_id IS NULL
+                   AND COALESCE(matched_gift_code, '')=''
+                   AND status='ignored'
+                """,
+                (transfer_id,),
+            )
+            if not conn.execute("SELECT changes()").fetchone()[0]:
+                conn.rollback()
+                return False, "Transfer archive state changed; reload and try again", 409, {}
+            conn.commit()
+            return True, None, 200, {"already_active": False}
+
+        if status == "ignored":
+            conn.rollback()
+            return True, None, 200, {"already_archived": True}
+        if status != "unmatched":
+            conn.rollback()
+            return False, "Only active unmatched transfers can be archived", 409, {}
+        conn.execute(
+            """
+            UPDATE etransfers
+               SET status='ignored',
+                   archived_at=COALESCE(archived_at, CURRENT_TIMESTAMP)
+             WHERE id=?
+               AND matched_booking_id IS NULL
+               AND COALESCE(matched_gift_code, '')=''
+               AND status='unmatched'
+            """,
+            (transfer_id,),
+        )
+        if not conn.execute("SELECT changes()").fetchone()[0]:
+            conn.rollback()
+            return False, "Transfer archive state changed; reload and try again", 409, {}
+        conn.commit()
+        return True, None, 200, {"already_archived": False}
+    except Exception:
+        conn.rollback()
+        log.exception("[transfers] archive state mutation failed")
+        return False, "Could not update transfer archive state", 500, {}
+    finally:
+        conn.close()
 
 
 def _transfer_ref_from_csv(row_num, date, sender, amount):
@@ -11157,16 +11265,23 @@ def _import_etransfers_csv(file_obj):
             """, (ref, sender, amount, subject, direction, date))
             inserted += 1
         except sqlite3.IntegrityError:
-            conn.execute("""
-                UPDATE etransfers
-                   SET sender_name=COALESCE(NULLIF(?, ''), sender_name),
-                       amount=COALESCE(?, amount),
-                       memo=COALESCE(NULLIF(?, ''), memo),
-                       direction=COALESCE(NULLIF(?, ''), direction),
-                       email_date=COALESCE(NULLIF(?, ''), email_date)
-                 WHERE reference_number=?
-            """, (sender, amount, subject, direction, date, ref))
-            updated += 1
+            existing = conn.execute(
+                "SELECT status FROM etransfers WHERE reference_number=?",
+                (ref,),
+            ).fetchone()
+            if existing and existing["status"] == "ignored":
+                skipped += 1
+            else:
+                conn.execute("""
+                    UPDATE etransfers
+                       SET sender_name=COALESCE(NULLIF(?, ''), sender_name),
+                           amount=COALESCE(?, amount),
+                           memo=COALESCE(NULLIF(?, ''), memo),
+                           direction=COALESCE(NULLIF(?, ''), direction),
+                           email_date=COALESCE(NULLIF(?, ''), email_date)
+                     WHERE reference_number=?
+                """, (sender, amount, subject, direction, date, ref))
+                updated += 1
     conn.commit()
     conn.close()
     return {"inserted": inserted, "updated": updated, "skipped": skipped}
@@ -11203,6 +11318,14 @@ def _link_transfer_to_booking(transfer_id, booking_id):
             conn.rollback(); return False, "Transfer not found"
         if not booking:
             conn.rollback(); return False, "Booking not found"
+        if (
+            transfer["status"] != "unmatched"
+            or transfer["matched_booking_id"] is not None
+            or transfer["matched_gift_code"]
+            or (transfer["direction"] or "in").lower() != "in"
+        ):
+            conn.rollback()
+            return False, "Transfer must be active, inbound, unmatched, and unlinked"
         amount = float(transfer["amount"] or 0)
         current_paid = float(booking["paid_amount"] or 0)
         new_paid = max(current_paid, amount)
@@ -11238,10 +11361,10 @@ def _link_transfer_to_booking(transfer_id, booking_id):
         return False, str(e)
     finally:
         conn.close()
-        try:
-            sync_to_notion(booking_id)
-        except Exception:
-            pass
+    try:
+        sync_to_notion(booking_id)
+    except Exception:
+        pass
     if booking_for_event.get("confirmed"):
         _record_booking_funnel_event(
             booking_for_event,
@@ -11392,11 +11515,32 @@ def admin_transfer_link(transfer_id):
 @app.route("/admin/transfers/<int:transfer_id>/ignore", methods=["POST"])
 @admin_required
 def admin_transfer_ignore(transfer_id):
-    conn = db_conn()
-    _ensure_etransfers_table(conn)
-    conn.execute("UPDATE etransfers SET status='ignored' WHERE id=?", (transfer_id,))
-    conn.commit(); conn.close()
-    return jsonify({"success": True})
+    """Backward-compatible alias for the audited archive action."""
+    ok, error, status_code, metadata = _mutate_transfer_archive_state(transfer_id)
+    if not ok:
+        return jsonify({"success": False, "error": error}), status_code
+    return jsonify({"success": True, **metadata})
+
+
+@app.route("/admin/transfers/<int:transfer_id>/archive", methods=["POST"])
+@admin_required
+def admin_transfer_archive(transfer_id):
+    ok, error, status_code, metadata = _mutate_transfer_archive_state(transfer_id)
+    if not ok:
+        return jsonify({"success": False, "error": error}), status_code
+    return jsonify({"success": True, **metadata})
+
+
+@app.route("/admin/transfers/<int:transfer_id>/restore", methods=["POST"])
+@admin_required
+def admin_transfer_restore(transfer_id):
+    ok, error, status_code, metadata = _mutate_transfer_archive_state(
+        transfer_id,
+        restore=True,
+    )
+    if not ok:
+        return jsonify({"success": False, "error": error}), status_code
+    return jsonify({"success": True, **metadata})
 
 
 @app.route("/admin/transfers/<int:transfer_id>/unlink", methods=["POST"])

@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
 <style>
 :root{--bg:#f0f2f5;--surface:#fff;--surface2:#f7f8fa;--border:#e4e7ec;--text:#111827;--muted:#6b7280;--accent:#f97316;--accent2:#ea580c;--ok:#16a34a;--warn:#d97706;--danger:#dc2626;--top:#111827;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,.07),0 8px 24px rgba(0,0,0,.04)}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,sans-serif;font-size:14px}.topbar{height:56px;background:var(--top);display:flex;align-items:center;gap:20px;padding:0 24px;position:sticky;top:0;z-index:10}.brand{color:#fff;font-weight:700;white-space:nowrap}.brand:before{content:'';display:inline-block;width:8px;height:8px;background:var(--accent);border-radius:50%;margin-right:10px}.nav{display:flex;gap:4px}.nav a{color:#9ca3af;text-decoration:none;font-size:13px;padding:7px 12px;border-radius:9px}.nav a:hover{background:rgba(255,255,255,.08);color:#fff}.nav a.active{color:var(--accent);background:rgba(249,115,22,.15)}.spacer{flex:1}.wrap{max-width:1280px;margin:0 auto;padding:24px}.hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.hero h1{margin:0;font-size:28px;letter-spacing:-.03em}.hero p{margin:6px 0 0;color:var(--muted)}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}.stat b{display:block;font-size:24px}.stat span{color:var(--muted);font-size:12px}.toolbar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px;box-shadow:var(--shadow)}input,select{border:1px solid var(--border);border-radius:9px;padding:9px 11px;background:#fff;font:inherit}input[type=search]{min-width:260px;flex:1}.btn{border:0;border-radius:9px;background:var(--accent);color:#fff;font-weight:700;padding:9px 13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}.btn:hover{background:var(--accent2)}.btn.ghost{background:#fff;color:var(--text);border:1px solid var(--border)}.btn.small{padding:6px 9px;font-size:12px}.btn.danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}.day{margin:22px 0 10px;font-size:13px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.08em}.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;box-shadow:var(--shadow)}table{width:100%;border-collapse:collapse;min-width:980px}th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);background:#fafafa}tr:last-child td{border-bottom:0}.amount{font-weight:800;font-variant-numeric:tabular-nums}.badge{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800}.badge.matched{background:#dcfce7;color:#166534}.badge.unmatched{background:#fef3c7;color:#92400e}.badge.ignored{background:#f3f4f6;color:#6b7280}.memo{max-width:360px;color:var(--muted);font-size:12px;line-height:1.45}.linked{font-size:12px}.linked a{color:var(--accent2);font-weight:700}.actions{display:flex;gap:6px;flex-wrap:wrap}.link-row{display:flex;gap:6px;min-width:250px}.link-row select{min-width:180px;max-width:260px}.empty{padding:60px;text-align:center;color:var(--muted)}.toast{position:fixed;right:18px;bottom:18px;background:#111827;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.2);display:none}.toast.show{display:block}@media(max-width:760px){.wrap{padding:14px}.hero{display:block}.stats{grid-template-columns:repeat(2,1fr)}.topbar{overflow-x:auto}.toolbar{display:block}.toolbar>*{margin:4px 0;width:100%}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,sans-serif;font-size:14px}.topbar{height:56px;background:var(--top);display:flex;align-items:center;gap:20px;padding:0 24px;position:sticky;top:0;z-index:10}.brand{color:#fff;font-weight:700;white-space:nowrap}.brand:before{content:'';display:inline-block;width:8px;height:8px;background:var(--accent);border-radius:50%;margin-right:10px}.nav{display:flex;gap:4px}.nav a{color:#9ca3af;text-decoration:none;font-size:13px;padding:7px 12px;border-radius:9px}.nav a:hover{background:rgba(255,255,255,.08);color:#fff}.nav a.active{color:var(--accent);background:rgba(249,115,22,.15)}.spacer{flex:1}.wrap{max-width:1280px;margin:0 auto;padding:24px}.hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.hero h1{margin:0;font-size:28px;letter-spacing:-.03em}.hero p{margin:6px 0 0;color:var(--muted)}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:18px 0}.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}.stat b{display:block;font-size:24px}.stat span{color:var(--muted);font-size:12px}.toolbar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px;box-shadow:var(--shadow)}input,select{border:1px solid var(--border);border-radius:9px;padding:9px 11px;background:#fff;font:inherit}input[type=search]{min-width:260px;flex:1}.btn{border:0;border-radius:9px;background:var(--accent);color:#fff;font-weight:700;padding:9px 13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}.btn:hover{background:var(--accent2)}.btn.ghost{background:#fff;color:var(--text);border:1px solid var(--border)}.btn.small{padding:6px 9px;font-size:12px}.btn.danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}.day{margin:22px 0 10px;font-size:13px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.08em}.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;box-shadow:var(--shadow)}table{width:100%;border-collapse:collapse;min-width:1080px}th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);background:#fafafa}tr:last-child td{border-bottom:0}.amount{font-weight:800;font-variant-numeric:tabular-nums}.badge{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800}.badge.matched{background:#dcfce7;color:#166534}.badge.unmatched{background:#fef3c7;color:#92400e}.badge.ignored{background:#f3f4f6;color:#6b7280}.meta{color:var(--muted);font-size:11px;line-height:1.45}.memo{max-width:360px;color:var(--muted);font-size:12px;line-height:1.45}.linked{font-size:12px}.linked a{color:var(--accent2);font-weight:700}.actions{display:flex;gap:6px;flex-wrap:wrap}.link-row{display:flex;gap:6px;min-width:250px}.link-row select{min-width:180px;max-width:260px}.empty{padding:60px;text-align:center;color:var(--muted)}.toast{position:fixed;right:18px;bottom:18px;background:#111827;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.2);display:none}.toast.show{display:block}@media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:760px){.wrap{padding:14px}.hero{display:block}.topbar{overflow-x:auto}.toolbar{display:block}.toolbar>*{margin:4px 0;width:100%}}
 </style>
 </head>
 <body>
@@ -17,7 +17,7 @@
   <section class="hero">
     <div>
       <h1>Interac e-Transfers</h1>
-      <p>All incoming transfers from email/CSV, grouped by day. Link unmatched payments to real bookings.</p>
+      <p>Review active unmatched inbound transfers. Archived history stays available with audit timestamps and original financial details.</p>
     </div>
     <form id="importForm" enctype="multipart/form-data">
       <input type="file" name="csv" accept=".csv" required>
@@ -38,19 +38,23 @@
   <section class="stats">
     <div class="stat"><b>{{ stats.total or 0 }}</b><span>Total rows</span></div>
     <div class="stat"><b>{{ stats.matched or 0 }}</b><span>Matched</span></div>
-    <div class="stat"><b>{{ stats.unmatched or 0 }}</b><span>Unmatched</span></div>
+    <div class="stat"><b>{{ stats.unmatched or 0 }}</b><span>Active unmatched</span></div>
+    <div class="stat"><b>{{ stats.ignored or 0 }}</b><span>Archived</span></div>
     <div class="stat"><b>${{ '%.2f'|format(stats.incoming_total or 0) }}</b><span>Incoming total</span></div>
   </section>
   <form class="toolbar" method="get">
     <input type="search" name="search" placeholder="Search sender, reference, memo, booking…" value="{{ filters.search }}">
-    <select name="status">
-      {% for s in ['unmatched','matched','ignored','all'] %}<option value="{{s}}" {% if filters.status==s %}selected{% endif %}>{{s}}</option>{% endfor %}
+    <select name="status" aria-label="Transfer status">
+      {% for value, label in [('unmatched','Active unmatched'),('matched','Matched'),('ignored','Archived history'),('all','All transfers')] %}
+        <option value="{{ value }}" {% if filters.status==value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
     </select>
-    <select name="direction">
+    <select name="direction" aria-label="Transfer direction">
       {% for d in ['in','out','all'] %}<option value="{{d}}" {% if filters.direction==d %}selected{% endif %}>{{d}}</option>{% endfor %}
     </select>
     <button class="btn" type="submit">Filter</button>
-    <a class="btn ghost" href="/admin/transfers?status=unmatched&direction=in">Needs matching</a>
+    <a class="btn ghost" href="/admin/transfers?status=unmatched&direction=in">Active queue</a>
+    <a class="btn ghost" href="/admin/transfers?status=ignored&direction=in">Archived history</a>
   </form>
   {% if not grouped %}
     <div class="table-wrap"><div class="empty">No transfers yet. Import CSV or wait for the e-Transfer watcher to scan new emails.</div></div>
@@ -62,12 +66,21 @@
         <thead><tr><th>Sender</th><th>Amount</th><th>Reference / Source</th><th>Memo</th><th>Status</th><th>Linked booking</th><th>Actions</th></tr></thead>
         <tbody>
         {% for t in group['items'] %}
-          <tr data-transfer-id="{{ t.id }}">
+          <tr data-transfer-id="{{ t.id }}" data-transfer-state="{{ t.status or 'unmatched' }}">
             <td><strong>{{ t.sender_name or '—' }}</strong><br><small>{{ t.email_date or t.created_at }}</small></td>
             <td><span class="amount">${{ '%.2f'|format(t.amount or 0) }}</span><br><small>{{ t.direction or 'in' }}</small></td>
-            <td><code>{{ t.reference_number or '—' }}</code><br><small>{{ t.source or 'email' }}</small></td>
+            <td>
+              <code>{{ t.reference_number or '—' }}</code>
+              <div class="meta">Source: {{ t.source or 'email' }}</div>
+              <div class="meta">Message ID: {{ t.message_id or '—' }}</div>
+              <div class="meta">Recorded: {{ t.created_at or '—' }}</div>
+            </td>
             <td><div class="memo">{{ t.memo or '—' }}</div></td>
-            <td><span class="badge {{ t.status or 'unmatched' }}">{{ t.status or 'unmatched' }}</span></td>
+            <td>
+              <span class="badge {{ t.status or 'unmatched' }}">{% if t.status == 'ignored' %}Archived{% else %}{{ t.status or 'unmatched' }}{% endif %}</span>
+              {% if t.archived_at %}<div class="meta">Archived: {{ t.archived_at }}</div>{% endif %}
+              {% if t.restored_at %}<div class="meta">Restored: {{ t.restored_at }}</div>{% endif %}
+            </td>
             <td class="linked">
               {% if t.matched_booking_id %}
                 <a href="/admin/booking/{{ t.matched_booking_id }}">#{{ t.matched_booking_id }} · {{ t.booking_name or 'booking' }}</a><br>
@@ -81,7 +94,13 @@
             </td>
             <td>
               <div class="actions">
-                {% if t.matched_booking_id %}
+                {% if t.status == 'ignored' %}
+                  {% if (t.direction or 'in') == 'in' and not t.matched_booking_id and not t.matched_gift_code %}
+                    <button class="btn small ghost" data-action="restore">Restore</button>
+                  {% else %}
+                    <span class="meta">Audit history only</span>
+                  {% endif %}
+                {% elif t.matched_booking_id %}
                   <button class="btn small ghost" data-action="unlink">Unlink</button>
                 {% elif t.matched_gift_code %}
                   <a class="btn small ghost" href="/gift/certificate/{{ t.matched_gift_code }}">PDF</a>
@@ -95,7 +114,9 @@
                     </select>
                     <button class="btn small" data-action="link">Link</button>
                   </div>
-                  <button class="btn small danger" data-action="ignore">Ignore</button>
+                  {% if (t.direction or 'in') == 'in' %}
+                    <button class="btn small danger" data-action="archive">Archive</button>
+                  {% endif %}
                 {% endif %}
               </div>
             </td>
@@ -111,7 +132,7 @@
 function toast(msg){const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2400)}
 async function postJSON(url, body){const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const data=await res.json().catch(()=>({})); if(!res.ok||data.success===false) throw new Error(data.error||'Request failed'); return data;}
 document.getElementById('importForm').addEventListener('submit', async (e)=>{e.preventDefault(); const fd=new FormData(e.currentTarget); const res=await fetch('/admin/transfers/import',{method:'POST',body:fd}); const data=await res.json().catch(()=>({})); if(!res.ok||!data.success){toast(data.error||'Import failed'); return;} toast(`Imported ${data.inserted}, updated ${data.updated}`); setTimeout(()=>location.reload(),700);});
-document.addEventListener('click', async (e)=>{const btn=e.target.closest('[data-action]'); if(!btn) return; e.preventDefault(); const tr=btn.closest('tr[data-transfer-id]'); const id=tr.dataset.transferId; try{ if(btn.dataset.action==='link'){const bid=tr.querySelector('[data-booking-select]').value; if(!bid){toast('Choose booking first'); return;} await postJSON(`/admin/transfers/${id}/link`,{booking_id:bid}); toast('Transfer linked'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='ignore'){await postJSON(`/admin/transfers/${id}/ignore`,{}); toast('Ignored'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='unlink'){await postJSON(`/admin/transfers/${id}/unlink`,{}); toast('Unlinked'); setTimeout(()=>location.reload(),500);} }catch(err){toast(err.message||'Error')}});
+document.addEventListener('click', async (e)=>{const btn=e.target.closest('[data-action]'); if(!btn) return; e.preventDefault(); const tr=btn.closest('tr[data-transfer-id]'); const id=tr.dataset.transferId; try{ if(btn.dataset.action==='link'){const bid=tr.querySelector('[data-booking-select]').value; if(!bid){toast('Choose booking first'); return;} await postJSON(`/admin/transfers/${id}/link`,{booking_id:bid}); toast('Transfer linked'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='archive'){await postJSON(`/admin/transfers/${id}/archive`,{}); toast('Transfer archived'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='restore'){await postJSON(`/admin/transfers/${id}/restore`,{}); toast('Transfer restored'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='unlink'){await postJSON(`/admin/transfers/${id}/unlink`,{}); toast('Unlinked'); setTimeout(()=>location.reload(),500);} }catch(err){toast(err.message||'Error')}});
 </script>
 </body>
 </html>

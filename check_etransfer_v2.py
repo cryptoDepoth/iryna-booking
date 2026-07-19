@@ -125,6 +125,29 @@ def get_processed_email(message_id):
     return dict(row) if row else None
 
 
+def is_etransfer_archived(message_id):
+    """Return True when an unmatched ledger row was archived by an admin."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            """
+            SELECT 1
+              FROM etransfers
+             WHERE message_id=?
+               AND status='ignored'
+               AND matched_booking_id IS NULL
+               AND COALESCE(matched_gift_code, '')=''
+             LIMIT 1
+            """,
+            (message_id,),
+        ).fetchone()
+        return row is not None
+    except sqlite3.OperationalError:
+        return False
+    finally:
+        conn.close()
+
+
 def mark_message_processed(message_id, booking_id, amount):
     conn = get_db()
     c = conn.cursor()
@@ -1295,6 +1318,10 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
     Returns (confirmed_booking_id, ambiguity_list) or (None, None)."""
     msg_id = str(email.get("id", ""))
     if not msg_id:
+        return None, None
+
+    if is_etransfer_archived(msg_id):
+        print(f"   [skip] Message {msg_id} is archived in the transfer ledger")
         return None, None
 
     reconciliation_bookings = reconciliation_bookings or []
