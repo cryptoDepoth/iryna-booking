@@ -239,6 +239,73 @@ def test_archive_wins_before_exact_overpaid_or_partial_booking_mutation(
     assert alerts == []
 
 
+@pytest.mark.parametrize("terminal_status", ["cancelled", "expired"])
+def test_cancel_or_expire_during_body_read_rolls_back_confirmation_claims(
+    atomic_env,
+    monkeypatch,
+    terminal_status,
+):
+    db_path, _, _ = atomic_env
+    message_id = f"{terminal_status}-during-body-read"
+    booking_id = _insert_booking(db_path)
+    _insert_transfer(db_path, message_id, 120.50)
+
+    def release_booking_during_body_read(_message_id):
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "UPDATE bookings SET status=?, reserved_until=NULL WHERE id=?",
+            (terminal_status, booking_id),
+        )
+        conn.commit()
+        conn.close()
+        return "You've received $120.50 from Atomic Client"
+
+    monkeypatch.setattr(
+        checker,
+        "read_message_body",
+        release_booking_during_body_read,
+    )
+    monkeypatch.setattr(
+        checker,
+        "try_confirm_gift_etransfer",
+        lambda *args, **kwargs: False,
+    )
+    effects = []
+    monkeypatch.setattr(
+        booking_app,
+        "_after_auto_payment_confirmed",
+        lambda confirmed_id: effects.append(confirmed_id),
+    )
+    stale_pending = checker.get_pending_bookings(within_minutes=30)
+
+    confirmed_ids = booking_app._process_etransfer_email_batch(
+        [
+            {
+                "id": message_id,
+                "date": datetime.now(timezone.utc).isoformat(),
+                "subject": "Interac e-Transfer: You've received $120.50",
+                "from": {"addr": "notify@payments.interac.ca"},
+            }
+        ],
+        stale_pending,
+        [],
+    )
+    for confirmed_id in confirmed_ids:
+        booking_app._after_auto_payment_confirmed(confirmed_id)
+
+    assert confirmed_ids == []
+    assert effects == []
+    assert _booking_state(db_path, booking_id) == (
+        terminal_status,
+        0,
+        0,
+        0.0,
+    )
+    ledger, processed = _ownership_state(db_path, message_id)
+    assert ledger == ("unmatched", None, None, None)
+    assert processed is None
+
+
 @pytest.mark.parametrize("previously_processed", [False, True])
 def test_archive_wins_before_both_reconciliation_mutations(
     atomic_env,
@@ -458,6 +525,39 @@ def test_writer_first_booking_commit_owns_ledger_and_rejects_archive(
     assert success is False
     assert error == "Matched transfers cannot be archived or restored"
     assert status == 409
+
+
+def test_atomic_confirmation_rejects_already_paid_unconfirmed_booking(
+    atomic_env,
+):
+    db_path, _, _ = atomic_env
+    message_id = "already-paid-unconfirmed"
+    booking_id = _insert_booking(
+        db_path,
+        status="pending_payment",
+        confirmed=0,
+        paid=1,
+        paid_amount=120.50,
+    )
+    _insert_transfer(db_path, message_id, 120.50)
+
+    committed = checker._apply_booking_payment_transaction(
+        message_id,
+        booking_id,
+        120.50,
+        "confirm",
+    )
+
+    assert committed is False
+    assert _booking_state(db_path, booking_id) == (
+        "pending_payment",
+        0,
+        1,
+        120.50,
+    )
+    ledger, processed = _ownership_state(db_path, message_id)
+    assert ledger == ("unmatched", None, None, None)
+    assert processed is None
 
 
 def test_writer_first_processed_orphan_reconciliation_updates_existing_owner(
@@ -1412,13 +1512,15 @@ def test_archive_winning_batch_never_runs_booking_post_commit_effects(
     )
 
 
+@pytest.mark.parametrize("eligible_status", ["reserved", "pending_payment"])
 def test_writer_winning_batch_runs_booking_effects_after_durable_commit(
     atomic_env,
     monkeypatch,
+    eligible_status,
 ):
     db_path, _, _ = atomic_env
-    message_id = "writer-batch-side-effects"
-    booking_id = _insert_booking(db_path)
+    message_id = f"writer-batch-side-effects-{eligible_status}"
+    booking_id = _insert_booking(db_path, status=eligible_status)
     _insert_transfer(db_path, message_id, 120.50)
     monkeypatch.setattr(
         checker,

@@ -409,7 +409,10 @@ def _apply_booking_payment_transaction(
                 """
                 UPDATE bookings
                    SET confirmed=1, paid=1, status='confirmed', paid_amount=?
-                 WHERE id=? AND confirmed=0
+                 WHERE id=?
+                   AND confirmed=0
+                   AND paid=0
+                   AND status IN ('reserved', 'pending_payment')
                 """,
                 (amount, booking_id),
             )
