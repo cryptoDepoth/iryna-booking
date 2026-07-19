@@ -40,17 +40,18 @@
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --nude:#f5ede8; --rose:#c4857a; --rose-deep:#a3685e; --rose-glow:rgba(196,133,122,.18);
-      --ink:#1c1917; --ink-2:#44403c; --ink-3:#78716c; --ink-4:#a8a29e; --ink-5:#e7e5e4;
+      --nude:#f5ede8; --rose:#9f6258; --rose-deep:#835047; --rose-glow:rgba(196,133,122,.18);
+      --ink:#1c1917; --ink-2:#44403c; --ink-3:#746e69; --ink-4:#746e69; --ink-5:#e7e5e4;
       --page-bg:#faf7f5; --surface:#fff;
       --green:#3d6b4f; --green-bg:#edf5f0;
-      --amber:#92722a; --amber-bg:#fdf5e4;
+      --amber:#80611c; --amber-bg:#fdf5e4;
       --red:#8b3535; --red-bg:#fdf0f0;
       --font-d:'Cormorant Garamond',Georgia,serif;
       --font-b:'DM Sans',system-ui,sans-serif;
     }
     html{font-size:16px}
     body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
+    :where(a,button,summary,[tabindex]):focus-visible{outline:3px solid var(--rose-deep);outline-offset:3px}
 
     /* HERO */
     .hero{padding:60px 28px 18px;text-align:center;max-width:760px;margin:0 auto}
@@ -147,6 +148,9 @@
 
     footer{text-align:center;padding:32px;color:var(--ink-4);font-size:.85rem;border-top:1px solid rgba(0,0,0,.04)}
     footer a{color:var(--rose);text-decoration:none;font-weight:500}
+    @media(max-width:640px){
+      .hero-jump,.hero-whatsapp,.filters .chip{min-height:44px;align-items:center;justify-content:center}
+    }
   </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
 </head>

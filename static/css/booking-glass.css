@@ -11,24 +11,24 @@
   --nude: #F9F0EE;
   --blush: #F3E1DD;
   --blush-deep: #E8C5BD;
-  --rose: #B08428;
-  --rose-deep: #8F6A24;
+  --rose: #8F6A24;
+  --rose-deep: #76511A;
   --rose-glow: rgba(201, 162, 75, .18);
 
   --ink: #3A3230;
   --ink-2: #5C5451;
-  --ink-3: #887E7B;
-  --ink-4: #B0A8A5;
+  --ink-3: #746E69;
+  --ink-4: #746E69;
   --ink-5: #E5E1DF;
 
   --page-bg: #FFFAF5;
   --surface: rgba(255, 255, 255, 0.55);
 
-  --green: #5A8A6A;
+  --green: #3D6B4F;
   --green-bg: #EDF5F0;
-  --amber: #A0822A;
+  --amber: #80611C;
   --amber-bg: #FDF5E4;
-  --red: #A34545;
+  --red: #8B3535;
   --red-bg: #FDF0F0;
 
   --font-d: 'Playfair Display', Georgia, serif;
@@ -233,7 +233,7 @@ footer {
 
 /* ====== INPUT FIELDS — glass touch ====== */
 .drawer input {
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border: 1.5px solid var(--ink-3);
   background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(8px);
   border-radius: 1rem;
@@ -246,7 +246,7 @@ footer {
 /* ====== SLOTS — glass pills ====== */
 .drawer .slot {
   border-radius: 999px;
-  border: 1.5px solid var(--glass-border);
+  border: 1.5px solid var(--ink-3);
   background: var(--glass-white);
   backdrop-filter: blur(8px);
 }

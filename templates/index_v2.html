@@ -257,7 +257,7 @@
 :root{
   --nude:#f5ede8; --blush:#e8c8c0; --rose:#c4857a; --rose-deep:#a3685e;
   --rose-glow:rgba(196,133,122,.18);
-  --ink:#1c1917; --ink-2:#44403c; --ink-3:#78716c; --ink-4:#a8a29e; --ink-5:#e7e5e4;
+  --ink:#1c1917; --ink-2:#44403c; --ink-3:#78716c; --ink-4:#746e69; --ink-5:#e7e5e4;
   --page-bg:#faf7f5; --surface:#fff;
   --green:#3d6b4f; --green-bg:#edf5f0;
   --amber:#92722a; --amber-bg:#fdf5e4;
@@ -268,13 +268,15 @@
 }
 /* ── Champagne brand skin (aligns home with /wedding /family /maternity), 2026-07-09 ── */
 :root{
-  --nude:#F6EEDF; --blush:#EAD9B4; --rose:#B08428; --rose-deep:#8F6A24;
+  --nude:#F6EEDF; --blush:#EAD9B4; --rose:#8F6A24; --rose-deep:#76511A;
   --rose-glow:rgba(201,162,75,.20);
   --page-bg:#FBF7F0;
 }
 html,body{overflow-x:hidden;max-width:100vw}
 body{font-family:var(--font-b);background:var(--page-bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh}
 img,picture,video{max-width:100%;height:auto;display:block}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+:where(a,button,input,textarea,select,summary,[tabindex]):focus-visible{outline:3px solid var(--rose-deep);outline-offset:3px}
 
 /* ── TOP NAV ── */
 .nav{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid rgba(0,0,0,.04);background:rgba(250,247,245,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:30;gap:10px}
@@ -509,7 +511,8 @@ img,picture,video{max-width:100%;height:auto;display:block}
 }
 .drawer input{width:100%;padding:12px 14px;background:#fff;border:1.5px solid var(--ink-5);border-radius:10px;font:.92rem var(--font-b);outline:none}
 .drawer input:focus{border-color:var(--rose);box-shadow:0 0 0 3px rgba(196,133,122,.12)}
-.field-error{display:block;color:#e53e3e;font-size:.72rem;margin-top:4px;}
+.field-error{display:block;color:#b42318;font-size:.72rem;margin-top:4px;}
+.field-error[hidden]{display:none}
 .drawer .addon-section,.drawer .agreement-section,.drawer .booking-summary{border:1px solid var(--ink-5);border-radius:14px;background:#fff;padding:13px 14px;margin:0 0 14px}
 .drawer .addon-option{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--ink-5)}
 .drawer .addon-option:first-of-type{border-top:0}
@@ -518,6 +521,8 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .drawer .addon-desc{font-size:.78rem;color:var(--ink-3);line-height:1.4;margin-top:3px}
 .drawer .addon-price{font-weight:800;color:var(--rose);white-space:nowrap}
 .drawer .agreement-section label{display:flex;gap:9px;align-items:flex-start;font-size:.82rem;line-height:1.45;color:var(--ink-2);margin:8px 0}
+.drawer .agreement-choice{border:0;padding:0;margin:0}
+.drawer .agreement-choice legend{padding:0}
 .drawer .agreement-section input[type="checkbox"],.drawer .agreement-section input[type="radio"]{width:17px;height:17px;flex:0 0 auto;margin-top:1px;accent-color:var(--rose)}
 .drawer .booking-summary .summary-row{display:flex;justify-content:space-between;gap:12px;font-size:.84rem;padding:5px 0;border-bottom:1px solid var(--ink-5)}
 .drawer .booking-summary .summary-row:last-child{border-bottom:0;font-weight:800}
@@ -694,6 +699,9 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   .proof span strong{font-weight:500}
 }
 @media(max-width:640px){
+  .nav .brand,.nav-gift,.cat-pills .cp,.hero-cta,.filters .chip,.event-card .price-bar .cta,.lbtn{min-height:44px}
+  .drawer .dphoto .close,.assistant-close{width:44px;height:44px}
+  .tmt-more{min-width:44px;min-height:44px}
   .drawer .slot{padding:15px 4px}
   .drawer .btn{padding:16px}
   .event-card .price-bar .cta{padding:12px 18px}
@@ -722,7 +730,7 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   .direct-callout-cta{align-self:stretch;text-align:center}
 }
 </style>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-glass.css') }}?v=glass-1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-glass.css') }}?v=glass-2">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
 {% if initial_events %}
 <script type="application/ld+json">
@@ -1024,7 +1032,7 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
       <span class="sub" data-i18n="tmt_subhead">Real feedback from families, couples, and sessions I’ve photographed</span>
     </div>
     <div class="tmt-swipe-hint" aria-hidden="true"><span class="hand">👆</span><span>Swipe reviews left or right</span></div>
-    <div class="tmt-marquee reveal" id="tmtMarquee" aria-label="Client reviews carousel. Swipe horizontally to browse with your finger or mouse.">
+    <div class="tmt-marquee reveal" id="tmtMarquee" role="region" aria-roledescription="carousel" tabindex="0" aria-label="Client reviews carousel. Use left and right arrow keys, or swipe, to browse.">
       <div class="tmt-track" id="tmtTrack">
         <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="/static/images/review-avatars/review-001.webp" alt="Richelle review photo" width="48" height="48" loading="lazy"><div class="tmt-who"><div class="tmt-name">Richelle</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“We had a wonderful Mother's Day photo shoot experience. The studio set up was beautiful, the photographer was patient and professional, and the photos turned out absolutely stunning!”</p></article>
         <article class="tmt-card"><div class="tmt-top"><img class="tmt-avatar" src="/static/images/review-avatars/review-002.webp" alt="Jaskaran Kaur review photo" width="48" height="48" loading="lazy"><div class="tmt-who"><div class="tmt-name">Jaskaran Kaur</div><div class="tmt-source">Client review</div></div></div><div class="tmt-stars" aria-label="5 out of 5 stars">★★★★★</div><p class="tmt-quote">“Great photos and easy to download.”</p></article>
@@ -1068,10 +1076,10 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
 </main>
 
 <!-- ────────── BOOKING DRAWER ────────── -->
-<div class="drawer-bg" id="drawer">
-  <div class="drawer" id="drawerCard">
+<div class="drawer-bg" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle" aria-hidden="true">
+  <div class="drawer" id="drawerCard" tabindex="-1">
     <div class="dphoto" id="dphoto">
-      <button class="close" onclick="closeDrawer()">&times;</button>
+      <button class="close" type="button" aria-label="Close booking dialog" onclick="closeDrawer()">&times;</button>
       <h2 id="dTitle"></h2>
     </div>
     <div class="dbody" id="dbody"></div>
@@ -1085,15 +1093,15 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
     <span>Language:</span>
   <span id="lang-sw" style="display:inline-flex;gap:3px;background:rgba(0,0,0,0.05);border-radius:20px;padding:3px;vertical-align:middle;">
     <button class="lbtn active" onclick="setLang('en')" data-lang="en" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:white;color:var(--rose);box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all .2s;font-family:inherit;">EN</button>
-    <button class="lbtn" onclick="setLang('ru')" data-lang="ru" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">РУ</button>
-    <button class="lbtn" onclick="setLang('hi')" data-lang="hi" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">हिं</button>
-    <button class="lbtn" onclick="setLang('uk')" data-lang="uk" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:#a8a29e;transition:all .2s;font-family:inherit;">УК</button>
+    <button class="lbtn" onclick="setLang('ru')" data-lang="ru" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:all .2s;font-family:inherit;">РУ</button>
+    <button class="lbtn" onclick="setLang('hi')" data-lang="hi" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:all .2s;font-family:inherit;">हिं</button>
+    <button class="lbtn" onclick="setLang('uk')" data-lang="uk" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:all .2s;font-family:inherit;">УК</button>
   </span></p>
   <!-- Hidden admin access: tiny dot in footer -->
   <a href="/backstage" class="admin-hint" title="Admin access">·</a>
 </footer>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <div class="assistant-widget" id="assistantWidget">
   <button class="assistant-launch" id="assistantLaunch" type="button" aria-label="Open assistant" onclick="toggleAssistant()">
@@ -1110,7 +1118,7 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
     </div>
     <div class="assistant-messages" id="assistantMessages"></div>
     <form class="assistant-form" onsubmit="sendAssistantMessage(event)">
-      <input id="assistantInput" type="text" maxlength="500" autocomplete="off" placeholder="Ask a question">
+      <input id="assistantInput" type="text" maxlength="500" autocomplete="off" placeholder="Ask a question" aria-label="Ask a question">
       <button class="assistant-send" id="assistantSend" type="submit" aria-label="Send">›</button>
     </form>
   </section>
@@ -1208,6 +1216,7 @@ const STRIPE_ENABLED = {{ stripe_enabled | tojson }};
 let payTimer = null;
 let currentDrawerEventId = null;
 let currentDrawerDate = null;
+let drawerInvoker = null;
 const trackedSessionViews = new Set();
 const trackedFormStarts = new Set();
 
@@ -1536,12 +1545,18 @@ function renderIncludedSection(eventObj) {
 function renderAgreementSection(eventObj) {
   if (!eventObj?.agreement?.enabled) return '';
   return `<section class="agreement-section" aria-label="Booking agreement">
-    <div class="lbl">Booking terms</div>
-    <label><input type="checkbox" id="termsAccepted"> <span>I agree to the booking terms, including the non-refundable reservation payment and rescheduling/cancellation policy shown for this session.</span></label>
-    <input id="agreementName" class="full" type="text" autocomplete="name" placeholder="Electronic signature / full legal name">
-    <div class="lbl" style="margin-top:12px">Photo/video privacy</div>
-    <label><input type="radio" name="marketingConsent" value="yes"> <span>Yes, I allow Pashynska Photography to use selected photos/videos from this session for portfolio, website, social media, ads, and marketing.</span></label>
-    <label><input type="radio" name="marketingConsent" value="no"> <span>No, please keep my gallery private.</span></label>
+    <fieldset class="agreement-choice" id="termsAgreement">
+      <legend class="lbl">Booking terms</legend>
+      <label><input type="checkbox" id="termsAccepted" onchange="clearGroupError('termsAgreement')"> <span>I agree to the booking terms, including the non-refundable reservation payment and rescheduling/cancellation policy shown for this session.</span></label>
+      <span class="field-error" id="termsAgreement-error" role="alert" hidden></span>
+    </fieldset>
+    <input id="agreementName" class="full" type="text" autocomplete="name" placeholder="Electronic signature / full legal name" aria-label="Electronic signature or full legal name" oninput="clearFieldError(this)">
+    <fieldset class="agreement-choice" id="privacyAgreement" style="margin-top:12px">
+      <legend class="lbl">Photo/video privacy</legend>
+      <label><input type="radio" name="marketingConsent" value="yes" onchange="clearGroupError('privacyAgreement')"> <span>Yes, I allow Pashynska Photography to use selected photos/videos from this session for portfolio, website, social media, ads, and marketing.</span></label>
+      <label><input type="radio" name="marketingConsent" value="no" onchange="clearGroupError('privacyAgreement')"> <span>No, please keep my gallery private.</span></label>
+      <span class="field-error" id="privacyAgreement-error" role="alert" hidden></span>
+    </fieldset>
   </section>`;
 }
 function changeTimeFocus() {
@@ -1933,7 +1948,14 @@ document.getElementById('filters').addEventListener('click', (e) => {
 /* drawer */
 function showDrawer() {
   toggleAssistant(false);
-  document.getElementById('drawer').classList.add('open');
+  const drawer = document.getElementById('drawer');
+  const active = document.activeElement;
+  if (active && active !== document.body && !drawer.contains(active)) {
+    drawerInvoker = active;
+  }
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+  drawer.querySelector('.close')?.focus();
 }
 
 async function openDrawer(id) {
@@ -1992,9 +2014,9 @@ async function openDrawer(id) {
         ${T('waitlist_msg')}
       </div>
       <div class="form">
-        <input class="full" placeholder="${T('full_name').replace(/ \*$/, '')}" id="wName">
-        <input placeholder="${T('email_ph').replace(/ \*$/, '')}" id="wEmail">
-        <input placeholder="${T('ig_ph')}" id="wIg">
+        <input class="full" data-ph="full_name" placeholder="${T('full_name').replace(/ \*$/, '')}" aria-label="${T('full_name').replace(/ \*$/, '')}" id="wName" autocomplete="name" oninput="clearFieldError(this)">
+        <input data-ph="email_ph" placeholder="${T('email_ph').replace(/ \*$/, '')}" aria-label="${T('email_ph').replace(/ \*$/, '')}" id="wEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
+        <input data-ph="ig_ph" placeholder="${T('ig_ph')}" aria-label="${T('ig_ph')}" id="wIg" autocomplete="off" oninput="clearFieldError(this)">
       </div>
       <button class="btn" onclick="joinWaitlist('${e.id}')">${T('join_waitlist_btn')}</button>`;
     showDrawer();
@@ -2037,9 +2059,9 @@ async function openDrawer(id) {
           ${T('no_slots_msg')} ${T('waitlist_msg')}
         </div>
         <div class="form">
-          <input class="full" placeholder="${T('full_name').replace(/ \*$/, '')}" id="wName">
-          <input placeholder="${T('email_ph').replace(/ \*$/, '')}" id="wEmail" type="email" inputmode="email">
-          <input placeholder="${T('ig_ph')}" id="wIg">
+          <input class="full" data-ph="full_name" placeholder="${T('full_name').replace(/ \*$/, '')}" aria-label="${T('full_name').replace(/ \*$/, '')}" id="wName" autocomplete="name" oninput="clearFieldError(this)">
+          <input data-ph="email_ph" placeholder="${T('email_ph').replace(/ \*$/, '')}" aria-label="${T('email_ph').replace(/ \*$/, '')}" id="wEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
+          <input data-ph="ig_ph" placeholder="${T('ig_ph')}" aria-label="${T('ig_ph')}" id="wIg" autocomplete="off" oninput="clearFieldError(this)">
         </div>
         <button class="btn" onclick="joinWaitlist('${e.id}')">${T('join_waitlist_btn')}</button>
         <button class="btn-ghost" onclick="closeDrawer()" style="margin-top:10px">${T('close_btn')}</button>`;
@@ -2050,7 +2072,7 @@ async function openDrawer(id) {
     const isRolling = e.booking_type === 'rolling_availability';
     const rollingDateControl = isRolling ? `
       <div class="lbl">Choose date</div>
-      <input class="full" id="bookingDate" type="date" min="${todayISO()}" max="${addDaysISO(e.availability_horizon_days || 90)}" value="${selectedDate}" onchange="reloadSlotsForSelectedDate('${e.id}')" style="width:100%;box-sizing:border-box;margin-bottom:14px;padding:12px;border:1.5px solid var(--ink-5);border-radius:10px;font:500 .9rem var(--font-b)">
+      <input class="full" id="bookingDate" type="date" aria-label="Choose date" min="${todayISO()}" max="${addDaysISO(e.availability_horizon_days || 90)}" value="${selectedDate}" onchange="reloadSlotsForSelectedDate('${e.id}')" style="width:100%;box-sizing:border-box;margin-bottom:14px;padding:12px;border:1.5px solid var(--ink-5);border-radius:10px;font:500 .9rem var(--font-b)">
     ` : '';
 
     dbody.innerHTML = `
@@ -2071,23 +2093,23 @@ async function openDrawer(id) {
       </div>
       ${renderIncludedSection(e)}
       ${rollingDateControl}
-      <div class="lbl">${T('available_slots_lbl')}</div>
-      <div class="slots" id="slotsBox">
+      <div class="lbl" id="availableSlotsLabel">${T('available_slots_lbl')}</div>
+      <div class="slots" id="slotsBox" role="group" aria-labelledby="availableSlotsLabel">
         ${availableSlots.map((s, i) => `
-          <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
+          <button type="button" class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" aria-label="${s.label || s.time}" aria-pressed="${i === 0 ? 'true' : 'false'}" onclick="pickSlot(this)">${s.time}</button>
         `).join('')}
       </div>
       <div id="slotEmptyMsg" style="display:${availableSlots.length ? 'none' : 'block'};background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px;font-size:.86rem;margin-bottom:14px;text-align:center">${slotsData.foreign_booked ? T('slot_foreign_msg', {ig: slotsData.instagram_handle || '@pashynska.photo'}) : T('no_slots_msg')}</div>
       <div class="booking-summary" id="bookingSummary"></div>
       ${renderAddonsSection(e)}
       <div class="form">
-        <input data-ph="full_name" placeholder="${T('full_name')}" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
-        <input data-ph="phone_ph" placeholder="${T('phone_ph')}" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
-        <input data-ph="email_ph" placeholder="${T('email_ph')}" id="fEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
-        <input data-ph="ig_ph" placeholder="${T('ig_ph')}" id="fIg" autocomplete="off" oninput="clearFieldError(this)">
+        <input data-ph="full_name" placeholder="${T('full_name')}" aria-label="${T('full_name').replace(/ \*$/, '')}" class="full" id="fName" autocomplete="name" oninput="clearFieldError(this)">
+        <input data-ph="phone_ph" placeholder="${T('phone_ph')}" aria-label="Phone" id="fPhone" type="tel" autocomplete="tel" inputmode="tel" oninput="clearFieldError(this)">
+        <input data-ph="email_ph" placeholder="${T('email_ph')}" aria-label="${T('email_ph').replace(/ \*$/, '')}" id="fEmail" type="email" autocomplete="email" inputmode="email" oninput="clearFieldError(this)">
+        <input data-ph="ig_ph" placeholder="${T('ig_ph')}" aria-label="Instagram" id="fIg" autocomplete="off" oninput="clearFieldError(this)">
         <div class="referral-wrap" style="grid-column:1/-1; margin-top:4px;">
           <div style="display:flex; gap:8px; align-items:stretch;">
-            <input id="fReferral" type="text" placeholder="Referral or gift code (optional)" autocomplete="off" oninput="clearFieldError(this); document.getElementById('referralStatus').textContent='';" style="flex:1; text-transform:uppercase;">
+            <input id="fReferral" type="text" placeholder="Referral or gift code (optional)" aria-label="Referral or gift code (optional)" autocomplete="off" oninput="clearFieldError(this); document.getElementById('referralStatus').textContent='';" style="flex:1; text-transform:uppercase;">
             <button type="button" id="referralApplyBtn" onclick="applyReferralCode()" style="padding:10px 14px; border-radius:10px; border:1px solid var(--rose); background:#fff; color:var(--rose); font-weight:600; cursor:pointer;">Apply</button>
           </div>
           <span id="referralStatus" style="display:block; font-size:.78rem; margin-top:4px; min-height:1.2em;"></span>
@@ -2109,8 +2131,12 @@ async function openDrawer(id) {
 }
 
 function pickSlot(btn) {
-  btn.parentNode.querySelectorAll('.slot').forEach(s => s.classList.remove('sel'));
+  btn.parentNode.querySelectorAll('.slot').forEach(s => {
+    s.classList.remove('sel');
+    s.setAttribute('aria-pressed', 'false');
+  });
   btn.classList.add('sel');
+  btn.setAttribute('aria-pressed', 'true');
   updateBookingSummary();
   trackBookingEvent('slot_selected', currentDrawerEventId, {time: btn.dataset.time || '', date: currentDrawerDate || ''});
 }
@@ -2125,7 +2151,7 @@ async function reloadSlotsForSelectedDate(eventId) {
     const data = await API.slots(input.value, eventId);
     const slots = data.slots || [];
     slotsBox.innerHTML = slots.map((s, i) => `
-      <button class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" onclick="pickSlot(this)">${s.time}</button>
+      <button type="button" class="slot ${i === 0 ? 'sel' : ''}" data-time="${s.time}" aria-label="${s.label || s.time}" aria-pressed="${i === 0 ? 'true' : 'false'}" onclick="pickSlot(this)">${s.time}</button>
     `).join('');
     if (empty) empty.style.display = slots.length ? 'none' : 'block';
     const dateLabel = document.getElementById('drawerDateLabel');
@@ -2141,24 +2167,57 @@ async function reloadSlotsForSelectedDate(eventId) {
 // ── FIELD VALIDATION HELPERS ──
 function clearFieldError(el) {
   el.style.borderColor = '';
-  const err = el.parentNode.querySelector('.field-error[data-for="' + el.id + '"]');
+  el.removeAttribute('aria-invalid');
+  const errorId = el.getAttribute('aria-describedby');
+  el.removeAttribute('aria-describedby');
+  const err = errorId
+    ? document.getElementById(errorId)
+    : el.parentNode.querySelector('.field-error[data-for="' + el.id + '"]');
   if (err) err.remove();
 }
 
 function showFieldError(elId, msg) {
   const el = document.getElementById(elId);
-  if (!el) return;
+  if (!el) return null;
   el.style.borderColor = '#e53e3e';
-  el.focus();
   // Remove existing error
   const old = el.parentNode.querySelector('.field-error[data-for="' + elId + '"]');
   if (old) old.remove();
   const span = document.createElement('span');
   span.className = 'field-error';
+  span.id = elId + '-error';
+  span.setAttribute('role', 'alert');
   span.dataset.for = elId;
-  span.style.cssText = 'display:block; color:#e53e3e; font-size:.73rem; margin-top:4px; grid-column:1/-1;';
+  span.style.cssText = 'display:block; color:#b42318; font-size:.73rem; margin-top:4px; grid-column:1/-1;';
   span.textContent = msg;
   el.insertAdjacentElement('afterend', span);
+  el.setAttribute('aria-invalid', 'true');
+  el.setAttribute('aria-describedby', span.id);
+  return el;
+}
+
+function clearGroupError(groupId) {
+  const group = document.getElementById(groupId);
+  const error = document.getElementById(groupId + '-error');
+  group?.removeAttribute('aria-invalid');
+  group?.removeAttribute('aria-describedby');
+  if (error) {
+    error.textContent = '';
+    error.hidden = true;
+  }
+}
+
+function showGroupError(groupId, msg, focusSelector) {
+  const group = document.getElementById(groupId);
+  const error = document.getElementById(groupId + '-error');
+  if (!group || !error) return null;
+  error.textContent = msg;
+  error.hidden = false;
+  group.setAttribute('aria-invalid', 'true');
+  group.setAttribute('aria-describedby', error.id);
+  const target = group.querySelector(focusSelector);
+  target?.focus();
+  return target;
 }
 
 function validateBookingForm() {
@@ -2167,23 +2226,28 @@ function validateBookingForm() {
   const email = document.getElementById('fEmail')?.value.trim() || '';
   const ig    = document.getElementById('fIg')?.value.trim() || '';
   let valid = true;
+  let firstInvalid = null;
+  const markInvalid = (id, message) => {
+    const field = showFieldError(id, message);
+    if (!firstInvalid) firstInvalid = field;
+  };
 
   // Name: letters, spaces, hyphens, apostrophes — 2-80 chars
   // Accept Latin, Cyrillic, Devanagari (Hindi)
   if (name.length < 2) {
-    showFieldError('fName', T('err_name_required'));
+    markInvalid('fName', T('err_name_required'));
     valid = false;
   } else if (!/^[A-Za-zÀ-ÖØ-öø-ÿА-Яа-яЁёЇїІіЄєҐґऀ-ॿ'\- ]{2,80}$/.test(name)) {
-    showFieldError('fName', T('err_name_format'));
+    markInvalid('fName', T('err_name_format'));
     valid = false;
   }
 
   // Email
   if (!email) {
-    showFieldError('fEmail', T('err_email_required'));
+    markInvalid('fEmail', T('err_email_required'));
     valid = false;
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-    showFieldError('fEmail', T('err_email_format'));
+    markInvalid('fEmail', T('err_email_format'));
     valid = false;
   }
 
@@ -2194,14 +2258,14 @@ function validateBookingForm() {
     if (raw.startsWith('+')) {
       // International format — just check digit count
       if (digits.length < 7 || digits.length > 15) {
-        showFieldError('fPhone', T('err_phone'));
+        markInvalid('fPhone', T('err_phone'));
         valid = false;
       }
     } else {
       // North American — strip leading 1 if 11 digits
       if (digits.startsWith('1') && digits.length === 11) digits = digits.slice(1);
       if (digits.length !== 10 || ['0','1'].includes(digits[0]) || ['0','1'].includes(digits[3])) {
-        showFieldError('fPhone', T('err_phone'));
+        markInvalid('fPhone', T('err_phone'));
         valid = false;
       }
     }
@@ -2211,11 +2275,12 @@ function validateBookingForm() {
   if (ig) {
     const handle = ig.startsWith('@') ? ig.slice(1) : ig;
     if (!/^[A-Za-z0-9_.]{1,30}$/.test(handle)) {
-      showFieldError('fIg', T('err_ig'));
+      markInvalid('fIg', T('err_ig'));
       valid = false;
     }
   }
 
+  if (firstInvalid) firstInvalid.focus();
   return valid;
 }
 
@@ -2287,9 +2352,15 @@ async function reserveSlot(eventId, eventDate) {
 
   if (!validateBookingForm()) return;
   if (agreementEnabled) {
-    if (!termsAccepted) { toast('Please accept the booking terms.'); return; }
-    if (!agreementName) { showFieldError('agreementName', 'Please enter your full legal name.'); return; }
-    if (!['yes','no'].includes(marketingConsent)) { toast('Please choose your photo/video privacy preference.'); return; }
+    if (!termsAccepted) {
+      showGroupError('termsAgreement', 'Please accept the booking terms.', '#termsAccepted');
+      return;
+    }
+    if (!agreementName) { showFieldError('agreementName', 'Please enter your full legal name.')?.focus(); return; }
+    if (!['yes','no'].includes(marketingConsent)) {
+      showGroupError('privacyAgreement', 'Please choose your photo/video privacy preference.', 'input[type="radio"]');
+      return;
+    }
   }
 
   // ── reCAPTCHA v3 verification (anti-bot) ─────────────────────────
@@ -2402,9 +2473,9 @@ function goToPayment(eventId, eventDate) {
     ` : '';
   document.getElementById('dbody').innerHTML = `
     <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
-      <button onclick="restoreDrawer('${eventId}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;cursor:pointer;font-size:14px">‹</button>
+      <button type="button" aria-label="Back to booking details" onclick="restoreDrawer('${eventId}')" style="width:44px;height:44px;border-radius:50%;border:1px solid var(--ink-5);background:#fff;cursor:pointer;font-size:14px">‹</button>
       <div>
-        <div style="font-weight:600;font-size:.96rem">${T('pay_complete_title')}</div>
+        <h3 id="paymentStepTitle" tabindex="-1" style="font:600 .96rem var(--font-b)">${T('pay_complete_title')}</h3>
         <div style="font-size:.76rem;color:var(--ink-3);line-height:1.35">${fmtDate(eventDate)} · ${time} · ${T('pay_intro_soft')}</div>
       </div>
     </div>
@@ -2486,6 +2557,7 @@ function goToPayment(eventId, eventDate) {
     <button class="btn" onclick="confirmClientPayment('${e.id}')">${T('pay_confirm_btn', {amt: amt})}</button>
     <button class="btn-ghost" onclick="restoreDrawer('${e.id}')">${T('pay_back_btn')}</button>
   `;
+  document.getElementById('paymentStepTitle')?.focus();
   startPayTimer();
 }
 
@@ -2762,7 +2834,19 @@ async function joinWaitlist(eventId) {
   const name = document.getElementById('wName')?.value?.trim();
   const email = document.getElementById('wEmail')?.value?.trim();
   const ig = document.getElementById('wIg')?.value?.trim();
-  if (!name || !email) { toast(T('fill_name_email')); return; }
+  let firstInvalid = null;
+  if (!name) firstInvalid = showFieldError('wName', T('err_name_required'));
+  if (!email) {
+    const field = showFieldError('wEmail', T('err_email_required'));
+    if (!firstInvalid) firstInvalid = field;
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    const field = showFieldError('wEmail', T('err_email_format'));
+    if (!firstInvalid) firstInvalid = field;
+  }
+  if (firstInvalid) {
+    firstInvalid.focus();
+    return;
+  }
 
   try {
     const result = await API.waitlist({
@@ -2784,7 +2868,9 @@ async function joinWaitlist(eventId) {
 }
 
 function closeDrawer() {
-  document.getElementById('drawer').classList.remove('open');
+  const drawer = document.getElementById('drawer');
+  drawer.classList.remove('open');
+  drawer.setAttribute('aria-hidden', 'true');
   currentDrawerEventId = null;
   currentDrawerDate = null;
   if (payTimer) clearInterval(payTimer);
@@ -2796,13 +2882,45 @@ function closeDrawer() {
     dphoto.style.height = "";
     dphoto.querySelector('h2').style.display = '';
   }, 300);
+  const restoreTarget = drawerInvoker;
+  drawerInvoker = null;
+  if (restoreTarget?.isConnected) {
+    restoreTarget.focus();
+  }
 }
 
 document.getElementById('drawer').addEventListener('click', (e) => { if (e.target.id === 'drawer') closeDrawer() });
 
-// Keyboard: Escape closes drawer, Enter on slot selects it
+// Keyboard: keep modal focus inside, Escape closes and restores the opener.
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeDrawer();
+  const drawer = document.getElementById('drawer');
+  if (!drawer.classList.contains('open')) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeDrawer();
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const focusable = [...drawer.querySelectorAll(
+    'a[href],button:not([disabled]),input:not([disabled]):not([tabindex="-1"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+  )].filter(el => el.getClientRects().length > 0);
+  if (!focusable.length) {
+    e.preventDefault();
+    document.getElementById('drawerCard')?.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  } else if (!drawer.contains(document.activeElement)) {
+    e.preventDefault();
+    first.focus();
+  }
 });
 
 function renderPast() {
@@ -3550,7 +3668,10 @@ function applyStaticI18n(){
   // Placeholders
   document.querySelectorAll('[data-ph]').forEach(el => {
     const k = el.dataset.ph;
-    if (dict[k] !== undefined) el.placeholder = dict[k];
+    if (dict[k] !== undefined) {
+      el.placeholder = dict[k];
+      el.setAttribute('aria-label', String(dict[k]).replace(/ \*$/, ''));
+    }
   });
   // <html lang>
   document.documentElement.setAttribute('lang', CURRENT_LANG);
@@ -3567,7 +3688,7 @@ function setLang(lang) {
   document.querySelectorAll('.lbtn').forEach(b => {
     const isActive = b.dataset.lang === lang;
     b.style.background  = isActive ? 'white' : 'transparent';
-    b.style.color       = isActive ? 'var(--rose)' : '#a8a29e';
+    b.style.color       = isActive ? 'var(--rose)' : 'var(--ink-3)';
     b.style.boxShadow   = isActive ? '0 1px 4px rgba(0,0,0,0.1)' : 'none';
   });
 
@@ -3687,8 +3808,12 @@ function initTestimonialCarousel(){
         if (dist < best) { best = dist; activeIndex = idx; }
       });
       list.forEach(function(card, idx){
-        card.classList.toggle('is-active', idx === activeIndex);
+        const isActive = idx === activeIndex;
+        card.classList.toggle('is-active', isActive);
         card.classList.toggle('is-near', Math.abs(idx - activeIndex) === 1);
+        card.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+        const more = card.querySelector('.tmt-more');
+        if (more) more.tabIndex = isActive ? 0 : -1;
       });
       if (activeIndex !== lastActiveIndex) {
         lastActiveIndex = activeIndex;
@@ -3782,6 +3907,22 @@ function initTestimonialCarousel(){
 
     marquee.addEventListener('scroll', scheduleActiveUpdate, { passive: true });
     window.addEventListener('resize', scheduleActiveUpdate, { passive: true });
+    marquee.addEventListener('keydown', function(ev){
+      if (ev.target !== marquee) return;
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      ev.preventDefault();
+      const list = cards();
+      const current = Math.max(0, list.findIndex(card => card.classList.contains('is-active')));
+      const delta = ev.key === 'ArrowRight' ? 1 : -1;
+      const next = Math.max(0, Math.min(list.length - 1, current + delta));
+      const target = list[next];
+      if (!target) return;
+      marquee.scrollTo({
+        left: Math.max(0, target.offsetLeft - (marquee.clientWidth - target.clientWidth) / 2),
+        behavior: prefersReducedMotion ? 'auto' : 'smooth'
+      });
+      window.setTimeout(centerActiveCard, prefersReducedMotion ? 0 : 260);
+    });
 
     marquee.addEventListener('pointerdown', function(ev){
       if (ev.button !== undefined && ev.button !== 0) return;
@@ -3906,7 +4047,10 @@ function updateAssistantLang() {
   const send = document.getElementById('assistantSend');
   if (title) title.textContent = assistantCopy('title');
   if (subtitle) subtitle.textContent = assistantCopy('subtitle');
-  if (input) input.placeholder = assistantCopy('placeholder');
+  if (input) {
+    input.placeholder = assistantCopy('placeholder');
+    input.setAttribute('aria-label', assistantCopy('placeholder'));
+  }
   if (launch) launch.setAttribute('aria-label', assistantCopy('open'));
   if (close) close.setAttribute('aria-label', assistantCopy('close'));
   if (send) send.setAttribute('aria-label', assistantCopy('send'));

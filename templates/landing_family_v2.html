@@ -170,8 +170,8 @@
   <style>
     :root{
       --bg:#FBF7F0; --panel:#FFFFFF; --panel-2:#F6EEDF;
-      --ink:#2B241B; --muted:#8A7B66; --line:rgba(196,151,58,.35); --line-soft:rgba(196,151,58,.16);
-      --gold:#C9A24B; --gold-2:#E8C45F; --gold-3:#F6E3B0; --gold-deep:#A8823A;
+      --ink:#2B241B; --muted:#75684F; --line:rgba(196,151,58,.35); --line-soft:rgba(196,151,58,.16);
+      --gold:#C9A24B; --gold-2:#E8C45F; --gold-3:#F6E3B0; --gold-deep:#76591C;
       --serif:'Cormorant Garamond',Georgia,serif; --sans:'DM Sans',-apple-system,sans-serif;
       --shadow-lg:0 24px 70px -24px rgba(90,70,40,.35);
     }
@@ -181,6 +181,7 @@
     img{max-width:100%;display:block}
     a{color:inherit}
     ::selection{background:rgba(232,196,95,.45)}
+    :where(a,button,input,summary,[tabindex]):focus-visible{outline:3px solid var(--gold-deep);outline-offset:3px}
 
     /* ═══ Pill nav ═══ */
     .pill-nav{position:fixed;top:22px;left:0;right:0;z-index:60;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;padding:0 16px}.pill-nav>*{flex:0 0 auto}
@@ -352,7 +353,7 @@
     .footer-links{display:flex;flex-wrap:wrap;justify-content:center;gap:26px;font-size:.9rem;font-weight:600}
     .footer-links a{text-decoration:none;color:var(--muted)}
     .footer-links a:hover{color:var(--gold-deep)}
-    .footer-copy{margin-top:18px;font-size:.78rem;color:rgba(138,123,102,.75)}
+    .footer-copy{margin-top:18px;font-size:.78rem;color:var(--muted)}
 
     .mcta{position:fixed;left:12px;right:12px;bottom:12px;z-index:70;display:none;opacity:0;transform:translateY(16px);transition:opacity .35s,transform .35s;pointer-events:none}
     .mcta.show{opacity:1;transform:none;pointer-events:auto}
@@ -373,6 +374,7 @@
     @media(max-width:899px){
       .pill-nav{display:none}
       .m-nav{display:flex}
+      .m-nav .logo,.m-nav .ghost,.m-nav .gift{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
       .hero{display:block;min-height:0}
       .hero-frame{display:none}
       .hero-media{position:relative;inset:0;height:46svh;min-height:330px}
