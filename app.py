@@ -560,7 +560,30 @@ def _background_threads_disabled():
 import threading as _threading
 
 _watcher_started = False
+ETRANSFER_SCAN_ALERT_THROTTLE_SECONDS = int(
+    os.environ.get("ETRANSFER_SCAN_ALERT_THROTTLE_SECONDS", "3600")
+)
+ETRANSFER_SCAN_OVERDUE_SECONDS = int(
+    os.environ.get("ETRANSFER_SCAN_OVERDUE_SECONDS", "300")
+)
+_watcher_state_lock = _threading.Lock()
+_ETRANSFER_SCAN_DETAILS = {
+    "scan_exception": "scan exception",
+    "fetch_busy_cached": "email fetch busy; cached envelopes skipped",
+    "fetch_busy_no_cache": "email fetch busy; no fresh envelopes available",
+    "fetch_cached": "cached envelopes skipped; waiting for a fresh scan",
+    "envelope_fetch_failed": "email envelope fetch failed",
+    "message_body_unavailable": "one or more Interac message bodies could not be read",
+    "fresh_scan_overdue": "fresh scan overdue while payment work is eligible",
+}
 _watcher_state = {
+    "status": "never",
+    "detail": None,
+    "last_attempt_at": None,
+    "last_success_at": None,
+    "last_attempt_epoch": None,
+    "last_success_epoch": None,
+    "last_alert_at_epoch": None,
     "last_email_scan_at": None,
     "last_email_scan_ok": None,
     "last_email_scan_error": None,
@@ -568,6 +591,113 @@ _watcher_state = {
     "last_auto_confirmed_booking_id": None,
     "last_auto_confirmed_at": None,
 }
+
+
+def _watchdog_iso(epoch):
+    return datetime.fromtimestamp(float(epoch), tz=timezone.utc).isoformat()
+
+
+def _watcher_state_snapshot():
+    with _watcher_state_lock:
+        return dict(_watcher_state)
+
+
+def _reset_etransfer_watchdog_state():
+    """Reset in-process observability state for deterministic tests."""
+    with _watcher_state_lock:
+        _watcher_state.clear()
+        _watcher_state.update({
+            "status": "never",
+            "detail": None,
+            "last_attempt_at": None,
+            "last_success_at": None,
+            "last_attempt_epoch": None,
+            "last_success_epoch": None,
+            "last_alert_at_epoch": None,
+            "last_email_scan_at": None,
+            "last_email_scan_ok": None,
+            "last_email_scan_error": None,
+            "last_email_count": 0,
+            "last_auto_confirmed_booking_id": None,
+            "last_auto_confirmed_at": None,
+        })
+
+
+def _notify_etransfer_scan_issue(status, detail, at_epoch):
+    """Send one sanitized Telegram admin alert per throttle window."""
+    with _watcher_state_lock:
+        last_alert = _watcher_state.get("last_alert_at_epoch")
+        if (
+            last_alert is not None
+            and float(at_epoch) - float(last_alert)
+            < ETRANSFER_SCAN_ALERT_THROTTLE_SECONDS
+        ):
+            return False
+        # Claim the throttle slot before delivery so sender failures cannot
+        # create an alert storm on every watcher tick.
+        _watcher_state["last_alert_at_epoch"] = float(at_epoch)
+        last_success_at = _watcher_state.get("last_success_at")
+
+    reason = _ETRANSFER_SCAN_DETAILS.get(detail, "scan health degraded")
+    message = (
+        "⚠️ <b>e-Transfer scan watchdog</b>\n"
+        f"Status: {_tg_escape(status)}\n"
+        f"Reason: {_tg_escape(reason)}\n"
+        f"Last fresh success: {_tg_escape(last_success_at or 'never')}"
+    )
+    try:
+        _notify_admin(message)
+    except Exception as exc:
+        log.error("[watcher] Telegram watchdog alert failed: %s", type(exc).__name__)
+    return True
+
+
+def _record_etransfer_scan_issue(
+    *,
+    status,
+    detail,
+    at_epoch=None,
+    email_count=None,
+    notify=True,
+    record_attempt=True,
+):
+    """Record a bounded failure/degradation code without provider content."""
+    at_epoch = float(time.time() if at_epoch is None else at_epoch)
+    safe_detail = detail if detail in _ETRANSFER_SCAN_DETAILS else "scan_exception"
+    with _watcher_state_lock:
+        if record_attempt:
+            attempt_at = _watchdog_iso(at_epoch)
+            _watcher_state["last_attempt_at"] = attempt_at
+            _watcher_state["last_attempt_epoch"] = at_epoch
+            _watcher_state["last_email_scan_at"] = attempt_at
+        _watcher_state["status"] = status
+        _watcher_state["detail"] = safe_detail
+        _watcher_state["last_email_scan_ok"] = False
+        _watcher_state["last_email_scan_error"] = safe_detail
+        if email_count is not None:
+            _watcher_state["last_email_count"] = int(email_count)
+    if notify:
+        _notify_etransfer_scan_issue(status, safe_detail, at_epoch)
+
+
+def _record_etransfer_scan_success(at_epoch=None, email_count=0):
+    """Advance success only after a fresh envelope scan and readable bodies."""
+    at_epoch = float(time.time() if at_epoch is None else at_epoch)
+    success_at = _watchdog_iso(at_epoch)
+    with _watcher_state_lock:
+        _watcher_state.update({
+            "status": "healthy",
+            "detail": None,
+            "last_attempt_at": success_at,
+            "last_success_at": success_at,
+            "last_attempt_epoch": at_epoch,
+            "last_success_epoch": at_epoch,
+            "last_email_scan_at": success_at,
+            "last_email_scan_ok": True,
+            "last_email_scan_error": None,
+            "last_email_count": int(email_count),
+        })
+
 
 def _process_etransfer_email_batch(emails, pending, reconciliation):
     """Match a batch of Interac emails against pending bookings.
@@ -590,7 +720,7 @@ def _process_etransfer_email_batch(emails, pending, reconciliation):
     return confirmed_ids
 
 
-def _watcher_thread():
+def _watcher_thread(max_cycles=None, time_module=None):
     """Daemon thread — does two periodic jobs:
        1. Check Gmail for incoming Interac e-Transfers and auto-confirm bookings
        2. Expire stale reservations whose 15-min window has passed, freeing slots
@@ -599,7 +729,7 @@ def _watcher_thread():
     forever (until someone hits /expired manually). That silently kills
     conversion: the next visitor sees 'Sold out' on a slot nobody is paying for.
     """
-    import time as _time
+    _time = time_module or time
     CHECK_INTERVAL = 30  # seconds — fast enough to free slots for the next visitor
     EMAIL_POLL_INTERVAL = int(os.environ.get("ETRANSFER_EMAIL_POLL_INTERVAL", "60"))
     RECONCILIATION_INTERVAL = int(os.environ.get("ETRANSFER_RECONCILIATION_INTERVAL", "1800"))
@@ -607,14 +737,23 @@ def _watcher_thread():
     LIVE_EMAIL_LOOKBACK_DAYS = int(os.environ.get("ETRANSFER_LIVE_EMAIL_LOOKBACK_DAYS", "7"))
     last_email_poll = 0.0
     last_reconciliation_poll = 0.0
+    started_at = _time.time()
+    cycles = 0
     log_w = logging.getLogger("watcher")
     log_w.info("[watcher] Global e-Transfer + slot-expiry watcher started")
 
     from check_etransfer_v2 import (
-        get_pending_bookings, get_reconciliation_bookings, get_emails
+        consume_last_body_read_status,
+        get_last_email_fetch_status,
+        get_pending_bookings,
+        get_reconciliation_bookings,
+        get_emails,
     )
 
     while True:
+        cycle_now = _time.time()
+        eligible_work = False
+
         # 1. Sweep expired reservations every tick — cheap query, no external IO.
         try:
             released = expire_reservations()
@@ -625,8 +764,9 @@ def _watcher_thread():
 
         # 2. Poll Gmail for e-Transfer notifications and match to pending bookings.
         try:
-            now = _time.time()
+            now = cycle_now
             pending = get_pending_bookings(within_minutes=30)
+            eligible_work = bool(pending)
             should_poll_email = bool(pending) and (now - last_email_poll >= EMAIL_POLL_INTERVAL)
 
             # Reconciliation is useful, but it is not time-critical. Running it
@@ -636,35 +776,106 @@ def _watcher_thread():
             if now - last_reconciliation_poll >= RECONCILIATION_INTERVAL:
                 reconciliation = get_reconciliation_bookings(within_days=120)
                 should_poll_email = should_poll_email or bool(reconciliation)
+                eligible_work = eligible_work or bool(reconciliation)
                 last_reconciliation_poll = now
 
             if should_poll_email:
                 last_email_poll = now
+                consume_last_body_read_status()
                 emails = get_emails(
                     page_size=LIVE_EMAIL_PAGE_SIZE,
                     lookback_days=LIVE_EMAIL_LOOKBACK_DAYS,
                 )
-                _watcher_state["last_email_scan_at"] = datetime.now(timezone.utc).isoformat()
-                _watcher_state["last_email_scan_ok"] = emails is not None
-                _watcher_state["last_email_scan_error"] = (
-                    None if emails is not None else "Could not fetch filtered Interac emails from Gmail"
-                )
-                _watcher_state["last_email_count"] = len(emails or [])
+                fetch_outcome = get_last_email_fetch_status().get("outcome")
+                email_count = len(emails or [])
                 if emails is None:
-                    log_w.error("[watcher] Filtered Interac Gmail scan failed")
-                elif emails:
-                    for confirmed_id in _process_etransfer_email_batch(emails, pending, reconciliation):
-                        _after_auto_payment_confirmed(confirmed_id)
-                        _watcher_state["last_auto_confirmed_booking_id"] = confirmed_id
-                        _watcher_state["last_auto_confirmed_at"] = datetime.now(timezone.utc).isoformat()
+                    _record_etransfer_scan_issue(
+                        status=(
+                            "degraded"
+                            if fetch_outcome == "busy_no_cache"
+                            else "failed"
+                        ),
+                        detail=(
+                            "fetch_busy_no_cache"
+                            if fetch_outcome == "busy_no_cache"
+                            else "envelope_fetch_failed"
+                        ),
+                        at_epoch=now,
+                        email_count=0,
+                    )
+                    if fetch_outcome != "busy_no_cache":
+                        log_w.error("[watcher] Filtered Interac Gmail scan failed")
+                else:
+                    if emails:
+                        for confirmed_id in _process_etransfer_email_batch(
+                            emails, pending, reconciliation
+                        ):
+                            _after_auto_payment_confirmed(confirmed_id)
+                            with _watcher_state_lock:
+                                _watcher_state["last_auto_confirmed_booking_id"] = confirmed_id
+                                _watcher_state["last_auto_confirmed_at"] = _watchdog_iso(now)
+                    body_status = consume_last_body_read_status()
+                    if body_status.get("unavailable_count"):
+                        _record_etransfer_scan_issue(
+                            status="degraded",
+                            detail="message_body_unavailable",
+                            at_epoch=now,
+                            email_count=email_count,
+                        )
+                    elif fetch_outcome == "fresh":
+                        _record_etransfer_scan_success(now, email_count=email_count)
+                    elif fetch_outcome == "busy_cached":
+                        _record_etransfer_scan_issue(
+                            status="degraded",
+                            detail="fetch_busy_cached",
+                            at_epoch=now,
+                            email_count=email_count,
+                        )
+                    elif fetch_outcome == "cache_hit":
+                        _record_etransfer_scan_issue(
+                            status="skipped",
+                            detail="fetch_cached",
+                            at_epoch=now,
+                            email_count=email_count,
+                            notify=False,
+                        )
+                    else:
+                        _record_etransfer_scan_issue(
+                            status="failed",
+                            detail="envelope_fetch_failed",
+                            at_epoch=now,
+                            email_count=0,
+                        )
+                        log_w.error("[watcher] Filtered Interac Gmail scan failed")
             else:
                 log_w.debug("[watcher] No pending/reconciliation work or email poll throttled")
         except Exception as e:
-            _watcher_state["last_email_scan_at"] = datetime.now(timezone.utc).isoformat()
-            _watcher_state["last_email_scan_ok"] = False
-            _watcher_state["last_email_scan_error"] = str(e)
-            log_w.error(f"[watcher] e-Transfer check error: {e}")
+            _record_etransfer_scan_issue(
+                status="failed",
+                detail="scan_exception",
+                at_epoch=cycle_now,
+            )
+            log_w.error("[watcher] e-Transfer check error: %s", type(e).__name__)
 
+        if eligible_work:
+            state = _watcher_state_snapshot()
+            last_success_epoch = state.get("last_success_epoch")
+            overdue_from = (
+                float(last_success_epoch)
+                if last_success_epoch is not None
+                else float(started_at)
+            )
+            if cycle_now - overdue_from >= ETRANSFER_SCAN_OVERDUE_SECONDS:
+                _record_etransfer_scan_issue(
+                    status="overdue",
+                    detail="fresh_scan_overdue",
+                    at_epoch=cycle_now,
+                    record_attempt=False,
+                )
+
+        cycles += 1
+        if max_cycles is not None and cycles >= max_cycles:
+            break
         _time.sleep(CHECK_INTERVAL)
 
 
@@ -4462,7 +4673,9 @@ def _daily_backup_worker():
         time.sleep(6 * 60 * 60)
 
 
-if os.environ.get("FLASK_ENV") != "development" and not app.config.get("TESTING"):
+if _background_threads_disabled():
+    log.info("[backup] Daily backup worker disabled by DISABLE_BACKGROUND_THREADS")
+elif os.environ.get("FLASK_ENV") != "development" and not app.config.get("TESTING"):
     threading.Thread(target=_daily_backup_worker, daemon=True, name="daily-backup").start()
 
 def _parse_reserved_until_utc(value):
@@ -8048,6 +8261,7 @@ def admin_health():
     import shutil
 
     status = {}
+    watcher_state = _watcher_state_snapshot()
 
     # Database
     try:
@@ -8061,18 +8275,28 @@ def admin_health():
 
     # Himalaya email CLI
     himalaya_ok = shutil.which("himalaya") is not None
-    last_scan_failed = _watcher_state.get("last_email_scan_ok") is False
+    last_scan_failed = watcher_state.get("last_email_scan_ok") is False
     status["email_himalaya"] = {
         "ok": himalaya_ok and not last_scan_failed,
         "error": (
-            _watcher_state.get("last_email_scan_error")
+            watcher_state.get("last_email_scan_error")
             if himalaya_ok
             else "himalaya CLI not found in PATH — emails will silently fail"
         ),
-        "last_scan_at": _watcher_state.get("last_email_scan_at"),
-        "last_scan_email_count": _watcher_state.get("last_email_count", 0),
-        "last_auto_confirmed_booking_id": _watcher_state.get("last_auto_confirmed_booking_id"),
-        "last_auto_confirmed_at": _watcher_state.get("last_auto_confirmed_at"),
+        "last_scan_at": watcher_state.get("last_email_scan_at"),
+        "last_scan_email_count": watcher_state.get("last_email_count", 0),
+        "last_auto_confirmed_booking_id": watcher_state.get("last_auto_confirmed_booking_id"),
+        "last_auto_confirmed_at": watcher_state.get("last_auto_confirmed_at"),
+    }
+
+    scan_status = watcher_state.get("status") or "never"
+    status["etransfer_scan"] = {
+        "ok": scan_status in ("healthy", "never"),
+        "status": scan_status,
+        "detail": watcher_state.get("detail"),
+        "last_attempt_at": watcher_state.get("last_attempt_at"),
+        "last_success_at": watcher_state.get("last_success_at"),
+        "last_email_count": watcher_state.get("last_email_count", 0),
     }
 
     # Telegram bot

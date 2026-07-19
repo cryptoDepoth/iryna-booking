@@ -33,6 +33,8 @@ ETRANSFER_EMAIL_TIMEOUT = int(os.environ.get("ETRANSFER_EMAIL_TIMEOUT", "20"))
 _EMAIL_FETCH_LOCK = threading.Lock()
 _EMAIL_FETCH_CACHE = {"ts": 0.0, "page_size": None, "lookback_days": None, "emails": None}
 _EMAIL_FETCH_CACHE_TTL = int(os.environ.get("ETRANSFER_EMAIL_CACHE_TTL", "60"))
+_EMAIL_FETCH_STATUS = threading.local()
+_BODY_READ_STATUS = threading.local()
 
 # Admin alerts (ambiguity/orphan) are throttled: the watcher re-scans every
 # ~60s and an unresolved collision would otherwise re-fire the same Telegram
@@ -76,6 +78,32 @@ def _send_admin_alert(text):
     """Deliver an admin alert via the app's Telegram notifier."""
     from app import _notify_admin
     _notify_admin(_html_escape(str(text or ""), quote=False))
+
+
+def _set_email_fetch_status(outcome):
+    """Publish only a bounded outcome code for watcher observability."""
+    _EMAIL_FETCH_STATUS.outcome = str(outcome or "unknown")
+
+
+def get_last_email_fetch_status():
+    return {"outcome": getattr(_EMAIL_FETCH_STATUS, "outcome", "never")}
+
+
+def reset_email_fetch_status():
+    _EMAIL_FETCH_STATUS.outcome = "never"
+
+
+def _record_body_read_failure():
+    _BODY_READ_STATUS.unavailable_count = (
+        int(getattr(_BODY_READ_STATUS, "unavailable_count", 0)) + 1
+    )
+
+
+def consume_last_body_read_status():
+    """Return and clear body-read degradation for the current scan thread."""
+    unavailable_count = int(getattr(_BODY_READ_STATUS, "unavailable_count", 0))
+    _BODY_READ_STATUS.unavailable_count = 0
+    return {"unavailable_count": unavailable_count}
 
 
 def get_db():
@@ -324,10 +352,14 @@ def get_emails(page_size=None, lookback_days=None):
         and cached.get("lookback_days") == lookback_days
         and now - float(cached.get("ts") or 0) <= _EMAIL_FETCH_CACHE_TTL
     ):
+        _set_email_fetch_status("cache_hit")
         return cached.get("emails")
 
     if not _EMAIL_FETCH_LOCK.acquire(blocking=False):
         print("[himalaya] envelope list skipped: another fetch is already running")
+        _set_email_fetch_status(
+            "busy_cached" if cached.get("emails") is not None else "busy_no_cache"
+        )
         return cached.get("emails")
 
     try:
@@ -355,6 +387,7 @@ def get_emails(page_size=None, lookback_days=None):
                 rc = result.returncode if result else "?"
                 detail = ((result.stderr if result else "") or "").strip()[-300:]
                 print(f"[himalaya] filtered Interac envelope list failed: rc={rc} {detail}")
+                _set_email_fetch_status("envelope_fetch_failed")
                 return None
             raw = result.stdout.strip()
             if not raw:
@@ -365,6 +398,7 @@ def get_emails(page_size=None, lookback_days=None):
                     "lookback_days": lookback_days,
                     "emails": emails,
                 })
+                _set_email_fetch_status("fresh")
                 return emails
             try:
                 parsed = json.loads(raw)
@@ -375,6 +409,7 @@ def get_emails(page_size=None, lookback_days=None):
                     "lookback_days": lookback_days,
                     "emails": emails,
                 })
+                _set_email_fetch_status("fresh")
                 return emails
             except json.JSONDecodeError:
                 pass
@@ -392,9 +427,11 @@ def get_emails(page_size=None, lookback_days=None):
                 "lookback_days": lookback_days,
                 "emails": emails,
             })
+            _set_email_fetch_status("fresh")
             return emails
         except Exception as e:
             print(f"[himalaya] Error fetching emails: {e}")
+            _set_email_fetch_status("envelope_fetch_failed")
             return None
     finally:
         _EMAIL_FETCH_LOCK.release()
@@ -1273,6 +1310,7 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
 
     body = read_message_body(msg_id)
     if not body:
+        _record_body_read_failure()
         return None, None
 
     amount = extract_payment_info(body)
