@@ -30,6 +30,133 @@ def _with_test_base(html):
     return html.replace("<head>", '<head><base href="http://booking.test/">', 1)
 
 
+def _install_deferred_action_fetch(page):
+    page.evaluate(
+        """
+        () => {
+          window.__adminActionRequests = [];
+          window.__adminActionPending = [];
+          window.fetch = (url, options = {}) => {
+            window.__adminActionRequests.push({
+              url: String(url),
+              method: options.method || 'GET',
+            });
+            return new Promise((resolve, reject) => {
+              window.__adminActionPending.push({ resolve, reject });
+            });
+          };
+        }
+        """
+    )
+
+
+def _assert_single_flight_failure_and_retry(
+    page,
+    *,
+    button_selector,
+    invoke_twice_script,
+    invoke_once_script,
+    request_url,
+    error_text,
+    error_class,
+    success_text,
+    success_class,
+    success_payload,
+):
+    button = page.locator(button_selector)
+    original_text = button.evaluate("element => element.textContent")
+    assert button.is_enabled()
+    assert button.get_attribute("aria-busy") is None
+
+    _install_deferred_action_fetch(page)
+    page.evaluate(invoke_twice_script)
+    page.wait_for_function("() => window.__adminActionRequests.length === 1")
+
+    busy_state = button.evaluate(
+        """
+        element => ({
+          disabled: element.disabled,
+          ariaBusy: element.getAttribute('aria-busy'),
+          text: element.textContent,
+        })
+        """
+    )
+    assert busy_state == {
+        "disabled": True,
+        "ariaBusy": "true",
+        "text": "Sending…",
+    }
+    assert page.evaluate("() => window.__adminActionRequests") == [
+        {"url": request_url, "method": "POST"}
+    ]
+
+    page.evaluate(
+        """
+        () => window.__adminActionPending[0].reject(
+          new Error('forced offline regression')
+        )
+        """
+    )
+    page.wait_for_function(
+        """
+        ([selector, text]) => {
+          const button = document.querySelector(selector);
+          return button
+            && !button.disabled
+            && !button.hasAttribute('aria-busy')
+            && button.textContent === text;
+        }
+        """,
+        arg=[button_selector, original_text],
+    )
+
+    toast = page.locator("#toast")
+    assert toast.is_visible()
+    assert error_text in toast.inner_text()
+    assert error_class in toast.get_attribute("class").split()
+
+    page.evaluate(invoke_once_script)
+    page.wait_for_function("() => window.__adminActionRequests.length === 2")
+    assert button.is_disabled()
+    assert button.get_attribute("aria-busy") == "true"
+    assert button.evaluate("element => element.textContent") == "Sending…"
+
+    page.evaluate(
+        """
+        payload => window.__adminActionPending[1].resolve(
+          new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: {'Content-Type': 'application/json'},
+          })
+        )
+        """,
+        success_payload,
+    )
+    page.wait_for_function(
+        """
+        ([selector, text, successText]) => {
+          const button = document.querySelector(selector);
+          const toast = document.querySelector('#toast');
+          return button
+            && !button.disabled
+            && !button.hasAttribute('aria-busy')
+            && button.textContent === text
+            && toast
+            && toast.textContent.includes(successText);
+        }
+        """,
+        arg=[button_selector, original_text, success_text],
+    )
+
+    assert toast.is_visible()
+    assert success_text in toast.inner_text()
+    assert success_class in toast.get_attribute("class").split()
+    assert page.evaluate("() => window.__adminActionRequests") == [
+        {"url": request_url, "method": "POST"},
+        {"url": request_url, "method": "POST"},
+    ]
+
+
 @pytest.fixture()
 def admin_client(tmp_path, monkeypatch):
     monkeypatch.setattr(booking_app, "DB_PATH", str(tmp_path / "admin-quick-wins.db"))
@@ -404,6 +531,250 @@ def test_invoice_balance_and_recheck_actions_are_single_flight_and_recover(admin
             "balance": 1,
             "recheck": 1,
         }
+        browser.close()
+
+
+def test_classic_dashboard_balance_request_is_single_flight_and_retries(admin_client):
+    booking_id = _insert_booking()
+    response = admin_client.get(
+        "/admin",
+        headers={"X-Admin-Key": "test-admin-key"},
+    )
+    assert response.status_code == 200
+    html = _with_test_base(response.get_data(as_text=True))
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(**_chromium_launch_options(playwright))
+        page = browser.new_page()
+        page.route("**/*", lambda route: route.abort())
+        page.set_content(html, wait_until="domcontentloaded")
+        page.evaluate("window.confirm = () => true")
+
+        selector = ".btn-balance"
+        page.wait_for_selector(selector)
+        _assert_single_flight_failure_and_retry(
+            page,
+            button_selector=selector,
+            invoke_twice_script=f"""
+                () => {{
+                  const button = document.querySelector('{selector}');
+                  window.requestBalance({booking_id}, 'Admin Audit Client', button);
+                  window.requestBalance({booking_id}, 'Admin Audit Client', button);
+                }}
+            """,
+            invoke_once_script=f"""
+                () => {{
+                  window.requestBalance(
+                    {booking_id},
+                    'Admin Audit Client',
+                    document.querySelector('{selector}')
+                  );
+                }}
+            """,
+            request_url="/admin/request-balance",
+            error_text="Network error: forced offline regression",
+            error_class="error",
+            success_text="Balance request sent",
+            success_class="success",
+            success_payload={"success": True, "balance_due": 200.0},
+        )
+        browser.close()
+
+
+def test_client_database_invoice_send_is_single_flight_and_retries(admin_client):
+    booking_id = _insert_booking()
+    booking_app.sync_client(
+        "admin-audit@example.test",
+        "Admin Audit Client",
+        "4035550101",
+        "admin.audit",
+    )
+    response = admin_client.get(
+        "/admin/clients",
+        headers={"X-Admin-Key": "test-admin-key"},
+    )
+    clients_response = admin_client.get(
+        "/admin/api/clients",
+        headers={"X-Admin-Key": "test-admin-key"},
+    )
+    assert response.status_code == 200
+    assert clients_response.status_code == 200
+    clients_fixture = clients_response.get_json()
+    assert len(clients_fixture) == 1
+    client_id = clients_fixture[0]["id"]
+    detail_response = admin_client.get(
+        f"/admin/api/clients/{client_id}",
+        headers={"X-Admin-Key": "test-admin-key"},
+    )
+    assert detail_response.status_code == 200
+    detail_fixture = detail_response.get_json()
+    html = _with_test_base(response.get_data(as_text=True))
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(**_chromium_launch_options(playwright))
+        page = browser.new_page()
+
+        def route_request(route):
+            path = urlsplit(route.request.url).path
+            if path == "/admin/api/clients":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(clients_fixture),
+                )
+                return
+            if path == f"/admin/api/clients/{client_id}":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(detail_fixture),
+                )
+                return
+            route.abort()
+
+        page.route("**/*", route_request)
+        page.set_content(html, wait_until="domcontentloaded")
+        page.locator(".client-card").click()
+
+        selector = (
+            f'.booking-row[data-booking-id="{booking_id}"] '
+            'button[title="Send invoice to client"]'
+        )
+        page.wait_for_selector(selector)
+        _assert_single_flight_failure_and_retry(
+            page,
+            button_selector=selector,
+            invoke_twice_script=f"""
+                () => {{
+                  const button = document.querySelector('{selector}');
+                  window.sendInvoice({booking_id}, button);
+                  window.sendInvoice({booking_id}, button);
+                }}
+            """,
+            invoke_once_script=f"""
+                () => {{
+                  window.sendInvoice(
+                    {booking_id},
+                    document.querySelector('{selector}')
+                  );
+                }}
+            """,
+            request_url=f"/admin/booking/{booking_id}/send-invoice",
+            error_text="Failed to send invoice",
+            error_class="err",
+            success_text=f"Invoice sent to client for #{booking_id}",
+            success_class="ok",
+            success_payload={"success": True},
+        )
+        browser.close()
+
+
+def test_event_roster_balance_request_is_single_flight_and_retries(
+    admin_client,
+    monkeypatch,
+):
+    booking_id = _insert_booking()
+    event = {
+        "id": "mission-mini-1",
+        "title": "Mission Test Mini One",
+        "date": "2099-08-01",
+        "start_time": "10:00",
+        "end_time": "13:00",
+        "session_length": 20,
+        "break_length": 10,
+        "slot_interval": 30,
+        "deposit": 100.0,
+        "full_price": 300.0,
+        "location": "Calgary test location",
+        "status": "active",
+    }
+    monkeypatch.setattr(booking_app, "EVENTS", [event])
+    response = admin_client.get(
+        "/admin/event/mission-mini-1",
+        headers={"X-Admin-Key": "test-admin-key"},
+    )
+    assert response.status_code == 200
+    html = _with_test_base(response.get_data(as_text=True))
+    slots_fixture = {
+        "event": event,
+        "summary": {
+            "booked": 1,
+            "confirmed": 1,
+            "pending": 0,
+            "blocked": 0,
+            "free": 0,
+        },
+        "slots": [],
+        "bookings": [
+            {
+                "id": booking_id,
+                "name": "Admin Audit Client",
+                "email": "admin-audit@example.test",
+                "phone": "4035550101",
+                "instagram": "admin.audit",
+                "time": "10:00",
+                "status": "confirmed",
+                "confirmed": 1,
+                "paid_amount": 100.0,
+                "deposit_amount": 100.0,
+                "selected_addons": [],
+            },
+        ],
+    }
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(**_chromium_launch_options(playwright))
+        page = browser.new_page()
+
+        def route_request(route):
+            path = urlsplit(route.request.url).path
+            if path == "/admin/api/event/mission-mini-1/slots":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(slots_fixture),
+                )
+                return
+            route.abort()
+
+        page.route("**/*", route_request)
+        page.set_content(html, wait_until="domcontentloaded")
+        page.evaluate("window.confirm = () => true")
+
+        selector = '[data-roster-action="balance"]'
+        page.wait_for_selector(selector)
+        _assert_single_flight_failure_and_retry(
+            page,
+            button_selector=selector,
+            invoke_twice_script=f"""
+                () => {{
+                  const button = document.querySelector('{selector}');
+                  window.requestBalance({booking_id}, 'Admin Audit Client', button);
+                  window.requestBalance({booking_id}, 'Admin Audit Client', button);
+                }}
+            """,
+            invoke_once_script=f"""
+                () => {{
+                  window.requestBalance(
+                    {booking_id},
+                    'Admin Audit Client',
+                    document.querySelector('{selector}')
+                  );
+                }}
+            """,
+            request_url="/admin/request-balance",
+            error_text="Network error: forced offline regression",
+            error_class="err",
+            success_text="Balance request sent",
+            success_class="ok",
+            success_payload={"success": True, "balance_due": 200.0},
+        )
         browser.close()
 
 
