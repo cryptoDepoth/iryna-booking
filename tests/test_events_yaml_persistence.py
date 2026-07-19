@@ -1,7 +1,10 @@
+import hashlib
+import io
 import json
 import os
 import shutil
 import threading
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,7 +36,68 @@ def _create_payload(title):
 def event_admin(tmp_path, monkeypatch):
     events_path = tmp_path / "persistent" / "events.yaml"
     events_path.parent.mkdir()
-    shutil.copy2(Path(booking_app.app.root_path) / "events.yaml", events_path)
+    events_path.write_text(
+        yaml.safe_dump(
+            {
+                "events": [
+                    {
+                        "id": "persistence-fixture",
+                        "title": "Persistence Fixture",
+                        "subtitle": "Sentinel event content",
+                        "date": "2026-12-05",
+                        "start_time": "10:00",
+                        "end_time": "12:00",
+                        "session_length": 20,
+                        "break_length": 10,
+                        "slot_interval": 30,
+                        "deposit": 95,
+                        "full_price": 250,
+                        "booking_type": "fixed_slots",
+                        "session_type": "mini",
+                        "status": "active",
+                        "featured": True,
+                        "location": "Calgary sentinel location",
+                        "included": ["Sentinel inclusion"],
+                        "photos": [
+                            "/images/persistence-existing-one.webp",
+                            "/images/persistence-existing-two.webp",
+                        ],
+                        "persistence_sentinel": {
+                            "nested": ["preserve", {"value": 7}],
+                        },
+                    },
+                    {
+                        "id": "persistence-sibling",
+                        "title": "Untouched Sibling Event",
+                        "date": "2026-12-06",
+                        "start_time": "14:00",
+                        "end_time": "15:00",
+                        "session_length": 30,
+                        "break_length": 0,
+                        "slot_interval": 30,
+                        "deposit": 80,
+                        "full_price": 210,
+                        "booking_type": "fixed_slots",
+                        "session_type": "mini",
+                        "status": "upcoming",
+                        "photos": ["/images/persistence-sibling.webp"],
+                        "persistence_sentinel": {
+                            "nested": ["sibling", {"value": 13}],
+                        },
+                    },
+                ],
+                "settings": {
+                    "photographer_email": "persistence@example.test",
+                    "persistence_sentinel": {
+                        "nested": ["settings", {"value": 11}],
+                    },
+                },
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
 
     db_path = tmp_path / "bookings.db"
     monkeypatch.setattr(booking_app, "DB_PATH", str(db_path))
@@ -55,11 +119,68 @@ def _assert_atomic_revision(events_path, previous_inode, previous_lastmod=None):
     assert events_path.stat().st_ino != previous_inode
     state_path = Path(f"{events_path}.revision.json")
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    assert state["sha256"] == booking_app._normalized_yaml_sha256(str(events_path))
+    persisted = yaml.safe_load(events_path.read_text(encoding="utf-8"))
+    normalized = yaml.safe_dump(
+        persisted,
+        allow_unicode=True,
+        sort_keys=True,
+    ).encode("utf-8")
+    assert state["sha256"] == hashlib.sha256(normalized).hexdigest()
     datetime.fromisoformat(state["lastmod"]).date()
     if previous_lastmod is not None:
         assert state["lastmod"] >= previous_lastmod
     return events_path.stat().st_ino, state["lastmod"]
+
+
+def _seed_revision_floor(events_path, monkeypatch):
+    revision_floor = "2026-07-18"
+    persisted = yaml.safe_load(events_path.read_text(encoding="utf-8"))
+    normalized = yaml.safe_dump(
+        persisted,
+        allow_unicode=True,
+        sort_keys=True,
+    ).encode("utf-8")
+    Path(f"{events_path}.revision.json").write_text(
+        json.dumps({
+            "lastmod": revision_floor,
+            "sha256": hashlib.sha256(normalized).hexdigest(),
+        }),
+        encoding="utf-8",
+    )
+
+    original_getmtime = booking_app.os.path.getmtime
+    earlier_mtime = datetime(2026, 7, 1, tzinfo=timezone.utc).timestamp()
+
+    def earlier_events_mtime(path):
+        if os.path.abspath(path) == os.path.abspath(events_path):
+            return earlier_mtime
+        return original_getmtime(path)
+
+    monkeypatch.setattr(
+        booking_app.os.path,
+        "getmtime",
+        earlier_events_mtime,
+    )
+    return revision_floor
+
+
+def _assert_complete_atomic_revision(
+    events_path,
+    expected_document,
+    previous_inode,
+    previous_lastmod=None,
+):
+    persisted = yaml.safe_load(events_path.read_text(encoding="utf-8"))
+    assert persisted == expected_document
+    return _assert_atomic_revision(
+        events_path,
+        previous_inode,
+        previous_lastmod,
+    )
+
+
+def _document_event(document, event_id):
+    return next(event for event in document["events"] if event["id"] == event_id)
 
 
 def test_admin_event_mutations_use_atomic_replacement_and_sync_revision(event_admin):
@@ -115,6 +236,218 @@ def test_admin_event_mutations_use_atomic_replacement_and_sync_revision(event_ad
     )
     assert deleted_created.status_code == 200
     _assert_atomic_revision(events_path, inode, lastmod)
+
+
+def test_photo_mutation_endpoints_preserve_complete_yaml_and_revision(
+    event_admin, monkeypatch, tmp_path
+):
+    client, events_path = event_admin
+    photos_dir = tmp_path / "photos"
+    bundled_dir = tmp_path / "bundled"
+    photos_dir.mkdir()
+    bundled_dir.mkdir()
+    monkeypatch.setattr(booking_app, "PHOTOS_DIR", str(photos_dir))
+    monkeypatch.setattr(booking_app, "_BUNDLED_IMAGES_DIR", str(bundled_dir))
+
+    generated_urls = iter(
+        f"/images/persistence-photo-{index}.webp" for index in range(1, 5)
+    )
+
+    def save_test_photo(_event_id, _file_storage):
+        url = next(generated_urls)
+        saved_path = photos_dir / os.path.basename(url)
+        saved_path.write_bytes(b"complete-test-webp")
+        return url, str(saved_path), {
+            "width": 1200,
+            "height": 800,
+            "bytes": saved_path.stat().st_size,
+        }
+
+    monkeypatch.setattr(
+        booking_app,
+        "_save_optimized_admin_photo",
+        save_test_photo,
+    )
+
+    expected = yaml.safe_load(events_path.read_text(encoding="utf-8"))
+    event_id = expected["events"][0]["id"]
+    expected_event = _document_event(expected, event_id)
+    original_photo_count = len(expected_event.get("photos") or [])
+    inode = events_path.stat().st_ino
+    lastmod = _seed_revision_floor(events_path, monkeypatch)
+
+    added = client.post(
+        f"/admin/photos/{event_id}/upload",
+        headers=_headers(),
+        data={"photo": (io.BytesIO(b"photo-add"), "add.jpg")},
+        content_type="multipart/form-data",
+    )
+    assert added.status_code == 200, added.get_data(as_text=True)
+    added_url = added.get_json()["url"]
+    expected_event.setdefault("photos", []).append(added_url)
+    inode, lastmod = _assert_complete_atomic_revision(
+        events_path, expected, inode, lastmod
+    )
+
+    replaced = client.post(
+        f"/admin/photos/{event_id}/upload",
+        headers=_headers(),
+        data={
+            "slot_index": str(original_photo_count),
+            "photo": (io.BytesIO(b"photo-replace"), "replace.jpg"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert replaced.status_code == 200, replaced.get_data(as_text=True)
+    replacement_url = replaced.get_json()["url"]
+    expected_event["photos"][original_photo_count] = replacement_url
+    inode, lastmod = _assert_complete_atomic_revision(
+        events_path, expected, inode, lastmod
+    )
+
+    batch = client.post(
+        f"/admin/photos/{event_id}/upload-batch",
+        headers=_headers(),
+        data={
+            "photos": [
+                (io.BytesIO(b"photo-batch-one"), "batch-one.jpg"),
+                (io.BytesIO(b"photo-batch-two"), "batch-two.jpg"),
+            ]
+        },
+        content_type="multipart/form-data",
+    )
+    assert batch.status_code == 200, batch.get_data(as_text=True)
+    expected_event["photos"].extend(batch.get_json()["urls"])
+    inode, lastmod = _assert_complete_atomic_revision(
+        events_path, expected, inode, lastmod
+    )
+
+    deleted = client.post(
+        f"/admin/photos/{event_id}/delete",
+        headers=_headers(),
+        json={"slot_index": original_photo_count},
+    )
+    assert deleted.status_code == 200, deleted.get_data(as_text=True)
+    expected_event["photos"].pop(original_photo_count)
+    _assert_complete_atomic_revision(events_path, expected, inode, lastmod)
+
+
+def test_custom_slot_mutations_preserve_complete_yaml_and_revision(
+    event_admin, monkeypatch
+):
+    client, events_path = event_admin
+    expected = yaml.safe_load(events_path.read_text(encoding="utf-8"))
+    event_id = expected["events"][0]["id"]
+    expected_event = _document_event(expected, event_id)
+    original_event = deepcopy(expected_event)
+    custom_time = "23:43"
+    assert all(
+        str(slot.get("time")) != custom_time
+        for slot in expected_event.get("custom_slots") or []
+        if isinstance(slot, dict)
+    )
+    inode = events_path.stat().st_ino
+    lastmod = _seed_revision_floor(events_path, monkeypatch)
+
+    added = client.post(
+        f"/admin/api/event/{event_id}/custom-slot",
+        headers=_headers(),
+        json={
+            "time": custom_time,
+            "session_length": 15,
+            "break_length": 10,
+            "allow_back_to_back": True,
+        },
+    )
+    assert added.status_code == 200, added.get_data(as_text=True)
+    custom_slot = {
+        "time": custom_time,
+        "session_length": 15,
+        "break_length": 0,
+        "allow_back_to_back": True,
+    }
+    expected_slots = list(expected_event.get("custom_slots") or [])
+    expected_slots.append(custom_slot)
+    expected_slots.sort(
+        key=lambda item: booking_app._time_minutes(item.get("time")) or 0
+    )
+    expected_event["custom_slots"] = expected_slots
+    inode, lastmod = _assert_complete_atomic_revision(
+        events_path, expected, inode, lastmod
+    )
+
+    removed = client.delete(
+        f"/admin/api/event/{event_id}/custom-slot",
+        headers=_headers(),
+        json={"time": custom_time},
+    )
+    assert removed.status_code == 200, removed.get_data(as_text=True)
+    expected["events"][0] = original_event
+    _assert_complete_atomic_revision(events_path, expected, inode, lastmod)
+
+
+def test_private_session_writer_preserves_complete_yaml_and_revision(
+    event_admin, monkeypatch
+):
+    client, events_path = event_admin
+    monkeypatch.setattr(booking_app, "_notify_admin", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(booking_app, "sync_client", lambda *_args, **_kwargs: None)
+
+    expected = yaml.safe_load(events_path.read_text(encoding="utf-8"))
+    inode = events_path.stat().st_ino
+    lastmod = _seed_revision_floor(events_path, monkeypatch)
+
+    created = client.post(
+        "/admin/api/private-session",
+        headers=_headers(),
+        json={
+            "date": "2026-11-12",
+            "start_time": "13:15",
+            "end_time": "14:30",
+            "client_name": "Persistence Client",
+            "email": "",
+            "instagram": "@persistence.client",
+            "price": 410,
+            "deposit": 120,
+            "photos": 33,
+            "already_paid": True,
+            "send_email": False,
+        },
+    )
+    assert created.status_code == 200, created.get_data(as_text=True)
+    body = created.get_json()
+    expected_event = {
+        "id": body["event_id"],
+        "title": "Individual Photoshoot — Persistence Client",
+        "subtitle": "Individual photoshoot (hidden from public website)",
+        "date": "2026-11-12",
+        "start_time": "13:15",
+        "end_time": "14:30",
+        "session_length": 75,
+        "break_length": 0,
+        "slot_interval": 75,
+        "deposit": 120.0,
+        "full_price": 410.0,
+        "location": "Calgary — exact spot sent after booking",
+        "session_type": "private",
+        "edited_photos": 33,
+        "featured": False,
+        "hidden": True,
+        "included": [
+            "75 min individual photoshoot",
+            "33 professionally edited photos",
+            "All original photos included",
+        ],
+        "photos": ["/images/placeholder.jpg"],
+    }
+    expected["events"].append(expected_event)
+
+    _assert_complete_atomic_revision(
+        events_path,
+        expected,
+        inode,
+        lastmod,
+    )
 
 
 def test_concurrent_sitemap_read_waits_for_complete_admin_event_write(
