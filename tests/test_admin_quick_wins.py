@@ -1,6 +1,8 @@
 """Regression coverage for the evidence-backed admin P2/P3 quick wins."""
 
+import json
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -8,6 +10,24 @@ import app as booking_app
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _chromium_launch_options(playwright):
+    launch_options = {"headless": True}
+    if not Path(playwright.chromium.executable_path).exists():
+        candidates = sorted(
+            (Path.home() / "Library" / "Caches" / "ms-playwright").glob(
+                "chromium_headless_shell-*/chrome-headless-shell-mac-arm64/"
+                "chrome-headless-shell"
+            )
+        )
+        assert candidates, "A local Playwright Chromium binary is required for DOM regressions"
+        launch_options["executable_path"] = str(candidates[-1])
+    return launch_options
+
+
+def _with_test_base(html):
+    return html.replace("<head>", '<head><base href="http://booking.test/">', 1)
 
 
 @pytest.fixture()
@@ -137,6 +157,254 @@ def test_admin_mobile_action_targets_are_at_least_44px():
     assert ".btn { min-height: 44px; }" in detail
     assert ".btn-sm { min-height: 44px;" in clients
     assert ".mini-btn { min-height: 44px;" in event_detail
+
+
+def test_event_roster_actions_have_rendered_mobile_touch_targets(admin_client, monkeypatch):
+    event = {
+        "id": "mission-mini-1",
+        "title": "Mission Test Mini One",
+        "date": "2099-08-01",
+        "start_time": "10:00",
+        "end_time": "13:00",
+        "session_length": 20,
+        "break_length": 10,
+        "slot_interval": 30,
+        "deposit": 100.0,
+        "full_price": 300.0,
+        "location": "Calgary test location",
+        "status": "active",
+    }
+    monkeypatch.setattr(booking_app, "EVENTS", [event])
+    response = admin_client.get(
+        "/admin/event/mission-mini-1",
+        headers={"X-Admin-Key": "test-admin-key"},
+    )
+    assert response.status_code == 200
+    html = _with_test_base(response.get_data(as_text=True))
+    slots_fixture = {
+        "event": event,
+        "summary": {
+            "booked": 2,
+            "confirmed": 1,
+            "pending": 1,
+            "blocked": 0,
+            "free": 0,
+        },
+        "slots": [],
+        "bookings": [
+            {
+                "id": 41,
+                "name": "Rendered Roster Client",
+                "email": "rendered-roster@example.test",
+                "phone": "4035550141",
+                "instagram": "rendered.roster",
+                "time": "10:00",
+                "status": "confirmed",
+                "confirmed": 1,
+                "paid_amount": 100.0,
+                "deposit_amount": 100.0,
+                "selected_addons": [],
+            },
+            {
+                "id": 42,
+                "name": "Pending Roster Client",
+                "email": "pending-roster@example.test",
+                "phone": "4035550142",
+                "instagram": "pending.roster",
+                "time": "10:30",
+                "status": "reserved",
+                "confirmed": 0,
+                "paid_amount": 0.0,
+                "deposit_amount": 100.0,
+                "selected_addons": [],
+            },
+        ],
+    }
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(**_chromium_launch_options(playwright))
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+
+        def route_request(route):
+            path = urlsplit(route.request.url).path
+            if path == "/admin/api/event/mission-mini-1/slots":
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(slots_fixture),
+                )
+                return
+            route.abort()
+
+        page.route("**/*", route_request)
+        page.set_content(html, wait_until="domcontentloaded")
+        page.wait_for_selector(".roster-actions .mini-btn")
+        actions = page.locator(".roster-actions .mini-btn")
+        assert actions.count() == 8
+        mobile_metrics = actions.evaluate_all(
+            """
+            elements => elements.map(element => {
+              const style = getComputedStyle(element);
+              const rect = element.getBoundingClientRect();
+              return {
+                tag: element.tagName,
+                text: element.textContent.trim(),
+                display: style.display,
+                alignItems: style.alignItems,
+                justifyContent: style.justifyContent,
+                height: rect.height,
+                padding: style.padding,
+              };
+            })
+            """
+        )
+        assert {metric["tag"] for metric in mobile_metrics} == {"A", "BUTTON"}
+        assert {metric["text"] for metric in mobile_metrics} == {
+            "Open",
+            "Balance",
+            "Confirm",
+            "Reschedule",
+            "Edit contact",
+        }
+        assert all(metric["display"] == "flex" for metric in mobile_metrics)
+        assert all(metric["alignItems"] == "center" for metric in mobile_metrics)
+        assert all(metric["justifyContent"] == "center" for metric in mobile_metrics)
+        assert all(metric["height"] >= 44 for metric in mobile_metrics)
+        assert all(metric["padding"] == "10px 12px" for metric in mobile_metrics)
+
+        page.set_viewport_size({"width": 1280, "height": 900})
+        desktop_metrics = actions.evaluate_all(
+            """
+            elements => elements.map(element => {
+              const style = getComputedStyle(element);
+              return {
+                display: style.display,
+                height: element.getBoundingClientRect().height,
+                padding: style.padding,
+              };
+            })
+            """
+        )
+        assert all(metric["display"] == "flex" for metric in desktop_metrics)
+        assert all(28 <= metric["height"] < 30 for metric in desktop_metrics)
+        assert all(metric["padding"] == "5px 9px" for metric in desktop_metrics)
+        browser.close()
+
+
+def test_invoice_balance_and_recheck_actions_are_single_flight_and_recover(admin_client):
+    booking_id = _insert_booking()
+    response = admin_client.get(
+        f"/admin/booking/{booking_id}",
+        headers={"X-Admin-Key": "test-admin-key"},
+    )
+    assert response.status_code == 200
+    html = _with_test_base(response.get_data(as_text=True))
+    calls = {
+        "invoice_save": 0,
+        "invoice_send": 0,
+        "balance": 0,
+        "recheck": 0,
+    }
+    request_state = {"invoice_should_fail": True}
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(**_chromium_launch_options(playwright))
+        page = browser.new_page()
+
+        def route_request(route):
+            path = urlsplit(route.request.url).path
+            if path == f"/admin/booking/{booking_id}/invoice":
+                calls["invoice_save"] += 1
+                if request_state["invoice_should_fail"]:
+                    route.abort("failed")
+                    return
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps({"success": True, "balance_due": 200.0}),
+                )
+                return
+            if path == f"/admin/booking/{booking_id}/send-invoice":
+                calls["invoice_send"] += 1
+                route.abort("failed")
+                return
+            if path == "/admin/request-balance":
+                calls["balance"] += 1
+                route.abort("failed")
+                return
+            if path == f"/admin/booking/{booking_id}/recheck-payment":
+                calls["recheck"] += 1
+                route.abort("failed")
+                return
+            route.abort()
+
+        page.route("**/*", route_request)
+        page.set_content(html, wait_until="domcontentloaded")
+        page.evaluate("window.confirm = () => true")
+
+        page.evaluate(
+            """
+            () => {
+              const button = document.querySelector('#save-invoice-btn');
+              window.saveInvoiceAmounts(button);
+              window.saveInvoiceAmounts(button);
+            }
+            """
+        )
+        page.wait_for_function(
+            """
+            () => {
+              const button = document.querySelector('#save-invoice-btn');
+              return button && !button.disabled && !button.hasAttribute('aria-busy');
+            }
+            """
+        )
+        assert calls["invoice_save"] == 1
+        assert "Network error:" in page.locator("#toast").inner_text()
+        assert "err" in page.locator("#toast").get_attribute("class").split()
+
+        request_state["invoice_should_fail"] = False
+        action_cases = (
+            ("sendInvoice", "#send-invoice-btn", "invoice_send"),
+            ("requestBalance", "#request-balance-btn", "balance"),
+            ("recheckPayment", "#recheck-payment-btn", "recheck"),
+        )
+        for function_name, selector, call_name in action_cases:
+            before = calls[call_name]
+            page.evaluate(
+                """
+                ([functionName, selector]) => {
+                  const button = document.querySelector(selector);
+                  window[functionName](button);
+                  window[functionName](button);
+                }
+                """,
+                [function_name, selector],
+            )
+            page.wait_for_function(
+                """
+                selector => {
+                  const button = document.querySelector(selector);
+                  return button && !button.disabled && !button.hasAttribute('aria-busy');
+                }
+                """,
+                arg=selector,
+            )
+            assert calls[call_name] == before + 1
+            assert "Network error:" in page.locator("#toast").inner_text()
+            assert "err" in page.locator("#toast").get_attribute("class").split()
+
+        assert calls == {
+            "invoice_save": 3,
+            "invoice_send": 1,
+            "balance": 1,
+            "recheck": 1,
+        }
+        browser.close()
 
 
 def test_site_improvement_report_records_every_admin_candidate_and_decision_field():
