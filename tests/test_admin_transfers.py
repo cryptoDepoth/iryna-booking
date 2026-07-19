@@ -688,3 +688,316 @@ def test_matched_booking_and_gift_transfers_cannot_be_archived_or_restored(clien
     assert booking_after == booking_before
     assert gift_after == gift_before
     assert hook_calls == []
+
+
+def test_unlink_only_accepts_a_matched_booking_transfer(client):
+    c, app, _, _ = client
+    _login(c)
+    matched_id = _insert_transfer(
+        app,
+        reference_number="unlink-matched-booking-ref",
+        message_id="unlink-matched-booking-message",
+        matched_booking_id=73,
+        status="matched",
+    )
+
+    response = c.post(f"/admin/transfers/{matched_id}/unlink", json={})
+
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
+    row = _transfer_row(app, matched_id)
+    assert row["matched_booking_id"] is None
+    assert row["matched_gift_code"] is None
+    assert row["status"] == "unmatched"
+
+
+def test_unlink_rejects_archived_and_gift_linked_rows_without_mutation(client):
+    c, app, _, _ = client
+    _login(c)
+    archived_id = _insert_transfer(
+        app,
+        reference_number="unlink-archived-ref",
+        message_id="unlink-archived-message",
+        status="ignored",
+        archived_at="2026-07-18 19:00:00",
+    )
+    gift_id = _insert_transfer(
+        app,
+        reference_number="unlink-gift-ref",
+        message_id="unlink-gift-message",
+        matched_gift_code="GIFT-TEST-UNLINK",
+        status="matched",
+    )
+    before = {
+        archived_id: _transfer_row(app, archived_id),
+        gift_id: _transfer_row(app, gift_id),
+    }
+
+    for transfer_id in (archived_id, gift_id):
+        response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+        assert response.status_code == 409
+        assert response.get_json()["success"] is False
+        assert _transfer_row(app, transfer_id) == before[transfer_id]
+
+
+def test_unlink_requires_admin_authentication_without_mutation(client):
+    c, app, _, _ = client
+    matched_id = _insert_transfer(
+        app,
+        reference_number="unlink-auth-ref",
+        message_id="unlink-auth-message",
+        matched_booking_id=84,
+        status="matched",
+    )
+    before = _transfer_row(app, matched_id)
+
+    response = c.post(f"/admin/transfers/{matched_id}/unlink", json={})
+
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "Unauthorized"
+    assert _transfer_row(app, matched_id) == before
+
+
+def test_auto_link_does_not_reactivate_transfer_archived_after_candidate_read(
+    client,
+    monkeypatch,
+):
+    _, app, db_path, _ = client
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id
+        ) VALUES (
+            '2026-08-04', '13:00', 'Archive Race Client',
+            'archive-race@example.com', '4035550188', '', 'Mission Mini',
+            'pending_payment', 0, 0, 0, 120.50, 241.00, 'mission-mini-4'
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="auto-link-archive-race-ref",
+        message_id="auto-link-archive-race-message",
+        sender_name="Archive Race Client",
+    )
+    real_db_conn = app.db_conn
+    archived = False
+
+    class ArchiveBeforeAutoLinkUpdate:
+        def __init__(self, connection):
+            self.connection = connection
+
+        @property
+        def row_factory(self):
+            return self.connection.row_factory
+
+        @row_factory.setter
+        def row_factory(self, value):
+            self.connection.row_factory = value
+
+        def execute(self, sql, params=()):
+            nonlocal archived
+            if (
+                not archived
+                and "UPDATE etransfers" in sql
+                and "SET matched_booking_id" in sql
+            ):
+                archive_conn = sqlite3.connect(db_path)
+                archive_conn.execute(
+                    """
+                    UPDATE etransfers
+                       SET status='ignored',
+                           archived_at='2026-07-18 20:00:00'
+                     WHERE id=?
+                    """,
+                    (transfer_id,),
+                )
+                archive_conn.commit()
+                archive_conn.close()
+                archived = True
+            return self.connection.execute(sql, params)
+
+        def __getattr__(self, name):
+            return getattr(self.connection, name)
+
+    monkeypatch.setattr(
+        app,
+        "db_conn",
+        lambda: ArchiveBeforeAutoLinkUpdate(real_db_conn()),
+    )
+
+    linked = app._auto_link_etransfers()
+
+    assert archived is True
+    assert linked == 0
+    row = _transfer_row(booking_app, transfer_id)
+    assert row["status"] == "ignored"
+    assert row["archived_at"] == "2026-07-18 20:00:00"
+    assert row["matched_booking_id"] is None
+
+
+def test_auto_link_keeps_existing_name_match_and_payment_semantics(client):
+    _, app, _, _ = client
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id
+        ) VALUES (
+            '2026-08-04', '13:30', 'Single Name Match',
+            'single-match@example.com', '4035550189', '', 'Mission Mini',
+            'pending_payment', 0, 0, 0, 120.50, 241.00, 'mission-mini-4'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    booking_before = tuple(
+        conn.execute(
+            "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+            (booking_id,),
+        ).fetchone()
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="auto-link-single-name-ref",
+        message_id="auto-link-single-name-message",
+        sender_name="Single Name Match",
+        amount=999.99,
+    )
+
+    linked = app._auto_link_etransfers()
+
+    assert linked == 1
+    row = _transfer_row(app, transfer_id)
+    assert row["status"] == "matched"
+    assert row["matched_booking_id"] == booking_id
+    conn = app.db_conn()
+    booking_after = tuple(
+        conn.execute(
+            "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+            (booking_id,),
+        ).fetchone()
+    )
+    conn.close()
+    assert booking_after == booking_before
+
+
+def test_archive_during_body_read_prevents_booking_confirmation(client, monkeypatch):
+    _, app, db_path, _ = client
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id,
+            created_at, reserved_until
+        ) VALUES (
+            '2026-08-05', '14:00', 'Body Race Client',
+            'body-race@example.com', '4035550199', '', 'Mission Mini',
+            'pending_payment', 0, 0, 0, 120.50, 241.00, 'mission-mini-5',
+            '2026-07-18 10:00:00', '2026-08-05 14:15:00'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="body-read-archive-race-ref",
+        message_id="body-read-archive-race-message",
+        sender_name="Body Race Client",
+        amount=120.50,
+    )
+
+    def archive_during_body_read(message_id):
+        assert message_id == "body-read-archive-race-message"
+        archive_conn = sqlite3.connect(db_path)
+        archive_conn.execute(
+            """
+            UPDATE etransfers
+               SET status='ignored',
+                   archived_at='2026-07-18 20:30:00'
+             WHERE id=?
+            """,
+            (transfer_id,),
+        )
+        archive_conn.commit()
+        archive_conn.close()
+        return (
+            "Interac e-Transfer: You've received $120.50 from Body Race Client.\n"
+            "Sent From: Body Race Client"
+        )
+
+    monkeypatch.setattr(checker, "read_message_body", archive_during_body_read)
+    monkeypatch.setattr(checker, "try_confirm_gift_etransfer", lambda *a, **k: False)
+    monkeypatch.setattr(
+        checker,
+        "_notify_admin_orphan",
+        lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("archived transfer must not reach orphan handling")
+        ),
+    )
+    pending = checker.get_pending_bookings(within_minutes=30)
+
+    confirmed_id, ambiguous = checker.check_single_email(
+        {
+            "id": "body-read-archive-race-message",
+            "date": "2026-07-18 11:00:00+00:00",
+        },
+        pending,
+    )
+
+    assert confirmed_id is None
+    assert ambiguous is None
+    conn = sqlite3.connect(db_path)
+    booking = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    processed = conn.execute(
+        "SELECT 1 FROM processed_emails WHERE message_id=?",
+        ("body-read-archive-race-message",),
+    ).fetchone()
+    conn.close()
+    assert booking == ("pending_payment", 0, 0, 0.0)
+    assert processed is None
+    row = _transfer_row(app, transfer_id)
+    assert row["status"] == "ignored"
+    assert row["archived_at"] == "2026-07-18 20:30:00"
+    assert row["matched_booking_id"] is None
+
+
+def test_mark_message_processed_does_not_overwrite_archived_ledger_row(client):
+    _, app, db_path, _ = client
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="processed-archive-guard-ref",
+        message_id="processed-archive-guard-message",
+        status="ignored",
+        archived_at="2026-07-18 21:00:00",
+    )
+    before = _transfer_row(app, transfer_id)
+
+    marked = checker.mark_message_processed(
+        "processed-archive-guard-message",
+        92,
+        120.50,
+    )
+
+    assert marked is False
+    assert _transfer_row(app, transfer_id) == before
+    conn = sqlite3.connect(db_path)
+    processed = conn.execute(
+        "SELECT 1 FROM processed_emails WHERE message_id=?",
+        ("processed-archive-guard-message",),
+    ).fetchone()
+    conn.close()
+    assert processed is None

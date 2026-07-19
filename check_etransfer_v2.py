@@ -152,33 +152,74 @@ def mark_message_processed(message_id, booking_id, amount):
     conn = get_db()
     c = conn.cursor()
     try:
-        c.execute("""
-            INSERT INTO processed_emails (message_id, booking_id, amount)
-            VALUES (?, ?, ?)
-        """, (message_id, booking_id, amount))
-    except sqlite3.IntegrityError:
-        # A message can be first recorded as an orphan, then later become a
-        # safe reconciliation match once the booking is confirmed/manual-fixed.
-        # Only attach/update it when doing so cannot steal it from another row.
-        if booking_id is not None:
-            c.execute("""
-                UPDATE processed_emails
-                   SET booking_id=?, amount=?, processed_at=CURRENT_TIMESTAMP
-                 WHERE message_id=?
-                   AND (booking_id IS NULL OR booking_id=?)
-            """, (booking_id, amount, message_id, booking_id))
-    # Auto-link the ledger entry for this email to the booking it confirmed.
-    if booking_id is not None:
+        conn.execute("BEGIN IMMEDIATE")
+        ledger_row = None
         try:
-            c.execute(
-                "UPDATE etransfers SET matched_booking_id=?, status='matched' "
-                "WHERE message_id=? AND (matched_booking_id IS NULL OR matched_booking_id=?)",
-                (booking_id, message_id, booking_id),
+            ledger_row = c.execute(
+                """
+                SELECT id, status, matched_booking_id, matched_gift_code
+                  FROM etransfers
+                 WHERE message_id=?
+                 LIMIT 1
+                """,
+                (message_id,),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            # Older standalone checker databases may not have the ledger table.
+            ledger_row = None
+
+        if ledger_row is not None and str(ledger_row["status"] or "").lower() == "ignored":
+            conn.rollback()
+            return False
+
+        try:
+            c.execute("""
+                INSERT INTO processed_emails (message_id, booking_id, amount)
+                VALUES (?, ?, ?)
+            """, (message_id, booking_id, amount))
+        except sqlite3.IntegrityError:
+            # A message can be first recorded as an orphan, then later become a
+            # safe reconciliation match once the booking is confirmed/manual-fixed.
+            # Only attach/update it when doing so cannot steal it from another row.
+            if booking_id is not None:
+                c.execute("""
+                    UPDATE processed_emails
+                       SET booking_id=?, amount=?, processed_at=CURRENT_TIMESTAMP
+                     WHERE message_id=?
+                       AND (booking_id IS NULL OR booking_id=?)
+                """, (booking_id, amount, message_id, booking_id))
+
+        # Auto-link the ledger entry for this email to the booking it confirmed.
+        # The compare-and-set prevents an archived row from being reactivated
+        # after check_single_email's final archive-state check.
+        if booking_id is not None and ledger_row is not None:
+            already_linked = (
+                str(ledger_row["status"] or "").lower() == "matched"
+                and ledger_row["matched_booking_id"] == booking_id
+                and not ledger_row["matched_gift_code"]
             )
-        except Exception:
-            pass
-    conn.commit()
-    conn.close()
+            if not already_linked:
+                c.execute(
+                    """
+                    UPDATE etransfers
+                       SET matched_booking_id=?, status='matched'
+                     WHERE id=?
+                       AND status='unmatched'
+                       AND matched_booking_id IS NULL
+                       AND COALESCE(matched_gift_code, '')=''
+                    """,
+                    (booking_id, ledger_row["id"]),
+                )
+                if c.rowcount != 1:
+                    conn.rollback()
+                    return False
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 _GIFT_CODE_RE = re.compile(r"\bGIFT-[A-Z0-9]{4}-[A-Z0-9]{4}\b", re.I)
@@ -203,11 +244,19 @@ def _mark_etransfer_gift_match(message_id, code):
     conn = get_db()
     try:
         _ensure_etransfer_gift_column(conn)
-        conn.execute(
-            "UPDATE etransfers SET matched_gift_code=?, status='matched' WHERE message_id=?",
+        cursor = conn.execute(
+            """
+            UPDATE etransfers
+               SET matched_gift_code=?, status='matched'
+             WHERE message_id=?
+               AND status='unmatched'
+               AND matched_booking_id IS NULL
+               AND COALESCE(matched_gift_code, '')=''
+            """,
             (code, message_id),
         )
         conn.commit()
+        return cursor.rowcount == 1
     finally:
         conn.close()
 
@@ -1320,8 +1369,13 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
     if not msg_id:
         return None, None
 
-    if is_etransfer_archived(msg_id):
+    def archived_at_payment_boundary():
+        if not is_etransfer_archived(msg_id):
+            return False
         print(f"   [skip] Message {msg_id} is archived in the transfer ledger")
+        return True
+
+    if archived_at_payment_boundary():
         return None, None
 
     reconciliation_bookings = reconciliation_bookings or []
@@ -1362,6 +1416,11 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
     except Exception as _e:
         print(f"   [ledger] record failed: {_e}")
 
+    # Body retrieval is slow external IO. Re-check after it, at the last shared
+    # boundary before any gift, reconciliation, or booking payment mutation.
+    if archived_at_payment_boundary():
+        return None, None
+
     _email_received_at = _parse_email_datetime(email.get("date"))
     if not processed and try_confirm_gift_etransfer(amount, body, msg_id, email_received_at=_email_received_at):
         mark_message_processed(msg_id, None, amount)
@@ -1385,6 +1444,8 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
             return None, recon_ambiguous
         if reconciled is not None:
             previous = float(reconciled.get("paid_amount") or 0)
+            if archived_at_payment_boundary():
+                return None, None
             if reconcile_confirmed_payment(reconciled["id"], amount):
                 mark_message_processed(msg_id, reconciled["id"], amount)
                 _notify_admin_reconciled(reconciled, previous, amount)
@@ -1424,6 +1485,8 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
             return None, recon_ambiguous
         if reconciled is not None:
             previous = float(reconciled.get("paid_amount") or 0)
+            if archived_at_payment_boundary():
+                return None, None
             if reconcile_confirmed_payment(reconciled["id"], amount):
                 mark_message_processed(msg_id, reconciled["id"], amount)
                 _notify_admin_reconciled(reconciled, previous, amount)
@@ -1463,6 +1526,8 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
 
     if match_type in ('exact', 'overpaid'):
         # Auto-confirm with the ACTUAL amount received (balance = full_price - amount).
+        if archived_at_payment_boundary():
+            return None, None
         if confirm_booking(matched["id"], amount):
             mark_message_processed(msg_id, matched["id"], amount)
             if match_type == 'overpaid':
@@ -1474,6 +1539,8 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
 
     if match_type == 'underpaid':
         # Record the payment but DO NOT confirm — admin handles it.
+        if archived_at_payment_boundary():
+            return None, None
         if record_partial_payment(matched["id"], amount):
             mark_message_processed(msg_id, matched["id"], amount)
             _notify_admin_underpaid(matched, expected, amount)

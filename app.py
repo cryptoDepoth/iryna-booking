@@ -11518,9 +11518,20 @@ def _auto_link_etransfers():
             continue  # need at least a first + last name to be confident
         ids = {bid for bid, bt in btoks if bt and len(st & bt) >= 2}
         if len(ids) == 1:
-            conn.execute("UPDATE etransfers SET matched_booking_id=?, status='matched' WHERE id=?",
-                         (ids.pop(), t["id"]))
-            linked += 1
+            booking_id = ids.pop()
+            cursor = conn.execute(
+                """
+                UPDATE etransfers
+                   SET matched_booking_id=?, status='matched'
+                 WHERE id=?
+                   AND direction='in'
+                   AND matched_booking_id IS NULL
+                   AND COALESCE(matched_gift_code, '')=''
+                   AND status='unmatched'
+                """,
+                (booking_id, t["id"]),
+            )
+            linked += cursor.rowcount
     conn.commit(); conn.close()
     return linked
 
@@ -11666,8 +11677,34 @@ def admin_transfer_restore(transfer_id):
 def admin_transfer_unlink(transfer_id):
     conn = db_conn()
     _ensure_etransfers_table(conn)
-    conn.execute("UPDATE etransfers SET matched_booking_id=NULL, status='unmatched' WHERE id=?", (transfer_id,))
-    conn.commit(); conn.close()
+    try:
+        cursor = conn.execute(
+            """
+            UPDATE etransfers
+               SET matched_booking_id=NULL, status='unmatched'
+             WHERE id=?
+               AND status='matched'
+               AND matched_booking_id IS NOT NULL
+               AND COALESCE(matched_gift_code, '')=''
+               AND COALESCE(direction, 'in')='in'
+            """,
+            (transfer_id,),
+        )
+        if cursor.rowcount != 1:
+            exists = conn.execute(
+                "SELECT 1 FROM etransfers WHERE id=?",
+                (transfer_id,),
+            ).fetchone()
+            conn.rollback()
+            if not exists:
+                return jsonify({"success": False, "error": "Transfer not found"}), 404
+            return jsonify({
+                "success": False,
+                "error": "Only booking-linked matched transfers can be unlinked",
+            }), 409
+        conn.commit()
+    finally:
+        conn.close()
     return jsonify({"success": True})
 
 
