@@ -112,6 +112,42 @@ def get_db():
     return conn
 
 
+def _ensure_etransfer_claim_schema(conn):
+    """Keep standalone checker databases compatible with atomic ownership."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS etransfers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reference_number TEXT UNIQUE,
+            message_id TEXT,
+            sender_name TEXT,
+            amount REAL,
+            memo TEXT,
+            direction TEXT DEFAULT 'in',
+            email_date TEXT,
+            matched_booking_id INTEGER,
+            matched_gift_code TEXT,
+            status TEXT DEFAULT 'unmatched',
+            source TEXT DEFAULT 'email',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            archived_at TEXT,
+            restored_at TEXT
+        )
+        """
+    )
+    columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(etransfers)").fetchall()
+    }
+    migrations = {
+        "matched_gift_code": "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT",
+        "archived_at": "ALTER TABLE etransfers ADD COLUMN archived_at TEXT",
+        "restored_at": "ALTER TABLE etransfers ADD COLUMN restored_at TEXT",
+    }
+    for column, ddl in migrations.items():
+        if column not in columns:
+            conn.execute(ddl)
+
+
 def is_message_processed(message_id):
     return get_processed_email(message_id) is not None
 
@@ -222,6 +258,200 @@ def mark_message_processed(message_id, booking_id, amount):
         conn.close()
 
 
+def _claim_processed_email(
+    conn,
+    message_id,
+    booking_id,
+    amount,
+    *,
+    allow_existing_orphan=False,
+):
+    """Claim one message inside the caller's open financial transaction."""
+    existing = conn.execute(
+        """
+        SELECT booking_id
+          FROM processed_emails
+         WHERE message_id=?
+         LIMIT 1
+        """,
+        (message_id,),
+    ).fetchone()
+    if existing is None:
+        try:
+            conn.execute(
+                """
+                INSERT INTO processed_emails (message_id, booking_id, amount)
+                VALUES (?, ?, ?)
+                """,
+                (message_id, booking_id, amount),
+            )
+        except sqlite3.IntegrityError:
+            return False
+        return True
+
+    if not allow_existing_orphan or existing["booking_id"] is not None:
+        return False
+    cursor = conn.execute(
+        """
+        UPDATE processed_emails
+           SET booking_id=?, amount=?, processed_at=CURRENT_TIMESTAMP
+         WHERE message_id=?
+           AND booking_id IS NULL
+        """,
+        (booking_id, amount, message_id),
+    )
+    return cursor.rowcount == 1
+
+
+def _resolve_active_ledger_id(conn, message_id, ledger_id=None):
+    """Return one exact active ledger row, rejecting duplicate ownership."""
+    rows = conn.execute(
+        """
+        SELECT id
+          FROM etransfers
+         WHERE message_id=?
+           AND direction='in'
+           AND status='unmatched'
+           AND matched_booking_id IS NULL
+           AND COALESCE(matched_gift_code, '')=''
+         ORDER BY id
+         LIMIT 2
+        """,
+        (message_id,),
+    ).fetchall()
+    if len(rows) != 1:
+        return None
+    resolved_id = rows[0]["id"]
+    if ledger_id is not None and resolved_id != ledger_id:
+        return None
+    return resolved_id
+
+
+def _claim_etransfer_booking(conn, ledger_id, message_id, booking_id):
+    """Atomically move one active unmatched ledger row to a booking."""
+    cursor = conn.execute(
+        """
+        UPDATE etransfers
+           SET matched_booking_id=?,
+               matched_gift_code=NULL,
+               status='matched'
+         WHERE id=?
+           AND message_id=?
+           AND direction='in'
+           AND status='unmatched'
+           AND matched_booking_id IS NULL
+           AND COALESCE(matched_gift_code, '')=''
+        """,
+        (booking_id, ledger_id, message_id),
+    )
+    return cursor.rowcount == 1
+
+
+def _claim_etransfer_gift(conn, ledger_id, message_id, code):
+    """Atomically move one active unmatched ledger row to a gift certificate."""
+    cursor = conn.execute(
+        """
+        UPDATE etransfers
+           SET matched_gift_code=?,
+               matched_booking_id=NULL,
+               status='matched'
+         WHERE id=?
+           AND message_id=?
+           AND direction='in'
+           AND status='unmatched'
+           AND matched_booking_id IS NULL
+           AND COALESCE(matched_gift_code, '')=''
+        """,
+        (code, ledger_id, message_id),
+    )
+    return cursor.rowcount == 1
+
+
+def _apply_booking_payment_transaction(
+    message_id,
+    booking_id,
+    amount,
+    mutation,
+    *,
+    allow_existing_orphan=False,
+    ledger_id=None,
+):
+    """Commit ledger ownership, message ownership, and one booking mutation."""
+    conn = get_db()
+    try:
+        _ensure_etransfer_claim_schema(conn)
+        conn.commit()
+        conn.execute("BEGIN IMMEDIATE")
+        ledger_id = _resolve_active_ledger_id(conn, message_id, ledger_id)
+        if ledger_id is None:
+            conn.rollback()
+            return False
+        if not _claim_etransfer_booking(
+            conn,
+            ledger_id,
+            message_id,
+            booking_id,
+        ):
+            conn.rollback()
+            return False
+        if not _claim_processed_email(
+            conn,
+            message_id,
+            booking_id,
+            amount,
+            allow_existing_orphan=allow_existing_orphan,
+        ):
+            conn.rollback()
+            return False
+
+        if mutation == "confirm":
+            cursor = conn.execute(
+                """
+                UPDATE bookings
+                   SET confirmed=1, paid=1, status='confirmed', paid_amount=?
+                 WHERE id=? AND confirmed=0
+                """,
+                (amount, booking_id),
+            )
+        elif mutation == "partial":
+            cursor = conn.execute(
+                """
+                UPDATE bookings
+                   SET paid_amount=?, status='partial_payment'
+                 WHERE id=?
+                   AND confirmed=0
+                   AND paid=0
+                   AND status IN ('reserved', 'pending_payment')
+                """,
+                (amount, booking_id),
+            )
+        elif mutation == "reconcile":
+            cursor = conn.execute(
+                """
+                UPDATE bookings
+                   SET paid=1, paid_amount=?
+                 WHERE id=?
+                   AND confirmed=1
+                   AND status='confirmed'
+                   AND (paid_amount IS NULL OR paid_amount < ?)
+                """,
+                (amount, booking_id, amount - 0.009),
+            )
+        else:
+            raise ValueError(f"Unknown booking payment mutation: {mutation}")
+
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return False
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 _GIFT_CODE_RE = re.compile(r"\bGIFT-[A-Z0-9]{4}-[A-Z0-9]{4}\b", re.I)
 
 
@@ -232,12 +462,7 @@ def extract_gift_code(body_text):
 
 
 def _ensure_etransfer_gift_column(conn):
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(etransfers)").fetchall()}
-    if "matched_gift_code" not in columns:
-        try:
-            conn.execute("ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT")
-        except sqlite3.OperationalError:
-            pass
+    _ensure_etransfer_claim_schema(conn)
 
 
 def _mark_etransfer_gift_match(message_id, code):
@@ -273,7 +498,136 @@ def _gift_modules():
     return gift_db, save_gift_pdf, send_gift_purchaser_email, send_gift_recipient_email
 
 
-def try_confirm_gift_etransfer(amount, body, message_id, email_received_at=None):
+def _gift_database_is_attach_compatible(conn, gift_db_path):
+    """Verify SQLite's cross-database atomic-commit prerequisites."""
+    if not DB_PATH or not gift_db_path:
+        return False
+    if DB_PATH == ":memory:" or gift_db_path == ":memory:":
+        return False
+    main_path = os.path.realpath(DB_PATH)
+    gift_path = os.path.realpath(gift_db_path)
+    if main_path == gift_path:
+        return False
+    if not os.path.isfile(main_path) or not os.path.isfile(gift_path):
+        return False
+    if os.stat(os.path.dirname(main_path)).st_dev != os.stat(os.path.dirname(gift_path)).st_dev:
+        return False
+
+    conn.execute("ATTACH DATABASE ? AS gift_atomic", (gift_path,))
+    main_journal = str(conn.execute("PRAGMA main.journal_mode").fetchone()[0]).lower()
+    gift_journal = str(
+        conn.execute("PRAGMA gift_atomic.journal_mode").fetchone()[0]
+    ).lower()
+    main_synchronous = int(conn.execute("PRAGMA main.synchronous").fetchone()[0])
+    gift_synchronous = int(
+        conn.execute("PRAGMA gift_atomic.synchronous").fetchone()[0]
+    )
+    return (
+        main_journal in {"delete", "persist", "truncate"}
+        and gift_journal in {"delete", "persist", "truncate"}
+        and main_synchronous > 0
+        and gift_synchronous > 0
+    )
+
+
+def _apply_gift_payment_transaction(
+    gift_db,
+    message_id,
+    code,
+    amount,
+    *,
+    ledger_id=None,
+    unique_amount_match=False,
+    email_received_at=None,
+):
+    """Atomically own the message and activate a gift across attached DBs."""
+    conn = get_db()
+    attached = False
+    try:
+        _ensure_etransfer_claim_schema(conn)
+        conn.commit()
+        if not _gift_database_is_attach_compatible(conn, gift_db.DB_PATH):
+            return False
+        attached = True
+        conn.execute("BEGIN IMMEDIATE")
+        ledger_id = _resolve_active_ledger_id(conn, message_id, ledger_id)
+        if ledger_id is None:
+            conn.rollback()
+            return False
+        if unique_amount_match:
+            candidates = conn.execute(
+                """
+                SELECT code, created_at
+                  FROM gift_atomic.gift_certificates
+                 WHERE status='pending_payment'
+                   AND ABS(amount_with_gst - ?) < 0.01
+                 ORDER BY created_at ASC
+                """,
+                (amount,),
+            ).fetchall()
+            if email_received_at is not None:
+                candidates = [
+                    candidate
+                    for candidate in candidates
+                    if (
+                        _parse_db_datetime(candidate["created_at"]) is None
+                        or _parse_db_datetime(candidate["created_at"])
+                        <= email_received_at
+                    )
+                ]
+            if len(candidates) != 1 or candidates[0]["code"] != code:
+                conn.rollback()
+                return False
+        if not _claim_etransfer_gift(
+            conn,
+            ledger_id,
+            message_id,
+            code,
+        ):
+            conn.rollback()
+            return False
+        if not _claim_processed_email(conn, message_id, None, amount):
+            conn.rollback()
+            return False
+        cursor = conn.execute(
+            """
+            UPDATE gift_atomic.gift_certificates
+               SET status='active',
+                   payment_status='paid',
+                   paid_amount=?,
+                   payment_reference=COALESCE(?, payment_reference),
+                   activated_at=CURRENT_TIMESTAMP
+             WHERE code=?
+               AND status='pending_payment'
+               AND ABS(amount_with_gst - ?) < 0.01
+            """,
+            (amount, message_id, code, amount),
+        )
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return False
+        conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        if attached and not conn.in_transaction:
+            try:
+                conn.execute("DETACH DATABASE gift_atomic")
+            except sqlite3.Error:
+                pass
+        conn.close()
+
+
+def try_confirm_gift_etransfer(
+    amount,
+    body,
+    message_id,
+    email_received_at=None,
+    *,
+    ledger_id=None,
+):
     """Confirm a pending gift certificate from an Interac e-Transfer email.
 
     Two paths:
@@ -282,8 +636,10 @@ def try_confirm_gift_etransfer(amount, body, message_id, email_received_at=None)
          all pending certs.  Single match → auto-confirm.  Multiple matches →
          admin Telegram alert, no auto-confirm.
 
-    Returns True when the email was definitively handled as a gift payment
-    (including ambiguous cases that were alerted but not auto-confirmed).
+    Returns False when this is not a handled gift payment. Otherwise returns:
+      - "committed" after durable atomic activation and ownership;
+      - "handled" for non-financial gift outcomes that should be processed;
+      - "conflict" when activation ownership or predicates did not commit.
     """
     code = extract_gift_code(body)
 
@@ -295,7 +651,7 @@ def try_confirm_gift_etransfer(amount, body, message_id, email_received_at=None)
             _send_admin_alert(
                 f"Gift payment memo has unknown code {code}. Amount: ${amount:.2f}. Message ID: {message_id}"
             )
-            return True
+            return "handled"
 
         expected = float(cert.get("amount_with_gst") or 0)
         if cert.get("status") != "pending_payment":
@@ -304,18 +660,24 @@ def try_confirm_gift_etransfer(amount, body, message_id, email_received_at=None)
                 f"Amount: ${amount:.2f}; expected ${expected:.2f}."
             )
             _mark_etransfer_gift_match(message_id, code)
-            return True
+            return "handled"
 
         if abs(amount - expected) >= 0.01:
             _send_admin_alert(
                 f"Gift e-Transfer amount mismatch for {code}. Received ${amount:.2f}; "
                 f"expected ${expected:.2f}. Certificate is still pending."
             )
-            return True
+            return "handled"
 
-        if not gift_db.mark_gift_payment_confirmed(code, amount, payment_reference=message_id):
-            _send_admin_alert(f"Gift e-Transfer matched {code}, but DB activation failed.")
-            return True
+        if not _apply_gift_payment_transaction(
+            gift_db,
+            message_id,
+            code,
+            amount,
+            ledger_id=ledger_id,
+        ):
+            print(f"   [gift] Atomic activation did not claim {code}")
+            return "conflict"
 
         cert = gift_db.get_gift_certificate(code)
         pdf_path = None
@@ -329,14 +691,13 @@ def try_confirm_gift_etransfer(amount, body, message_id, email_received_at=None)
         send_buyer_email(cert, pdf_path=pdf_path)
         if cert.get("recipient_email"):
             send_recipient_email(cert)
-        _mark_etransfer_gift_match(message_id, code)
         _send_admin_alert(
             f"Gift certificate paid and activated: {code}\n"
             f"Amount: ${amount:.2f}\n"
             f"Buyer: {cert.get('purchaser_name')} <{cert.get('purchaser_email')}>"
         )
         print(f"   ✅ CONFIRMED Gift certificate {code} — ${amount:.2f}")
-        return True
+        return "committed"
 
     # ── Amount-only fallback (no code in memo) ────────────────────────────────
     try:
@@ -376,12 +737,17 @@ def try_confirm_gift_etransfer(amount, body, message_id, email_received_at=None)
     # Exactly one match — auto-confirm.
     cert_row = candidates[0]
     cert_code = cert_row["code"]
-    if not gift_db.mark_gift_payment_confirmed(cert_code, amount, payment_reference=message_id):
-        _send_admin_alert(
-            f"Gift amount-only match for {cert_code} (${amount:.2f}), but DB activation failed. "
-            f"Message ID: {message_id}"
-        )
-        return True
+    if not _apply_gift_payment_transaction(
+        gift_db,
+        message_id,
+        cert_code,
+        amount,
+        ledger_id=ledger_id,
+        unique_amount_match=True,
+        email_received_at=email_received_at,
+    ):
+        print(f"   [gift] Atomic activation did not claim {cert_code}")
+        return "conflict"
 
     cert = gift_db.get_gift_certificate(cert_code)
     pdf_path = None
@@ -395,14 +761,13 @@ def try_confirm_gift_etransfer(amount, body, message_id, email_received_at=None)
     send_buyer_email(cert, pdf_path=pdf_path)
     if cert.get("recipient_email"):
         send_recipient_email(cert)
-    _mark_etransfer_gift_match(message_id, cert_code)
     _send_admin_alert(
         f"Gift certificate paid and activated (amount-only match): {cert_code}\n"
         f"Amount: ${amount:.2f}\n"
         f"Buyer: {cert.get('purchaser_name')} <{cert.get('purchaser_email')}>"
     )
     print(f"   ✅ CONFIRMED Gift certificate {cert_code} — ${amount:.2f} (amount-only fallback)")
-    return True
+    return "committed"
 
 
 def get_emails(page_size=None, lookback_days=None):
@@ -646,41 +1011,85 @@ def record_etransfer(reference_number=None, message_id=None, sender_name=None, a
     """Insert/UPSERT a transfer into the etransfers ledger.
 
     Keyed on reference_number (falls back to a message-id-based key) so repeated
-    scans of the same email/CSV row never create duplicates.
+    scans of the same email/CSV row never create duplicates. Returns the exact
+    ledger row id so the financial transaction can claim that row, not a later
+    message-id lookup.
     """
     ref = reference_number or (f"msg:{message_id}" if message_id else None)
     if not ref:
-        return False
+        return None
     if status is None:
         status = "matched" if matched_booking_id else "unmatched"
     conn = get_db()
     c = conn.cursor()
     try:
-        c.execute("""
-            INSERT INTO etransfers (reference_number, message_id, sender_name, amount, memo,
-                                    direction, email_date, matched_booking_id, status, source)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-        """, (ref, message_id, sender_name, amount, memo, direction, email_date,
-              matched_booking_id, status, source))
-    except sqlite3.IntegrityError:
-        # Already in the ledger — fill in any blanks, never wipe existing data.
-        c.execute("""
-            UPDATE etransfers
-               SET message_id=COALESCE(?, message_id),
-                   sender_name=COALESCE(?, sender_name),
-                   amount=COALESCE(amount, ?),
-                   memo=COALESCE(memo, ?),
-                   email_date=COALESCE(email_date, ?)
-             WHERE reference_number=?
-        """, (message_id, sender_name, amount, memo, email_date, ref))
-        if matched_booking_id:
+        _ensure_etransfer_claim_schema(conn)
+        if message_id:
+            existing = c.execute(
+                """
+                SELECT id
+                  FROM etransfers
+                 WHERE message_id=?
+                 ORDER BY id
+                 LIMIT 2
+                """,
+                (message_id,),
+            ).fetchall()
+            if len(existing) > 1:
+                conn.rollback()
+                return None
+            if existing:
+                ledger_id = existing[0]["id"]
+                c.execute(
+                    """
+                    UPDATE etransfers
+                       SET sender_name=COALESCE(?, sender_name),
+                           amount=COALESCE(amount, ?),
+                           memo=COALESCE(memo, ?),
+                           email_date=COALESCE(email_date, ?)
+                     WHERE id=?
+                    """,
+                    (sender_name, amount, memo, email_date, ledger_id),
+                )
+                conn.commit()
+                return ledger_id
+        try:
             c.execute("""
-                UPDATE etransfers SET matched_booking_id=?, status='matched'
-                 WHERE reference_number=? AND (matched_booking_id IS NULL OR matched_booking_id=?)
-            """, (matched_booking_id, ref, matched_booking_id))
-    conn.commit()
-    conn.close()
-    return True
+                INSERT INTO etransfers (
+                    reference_number, message_id, sender_name, amount, memo,
+                    direction, email_date, matched_booking_id, status, source
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+            """, (
+                ref, message_id, sender_name, amount, memo, direction,
+                email_date, matched_booking_id, status, source,
+            ))
+            ledger_id = c.lastrowid
+        except sqlite3.IntegrityError:
+            # Already in the ledger — fill in any blanks, never wipe existing data.
+            c.execute("""
+                UPDATE etransfers
+                   SET message_id=COALESCE(?, message_id),
+                       sender_name=COALESCE(?, sender_name),
+                       amount=COALESCE(amount, ?),
+                       memo=COALESCE(memo, ?),
+                       email_date=COALESCE(email_date, ?)
+                 WHERE reference_number=?
+            """, (message_id, sender_name, amount, memo, email_date, ref))
+            if matched_booking_id:
+                c.execute("""
+                    UPDATE etransfers SET matched_booking_id=?, status='matched'
+                     WHERE reference_number=?
+                       AND (matched_booking_id IS NULL OR matched_booking_id=?)
+                """, (matched_booking_id, ref, matched_booking_id))
+            row = c.execute(
+                "SELECT id FROM etransfers WHERE reference_number=?",
+                (ref,),
+            ).fetchone()
+            ledger_id = row["id"] if row else None
+        conn.commit()
+        return ledger_id
+    finally:
+        conn.close()
 
 
 def get_expected_amount_for_booking(booking_id):
@@ -910,7 +1319,13 @@ def match_by_amount_only(amount, bookings):
     return None, [], None
 
 
-def confirm_booking(booking_id, paid_amount=None):
+def confirm_booking(
+    booking_id,
+    paid_amount=None,
+    message_id=None,
+    *,
+    ledger_id=None,
+):
     """Confirm booking in DB.
 
     Only flips rows that are still unconfirmed: two same-amount Interac emails
@@ -918,6 +1333,14 @@ def confirm_booking(booking_id, paid_amount=None):
     same booking. The second email then correctly falls through to the orphan
     path instead of being silently swallowed.
     """
+    if message_id is not None:
+        return _apply_booking_payment_transaction(
+            message_id,
+            booking_id,
+            paid_amount,
+            "confirm",
+            ledger_id=ledger_id,
+        )
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -931,13 +1354,27 @@ def confirm_booking(booking_id, paid_amount=None):
     return updated > 0
 
 
-def record_partial_payment(booking_id, paid_amount):
+def record_partial_payment(
+    booking_id,
+    paid_amount,
+    message_id=None,
+    *,
+    ledger_id=None,
+):
     """Record a partial/underpayment WITHOUT confirming the booking.
 
     Sets paid_amount + status='partial_payment', but ONLY while the booking is
     still unconfirmed (confirmed=0) — so a stray later e-Transfer can never flip
     an already-confirmed booking back to unpaid. Returns True if a row changed.
     """
+    if message_id is not None:
+        return _apply_booking_payment_transaction(
+            message_id,
+            booking_id,
+            paid_amount,
+            "partial",
+            ledger_id=ledger_id,
+        )
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -951,13 +1388,29 @@ def record_partial_payment(booking_id, paid_amount):
     return updated > 0
 
 
-def reconcile_confirmed_payment(booking_id, paid_amount):
+def reconcile_confirmed_payment(
+    booking_id,
+    paid_amount,
+    message_id=None,
+    *,
+    allow_existing_orphan=False,
+    ledger_id=None,
+):
     """Raise paid_amount for an already-confirmed booking.
 
     Never lowers money, never changes date/time/client/status, and never sends
     client email. This is for delayed Interac messages correcting an amount
     that was previously entered as the standard deposit.
     """
+    if message_id is not None:
+        return _apply_booking_payment_transaction(
+            message_id,
+            booking_id,
+            paid_amount,
+            "reconcile",
+            allow_existing_orphan=allow_existing_orphan,
+            ledger_id=ledger_id,
+        )
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -1154,7 +1607,13 @@ def _notify_admin_ambiguity(amount, candidates):
         print(f"[admin] Failed to send ambiguity alert: {e}")
 
 
-def record_partial_payment(booking_id, paid_amount):
+def record_partial_payment(
+    booking_id,
+    paid_amount,
+    message_id=None,
+    *,
+    ledger_id=None,
+):
     """Record a partial/underpayment without confirming the booking.
     
     Updates paid_amount on the booking but keeps confirmed=0, paid=0.
@@ -1162,6 +1621,14 @@ def record_partial_payment(booking_id, paid_amount):
     
     Returns True if updated, False if booking is already confirmed or not found.
     """
+    if message_id is not None:
+        return _apply_booking_payment_transaction(
+            message_id,
+            booking_id,
+            paid_amount,
+            "partial",
+            ledger_id=ledger_id,
+        )
     conn = get_db()
     c = conn.cursor()
     # Check if booking is already confirmed or paid
@@ -1402,9 +1869,10 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
     print(f"   💰 Extracted amount: ${amount:.2f}")
 
     # Ledger: record every incoming transfer (even if it never matches a booking).
+    ledger_id = None
     try:
         _d = extract_etransfer_details(body)
-        record_etransfer(
+        ledger_id = record_etransfer(
             reference_number=_d.get("reference_number"),
             message_id=msg_id,
             sender_name=_d.get("sender_name"),
@@ -1415,6 +1883,9 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
         )
     except Exception as _e:
         print(f"   [ledger] record failed: {_e}")
+    if ledger_id is None:
+        print(f"   [skip] Message {msg_id} has no unique active ledger owner")
+        return None, None
 
     # Body retrieval is slow external IO. Re-check after it, at the last shared
     # boundary before any gift, reconciliation, or booking payment mutation.
@@ -1422,9 +1893,19 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
         return None, None
 
     _email_received_at = _parse_email_datetime(email.get("date"))
-    if not processed and try_confirm_gift_etransfer(amount, body, msg_id, email_received_at=_email_received_at):
-        mark_message_processed(msg_id, None, amount)
-        return None, None
+    if not processed:
+        gift_outcome = try_confirm_gift_etransfer(
+            amount,
+            body,
+            msg_id,
+            email_received_at=_email_received_at,
+            ledger_id=ledger_id,
+        )
+        if gift_outcome == "committed" or gift_outcome == "conflict":
+            return None, None
+        if gift_outcome:
+            mark_message_processed(msg_id, None, amount)
+            return None, None
 
     if processed:
         # Do not re-confirm/re-run side effects. The one safe exception is
@@ -1446,8 +1927,13 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
             previous = float(reconciled.get("paid_amount") or 0)
             if archived_at_payment_boundary():
                 return None, None
-            if reconcile_confirmed_payment(reconciled["id"], amount):
-                mark_message_processed(msg_id, reconciled["id"], amount)
+            if reconcile_confirmed_payment(
+                reconciled["id"],
+                amount,
+                msg_id,
+                allow_existing_orphan=True,
+                ledger_id=ledger_id,
+            ):
                 _notify_admin_reconciled(reconciled, previous, amount)
                 print(f"   ✅ RECONCILED processed message {msg_id}: Booking #{reconciled['id']} ${previous:.2f} → ${amount:.2f}")
             return None, None
@@ -1487,8 +1973,12 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
             previous = float(reconciled.get("paid_amount") or 0)
             if archived_at_payment_boundary():
                 return None, None
-            if reconcile_confirmed_payment(reconciled["id"], amount):
-                mark_message_processed(msg_id, reconciled["id"], amount)
+            if reconcile_confirmed_payment(
+                reconciled["id"],
+                amount,
+                msg_id,
+                ledger_id=ledger_id,
+            ):
                 _notify_admin_reconciled(reconciled, previous, amount)
                 print(f"   ✅ RECONCILED Booking #{reconciled['id']} paid_amount ${previous:.2f} → ${amount:.2f}")
             return None, None
@@ -1528,8 +2018,12 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
         # Auto-confirm with the ACTUAL amount received (balance = full_price - amount).
         if archived_at_payment_boundary():
             return None, None
-        if confirm_booking(matched["id"], amount):
-            mark_message_processed(msg_id, matched["id"], amount)
+        if confirm_booking(
+            matched["id"],
+            amount,
+            msg_id,
+            ledger_id=ledger_id,
+        ):
             if match_type == 'overpaid':
                 _notify_admin_overpaid(matched, expected, amount)
             print(f"   ✅ CONFIRMED Booking #{matched['id']} — ${amount:.2f} ({match_type})")
@@ -1541,14 +2035,18 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
         # Record the payment but DO NOT confirm — admin handles it.
         if archived_at_payment_boundary():
             return None, None
-        if record_partial_payment(matched["id"], amount):
-            mark_message_processed(msg_id, matched["id"], amount)
+        if record_partial_payment(
+            matched["id"],
+            amount,
+            msg_id,
+            ledger_id=ledger_id,
+        ):
             _notify_admin_underpaid(matched, expected, amount)
             print(f"   ⚠️ UNDERPAID Booking #{matched['id']} — ${amount:.2f} (expected ${expected:.2f}); NOT confirmed")
             return None, None
-        # Booking already confirmed or gone — mark processed so we don't retry-loop.
+        # Booking ownership changed or the row is no longer eligible. Leave the
+        # message active so the coupled transaction can be retried or reviewed.
         print(f"   [skip] Could not record partial payment for #{matched['id']} (already confirmed?)")
-        mark_message_processed(msg_id, matched["id"], amount)
         return None, None
 
     print(f"   ❌ Unhandled match_type for #{matched['id']}")
