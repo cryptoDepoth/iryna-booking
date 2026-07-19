@@ -737,6 +737,7 @@ def _watcher_thread(max_cycles=None, time_module=None):
     LIVE_EMAIL_LOOKBACK_DAYS = int(os.environ.get("ETRANSFER_LIVE_EMAIL_LOOKBACK_DAYS", "7"))
     last_email_poll = 0.0
     last_reconciliation_poll = 0.0
+    reconciliation_eligible_work = False
     started_at = _time.time()
     cycles = 0
     log_w = logging.getLogger("watcher")
@@ -776,8 +777,9 @@ def _watcher_thread(max_cycles=None, time_module=None):
             if now - last_reconciliation_poll >= RECONCILIATION_INTERVAL:
                 reconciliation = get_reconciliation_bookings(within_days=120)
                 should_poll_email = should_poll_email or bool(reconciliation)
-                eligible_work = eligible_work or bool(reconciliation)
+                reconciliation_eligible_work = bool(reconciliation)
                 last_reconciliation_poll = now
+            eligible_work = eligible_work or reconciliation_eligible_work
 
             if should_poll_email:
                 last_email_poll = now

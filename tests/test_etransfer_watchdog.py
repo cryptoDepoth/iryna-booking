@@ -328,6 +328,42 @@ def test_repeated_cached_scan_becomes_overdue_without_advancing_success(monkeypa
     assert len(alerts) == 1
 
 
+def test_reconciliation_only_cached_scan_becomes_overdue_between_refreshes(monkeypatch):
+    monkeypatch.setenv("ETRANSFER_EMAIL_POLL_INTERVAL", "0")
+    monkeypatch.setenv("ETRANSFER_RECONCILIATION_INTERVAL", "1800")
+    monkeypatch.setattr(checker, "get_pending_bookings", lambda within_minutes=30: [])
+    reconciliation_calls = []
+
+    def get_reconciliation_bookings(within_days=120):
+        reconciliation_calls.append(within_days)
+        return [{"id": 42}]
+
+    monkeypatch.setattr(checker, "get_reconciliation_bookings", get_reconciliation_bookings)
+    monkeypatch.setattr(booking_app, "expire_reservations", lambda: 0)
+    monkeypatch.setattr(booking_app, "ETRANSFER_SCAN_OVERDUE_SECONDS", 60)
+    fetch_calls = []
+    monkeypatch.setattr(
+        checker,
+        "get_emails",
+        lambda **_kwargs: fetch_calls.append(_kwargs) or [],
+    )
+    monkeypatch.setattr(checker, "get_last_email_fetch_status", lambda: {"outcome": "cache_hit"})
+    alerts = []
+    monkeypatch.setattr(booking_app, "_notify_admin", lambda message, **_kwargs: alerts.append(message))
+    booking_app._record_etransfer_scan_success(2_000.0, email_count=0)
+
+    booking_app._watcher_thread(max_cycles=3, time_module=FakeTime(now=2_000.0))
+
+    state = booking_app._watcher_state_snapshot()
+    assert reconciliation_calls == [120]
+    assert len(fetch_calls) == 1
+    assert state["status"] == "overdue"
+    assert state["detail"] == "fresh_scan_overdue"
+    assert state["last_attempt_at"] == "1970-01-01T00:33:20+00:00"
+    assert state["last_success_at"] == "1970-01-01T00:33:20+00:00"
+    assert len(alerts) == 1
+
+
 def test_scan_health_is_admin_only_sanitized_and_public_liveness_stays_green(tmp_path, monkeypatch):
     db_path = tmp_path / "health.db"
     monkeypatch.setattr(booking_app, "DB_PATH", str(db_path))
@@ -364,14 +400,74 @@ def test_scan_health_is_admin_only_sanitized_and_public_liveness_stays_green(tmp
     assert "raw-provider-secret" not in authenticated.get_data(as_text=True)
 
 
-def test_admin_health_template_renders_watchdog_fields():
-    source = Path(__file__).resolve().parents[1] / "templates" / "admin_health.html"
-    html = source.read_text(encoding="utf-8")
-    assert "etransfer_scan" in html
-    assert "last_attempt_at" in html
-    assert "last_success_at" in html
-    assert "status" in html
-    assert "detail" in html
+def test_admin_health_renders_degraded_watchdog_card_in_browser(client):
+    with client.session_transaction() as session:
+        session["admin_authenticated"] = True
+    response = client.get("/admin/health-center")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True).replace(
+        "<head>",
+        '<head><base href="http://booking.test/">',
+        1,
+    )
+    health_fixture = {
+        "healthy": False,
+        "timestamp": "2026-07-19T05:30:00Z",
+        "checks": {
+            "etransfer_scan": {
+                "ok": False,
+                "status": "degraded",
+                "detail": "message_body_unavailable",
+                "last_attempt_at": "2026-07-19T05:29:30+00:00",
+                "last_success_at": "2026-07-19T05:20:00+00:00",
+                "last_email_count": 1,
+            }
+        },
+    }
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        launch_options = {"headless": True}
+        if not Path(playwright.chromium.executable_path).exists():
+            candidates = sorted(
+                (Path.home() / "Library" / "Caches" / "ms-playwright").glob(
+                    "chromium_headless_shell-*/chrome-headless-shell-mac-arm64/"
+                    "chrome-headless-shell"
+                )
+            )
+            assert candidates, "A local Playwright Chromium binary is required for the DOM regression"
+            launch_options["executable_path"] = str(candidates[-1])
+        browser = playwright.chromium.launch(**launch_options)
+        page = browser.new_page()
+        page.route(
+            "http://booking.test/admin/health",
+            lambda route: route.fulfill(
+                status=503,
+                content_type="application/json",
+                body=json.dumps(health_fixture),
+            ),
+        )
+        page.route(
+            "http://booking.test/admin/backups",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body="[]",
+            ),
+        )
+        page.set_content(html, wait_until="domcontentloaded")
+        card = page.locator("article.card", has_text="e-Transfer scan")
+        card.wait_for()
+
+        assert card.locator(".pill").inner_text() == "Attention"
+        card_text = card.inner_text()
+        assert "degraded" in card_text
+        assert "message_body_unavailable" in card_text
+        assert "2026-07-19T05:29:30+00:00" in card_text
+        assert "2026-07-19T05:20:00+00:00" in card_text
+        assert "raw-provider-secret" not in page.locator("body").inner_text()
+        browser.close()
 
 
 def test_production_import_with_background_threads_disabled_starts_no_app_loops(tmp_path):
