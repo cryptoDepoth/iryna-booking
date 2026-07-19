@@ -198,6 +198,7 @@
     .avatar { width: 52px; height: 52px; font-size: 18px; }
     .hero-name { font-size: 20px; }
     .topbar-nav { display: none; }
+    .btn { min-height: 44px; }
   }
 </style>
 </head>
@@ -416,11 +417,11 @@
         <p class="hint">Payment options sent to client: Interac e-Transfer to {{ email if email is defined else 'iryna.pashynska@gmail.com' }} + Stripe/card link when available.</p>
       </div>
       <div class="btn-row" style="margin-top:14px;">
-        <button class="btn btn-outline" type="button" onclick="saveInvoiceAmounts()">💾 Save amounts</button>
+        <button class="btn btn-outline" type="button" id="save-invoice-btn" onclick="saveInvoiceAmounts(this)">💾 Save amounts</button>
         <a class="btn btn-outline" href="/admin/booking/{{ booking.id }}/invoice" target="_blank" rel="noopener">⬇ Download PDF</a>
-        <button class="btn btn-accent" type="button" onclick="sendInvoice()">📧 Email invoice</button>
-        <button class="btn btn-primary" type="button" onclick="requestBalance()">💸 Request balance</button>
-        <button class="btn btn-outline" type="button" onclick="recheckPayment()">↻ Recheck Interac</button>
+        <button class="btn btn-accent" type="button" id="send-invoice-btn" onclick="sendInvoice(this)">📧 Email invoice</button>
+        <button class="btn btn-primary" type="button" id="request-balance-btn" onclick="requestBalance(this)">💸 Request balance</button>
+        <button class="btn btn-outline" type="button" id="recheck-payment-btn" onclick="recheckPayment(this)">↻ Recheck Interac</button>
       </div>
     </section>
 
@@ -485,12 +486,31 @@
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 3500);
   }
 
+  function beginAdminAction(button, busyText) {
+    if (!button || button.disabled) return null;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = busyText;
+    return function finishAdminAction() {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.textContent = originalText;
+    };
+  }
+
   async function adminPost(path, body, method) {
-    const res = await fetch('/admin/booking/' + bookingId + path, {
-      method: method || 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {})
-    });
+    let res;
+    try {
+      res = await fetch('/admin/booking/' + bookingId + path, {
+        method: method || 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+    } catch (error) {
+      showToast('Network error: ' + error.message, 'err');
+      return null;
+    }
     if (res.status === 401 || res.status === 403) {
       const next = encodeURIComponent(location.pathname);
       location.href = '/admin/login?next=' + next;
@@ -515,17 +535,24 @@
     return balance;
   }
 
-  async function saveInvoiceAmounts() {
+  async function saveInvoiceAmounts(button) {
+    button = button || document.getElementById('save-invoice-btn');
+    const done = beginAdminAction(button, 'Saving…');
+    if (!done) return null;
     showToast('Saving invoice amounts…');
-    const r = await adminPost('/invoice', invoiceAmounts(), 'PATCH');
-    if (!r) return null;
-    if (r.ok && r.data && r.data.success) {
-      if (typeof r.data.balance_due === 'number') document.getElementById('invoiceBalanceDue').textContent = r.data.balance_due.toFixed(2);
-      showToast('Invoice amounts saved ✓', 'ok');
-      return r.data;
+    try {
+      const r = await adminPost('/invoice', invoiceAmounts(), 'PATCH');
+      if (!r) return null;
+      if (r.ok && r.data && r.data.success) {
+        if (typeof r.data.balance_due === 'number') document.getElementById('invoiceBalanceDue').textContent = r.data.balance_due.toFixed(2);
+        showToast('Invoice amounts saved ✓', 'ok');
+        return r.data;
+      }
+      showToast((r.data && r.data.error) || 'Failed to save invoice amounts', 'err');
+      return null;
+    } finally {
+      done();
     }
-    showToast((r.data && r.data.error) || 'Failed to save invoice amounts', 'err');
-    return null;
   }
 
   async function saveContact() {
@@ -543,52 +570,79 @@
     }
   }
 
-  async function requestBalance() {
+  async function requestBalance(button) {
+    button = button || document.getElementById('request-balance-btn');
+    const done = beginAdminAction(button, 'Sending…');
+    if (!done) return;
     const balance = recalcInvoice();
-    if (balance <= 0) { showToast('No remaining balance to request', 'err'); return; }
-    const saved = await saveInvoiceAmounts();
-    if (!saved) return;
-    if (!confirm('Send balance request for $' + Number(saved.balance_due || balance).toFixed(2) + ' CAD to this client?')) return;
-    showToast('Creating payment request + emailing client…');
-    const res = await fetch('/admin/request-balance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ booking_id: bookingId })
-    });
-    let data = null;
-    try { data = await res.json(); } catch (e) { /* ignore */ }
-    if (res.ok && data && data.success) {
-      const linkNote = data.stripe_url ? ' Stripe link created.' : ' Interac only.';
-      showToast('Balance request sent ✓' + linkNote, 'ok');
-    } else {
-      showToast((data && data.error) || 'Failed to send balance request', 'err');
+    try {
+      if (balance <= 0) { showToast('No remaining balance to request', 'err'); return; }
+      const saved = await saveInvoiceAmounts(document.getElementById('save-invoice-btn'));
+      if (!saved) return;
+      if (!confirm('Send balance request for $' + Number(saved.balance_due || balance).toFixed(2) + ' CAD to this client?')) return;
+      showToast('Creating payment request + emailing client…');
+      let res;
+      try {
+        res = await fetch('/admin/request-balance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_id: bookingId })
+        });
+      } catch (error) {
+        showToast('Network error: ' + error.message, 'err');
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && data.success) {
+        const linkNote = data.stripe_url ? ' Stripe link created.' : ' Interac only.';
+        showToast('Balance request sent ✓' + linkNote, 'ok');
+      } else {
+        showToast((data && data.error) || 'Failed to send balance request', 'err');
+      }
+    } finally {
+      done();
     }
   }
 
-  async function recheckPayment() {
+  async function recheckPayment(button) {
+    button = button || document.getElementById('recheck-payment-btn');
+    const done = beginAdminAction(button, 'Checking…');
+    if (!done) return;
     showToast('Checking recent Interac emails…');
-    const r = await adminPost('/recheck-payment');
-    if (!r) return;
-    if (r.ok && r.data && r.data.success) {
-      const paid = Number(r.data.paid_amount || 0).toFixed(2);
-      const balance = Number(r.data.balance_due || 0).toFixed(2);
-      const message = r.data.updated
-        ? 'Payment corrected ✓ Paid $' + paid + ', balance $' + balance
-        : 'No newer Interac amount found';
-      showToast(message, r.data.updated ? 'ok' : '');
-      if (r.data.updated) setTimeout(() => location.reload(), 800);
-    } else {
-      showToast((r.data && r.data.error) || 'Failed to recheck Interac', 'err');
+    try {
+      const r = await adminPost('/recheck-payment');
+      if (!r) return;
+      if (r.ok && r.data && r.data.success) {
+        const paid = Number(r.data.paid_amount || 0).toFixed(2);
+        const balance = Number(r.data.balance_due || 0).toFixed(2);
+        const message = r.data.updated
+          ? 'Payment corrected ✓ Paid $' + paid + ', balance $' + balance
+          : 'No newer Interac amount found';
+        showToast(message, r.data.updated ? 'ok' : '');
+        if (r.data.updated) setTimeout(() => location.reload(), 800);
+      } else {
+        showToast((r.data && r.data.error) || 'Failed to recheck Interac', 'err');
+      }
+    } finally {
+      done();
     }
   }
 
-  async function sendInvoice() {
+  async function sendInvoice(button) {
+    button = button || document.getElementById('send-invoice-btn');
+    const done = beginAdminAction(button, 'Sending…');
+    if (!done) return;
     showToast('Sending invoice…');
-    await saveInvoiceAmounts();
-    const r = await adminPost('/send-invoice');
-    if (!r) return;
-    if (r.ok && r.data && r.data.success) showToast('Invoice emailed ✓', 'ok');
-    else showToast((r.data && r.data.error) || 'Failed to send invoice', 'err');
+    try {
+      const saved = await saveInvoiceAmounts(document.getElementById('save-invoice-btn'));
+      if (!saved) return;
+      const r = await adminPost('/send-invoice');
+      if (!r) return;
+      if (r.ok && r.data && r.data.success) showToast('Invoice emailed ✓', 'ok');
+      else showToast((r.data && r.data.error) || 'Failed to send invoice', 'err');
+    } finally {
+      done();
+    }
   }
 
   async function sendGallery() {

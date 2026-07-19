@@ -371,6 +371,7 @@
     .status-badge { justify-self: end; text-align: right; }
     .booking-amount { grid-column: 1 / 2; }
     .booking-actions { grid-column: 1 / -1; margin-top: 4px; }
+    .btn-sm { min-height: 44px; padding: 8px 12px; }
   }
 </style>
 </head>
@@ -601,7 +602,7 @@ function renderDetail({ client, bookings, notes }) {
     // Build action buttons based on booking status
     const actions = [];
     if (b.status === 'confirmed') {
-      actions.push(`<button class="btn-sm btn-primary" onclick="sendInvoice(${b.id})" title="Send invoice to client">📧 Send Invoice</button>`);
+      actions.push(`<button class="btn-sm btn-primary" onclick="sendInvoice(${b.id}, this)" title="Send invoice to client">📧 Send Invoice</button>`);
       actions.push(`<button class="btn-sm btn-outline" onclick="downloadInvoice(${b.id})" title="Download invoice PDF">📄 Invoice PDF</button>`);
       actions.push(`<button class="btn-sm btn-outline" onclick="editInvoiceAmounts(${b.id}, ${b.full_price||0}, ${b.deposit_amount||0}, '${parseFloat(b.paid_amount||0).toFixed(2)}')" title="Edit amounts">✏️ Edit</button>`);
     }
@@ -783,13 +784,24 @@ async function triggerBackup() {
   } catch(e) { showToast("Backup failed", "err"); }
 }
 
-async function sendInvoice(bookingId) {
+async function sendInvoice(bookingId, button) {
+  if (!button || button.disabled) return;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.textContent = "Sending…";
   try {
     const res = await fetch(`/admin/booking/${bookingId}/send-invoice`, { method: "POST" });
     const data = await res.json();
     if (data.success) showToast(`Invoice sent to client for #${bookingId}`, "ok");
     else showToast(`Failed to send invoice: ${data.error || 'Unknown error'}`, "err");
-  } catch(e) { showToast("Failed to send invoice", "err"); }
+  } catch(e) {
+    showToast("Failed to send invoice", "err");
+  } finally {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    button.textContent = originalText;
+  }
 }
 
 async function downloadInvoice(bookingId) {

@@ -258,7 +258,7 @@
     .slot-grid { grid-template-columns: 1fr; }
     .slot { padding: 15px; }
     .slot-time { font-size: 18px; }
-    .mini-btn { min-height: 38px; padding: 8px 11px; }
+    .mini-btn { min-height: 44px; padding: 10px 12px; }
     .roster-contact { grid-template-columns: 1fr; }
     .topbar { padding: 0 16px; }
     .topbar-nav { display: none; }
@@ -628,7 +628,7 @@
     const name = button.dataset.name || '';
     const action = button.dataset.rosterAction;
     if (action === 'confirm') confirmBooking(id, name, Number(button.dataset.amount || 0));
-    if (action === 'balance') requestBalance(id, name);
+    if (action === 'balance') requestBalance(id, name, button);
     if (action === 'contact') {
       openContactModal(
         id,
@@ -784,18 +784,31 @@
     }
   }
 
-  async function requestBalance(id, name) {
+  async function requestBalance(id, name, button) {
+    if (!button || button.disabled) return;
     if (!confirm(`Send remaining balance request to ${name || 'this client'}?`)) return;
-    const res = await fetch('/admin/request-balance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ booking_id: id }),
-    });
-    const data = await res.json().catch(() => null);
-    if (res.ok && data && data.success) {
-      showToast('Balance request sent ✓', 'ok');
-    } else {
-      showToast((data && data.error) || 'Failed to send balance request', 'err');
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = 'Sending…';
+    try {
+      const res = await fetch('/admin/request-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: id }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && data.success) {
+        showToast('Balance request sent ✓', 'ok');
+      } else {
+        showToast((data && data.error) || 'Failed to send balance request', 'err');
+      }
+    } catch (error) {
+      showToast('Network error: ' + error.message, 'err');
+    } finally {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.textContent = originalText;
     }
   }
 

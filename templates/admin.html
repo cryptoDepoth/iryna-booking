@@ -1254,7 +1254,7 @@
         .row-individual .cell-time,.row-individual .cell-name a{color:#6b3fa0}
         .row-individual td:first-child{box-shadow:inset 3px 0 0 #8b5cf6}
         @media(max-width:640px){
-          .btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-delete,.filter-btn{min-height:40px}
+          .btn-outline,.btn-confirm,.btn-cancel,.btn-save,.btn-done,.btn-delete,.btn-mark-paid,.btn-balance,.btn-reschedule,.filter-btn{min-height:44px}
           .day-sep td{position:sticky;left:0}
         }
         @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
@@ -1622,7 +1622,7 @@
                         {% elif b.status == 'confirmed' %}
                             <button class="btn-done" disabled>✓ Done</button>
                             <button class="btn-mark-paid" onclick='markPaid({{ b.id }}, {{ (b.name or "") | tojson }})'>💰 Mark Paid</button>
-                            <button class="btn-balance" onclick='requestBalance({{ b.id }}, {{ (b.name or "") | tojson }})'>💸 Balance</button>
+                            <button class="btn-balance" onclick='requestBalance({{ b.id }}, {{ (b.name or "") | tojson }}, this)'>💸 Balance</button>
                             <button class="btn-reschedule" onclick='openRescheduleModal({{ b.id }}, {{ (b.name or "") | tojson }}, {{ (b.date or "") | tojson }}, {{ (b.time or "") | tojson }}, {{ (b.event_id or "") | tojson }})'>📅 Reschedule</button>
                             <button class="btn-delete" onclick='deleteBooking({{ b.id }}, {{ (b.name or "") | tojson }})'>🗑️ Delete</button>
                         {% else %}
@@ -1635,7 +1635,11 @@
                 <tr><td colspan="9">
                     <div class="empty">
                         <div class="empty-icon">📋</div>
+                        {% if filters.date_from or filters.date_to or filters.session_type or filters.status or filters.search %}
+                        <p>No bookings match the current filters.</p>
+                        {% else %}
                         <p>No bookings yet.</p>
+                        {% endif %}
                     </div>
                 </td></tr>
                 {% endfor %}
@@ -2340,8 +2344,13 @@
     }
 
     /* ── Request Balance: send remaining balance payment request ── */
-    async function requestBalance(id, name) {
+    async function requestBalance(id, name, button) {
+        if (!button || button.disabled) return;
         if (!confirm(`Send remaining balance payment request to ${name}?\n\nThe email will include Interac e-Transfer instructions plus a Stripe card / Apple Pay / Google Pay link when available.`)) return;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        button.textContent = 'Sending…';
         try {
             const res = await fetch('/admin/request-balance', {
                 method: 'POST',
@@ -2357,6 +2366,10 @@
             }
         } catch (err) {
             toast('Network error: ' + err.message, 'error');
+        } finally {
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+            button.textContent = originalText;
         }
     }
 
