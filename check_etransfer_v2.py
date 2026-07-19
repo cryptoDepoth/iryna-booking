@@ -1354,40 +1354,6 @@ def confirm_booking(
     return updated > 0
 
 
-def record_partial_payment(
-    booking_id,
-    paid_amount,
-    message_id=None,
-    *,
-    ledger_id=None,
-):
-    """Record a partial/underpayment WITHOUT confirming the booking.
-
-    Sets paid_amount + status='partial_payment', but ONLY while the booking is
-    still unconfirmed (confirmed=0) — so a stray later e-Transfer can never flip
-    an already-confirmed booking back to unpaid. Returns True if a row changed.
-    """
-    if message_id is not None:
-        return _apply_booking_payment_transaction(
-            message_id,
-            booking_id,
-            paid_amount,
-            "partial",
-            ledger_id=ledger_id,
-        )
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        UPDATE bookings
-        SET paid_amount=?, status='partial_payment'
-        WHERE id=? AND confirmed=0
-    """, (paid_amount, booking_id))
-    updated = c.rowcount
-    conn.commit()
-    conn.close()
-    return updated > 0
-
-
 def reconcile_confirmed_payment(
     booking_id,
     paid_amount,
