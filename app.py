@@ -12955,7 +12955,6 @@ def api_private_session():
     email). Legacy compat: when already_paid is omitted, an empty payment_link
     means "settled offline" (old modal semantics, pinned by tests)."""
     import secrets
-    import yaml
 
     data = request.json or {}
     date = (data.get("date") or "").strip()
@@ -13067,26 +13066,28 @@ def api_private_session():
              session_minutes, 0, 0),
         )
         booking_id = c.lastrowid
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        log.exception(f"[private-session] booking insert failed: {e}")
-        return jsonify({"error": "Не удалось создать бронь"}), 500
-    finally:
-        conn.close()
 
-    # Persist the hidden event (atomic temp-file swap so a crash can't truncate
-    # events.yaml). Uses the canonical path + shared lock so it can't race the
-    # other events.yaml writers. In-memory EVENTS is updated after the file wins.
-    try:
+        # Persist the hidden event while the booking transaction is still open,
+        # then commit the booking only after the YAML and revision sidecar win.
+        # A persistence failure therefore rolls back the booking and prevents
+        # an orphaned payment link from becoming durable.
         with _EVENTS_YAML_LOCK:
             events_data = _load_events_yaml_doc()
             events_data.setdefault("events", []).append(event)
             _write_events_yaml_doc(events_data)
-            global EVENTS
-            EVENTS.append(event)
+
+        conn.commit()
     except Exception as e:
-        log.error(f"[private-session] events.yaml save failed (booking #{booking_id} still created): {e}")
+        conn.rollback()
+        log.exception(f"[private-session] creation failed: {e}")
+        return jsonify({"error": "Не удалось создать бронь"}), 500
+    finally:
+        conn.close()
+
+    # Publish the already-durable event to in-process readers only after the
+    # booking commit succeeds.
+    global EVENTS
+    EVENTS.append(event)
 
     # Best-effort: keep the clients table in sync
     if email:

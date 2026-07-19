@@ -132,6 +132,108 @@ def test_private_session_with_payment_link_is_unpaid(admin_client):
     assert row["payment_link"] == "https://buy.stripe.com/test_abc"
 
 
+def test_private_session_persists_event_before_booking_commit(
+    admin_client, monkeypatch
+):
+    observed_booking_counts = []
+    original_write = booking_app._write_events_yaml_doc
+
+    def observe_uncommitted_booking(events_data):
+        conn = booking_app.db_conn()
+        observed_booking_counts.append(
+            conn.execute(
+                "SELECT COUNT(*) FROM bookings WHERE event_id LIKE 'private-%'"
+            ).fetchone()[0]
+        )
+        conn.close()
+        original_write(events_data)
+
+    monkeypatch.setattr(
+        booking_app,
+        "_write_events_yaml_doc",
+        observe_uncommitted_booking,
+    )
+    monkeypatch.setattr(booking_app, "_notify_admin", lambda *_args, **_kwargs: None)
+
+    response = admin_client.post(
+        "/admin/api/private-session",
+        json={
+            "date": "2026-08-17",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "client_name": "Atomic Success",
+            "email": "",
+            "price": "300",
+            "already_paid": True,
+        },
+        headers=_hdrs(),
+    )
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert observed_booking_counts == [0]
+
+
+def test_private_session_event_persistence_failure_rolls_back_booking(
+    admin_client, monkeypatch
+):
+    original_yaml = Path(admin_client.events_file).read_bytes()
+    revision_path = Path(f"{admin_client.events_file}.revision.json")
+    original_revision = (
+        revision_path.read_bytes() if revision_path.exists() else None
+    )
+    sent_emails = []
+    admin_notifications = []
+
+    def fail_event_persistence(_events_data):
+        raise OSError("simulated events sidecar failure")
+
+    monkeypatch.setattr(
+        booking_app,
+        "_write_events_yaml_doc",
+        fail_event_persistence,
+    )
+    monkeypatch.setattr(
+        booking_app,
+        "_send_private_payment_email",
+        lambda **_kwargs: sent_emails.append(_kwargs) or True,
+    )
+    monkeypatch.setattr(
+        booking_app,
+        "_notify_admin",
+        lambda message, **_kwargs: admin_notifications.append(message),
+    )
+
+    response = admin_client.post(
+        "/admin/api/private-session",
+        json={
+            "date": "2026-08-18",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "client_name": "Atomic Failure",
+            "email": "atomic@example.com",
+            "price": "300",
+            "send_email": True,
+            "already_paid": False,
+        },
+        headers=_hdrs(),
+    )
+
+    assert response.status_code == 500
+    conn = booking_app.db_conn()
+    assert conn.execute(
+        "SELECT COUNT(*) FROM bookings WHERE email='atomic@example.com'"
+    ).fetchone()[0] == 0
+    conn.close()
+    assert Path(admin_client.events_file).read_bytes() == original_yaml
+    if original_revision is None:
+        assert not revision_path.exists()
+    else:
+        assert revision_path.read_bytes() == original_revision
+    assert sent_emails == []
+    assert admin_notifications == []
+    assert admin_client.sync_client_calls == []
+
+
 # ── 3. Guards ─────────────────────────────────────────────────────────────────
 
 def test_private_session_requires_auth(admin_client, monkeypatch):
