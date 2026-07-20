@@ -133,3 +133,62 @@ def test_find_booking_event_falls_back_to_legacy_description():
     event = gcal_helper._find_booking_event(Service(), "iryna@example.com", "42")
     assert event["id"] == "legacy-42"
     assert calls[1]["q"] == "Booking #42"
+
+
+def test_delete_removes_exact_calendar_event(monkeypatch, capsys):
+    calls = []
+
+    class Request:
+        def execute(self):
+            return None
+
+    class Events:
+        def delete(self, **kwargs):
+            calls.append(kwargs)
+            return Request()
+
+    class Service:
+        def events(self):
+            return Events()
+
+    monkeypatch.setattr(gcal_helper, "_service", lambda: Service())
+
+    gcal_helper.cmd_delete(
+        Namespace(calendar="iryna@example.com", event_id="calendar-event-42")
+    )
+
+    assert calls == [{
+        "calendarId": "iryna@example.com",
+        "eventId": "calendar-event-42",
+    }]
+    output = capsys.readouterr().out
+    assert '"deleted": true' in output
+    assert '"missing": false' in output
+
+
+def test_delete_treats_missing_calendar_event_as_reconciled(monkeypatch, capsys):
+    class MissingError(Exception):
+        def __init__(self):
+            self.resp = Namespace(status=404)
+
+    class Request:
+        def execute(self):
+            raise MissingError()
+
+    class Events:
+        def delete(self, **kwargs):
+            return Request()
+
+    class Service:
+        def events(self):
+            return Events()
+
+    monkeypatch.setattr(gcal_helper, "_service", lambda: Service())
+
+    gcal_helper.cmd_delete(
+        Namespace(calendar="iryna@example.com", event_id="missing-event-42")
+    )
+
+    output = capsys.readouterr().out
+    assert '"deleted": false' in output
+    assert '"missing": true' in output

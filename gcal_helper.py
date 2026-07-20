@@ -11,6 +11,8 @@ One-time setup:
 Then app.py calls:
   gcal_helper.py create --calendar <id> --summary <s> --start <iso> --end <iso> --tz <tz> --description <d> --location <loc>
 which prints a single JSON line: {"id": "...", "htmlLink": "..."}
+To reconcile a reversed confirmation it calls:
+  gcal_helper.py delete --calendar <id> --event-id <event_id>
 """
 import argparse
 import json
@@ -149,6 +151,31 @@ def cmd_create(args):
     print(json.dumps({"id": ev.get("id"), "htmlLink": ev.get("htmlLink"), "existing": False}))
 
 
+def cmd_delete(args):
+    """Delete one known booking event, treating already-missing as success."""
+    svc = _service()
+    try:
+        svc.events().delete(
+            calendarId=args.calendar,
+            eventId=args.event_id,
+        ).execute()
+    except Exception as exc:
+        status = getattr(getattr(exc, "resp", None), "status", None)
+        if status not in {404, 410}:
+            raise
+        print(json.dumps({
+            "deleted": False,
+            "missing": True,
+            "id": args.event_id,
+        }))
+        return
+    print(json.dumps({
+        "deleted": True,
+        "missing": False,
+        "id": args.event_id,
+    }))
+
+
 def main():
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -164,6 +191,9 @@ def main():
     cr.add_argument("--tz", default="America/Edmonton")
     cr.add_argument("--description", default="")
     cr.add_argument("--location", default="")
+    delete = sub.add_parser("delete")
+    delete.add_argument("--calendar", required=True)
+    delete.add_argument("--event-id", required=True)
     args = p.parse_args()
     if args.cmd == "auth":
         cmd_auth()
@@ -171,6 +201,8 @@ def main():
         cmd_probe(args)
     elif args.cmd == "create":
         cmd_create(args)
+    elif args.cmd == "delete":
+        cmd_delete(args)
 
 
 if __name__ == "__main__":

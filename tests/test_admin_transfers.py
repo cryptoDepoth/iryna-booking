@@ -1,5 +1,7 @@
 import io
+import json
 import sqlite3
+import subprocess
 from datetime import datetime, timezone
 
 import pytest
@@ -199,6 +201,9 @@ def test_etransfer_archive_migration_is_idempotent(monkeypatch, tmp_path):
         "restored_at",
         "unlinked_at",
         "unlinked_booking_id",
+        "unlink_external_status",
+        "unlink_external_details",
+        "unlink_external_reconciled_at",
         "payment_mutation",
         "prior_booking_status",
         "prior_booking_confirmed",
@@ -1132,6 +1137,529 @@ def test_unlink_reverses_real_auto_payment_ownership_without_reuse(
     assert "Unlinked history" in history_html
     assert f"Previously #{original_booking_id}" in history_html
     assert "Audit history only" in history_html
+
+
+def test_unlink_reconciles_confirmation_external_state_after_ownership_commit(
+    client,
+    monkeypatch,
+):
+    c, app, db_path, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id,
+            calendar_event_id, calendar_event_url, notion_page_id
+        ) VALUES (
+            '2026-08-10', '13:20', 'External Reconciliation Client',
+            'external-reconciliation@example.com', '4035550207', '',
+            'Mission Mini', 'confirmed', 1, 1, 120.50, 120.50, 241.00,
+            'mission-mini-10', 'calendar-external-1',
+            'https://calendar.example/calendar-external-1', 'notion-external-1'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.execute(
+        """
+        INSERT INTO processed_emails (message_id, booking_id, amount)
+        VALUES ('unlink-external-success-message', ?, 120.50)
+        """,
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-external-success-ref",
+        message_id="unlink-external-success-message",
+        amount=120.50,
+        matched_booking_id=booking_id,
+        status="matched",
+    )
+    _set_transfer_payment_provenance(
+        app,
+        transfer_id,
+        mutation="confirm",
+        prior_status="pending_payment",
+        prior_confirmed=0,
+        prior_paid=0,
+        prior_paid_amount=0.0,
+    )
+    provider_calls = []
+
+    def fake_delete(target_booking_id, event_id=None, expected_state=None):
+        conn = sqlite3.connect(db_path)
+        booking_state = conn.execute(
+            "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+            (booking_id,),
+        ).fetchone()
+        transfer_state = conn.execute(
+            "SELECT status, matched_booking_id FROM etransfers WHERE id=?",
+            (transfer_id,),
+        ).fetchone()
+        conn.execute(
+            """
+            UPDATE bookings
+               SET calendar_event_id=NULL,
+                   calendar_event_url=NULL
+             WHERE id=?
+            """,
+            (booking_id,),
+        )
+        conn.commit()
+        conn.close()
+        provider_calls.append(("calendar", target_booking_id, event_id))
+        assert booking_state == ("pending_payment", 0, 0, 0.0)
+        assert transfer_state == ("unlinked", None)
+        assert expected_state == {
+            "status": "pending_payment",
+            "confirmed": 0,
+            "paid": 0,
+            "paid_amount": 0.0,
+        }
+        return {"status": "removed", "event_id": event_id}
+
+    def fake_notion(target_booking_id, expected_state=None):
+        conn = sqlite3.connect(db_path)
+        state = conn.execute(
+            "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+            (booking_id,),
+        ).fetchone()
+        conn.close()
+        provider_calls.append(("notion", target_booking_id))
+        assert state == ("pending_payment", 0, 0, 0.0)
+        assert expected_state == {
+            "status": "pending_payment",
+            "confirmed": 0,
+            "paid": 0,
+            "paid_amount": 0.0,
+        }
+        return {"status": "updated", "page_id": "notion-external-1"}
+
+    monkeypatch.setattr(app, "delete_calendar_event_for_booking", fake_delete)
+    monkeypatch.setattr(app, "update_notion_after_transfer_unlink", fake_notion)
+    monkeypatch.setattr(
+        app,
+        "_notify_admin",
+        lambda *args, **kwargs: pytest.fail(
+            "unlink operator warning must not emit another Telegram notification"
+        ),
+    )
+    monkeypatch.setattr(
+        app,
+        "_send_client_email",
+        lambda *args, **kwargs: pytest.fail(
+            "unlink must not send another client email"
+        ),
+    )
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    assert (
+        payload["external_reconciliation"]["status"]
+        == "corrected_with_irreversible_notifications"
+    )
+    assert payload["external_reconciliation"]["calendar"]["status"] == "removed"
+    assert payload["external_reconciliation"]["notion"]["status"] == "updated"
+    assert "client confirmation email" in payload["operator_alert"].lower()
+    assert "admin telegram" in payload["operator_alert"].lower()
+    assert "cannot be recalled" in payload["operator_alert"].lower()
+    assert provider_calls == [
+        ("calendar", booking_id, "calendar-external-1"),
+        ("notion", booking_id),
+    ]
+
+    conn = sqlite3.connect(db_path)
+    booking_after = conn.execute(
+        """
+        SELECT status, confirmed, paid, paid_amount,
+               calendar_event_id, calendar_event_url, notion_page_id
+          FROM bookings
+         WHERE id=?
+        """,
+        (booking_id,),
+    ).fetchone()
+    audit_row = conn.execute(
+        """
+        SELECT unlink_external_status, unlink_external_details,
+               unlink_external_reconciled_at
+          FROM etransfers
+         WHERE id=?
+        """,
+        (transfer_id,),
+    ).fetchone()
+    conn.close()
+    assert booking_after == (
+        "pending_payment",
+        0,
+        0,
+        0.0,
+        None,
+        None,
+        "notion-external-1",
+    )
+    assert audit_row[0] == "corrected_with_irreversible_notifications"
+    audit = json.loads(audit_row[1])
+    assert audit["calendar"]["status"] == "removed"
+    assert audit["notion"]["status"] == "updated"
+    assert audit["notifications"]["client_email"] == "possibly_sent_irreversible"
+    assert audit["notifications"]["admin_telegram"] == "possibly_sent_irreversible"
+    assert audit_row[2]
+
+    history = c.get("/admin/transfers?status=unlinked")
+    assert history.status_code == 200
+    history_html = history.get_data(as_text=True)
+    assert "External reconciliation" in history_html
+    assert "Calendar hold removed" in history_html
+    assert "Notion updated" in history_html
+    assert "cannot be recalled" in history_html
+    assert "window.alert(result.operator_alert" in history_html
+
+
+def test_unlink_contains_provider_failures_and_records_attention_required(
+    client,
+    monkeypatch,
+):
+    c, app, db_path, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id,
+            calendar_event_id, calendar_event_url, notion_page_id
+        ) VALUES (
+            '2026-08-10', '13:40', 'Provider Failure Client',
+            'provider-failure@example.com', '4035550208', '', 'Mission Mini',
+            'confirmed', 1, 1, 120.50, 120.50, 241.00, 'mission-mini-10',
+            'calendar-provider-failure',
+            'https://calendar.example/calendar-provider-failure',
+            'notion-provider-failure'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.execute(
+        """
+        INSERT INTO processed_emails (message_id, booking_id, amount)
+        VALUES ('unlink-provider-failure-message', ?, 120.50)
+        """,
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-provider-failure-ref",
+        message_id="unlink-provider-failure-message",
+        amount=120.50,
+        matched_booking_id=booking_id,
+        status="matched",
+    )
+    _set_transfer_payment_provenance(
+        app,
+        transfer_id,
+        mutation="confirm",
+        prior_status="pending_payment",
+        prior_confirmed=0,
+        prior_paid=0,
+        prior_paid_amount=0.0,
+    )
+    provider_calls = []
+
+    def fail_calendar(target_booking_id, event_id=None, expected_state=None):
+        conn = sqlite3.connect(db_path)
+        state = conn.execute(
+            "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+            (booking_id,),
+        ).fetchone()
+        conn.close()
+        provider_calls.append(("calendar", target_booking_id, event_id))
+        assert state == ("pending_payment", 0, 0, 0.0)
+        raise RuntimeError("calendar unavailable")
+
+    def fail_notion(target_booking_id, expected_state=None):
+        conn = sqlite3.connect(db_path)
+        state = conn.execute(
+            "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+            (booking_id,),
+        ).fetchone()
+        conn.close()
+        provider_calls.append(("notion", target_booking_id))
+        assert state == ("pending_payment", 0, 0, 0.0)
+        raise RuntimeError("notion unavailable")
+
+    monkeypatch.setattr(app, "delete_calendar_event_for_booking", fail_calendar)
+    monkeypatch.setattr(app, "update_notion_after_transfer_unlink", fail_notion)
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    assert payload["external_reconciliation"]["status"] == "attention_required"
+    assert payload["external_reconciliation"]["calendar"]["status"] == "failed"
+    assert payload["external_reconciliation"]["notion"]["status"] == "failed"
+    assert "calendar" in payload["operator_alert"].lower()
+    assert "notion" in payload["operator_alert"].lower()
+    assert provider_calls == [
+        ("calendar", booking_id, "calendar-provider-failure"),
+        ("notion", booking_id),
+    ]
+
+    conn = sqlite3.connect(db_path)
+    booking_after = conn.execute(
+        """
+        SELECT status, confirmed, paid, paid_amount,
+               calendar_event_id, calendar_event_url, notion_page_id
+          FROM bookings
+         WHERE id=?
+        """,
+        (booking_id,),
+    ).fetchone()
+    audit_row = conn.execute(
+        """
+        SELECT status, matched_booking_id, unlink_external_status,
+               unlink_external_details, unlink_external_reconciled_at
+          FROM etransfers
+         WHERE id=?
+        """,
+        (transfer_id,),
+    ).fetchone()
+    conn.close()
+    assert booking_after == (
+        "pending_payment",
+        0,
+        0,
+        0.0,
+        "calendar-provider-failure",
+        "https://calendar.example/calendar-provider-failure",
+        "notion-provider-failure",
+    )
+    assert audit_row[0:3] == ("unlinked", None, "attention_required")
+    audit = json.loads(audit_row[3])
+    assert audit["calendar"]["status"] == "failed"
+    assert audit["calendar"]["error"] == "RuntimeError"
+    assert audit["notion"]["status"] == "failed"
+    assert audit["notion"]["error"] == "RuntimeError"
+    assert audit_row[4]
+
+
+def test_unlink_does_not_remove_new_confirmation_calendar_state(
+    client,
+    monkeypatch,
+):
+    c, app, db_path, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id,
+            calendar_event_id, calendar_event_url
+        ) VALUES (
+            '2026-08-10', '14:00', 'Reconfirmed Client',
+            'reconfirmed@example.com', '4035550209', '', 'Mission Mini',
+            'confirmed', 1, 1, 120.50, 120.50, 241.00, 'mission-mini-10',
+            'calendar-original-confirmation',
+            'https://calendar.example/calendar-original-confirmation'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.execute(
+        """
+        INSERT INTO processed_emails (message_id, booking_id, amount)
+        VALUES ('unlink-reconfirmed-message', ?, 120.50)
+        """,
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-reconfirmed-ref",
+        message_id="unlink-reconfirmed-message",
+        amount=120.50,
+        matched_booking_id=booking_id,
+        status="matched",
+    )
+    _set_transfer_payment_provenance(
+        app,
+        transfer_id,
+        mutation="confirm",
+        prior_status="pending_payment",
+        prior_confirmed=0,
+        prior_paid=0,
+        prior_paid_amount=0.0,
+    )
+    real_delete = app.delete_calendar_event_for_booking
+
+    def reconfirm_then_reconcile(
+        target_booking_id,
+        event_id=None,
+        expected_state=None,
+    ):
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            """
+            UPDATE bookings
+               SET status='confirmed',
+                   confirmed=1,
+                   paid=1,
+                   paid_amount=120.50,
+                   calendar_event_id='calendar-new-confirmation',
+                   calendar_event_url='https://calendar.example/calendar-new-confirmation'
+             WHERE id=?
+            """,
+            (booking_id,),
+        )
+        conn.commit()
+        conn.close()
+        return real_delete(
+            target_booking_id,
+            event_id=event_id,
+            expected_state=expected_state,
+        )
+
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "superseded reconciliation must not call the Calendar provider"
+        ),
+    )
+    monkeypatch.setattr(
+        app,
+        "delete_calendar_event_for_booking",
+        reconfirm_then_reconcile,
+    )
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["external_reconciliation"]["status"] == "attention_required"
+    assert payload["external_reconciliation"]["calendar"]["status"] == "superseded"
+    assert payload["external_reconciliation"]["notion"]["status"] == "superseded"
+    conn = sqlite3.connect(db_path)
+    booking_after = conn.execute(
+        """
+        SELECT status, confirmed, paid, paid_amount,
+               calendar_event_id, calendar_event_url
+          FROM bookings
+         WHERE id=?
+        """,
+        (booking_id,),
+    ).fetchone()
+    transfer_after = conn.execute(
+        """
+        SELECT status, matched_booking_id, unlink_external_status
+          FROM etransfers
+         WHERE id=?
+        """,
+        (transfer_id,),
+    ).fetchone()
+    conn.close()
+    assert booking_after == (
+        "confirmed",
+        1,
+        1,
+        120.50,
+        "calendar-new-confirmation",
+        "https://calendar.example/calendar-new-confirmation",
+    )
+    assert transfer_after == ("unlinked", None, "attention_required")
+
+
+def test_unlink_flags_calendar_url_without_event_id_for_manual_follow_up(client):
+    c, app, _, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id,
+            calendar_event_id, calendar_event_url
+        ) VALUES (
+            '2026-08-10', '14:20', 'Legacy Calendar Client',
+            'legacy-calendar@example.com', '4035550210', '', 'Mission Mini',
+            'confirmed', 1, 1, 120.50, 120.50, 241.00, 'mission-mini-10',
+            NULL, 'https://calendar.example/legacy-without-id'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.execute(
+        """
+        INSERT INTO processed_emails (message_id, booking_id, amount)
+        VALUES ('unlink-legacy-calendar-message', ?, 120.50)
+        """,
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number="unlink-legacy-calendar-ref",
+        message_id="unlink-legacy-calendar-message",
+        amount=120.50,
+        matched_booking_id=booking_id,
+        status="matched",
+    )
+    _set_transfer_payment_provenance(
+        app,
+        transfer_id,
+        mutation="confirm",
+        prior_status="pending_payment",
+        prior_confirmed=0,
+        prior_paid=0,
+        prior_paid_amount=0.0,
+    )
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["external_reconciliation"]["status"] == "attention_required"
+    assert (
+        payload["external_reconciliation"]["calendar"]["status"]
+        == "inconsistent_local_state"
+    )
+    assert "calendar needs manual follow-up" in payload["operator_alert"].lower()
+    conn = app.db_conn()
+    booking_after = conn.execute(
+        """
+        SELECT status, confirmed, paid, paid_amount,
+               calendar_event_id, calendar_event_url
+          FROM bookings
+         WHERE id=?
+        """,
+        (booking_id,),
+    ).fetchone()
+    audit_status = conn.execute(
+        "SELECT unlink_external_status FROM etransfers WHERE id=?",
+        (transfer_id,),
+    ).fetchone()[0]
+    conn.close()
+    assert tuple(booking_after) == (
+        "pending_payment",
+        0,
+        0,
+        0.0,
+        None,
+        "https://calendar.example/legacy-without-id",
+    )
+    assert audit_status == "attention_required"
 
 
 @pytest.mark.parametrize(

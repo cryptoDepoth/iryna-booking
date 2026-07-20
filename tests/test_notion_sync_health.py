@@ -80,6 +80,121 @@ def test_notion_sync_uses_booking_event_duration_and_prices(notion_db, monkeypat
     conn.close()
 
 
+def test_unlink_notion_patch_clears_stale_confirmation_properties(
+    notion_db,
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_patch(url, headers, json, timeout):
+        captured.update({
+            "url": url,
+            "headers": headers,
+            "json": json,
+            "timeout": timeout,
+        })
+        return _Response(200)
+
+    monkeypatch.setattr(booking_app.requests, "patch", fake_patch)
+    conn = booking_app.db_conn()
+    cursor = conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, session_type, status, confirmed,
+            paid, paid_amount, notion_page_id, calendar_event_id,
+            calendar_event_url
+        ) VALUES (
+            '2026-08-01', '16:20', 'Unlinked Notion Client',
+            'notion-unlinked@example.com', '', 'mini', 'pending_payment',
+            0, 0, 0, 'notion-unlinked-page', NULL, NULL
+        )
+        """
+    )
+    booking_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    result = booking_app.update_notion_after_transfer_unlink(booking_id)
+
+    assert result == {
+        "status": "updated",
+        "page_id": "notion-unlinked-page",
+    }
+    assert captured["url"].endswith("/notion-unlinked-page")
+    properties = captured["json"]["properties"]
+    assert properties["Status"] == {
+        "select": {"name": "Pending Payment"}
+    }
+    assert properties["Paid"] == {"checkbox": False}
+    assert properties["Payment Method"] == {"select": None}
+    assert properties["Calendar Event"] == {"url": None}
+
+
+def test_unlink_notion_patch_restores_current_state_after_reconfirmation(
+    notion_db,
+    monkeypatch,
+):
+    conn = booking_app.db_conn()
+    cursor = conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, session_type, status, confirmed,
+            paid, paid_amount, notion_page_id
+        ) VALUES (
+            '2026-08-01', '16:40', 'Notion Race Client',
+            'notion-race@example.com', '', 'mini', 'pending_payment',
+            0, 0, 0, 'notion-race-page'
+        )
+        """
+    )
+    booking_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    restore_calls = []
+
+    def fake_patch(url, headers, json, timeout):
+        conn = booking_app.db_conn()
+        conn.execute(
+            """
+            UPDATE bookings
+               SET status='confirmed',
+                   confirmed=1,
+                   paid=1,
+                   paid_amount=120.50
+             WHERE id=?
+            """,
+            (booking_id,),
+        )
+        conn.commit()
+        conn.close()
+        return _Response(200)
+
+    monkeypatch.setattr(booking_app.requests, "patch", fake_patch)
+    monkeypatch.setattr(
+        booking_app,
+        "sync_to_notion",
+        lambda target_booking_id: (
+            restore_calls.append(target_booking_id) or True
+        ),
+    )
+
+    result = booking_app.update_notion_after_transfer_unlink(
+        booking_id,
+        expected_state={
+            "status": "pending_payment",
+            "confirmed": 0,
+            "paid": 0,
+            "paid_amount": 0,
+        },
+    )
+
+    assert result == {
+        "status": "superseded_restored",
+        "page_id": "notion-race-page",
+    }
+    assert restore_calls == [booking_id]
+
+
 def test_admin_health_detects_rejected_notion_token(notion_db, monkeypatch):
     booking_app._notion_health_cache.update({
         "checked_at": 0.0,

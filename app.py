@@ -3457,6 +3457,277 @@ def create_calendar_event_for_booking(booking_id):
         _calendar_state["last_error"] = f"{type(e).__name__}: calendar event was not created"
         return None
 
+
+def _booking_matches_expected_payment_state(booking, expected_state):
+    if not expected_state:
+        return True
+    try:
+        actual_amount = float(booking["paid_amount"] or 0)
+        expected_amount = float(expected_state.get("paid_amount") or 0)
+    except (TypeError, ValueError):
+        return False
+    return (
+        booking["status"] == expected_state.get("status")
+        and int(booking["confirmed"] or 0)
+        == int(expected_state.get("confirmed") or 0)
+        and int(booking["paid"] or 0) == int(expected_state.get("paid") or 0)
+        and abs(actual_amount - expected_amount) < 0.01
+    )
+
+
+def delete_calendar_event_for_booking(
+    booking_id,
+    event_id=None,
+    *,
+    expected_state=None,
+):
+    """Remove a confirmed booking's Calendar hold after a durable unlink."""
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        booking = conn.execute(
+            """
+            SELECT status, confirmed, paid, paid_amount,
+                   calendar_event_id, calendar_event_url
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+        if not booking:
+            return {"status": "booking_missing", "event_id": event_id}
+        if not _booking_matches_expected_payment_state(booking, expected_state):
+            return {"status": "superseded", "event_id": booking["calendar_event_id"]}
+        event_id = event_id or booking["calendar_event_id"]
+        if not event_id:
+            if booking["calendar_event_url"]:
+                return {
+                    "status": "inconsistent_local_state",
+                    "event_id": None,
+                }
+            return {"status": "not_created", "event_id": None}
+        if booking["calendar_event_id"] != event_id:
+            return {
+                "status": "superseded",
+                "event_id": booking["calendar_event_id"],
+            }
+        helper = os.environ.get("GCAL_HELPER")
+        if not helper:
+            return {"status": "not_configured", "event_id": event_id}
+    finally:
+        conn.close()
+        conn = None
+
+    try:
+        import subprocess as _sp
+        result = _sp.run(
+            [
+                helper,
+                "delete",
+                "--calendar",
+                CALENDAR_ID,
+                "--event-id",
+                str(event_id),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("Google Calendar helper rejected the delete request")
+        payload = json.loads(result.stdout.strip() or "{}")
+        conn = db_conn()
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        current = conn.execute(
+            """
+            SELECT status, confirmed, paid, paid_amount,
+                   calendar_event_id, calendar_event_url
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+        if (
+            not current
+            or not _booking_matches_expected_payment_state(current, expected_state)
+            or current["calendar_event_id"] != event_id
+        ):
+            conn.rollback()
+            current_event_id = current["calendar_event_id"] if current else None
+            should_restore = bool(
+                current
+                and current["status"] == "confirmed"
+                and current["confirmed"]
+                and current["paid"]
+                and current_event_id == event_id
+            )
+            conn.close()
+            if should_restore:
+                restored_url = create_calendar_event_for_booking(booking_id)
+                return {
+                    "status": (
+                        "superseded_restored"
+                        if restored_url
+                        else "superseded_restore_failed"
+                    ),
+                    "event_id": event_id,
+                }
+            return {
+                "status": "superseded",
+                "event_id": current_event_id,
+            }
+        expected_paid_amount = float(
+            (
+                expected_state.get("paid_amount")
+                if expected_state
+                else current["paid_amount"]
+            )
+            or 0
+        )
+        cursor = conn.execute(
+            """
+            UPDATE bookings
+               SET calendar_event_id=NULL,
+                   calendar_event_url=NULL
+             WHERE id=?
+               AND calendar_event_id=?
+               AND status=?
+               AND confirmed=?
+               AND paid=?
+               AND ABS(COALESCE(paid_amount, 0) - ?) < 0.01
+            """,
+            (
+                booking_id,
+                event_id,
+                expected_state.get("status") if expected_state else current["status"],
+                (
+                    expected_state.get("confirmed")
+                    if expected_state
+                    else current["confirmed"]
+                ),
+                expected_state.get("paid") if expected_state else current["paid"],
+                expected_paid_amount,
+            ),
+        )
+        if cursor.rowcount != 1:
+            conn.rollback()
+            raise RuntimeError("Calendar event ownership changed before local cleanup")
+        conn.commit()
+        _calendar_state.update({
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            "last_sync_booking_id": booking_id,
+            "last_error": None,
+        })
+        return {
+            "status": "already_missing" if payload.get("missing") else "removed",
+            "event_id": event_id,
+        }
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _calendar_state["last_error"] = f"{type(e).__name__}: calendar event was not removed"
+        raise
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def update_notion_after_transfer_unlink(booking_id, *, expected_state=None):
+    """Patch stale confirmation properties after a durable payment unlink."""
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        booking = conn.execute(
+            """
+            SELECT status, confirmed, paid, paid_amount, notion_page_id,
+                   calendar_event_url
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+        if not booking:
+            return {"status": "booking_missing"}
+        if not _booking_matches_expected_payment_state(booking, expected_state):
+            return {"status": "superseded"}
+        page_id = booking["notion_page_id"]
+        if not page_id:
+            return {"status": "not_created"}
+        if not NOTION_API_KEY:
+            return {"status": "not_configured", "page_id": page_id}
+        status_name = (
+            "Confirmed"
+            if booking["confirmed"]
+            else NOTION_STATUS_MAP.get(booking["status"], "Pending Payment")
+        )
+        calendar_event_url = booking["calendar_event_url"] or None
+        paid = bool(booking["paid"])
+        conn.close()
+        conn = None
+        response = requests.patch(
+            f"https://api.notion.com/v1/pages/{page_id}",
+            headers=NOTION_HEADERS,
+            json={
+                "properties": {
+                    "Status": {"select": {"name": status_name}},
+                    "Paid": {"checkbox": paid},
+                    "Payment Method": {
+                        "select": {"name": "e-Transfer"} if paid else None
+                    },
+                    "Calendar Event": {"url": calendar_event_url},
+                }
+            },
+            timeout=15,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"Notion unlink patch failed ({response.status_code}): "
+                f"{response.text[:200]}"
+            )
+        conn = db_conn()
+        conn.row_factory = sqlite3.Row
+        current = conn.execute(
+            """
+            SELECT status, confirmed, paid, paid_amount
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+        if not current or not _booking_matches_expected_payment_state(
+            current,
+            expected_state,
+        ):
+            conn.close()
+            conn = None
+            restored = sync_to_notion(booking_id)
+            return {
+                "status": (
+                    "superseded_restored"
+                    if restored
+                    else "superseded_restore_failed"
+                ),
+                "page_id": page_id,
+            }
+        _notion_state.update({
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            "last_sync_booking_id": booking_id,
+            "last_error": None,
+        })
+        return {"status": "updated", "page_id": page_id}
+    except Exception as e:
+        _notion_state["last_error"] = str(e)
+        raise
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 # ===== EVENTS CONFIG (YAML) =====
 # EVENTS_YAML_PATH env var lets Fly.io (or any deployment) store events on
 # the persistent volume (/data/events.yaml) so they survive restarts/redeploys.
@@ -4250,12 +4521,15 @@ def init_db():
         # processed_emails ledger for e-Transfer safety
         ("_meta",     "processed_emails",  "CREATE TABLE IF NOT EXISTS processed_emails (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT UNIQUE NOT NULL, booking_id INTEGER, amount REAL, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"),
         # Interac e-Transfer ledger — every incoming transfer (email + CSV import), linkable to a booking
-        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, matched_gift_code TEXT, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP, archived_at TEXT, restored_at TEXT, unlinked_at TEXT, unlinked_booking_id INTEGER, payment_mutation TEXT, prior_booking_status TEXT, prior_booking_confirmed INTEGER, prior_booking_paid INTEGER, prior_booking_paid_amount REAL)"),
+        ("_meta",     "etransfers",        "CREATE TABLE IF NOT EXISTS etransfers (id INTEGER PRIMARY KEY AUTOINCREMENT, reference_number TEXT UNIQUE, message_id TEXT, sender_name TEXT, amount REAL, memo TEXT, direction TEXT DEFAULT 'in', email_date TEXT, matched_booking_id INTEGER, matched_gift_code TEXT, status TEXT DEFAULT 'unmatched', source TEXT DEFAULT 'email', created_at TEXT DEFAULT CURRENT_TIMESTAMP, archived_at TEXT, restored_at TEXT, unlinked_at TEXT, unlinked_booking_id INTEGER, unlink_external_status TEXT, unlink_external_details TEXT, unlink_external_reconciled_at TEXT, payment_mutation TEXT, prior_booking_status TEXT, prior_booking_confirmed INTEGER, prior_booking_paid INTEGER, prior_booking_paid_amount REAL)"),
         ("etransfers", "matched_gift_code", "ALTER TABLE etransfers ADD COLUMN matched_gift_code TEXT"),
         ("etransfers", "archived_at",      "ALTER TABLE etransfers ADD COLUMN archived_at TEXT"),
         ("etransfers", "restored_at",      "ALTER TABLE etransfers ADD COLUMN restored_at TEXT"),
         ("etransfers", "unlinked_at",      "ALTER TABLE etransfers ADD COLUMN unlinked_at TEXT"),
         ("etransfers", "unlinked_booking_id", "ALTER TABLE etransfers ADD COLUMN unlinked_booking_id INTEGER"),
+        ("etransfers", "unlink_external_status", "ALTER TABLE etransfers ADD COLUMN unlink_external_status TEXT"),
+        ("etransfers", "unlink_external_details", "ALTER TABLE etransfers ADD COLUMN unlink_external_details TEXT"),
+        ("etransfers", "unlink_external_reconciled_at", "ALTER TABLE etransfers ADD COLUMN unlink_external_reconciled_at TEXT"),
         ("etransfers", "payment_mutation", "ALTER TABLE etransfers ADD COLUMN payment_mutation TEXT"),
         ("etransfers", "prior_booking_status", "ALTER TABLE etransfers ADD COLUMN prior_booking_status TEXT"),
         ("etransfers", "prior_booking_confirmed", "ALTER TABLE etransfers ADD COLUMN prior_booking_confirmed INTEGER"),
@@ -11252,6 +11526,9 @@ def _ensure_etransfers_table(conn=None):
             restored_at TEXT,
             unlinked_at TEXT,
             unlinked_booking_id INTEGER,
+            unlink_external_status TEXT,
+            unlink_external_details TEXT,
+            unlink_external_reconciled_at TEXT,
             payment_mutation TEXT,
             prior_booking_status TEXT,
             prior_booking_confirmed INTEGER,
@@ -11267,6 +11544,9 @@ def _ensure_etransfers_table(conn=None):
             "restored_at": "ALTER TABLE etransfers ADD COLUMN restored_at TEXT",
             "unlinked_at": "ALTER TABLE etransfers ADD COLUMN unlinked_at TEXT",
             "unlinked_booking_id": "ALTER TABLE etransfers ADD COLUMN unlinked_booking_id INTEGER",
+            "unlink_external_status": "ALTER TABLE etransfers ADD COLUMN unlink_external_status TEXT",
+            "unlink_external_details": "ALTER TABLE etransfers ADD COLUMN unlink_external_details TEXT",
+            "unlink_external_reconciled_at": "ALTER TABLE etransfers ADD COLUMN unlink_external_reconciled_at TEXT",
             "payment_mutation": "ALTER TABLE etransfers ADD COLUMN payment_mutation TEXT",
             "prior_booking_status": "ALTER TABLE etransfers ADD COLUMN prior_booking_status TEXT",
             "prior_booking_confirmed": "ALTER TABLE etransfers ADD COLUMN prior_booking_confirmed INTEGER",
@@ -11302,6 +11582,133 @@ def _clean_transfer_sender(raw):
 def _normalise_transfer_status(status):
     status = (status or "unmatched").strip().lower()
     return status if status in {"unmatched", "matched", "ignored", "unlinked"} else "unmatched"
+
+
+def _record_unlink_external_reconciliation(transfer_id, result):
+    """Persist bounded post-commit provider outcomes on the unlink audit row."""
+    conn = db_conn()
+    try:
+        payload = json.dumps(result, sort_keys=True, separators=(",", ":"))
+        if len(payload) > 4000:
+            payload = json.dumps({
+                "status": "attention_required",
+                "error": "external reconciliation audit details exceeded limit",
+            })
+        cursor = conn.execute(
+            """
+            UPDATE etransfers
+               SET unlink_external_status=?,
+                   unlink_external_details=?,
+                   unlink_external_reconciled_at=CURRENT_TIMESTAMP
+             WHERE id=?
+               AND status='unlinked'
+            """,
+            (result["status"], payload, transfer_id),
+        )
+        if cursor.rowcount != 1:
+            conn.rollback()
+            raise RuntimeError("unlinked transfer audit row changed")
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def _reconcile_unlinked_confirmation_external_state(
+    transfer_id,
+    booking_id,
+    *,
+    calendar_event_id,
+    expected_state,
+):
+    """Correct reversible confirmation effects and flag irreversible delivery."""
+    result = {
+        "status": "corrected_with_irreversible_notifications",
+        "calendar": {"status": "not_created"},
+        "notion": {"status": "not_created"},
+        "notifications": {
+            "client_email": "possibly_sent_irreversible",
+            "admin_telegram": "possibly_sent_irreversible",
+        },
+    }
+
+    try:
+        result["calendar"] = delete_calendar_event_for_booking(
+            booking_id,
+            event_id=calendar_event_id,
+            expected_state=expected_state,
+        )
+    except Exception as e:
+        log.error(
+            "[transfers] unlink Calendar reconciliation failed for #%s: %s",
+            booking_id,
+            type(e).__name__,
+        )
+        result["calendar"] = {
+            "status": "failed",
+            "event_id": calendar_event_id,
+            "error": type(e).__name__,
+        }
+
+    try:
+        result["notion"] = update_notion_after_transfer_unlink(
+            booking_id,
+            expected_state=expected_state,
+        )
+    except Exception as e:
+        log.error(
+            "[transfers] unlink Notion reconciliation failed for #%s: %s",
+            booking_id,
+            type(e).__name__,
+        )
+        result["notion"] = {
+            "status": "failed",
+            "error": type(e).__name__,
+        }
+
+    attention_statuses = {
+        "failed",
+        "not_configured",
+        "booking_missing",
+        "superseded",
+        "superseded_restored",
+        "superseded_restore_failed",
+        "inconsistent_local_state",
+    }
+    if (
+        result["calendar"].get("status") in attention_statuses
+        or result["notion"].get("status") in attention_statuses
+    ):
+        result["status"] = "attention_required"
+
+    operator_parts = []
+    calendar_status = result["calendar"].get("status")
+    if calendar_status in {"removed", "already_missing", "not_created"}:
+        operator_parts.append("Calendar hold reconciled")
+    else:
+        operator_parts.append("Calendar needs manual follow-up")
+    notion_status = result["notion"].get("status")
+    if notion_status in {"updated", "not_created"}:
+        operator_parts.append("Notion reconciled")
+    else:
+        operator_parts.append("Notion needs manual follow-up")
+    operator_parts.append(
+        "The original client confirmation email and admin Telegram notification "
+        "may already have been sent and cannot be recalled; contact the client if needed"
+    )
+    result["operator_alert"] = ". ".join(operator_parts) + "."
+
+    try:
+        _record_unlink_external_reconciliation(transfer_id, result)
+    except Exception as e:
+        log.error(
+            "[transfers] unlink external audit write failed for transfer #%s: %s",
+            transfer_id,
+            type(e).__name__,
+        )
+        result["status"] = "attention_required"
+        result["operator_alert"] += " External reconciliation audit recording failed."
+    return result
 
 
 def _mutate_transfer_archive_state(transfer_id, *, restore=False):
@@ -11661,6 +12068,15 @@ def admin_transfers():
     current_day = None
     for r in rows:
         d = dict(r)
+        try:
+            d["unlink_external"] = json.loads(
+                d.get("unlink_external_details") or "{}"
+            )
+        except (TypeError, json.JSONDecodeError):
+            d["unlink_external"] = {
+                "status": "attention_required",
+                "error": "audit details unavailable",
+            }
         day = (d.get("email_date") or d.get("created_at") or "")[:10] or "Unknown date"
         if not grouped or grouped[-1]["day"] != day:
             grouped.append({"day": day, "items": []})
@@ -11761,6 +12177,8 @@ def admin_transfer_unlink(transfer_id):
     conn = db_conn()
     conn.row_factory = sqlite3.Row
     _ensure_etransfers_table(conn)
+    external_reconciliation = None
+    reconciliation_context = None
     try:
         conn.execute("BEGIN IMMEDIATE")
         transfer = conn.execute(
@@ -11793,7 +12211,8 @@ def admin_transfer_unlink(transfer_id):
         booking_id = transfer["matched_booking_id"]
         booking = conn.execute(
             """
-            SELECT id, status, confirmed, paid, paid_amount
+            SELECT id, status, confirmed, paid, paid_amount,
+                   calendar_event_id
               FROM bookings
              WHERE id=?
             """,
@@ -12044,7 +12463,11 @@ def admin_transfer_unlink(transfer_id):
                SET matched_booking_id=NULL,
                    status='unlinked',
                    unlinked_booking_id=?,
-                   unlinked_at=COALESCE(unlinked_at, CURRENT_TIMESTAMP)
+                   unlinked_at=COALESCE(unlinked_at, CURRENT_TIMESTAMP),
+                   unlink_external_status=?,
+                   unlink_external_details=?,
+                   unlink_external_reconciled_at=
+                       CASE WHEN ?='pending' THEN NULL ELSE CURRENT_TIMESTAMP END
              WHERE id=?
                AND COALESCE(message_id, '')=?
                AND status='matched'
@@ -12052,7 +12475,49 @@ def admin_transfer_unlink(transfer_id):
                AND COALESCE(matched_gift_code, '')=''
                AND COALESCE(direction, 'in')='in'
             """,
-            (booking_id, transfer_id, message_id, booking_id),
+            (
+                booking_id,
+                "pending" if mutation == "confirm" else "not_required",
+                json.dumps(
+                    {
+                        "status": (
+                            "pending" if mutation == "confirm" else "not_required"
+                        ),
+                        "calendar": {
+                            "status": (
+                                "pending"
+                                if mutation == "confirm"
+                                else "not_applicable"
+                            )
+                        },
+                        "notion": {
+                            "status": (
+                                "pending"
+                                if mutation == "confirm"
+                                else "not_applicable"
+                            )
+                        },
+                        "notifications": {
+                            "client_email": (
+                                "possibly_sent_irreversible"
+                                if mutation == "confirm"
+                                else "not_applicable"
+                            ),
+                            "admin_telegram": (
+                                "possibly_sent_irreversible"
+                                if mutation == "confirm"
+                                else "not_applicable"
+                            ),
+                        },
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                "pending" if mutation == "confirm" else "not_required",
+                transfer_id,
+                message_id,
+                booking_id,
+            ),
         )
         if transfer_cursor.rowcount != 1:
             conn.rollback()
@@ -12061,6 +12526,28 @@ def admin_transfer_unlink(transfer_id):
                 "error": "Transfer ownership changed; reload and try again",
             }), 409
         conn.commit()
+        if mutation == "confirm":
+            reconciliation_context = {
+                "transfer_id": transfer_id,
+                "booking_id": booking_id,
+                "calendar_event_id": booking["calendar_event_id"],
+                "expected_state": {
+                    "status": prior_status,
+                    "confirmed": prior_confirmed,
+                    "paid": prior_paid,
+                    "paid_amount": prior_paid_amount,
+                },
+            }
+        else:
+            external_reconciliation = {
+                "status": "not_required",
+                "calendar": {"status": "not_applicable"},
+                "notion": {"status": "not_applicable"},
+                "notifications": {
+                    "client_email": "not_applicable",
+                    "admin_telegram": "not_applicable",
+                },
+            }
     except Exception:
         conn.rollback()
         log.exception("[transfers] unlink ownership reversal failed")
@@ -12070,7 +12557,17 @@ def admin_transfer_unlink(transfer_id):
         }), 500
     finally:
         conn.close()
-    return jsonify({"success": True})
+    if reconciliation_context:
+        external_reconciliation = _reconcile_unlinked_confirmation_external_state(
+            **reconciliation_context,
+        )
+    response = {
+        "success": True,
+        "external_reconciliation": external_reconciliation,
+    }
+    if external_reconciliation and external_reconciliation.get("operator_alert"):
+        response["operator_alert"] = external_reconciliation["operator_alert"]
+    return jsonify(response)
 
 
 @app.route("/admin/clients")

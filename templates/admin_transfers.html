@@ -82,6 +82,28 @@
               {% if t.archived_at %}<div class="meta">Archived: {{ t.archived_at }}</div>{% endif %}
               {% if t.restored_at %}<div class="meta">Restored: {{ t.restored_at }}</div>{% endif %}
               {% if t.unlinked_at %}<div class="meta">Unlinked: {{ t.unlinked_at }}</div>{% endif %}
+              {% if t.unlink_external_status %}
+                <div class="meta"><strong>External reconciliation:</strong> {{ t.unlink_external_status|replace('_', ' ') }}</div>
+                {% if t.unlink_external.calendar %}
+                  <div class="meta">
+                    {% if t.unlink_external.calendar.status in ['removed', 'already_missing'] %}Calendar hold removed
+                    {% elif t.unlink_external.calendar.status == 'not_created' %}No Calendar hold was recorded
+                    {% elif t.unlink_external.calendar.status not in ['not_applicable', 'pending'] %}Calendar needs manual follow-up
+                    {% endif %}
+                  </div>
+                {% endif %}
+                {% if t.unlink_external.notion %}
+                  <div class="meta">
+                    {% if t.unlink_external.notion.status == 'updated' %}Notion updated
+                    {% elif t.unlink_external.notion.status == 'not_created' %}No Notion page was recorded
+                    {% elif t.unlink_external.notion.status not in ['not_applicable', 'pending'] %}Notion needs manual follow-up
+                    {% endif %}
+                  </div>
+                {% endif %}
+                {% if t.unlink_external.notifications and t.unlink_external.notifications.client_email == 'possibly_sent_irreversible' %}
+                  <div class="meta">Client confirmation email and admin Telegram may already have been sent and cannot be recalled.</div>
+                {% endif %}
+              {% endif %}
             </td>
             <td class="linked">
               {% if t.matched_booking_id %}
@@ -138,7 +160,7 @@
 function toast(msg){const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2400)}
 async function postJSON(url, body){const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const data=await res.json().catch(()=>({})); if(!res.ok||data.success===false) throw new Error(data.error||'Request failed'); return data;}
 document.getElementById('importForm').addEventListener('submit', async (e)=>{e.preventDefault(); const fd=new FormData(e.currentTarget); const res=await fetch('/admin/transfers/import',{method:'POST',body:fd}); const data=await res.json().catch(()=>({})); if(!res.ok||!data.success){toast(data.error||'Import failed'); return;} toast(`Imported ${data.inserted}, updated ${data.updated}`); setTimeout(()=>location.reload(),700);});
-document.addEventListener('click', async (e)=>{const btn=e.target.closest('[data-action]'); if(!btn) return; e.preventDefault(); const tr=btn.closest('tr[data-transfer-id]'); const id=tr.dataset.transferId; try{ if(btn.dataset.action==='link'){const bid=tr.querySelector('[data-booking-select]').value; if(!bid){toast('Choose booking first'); return;} await postJSON(`/admin/transfers/${id}/link`,{booking_id:bid}); toast('Transfer linked'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='archive'){await postJSON(`/admin/transfers/${id}/archive`,{}); toast('Transfer archived'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='restore'){await postJSON(`/admin/transfers/${id}/restore`,{}); toast('Transfer restored'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='unlink'){await postJSON(`/admin/transfers/${id}/unlink`,{}); toast('Unlinked'); setTimeout(()=>location.reload(),500);} }catch(err){toast(err.message||'Error')}});
+document.addEventListener('click', async (e)=>{const btn=e.target.closest('[data-action]'); if(!btn) return; e.preventDefault(); const tr=btn.closest('tr[data-transfer-id]'); const id=tr.dataset.transferId; try{ if(btn.dataset.action==='link'){const bid=tr.querySelector('[data-booking-select]').value; if(!bid){toast('Choose booking first'); return;} await postJSON(`/admin/transfers/${id}/link`,{booking_id:bid}); toast('Transfer linked'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='archive'){await postJSON(`/admin/transfers/${id}/archive`,{}); toast('Transfer archived'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='restore'){await postJSON(`/admin/transfers/${id}/restore`,{}); toast('Transfer restored'); setTimeout(()=>location.reload(),500);} if(btn.dataset.action==='unlink'){const result=await postJSON(`/admin/transfers/${id}/unlink`,{}); window.alert(result.operator_alert||'Transfer unlinked. Review the audit history for external follow-up.'); location.reload();} }catch(err){toast(err.message||'Error')}});
 </script>
 </body>
 </html>

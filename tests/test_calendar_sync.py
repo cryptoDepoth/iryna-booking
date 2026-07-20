@@ -79,6 +79,191 @@ def test_calendar_sync_uses_event_details_and_persists_link(monkeypatch):
             pass
 
 
+def test_calendar_delete_runs_exact_helper_command_and_clears_local_link(
+    monkeypatch,
+    tmp_path,
+):
+    db_path = str(tmp_path / "calendar-delete.db")
+    monkeypatch.setattr(booking_app, "DB_PATH", db_path)
+    monkeypatch.setenv("GCAL_HELPER", "/tmp/fake-gcal-helper")
+    booking_app.init_db()
+    conn = booking_app.db_conn()
+    cursor = conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, session_type, status, confirmed,
+            paid, calendar_event_id, calendar_event_url
+        ) VALUES (
+            '2026-08-01', '16:20', 'Calendar Delete Client',
+            'calendar-delete@example.com', '', 'mini', 'pending_payment',
+            0, 0, 'calendar-delete-42',
+            'https://calendar.example/calendar-delete-42'
+        )
+        """
+    )
+    booking_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    captured = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        return subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=json.dumps({
+                "deleted": True,
+                "missing": False,
+                "id": "calendar-delete-42",
+            }),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = booking_app.delete_calendar_event_for_booking(
+        booking_id,
+        event_id="calendar-delete-42",
+    )
+
+    assert result == {
+        "status": "removed",
+        "event_id": "calendar-delete-42",
+    }
+    assert captured["args"] == [
+        "/tmp/fake-gcal-helper",
+        "delete",
+        "--calendar",
+        booking_app.CALENDAR_ID,
+        "--event-id",
+        "calendar-delete-42",
+    ]
+    conn = booking_app.db_conn()
+    row = conn.execute(
+        """
+        SELECT calendar_event_id, calendar_event_url
+          FROM bookings
+         WHERE id=?
+        """,
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    assert tuple(row) == (None, None)
+
+
+def test_calendar_delete_restores_hold_if_booking_reconfirms_during_provider_call(
+    monkeypatch,
+    tmp_path,
+):
+    db_path = str(tmp_path / "calendar-delete-race.db")
+    monkeypatch.setattr(booking_app, "DB_PATH", db_path)
+    monkeypatch.setenv("GCAL_HELPER", "/tmp/fake-gcal-helper")
+    booking_app.init_db()
+    conn = booking_app.db_conn()
+    cursor = conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, session_type, status, confirmed,
+            paid, paid_amount, calendar_event_id, calendar_event_url
+        ) VALUES (
+            '2026-08-01', '16:40', 'Calendar Race Client',
+            'calendar-race@example.com', '', 'mini', 'pending_payment',
+            0, 0, 0, 'calendar-race-old',
+            'https://calendar.example/calendar-race-old'
+        )
+        """
+    )
+    booking_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    restore_calls = []
+
+    def fake_run(args, **kwargs):
+        conn = booking_app.db_conn()
+        conn.execute(
+            """
+            UPDATE bookings
+               SET status='confirmed',
+                   confirmed=1,
+                   paid=1,
+                   paid_amount=120.50
+             WHERE id=?
+            """,
+            (booking_id,),
+        )
+        conn.commit()
+        conn.close()
+        return subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=json.dumps({
+                "deleted": True,
+                "missing": False,
+                "id": "calendar-race-old",
+            }),
+            stderr="",
+        )
+
+    def fake_restore(target_booking_id):
+        restore_calls.append(target_booking_id)
+        conn = booking_app.db_conn()
+        conn.execute(
+            """
+            UPDATE bookings
+               SET calendar_event_id='calendar-race-restored',
+                   calendar_event_url='https://calendar.example/calendar-race-restored'
+             WHERE id=?
+            """,
+            (booking_id,),
+        )
+        conn.commit()
+        conn.close()
+        return "https://calendar.example/calendar-race-restored"
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        booking_app,
+        "create_calendar_event_for_booking",
+        fake_restore,
+    )
+
+    result = booking_app.delete_calendar_event_for_booking(
+        booking_id,
+        event_id="calendar-race-old",
+        expected_state={
+            "status": "pending_payment",
+            "confirmed": 0,
+            "paid": 0,
+            "paid_amount": 0,
+        },
+    )
+
+    assert result == {
+        "status": "superseded_restored",
+        "event_id": "calendar-race-old",
+    }
+    assert restore_calls == [booking_id]
+    conn = booking_app.db_conn()
+    row = conn.execute(
+        """
+        SELECT status, confirmed, paid, paid_amount,
+               calendar_event_id, calendar_event_url
+          FROM bookings
+         WHERE id=?
+        """,
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    assert tuple(row) == (
+        "confirmed",
+        1,
+        1,
+        120.50,
+        "calendar-race-restored",
+        "https://calendar.example/calendar-race-restored",
+    )
+
+
 def test_calendar_health_probe_is_cached(monkeypatch):
     monkeypatch.setenv("GCAL_HELPER", "/tmp/fake-gcal-helper")
     monkeypatch.setenv("GOOGLE_CALENDAR_REFRESH_TOKEN", "refresh-marker")
