@@ -110,10 +110,37 @@ These findings are explicit recommendations only. They were not changed by this 
 
 - Baseline full suite: **543 passed, 1 skipped**
 - Final documentation-gate full suite: **671 passed, 1 skipped**
-- M1 and M2 validation contract assertions are recorded as passed in mission validation state.
+- Final deploy-gate full suite (after payment-safety hardening): **720 passed, 1 skipped**
+- M1, M2, M2-hardening and M3 validation contract assertions are recorded as passed in mission validation state.
 - The accessibility feature reported 13 focused Playwright tests, 91 targeted public regressions, and 671 full-suite passes.
-- No production deploy is reported by this feature.
-- Final fast-forward ancestry, secret/diff review, GitHub/Fly completion, and read-only production checks remain the responsibility of `final-integration-fast-forward-deploy`.
+
+## Post-audit payment-safety hardening (M3 deploy gate)
+
+Independent pre-deploy review surfaced payment-reconciliation concerns. Each was verified against `origin/main` before acting. The following hardening commits were added (all preserve amounts, matching, ambiguity, reconciliation and gift semantics):
+
+- `ee84895` — final e-Transfer confirmation CAS now requires `paid=0` + eligible reservation status (cancel/expire-during-body-IO cannot resurrect a booking).
+- `c4b48bb` — admin transfer unlink reverses ledger + processed-email ownership atomically (a transfer cannot credit two bookings).
+- `f79ccf9` / `8eed3a3` — private-session booking and hidden-event YAML/sidecar persistence made atomic in both failure directions (no orphaned booking or event).
+- `2cdeb5f` — confirmation transaction re-validates live `reserved_until` deadline and current pricing inputs inside the atomic tx.
+- `e59758a` — admin unlink reconciles external Calendar/Notion state and surfaces irreversible notifications after the durable ownership-reversal commit.
+- `0dcf855` **reverted** back to production `max()` manual-link accounting after the additive variant introduced regressions; proper cumulative accounting tracked as a follow-up.
+- `7de2a05` — fixed a mission-introduced regression so name-only transfers auto-linked to already-paid bookings can be unlinked without altering booking finances.
+- `a2b9ec5` — fixed a mission-introduced regression where the delayed confirmation callback gated on current aggregate `paid_amount`, silently suppressing valid Calendar/Notion/email/Telegram side effects after a legitimate amount change.
+
+Two payment-reconciliation concurrency concerns were **verified identical to current production `origin/main`** (not mission regressions) and explicitly owner-accepted for deployment, tracked as prioritized post-deploy follow-ups: (1) the ambiguity snapshot-then-confirm design (`confirm_booking … WHERE id=? AND confirmed=0`); (2) reference-collision ledger message ownership (`message_id=COALESCE(?, message_id)`). Additional tracked non-blocking follow-ups: partial-payment-branch deadline freshness, unlink pending-external-reconciliation recovery, and a potential duplicate-calendar-event race.
+
+## Deployment result
+
+- **Deployed:** fast-forward push `792fd14..a2b9ec5` → `origin/main` (33 commits, 185 files; whitespace-clean; no secrets/DB/CSV/env/key files in range).
+- **Pipeline:** GitHub Actions "Fly Deploy" for `a2b9ec5` completed **success**; Fly app `iryna-booking`.
+- **Production read-only checks (`https://book.pashynskaphoto.com`):**
+  - `/healthz` 200; `/`, `/family`, `/maternity`, `/book?type=mini`, `/events`, `/favicon.ico`, `/sitemap.xml` all 200.
+  - Credential-free payment routes `/payment`, `/success`, `/pay-balance` → 302 (never 500).
+  - Homepage compression: identity **286,707 B**, Brotli **68,046 B**, gzip **69,356 B**; `Vary: Accept-Encoding`; HTML `Cache-Control: no-cache`.
+  - Versioned static asset `Cache-Control: public, max-age=31536000, immutable`.
+  - OG image `image/jpeg`, **1200×630**, 149,313 B.
+  - Zero `i.wfolio.com` review hydration; 12 same-origin local review-avatar WebPs; `/images/` route serves `image/webp`.
+  - Conversion/SEO markers intact: **AW-610866068**, **LocalBusiness** JSON-LD, canonical.
 
 ## Data-safety statement
 
