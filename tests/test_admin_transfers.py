@@ -2,6 +2,7 @@ import io
 import json
 import sqlite3
 import subprocess
+import threading
 from datetime import datetime, timezone
 
 import pytest
@@ -106,6 +107,57 @@ def _set_transfer_payment_provenance(
     )
     conn.commit()
     conn.close()
+
+
+def _insert_confirmed_auto_payment(
+    app,
+    *,
+    message_id,
+    reference_number,
+    amount=120.50,
+):
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type, status,
+            confirmed, paid, paid_amount, deposit_amount, full_price, event_id
+        ) VALUES (
+            '2026-08-10', '12:40', 'Delayed Callback Client',
+            'delayed-callback@example.com', '4035550299', '', 'Mission Mini',
+            'confirmed', 1, 1, ?, ?, 241.00, 'mission-mini-10'
+        )
+        """,
+        (amount, amount),
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.execute(
+        """
+        INSERT INTO processed_emails (message_id, booking_id, amount)
+        VALUES (?, ?, ?)
+        """,
+        (message_id, booking_id, amount),
+    )
+    conn.commit()
+    conn.close()
+    transfer_id = _insert_transfer(
+        app,
+        reference_number=reference_number,
+        message_id=message_id,
+        amount=amount,
+        matched_booking_id=booking_id,
+        status="matched",
+    )
+    _set_transfer_payment_provenance(
+        app,
+        transfer_id,
+        mutation="confirm",
+        prior_status="pending_payment",
+        prior_confirmed=0,
+        prior_paid=0,
+        prior_paid_amount=0.0,
+    )
+    return booking_id, transfer_id
 
 
 def _forbid_payment_hooks(monkeypatch, app, *, include_link=True):
@@ -1233,6 +1285,469 @@ def test_unlink_reverses_real_auto_payment_ownership_without_reuse(
     assert "Unlinked history" in history_html
     assert f"Previously #{original_booking_id}" in history_html
     assert "Audit history only" in history_html
+
+
+def test_delayed_confirmation_callback_skips_all_effects_after_unlink(
+    client,
+    monkeypatch,
+):
+    c, app, db_path, _ = client
+    _login(c)
+    message_id = "unlink-delayed-callback-message"
+    booking_id, transfer_id = _insert_confirmed_auto_payment(
+        app,
+        message_id=message_id,
+        reference_number="unlink-delayed-callback-ref",
+    )
+    effects = []
+    monkeypatch.setattr(
+        app,
+        "create_calendar_event_for_booking",
+        lambda target: effects.append(("calendar", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "sync_to_notion",
+        lambda target: effects.append(("notion", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_send_client_email",
+        lambda **kwargs: effects.append(("email", kwargs["booking_id"])),
+    )
+    monkeypatch.setattr(
+        app,
+        "notify_payment_confirmed",
+        lambda target, amount=None: effects.append(("telegram", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_record_booking_funnel_event",
+        lambda booking, event, details=None: effects.append(("funnel", booking["id"])),
+    )
+    monkeypatch.setattr(
+        app,
+        "get_event_by_id",
+        lambda event_id: {
+            "id": event_id,
+            "date": "2026-08-10",
+            "title": "Mission Mini",
+        },
+    )
+    monkeypatch.setattr(
+        app,
+        "delete_calendar_event_for_booking",
+        lambda *args, **kwargs: {"status": "not_created"},
+    )
+    monkeypatch.setattr(
+        app,
+        "update_notion_after_transfer_unlink",
+        lambda *args, **kwargs: {"status": "not_created"},
+    )
+
+    response = c.post(f"/admin/transfers/{transfer_id}/unlink", json={})
+    assert response.status_code == 200
+
+    app._after_auto_payment_confirmed(booking_id, message_id=message_id)
+
+    assert effects == []
+    conn = sqlite3.connect(db_path)
+    booking_state = conn.execute(
+        """
+        SELECT status, confirmed, paid, paid_amount,
+               calendar_event_id, calendar_event_url, notion_page_id
+          FROM bookings
+         WHERE id=?
+        """,
+        (booking_id,),
+    ).fetchone()
+    transfer_state = conn.execute(
+        """
+        SELECT status, matched_booking_id, unlinked_booking_id,
+               unlink_external_status
+          FROM etransfers
+         WHERE id=?
+        """,
+        (transfer_id,),
+    ).fetchone()
+    conn.close()
+    assert booking_state == (
+        "pending_payment",
+        0,
+        0,
+        0.0,
+        None,
+        None,
+        None,
+    )
+    assert transfer_state == (
+        "unlinked",
+        None,
+        booking_id,
+        "corrected_with_irreversible_notifications",
+    )
+
+
+def test_confirmation_callback_preserves_effects_for_current_payment_owner(
+    client,
+    monkeypatch,
+):
+    _, app, db_path, _ = client
+    message_id = "valid-delayed-callback-message"
+    booking_id, transfer_id = _insert_confirmed_auto_payment(
+        app,
+        message_id=message_id,
+        reference_number="valid-delayed-callback-ref",
+    )
+    effects = []
+    monkeypatch.setattr(
+        app,
+        "create_calendar_event_for_booking",
+        lambda target: effects.append(("calendar", target)) or "calendar-url",
+    )
+    monkeypatch.setattr(
+        app,
+        "sync_to_notion",
+        lambda target: effects.append(("notion", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_send_client_email",
+        lambda **kwargs: effects.append(("email", kwargs["booking_id"])),
+    )
+    monkeypatch.setattr(
+        app,
+        "notify_payment_confirmed",
+        lambda target, amount=None: effects.append(("telegram", target, amount)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_record_booking_funnel_event",
+        lambda booking, event, details=None: effects.append(
+            ("funnel", booking["id"], event)
+        ),
+    )
+    monkeypatch.setattr(
+        app,
+        "get_event_by_id",
+        lambda event_id: {
+            "id": event_id,
+            "date": "2026-08-10",
+            "title": "Mission Mini",
+        },
+    )
+
+    app._after_auto_payment_confirmed(booking_id, message_id=message_id)
+
+    assert effects == [
+        ("calendar", booking_id),
+        ("notion", booking_id),
+        ("email", booking_id),
+        ("telegram", booking_id, 120.50),
+        ("funnel", booking_id, "booking_confirmed"),
+    ]
+    conn = sqlite3.connect(db_path)
+    booking_state = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    transfer_state = conn.execute(
+        "SELECT status, matched_booking_id FROM etransfers WHERE id=?",
+        (transfer_id,),
+    ).fetchone()
+    conn.close()
+    assert booking_state == ("confirmed", 1, 1, 120.50)
+    assert transfer_state == ("matched", booking_id)
+
+
+def test_unlink_waits_for_valid_callback_then_reconciles_its_effects(
+    client,
+    monkeypatch,
+):
+    _, app, db_path, _ = client
+    message_id = "callback-first-interleaving-message"
+    booking_id, transfer_id = _insert_confirmed_auto_payment(
+        app,
+        message_id=message_id,
+        reference_number="callback-first-interleaving-ref",
+    )
+    calendar_entered = threading.Event()
+    release_calendar = threading.Event()
+    unlink_started = threading.Event()
+    callback_errors = []
+    unlink_results = []
+    effects = []
+
+    def blocking_calendar(target):
+        calendar_entered.set()
+        if not release_calendar.wait(timeout=2):
+            raise AssertionError("test did not release the Calendar provider")
+        effects.append(("calendar", target))
+        return "calendar-url"
+
+    monkeypatch.setattr(app, "create_calendar_event_for_booking", blocking_calendar)
+    monkeypatch.setattr(
+        app,
+        "sync_to_notion",
+        lambda target: effects.append(("notion", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_send_client_email",
+        lambda **kwargs: effects.append(("email", kwargs["booking_id"])),
+    )
+    monkeypatch.setattr(
+        app,
+        "notify_payment_confirmed",
+        lambda target, amount=None: effects.append(("telegram", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_record_booking_funnel_event",
+        lambda booking, event, details=None: effects.append(("funnel", booking["id"])),
+    )
+    monkeypatch.setattr(
+        app,
+        "get_event_by_id",
+        lambda event_id: {
+            "id": event_id,
+            "date": "2026-08-10",
+            "title": "Mission Mini",
+        },
+    )
+    monkeypatch.setattr(
+        app,
+        "delete_calendar_event_for_booking",
+        lambda *args, **kwargs: {"status": "not_created"},
+    )
+    monkeypatch.setattr(
+        app,
+        "update_notion_after_transfer_unlink",
+        lambda *args, **kwargs: {"status": "not_created"},
+    )
+
+    def run_callback():
+        try:
+            app._after_auto_payment_confirmed(
+                booking_id,
+                message_id=message_id,
+            )
+        except Exception as exc:
+            callback_errors.append(exc)
+
+    def run_unlink():
+        with app.app.test_client() as unlink_client:
+            _login(unlink_client)
+            unlink_started.set()
+            response = unlink_client.post(
+                f"/admin/transfers/{transfer_id}/unlink",
+                json={},
+            )
+            unlink_results.append((response.status_code, response.get_json()))
+
+    callback_thread = threading.Thread(target=run_callback)
+    callback_thread.start()
+    assert calendar_entered.wait(timeout=2)
+
+    unlink_thread = threading.Thread(target=run_unlink)
+    unlink_thread.start()
+    assert unlink_started.wait(timeout=2)
+    unlink_thread.join(timeout=0.1)
+    assert unlink_thread.is_alive()
+
+    conn = sqlite3.connect(db_path)
+    state_while_callback_runs = conn.execute(
+        """
+        SELECT b.status, b.confirmed, b.paid, e.status, e.matched_booking_id
+          FROM bookings b
+          JOIN etransfers e ON e.id=?
+         WHERE b.id=?
+        """,
+        (transfer_id, booking_id),
+    ).fetchone()
+    conn.close()
+    assert state_while_callback_runs == (
+        "confirmed",
+        1,
+        1,
+        "matched",
+        booking_id,
+    )
+
+    release_calendar.set()
+    callback_thread.join(timeout=2)
+    unlink_thread.join(timeout=2)
+    assert not callback_thread.is_alive()
+    assert not unlink_thread.is_alive()
+    assert callback_errors == []
+    assert unlink_results[0][0] == 200
+    assert unlink_results[0][1]["success"] is True
+    assert effects == [
+        ("calendar", booking_id),
+        ("notion", booking_id),
+        ("email", booking_id),
+        ("telegram", booking_id),
+        ("funnel", booking_id),
+    ]
+
+    conn = sqlite3.connect(db_path)
+    final_state = conn.execute(
+        """
+        SELECT b.status, b.confirmed, b.paid, e.status, e.matched_booking_id
+          FROM bookings b
+          JOIN etransfers e ON e.id=?
+         WHERE b.id=?
+        """,
+        (transfer_id, booking_id),
+    ).fetchone()
+    conn.close()
+    assert final_state == ("pending_payment", 0, 0, "unlinked", None)
+
+
+def test_old_confirmation_callback_skips_booking_owned_by_new_transfer(
+    client,
+    monkeypatch,
+):
+    c, app, _, _ = client
+    _login(c)
+    old_message_id = "old-confirmation-owner-message"
+    booking_id, old_transfer_id = _insert_confirmed_auto_payment(
+        app,
+        message_id=old_message_id,
+        reference_number="old-confirmation-owner-ref",
+    )
+    monkeypatch.setattr(
+        app,
+        "delete_calendar_event_for_booking",
+        lambda *args, **kwargs: {"status": "not_created"},
+    )
+    monkeypatch.setattr(
+        app,
+        "update_notion_after_transfer_unlink",
+        lambda *args, **kwargs: {"status": "not_created"},
+    )
+    response = c.post(f"/admin/transfers/{old_transfer_id}/unlink", json={})
+    assert response.status_code == 200
+
+    new_message_id = "new-confirmation-owner-message"
+    conn = app.db_conn()
+    conn.execute(
+        """
+        UPDATE bookings
+           SET status='confirmed', confirmed=1, paid=1, paid_amount=120.50
+         WHERE id=?
+        """,
+        (booking_id,),
+    )
+    conn.execute(
+        """
+        INSERT INTO processed_emails (message_id, booking_id, amount)
+        VALUES (?, ?, 120.50)
+        """,
+        (new_message_id, booking_id),
+    )
+    conn.commit()
+    conn.close()
+    new_transfer_id = _insert_transfer(
+        app,
+        reference_number="new-confirmation-owner-ref",
+        message_id=new_message_id,
+        amount=120.50,
+        matched_booking_id=booking_id,
+        status="matched",
+    )
+    _set_transfer_payment_provenance(
+        app,
+        new_transfer_id,
+        mutation="confirm",
+        prior_status="pending_payment",
+        prior_confirmed=0,
+        prior_paid=0,
+        prior_paid_amount=0.0,
+    )
+    effects = []
+    monkeypatch.setattr(
+        app,
+        "create_calendar_event_for_booking",
+        lambda target: effects.append(("calendar", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "sync_to_notion",
+        lambda target: effects.append(("notion", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_send_client_email",
+        lambda **kwargs: effects.append(("email", kwargs["booking_id"])),
+    )
+    monkeypatch.setattr(
+        app,
+        "notify_payment_confirmed",
+        lambda target, amount=None: effects.append(("telegram", target)),
+    )
+
+    app._after_auto_payment_confirmed(
+        booking_id,
+        message_id=old_message_id,
+    )
+
+    assert effects == []
+
+
+def test_confirmation_callback_contains_provider_exception_without_db_mutation(
+    client,
+    monkeypatch,
+):
+    _, app, db_path, _ = client
+    message_id = "callback-provider-failure-message"
+    booking_id, transfer_id = _insert_confirmed_auto_payment(
+        app,
+        message_id=message_id,
+        reference_number="callback-provider-failure-ref",
+    )
+    later_effects = []
+
+    def fail_calendar(target):
+        raise RuntimeError("calendar unavailable")
+
+    monkeypatch.setattr(app, "create_calendar_event_for_booking", fail_calendar)
+    monkeypatch.setattr(
+        app,
+        "sync_to_notion",
+        lambda target: later_effects.append(("notion", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_send_client_email",
+        lambda **kwargs: later_effects.append(("email", kwargs["booking_id"])),
+    )
+    monkeypatch.setattr(
+        app,
+        "notify_payment_confirmed",
+        lambda target, amount=None: later_effects.append(("telegram", target)),
+    )
+
+    app._after_auto_payment_confirmed(booking_id, message_id=message_id)
+
+    assert later_effects == []
+    conn = sqlite3.connect(db_path)
+    booking_state = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    processed_state = conn.execute(
+        "SELECT booking_id, amount FROM processed_emails WHERE message_id=?",
+        (message_id,),
+    ).fetchone()
+    transfer_state = conn.execute(
+        "SELECT status, matched_booking_id FROM etransfers WHERE id=?",
+        (transfer_id,),
+    ).fetchone()
+    conn.close()
+    assert booking_state == ("confirmed", 1, 1, 120.50)
+    assert processed_state == (booking_id, 120.50)
+    assert transfer_state == ("matched", booking_id)
 
 
 def test_unlink_reconciles_confirmation_external_state_after_ownership_commit(

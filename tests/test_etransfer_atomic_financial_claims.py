@@ -290,8 +290,11 @@ def test_cancel_or_expire_during_body_read_rolls_back_confirmation_claims(
         stale_pending,
         [],
     )
-    for confirmed_id in confirmed_ids:
-        booking_app._after_auto_payment_confirmed(confirmed_id)
+    for confirmed_id, confirmed_message_id in confirmed_ids:
+        booking_app._after_auto_payment_confirmed(
+            confirmed_id,
+            message_id=confirmed_message_id,
+        )
 
     assert confirmed_ids == []
     assert effects == []
@@ -361,8 +364,11 @@ def test_reserved_deadline_elapsing_during_body_read_rolls_back_confirmation_cla
         stale_pending,
         [],
     )
-    for confirmed_id in confirmed_ids:
-        booking_app._after_auto_payment_confirmed(confirmed_id)
+    for confirmed_id, confirmed_message_id in confirmed_ids:
+        booking_app._after_auto_payment_confirmed(
+            confirmed_id,
+            message_id=confirmed_message_id,
+        )
 
     assert confirmed_ids == []
     assert effects == []
@@ -438,8 +444,11 @@ def test_full_price_change_during_body_read_rolls_back_confirmation_claims(
         stale_pending,
         [],
     )
-    for confirmed_id in confirmed_ids:
-        booking_app._after_auto_payment_confirmed(confirmed_id)
+    for confirmed_id, confirmed_message_id in confirmed_ids:
+        booking_app._after_auto_payment_confirmed(
+            confirmed_id,
+            message_id=confirmed_message_id,
+        )
 
     assert confirmed_ids == []
     assert effects == []
@@ -1866,8 +1875,11 @@ def test_archive_winning_batch_never_runs_booking_post_commit_effects(
         checker.get_pending_bookings(within_minutes=30),
         [],
     )
-    for confirmed_id in confirmed_ids:
-        booking_app._after_auto_payment_confirmed(confirmed_id)
+    for confirmed_id, confirmed_message_id in confirmed_ids:
+        booking_app._after_auto_payment_confirmed(
+            confirmed_id,
+            message_id=confirmed_message_id,
+        )
 
     assert confirmed_ids == []
     assert effects == []
@@ -1901,8 +1913,9 @@ def test_writer_winning_batch_runs_booking_effects_after_durable_commit(
     )
     effects = []
 
-    def assert_committed(confirmed_id):
+    def assert_committed(confirmed_id, *, message_id):
         assert confirmed_id == booking_id
+        assert message_id == f"writer-batch-side-effects-{eligible_status}"
         assert _booking_state(db_path, booking_id) == (
             "confirmed",
             1,
@@ -1932,8 +1945,11 @@ def test_writer_winning_batch_runs_booking_effects_after_durable_commit(
         checker.get_pending_bookings(within_minutes=30),
         [],
     )
-    for confirmed_id in confirmed_ids:
-        booking_app._after_auto_payment_confirmed(confirmed_id)
+    for confirmed_id, confirmed_message_id in confirmed_ids:
+        booking_app._after_auto_payment_confirmed(
+            confirmed_id,
+            message_id=confirmed_message_id,
+        )
 
-    assert confirmed_ids == [booking_id]
+    assert confirmed_ids == [(booking_id, message_id)]
     assert effects == [booking_id]

@@ -185,7 +185,7 @@ def test_watcher_batch_filters_pending_after_each_confirmation(monkeypatch):
         [{"id": 1}, {"id": 2}],
         [],
     )
-    assert confirmed == [1]
+    assert confirmed == [(1, "m1")]
     # second email must no longer see booking #1
     assert seen_pending == [[1, 2], [2]]
 

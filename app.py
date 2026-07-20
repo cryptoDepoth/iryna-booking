@@ -567,6 +567,7 @@ ETRANSFER_SCAN_OVERDUE_SECONDS = int(
     os.environ.get("ETRANSFER_SCAN_OVERDUE_SECONDS", "300")
 )
 _watcher_state_lock = _threading.Lock()
+_ETRANSFER_CONFIRMATION_EFFECTS_LOCK = _threading.RLock()
 _ETRANSFER_SCAN_DETAILS = {
     "scan_exception": "scan exception",
     "fetch_busy_cached": "email fetch busy; cached envelopes skipped",
@@ -705,19 +706,20 @@ def _process_etransfer_email_batch(emails, pending, reconciliation):
     The pending list is filtered after every confirmation so a second
     same-amount email in the same batch can never re-match the booking the
     first one just paid for — it falls through to the orphan path instead.
-    Returns the list of confirmed booking ids.
+    Returns ``(booking_id, message_id)`` ownership tokens for post-commit
+    confirmation effects.
     """
     from check_etransfer_v2 import is_etransfer_email, check_single_email
     pending = list(pending or [])
-    confirmed_ids = []
+    confirmations = []
     for email in emails:
         if not is_etransfer_email(email):
             continue
         confirmed_id, _ambiguous = check_single_email(email, pending, reconciliation)
         if confirmed_id:
-            confirmed_ids.append(confirmed_id)
+            confirmations.append((confirmed_id, str(email.get("id") or "")))
             pending = [b for b in pending if b.get("id") != confirmed_id]
-    return confirmed_ids
+    return confirmations
 
 
 def _watcher_thread(max_cycles=None, time_module=None):
@@ -809,10 +811,13 @@ def _watcher_thread(max_cycles=None, time_module=None):
                         log_w.error("[watcher] Filtered Interac Gmail scan failed")
                 else:
                     if emails:
-                        for confirmed_id in _process_etransfer_email_batch(
+                        for confirmed_id, message_id in _process_etransfer_email_batch(
                             emails, pending, reconciliation
                         ):
-                            _after_auto_payment_confirmed(confirmed_id)
+                            _after_auto_payment_confirmed(
+                                confirmed_id,
+                                message_id=message_id,
+                            )
                             with _watcher_state_lock:
                                 _watcher_state["last_auto_confirmed_booking_id"] = confirmed_id
                                 _watcher_state["last_auto_confirmed_at"] = _watchdog_iso(now)
@@ -2404,20 +2409,59 @@ def _maybe_payout_referral(booking_id):
         log.error(f"[referral] payout failed for booking #{booking_id}: {e}")
 
 
-def _after_auto_payment_confirmed(booking_id):
+def _after_auto_payment_confirmed(booking_id, *, message_id):
+    with _ETRANSFER_CONFIRMATION_EFFECTS_LOCK:
+        return _run_after_auto_payment_confirmed(
+            booking_id,
+            message_id=message_id,
+        )
+
+
+def _run_after_auto_payment_confirmed(booking_id, *, message_id):
     """Run the same side-effects after automatic e-Transfer confirmation
     that manual admin confirmation runs: calendar, Notion, client email,
-    and admin Telegram notification.
+    and admin Telegram notification. The exact committed transfer ownership is
+    re-checked before any provider call so a completed unlink wins over this
+    delayed callback.
     """
     try:
         conn = db_conn()
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
-        conn.close()
-        if not row:
-            log.warning(f"[auto-confirm] Booking #{booking_id} not found after payment match")
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT b.*
+                  FROM bookings b
+                  JOIN etransfers e
+                    ON e.message_id=?
+                   AND e.matched_booking_id=b.id
+                   AND e.status='matched'
+                   AND COALESCE(e.direction, 'in')='in'
+                   AND COALESCE(e.matched_gift_code, '')=''
+                   AND e.payment_mutation='confirm'
+                  JOIN processed_emails p
+                    ON p.message_id=e.message_id
+                   AND p.booking_id=b.id
+                 WHERE b.id=?
+                   AND b.status='confirmed'
+                   AND b.confirmed=1
+                   AND b.paid=1
+                   AND ABS(COALESCE(e.amount, -1) - COALESCE(p.amount, -2)) < 0.01
+                   AND ABS(COALESCE(e.amount, -1) - COALESCE(b.paid_amount, -2)) < 0.01
+                 LIMIT 2
+                """,
+                (str(message_id or ""), booking_id),
+            ).fetchall()
+        finally:
+            conn.close()
+        if len(rows) != 1:
+            log.warning(
+                "[auto-confirm] Skipping stale side-effects for booking #%s; "
+                "payment ownership is no longer current",
+                booking_id,
+            )
             return
-        booking = dict(row)
+        booking = dict(rows[0])
         event_url = create_calendar_event_for_booking(booking_id)
         sync_to_notion(booking_id)
         ev = get_event_by_id(booking.get("event_id"))
@@ -12161,6 +12205,11 @@ def admin_transfer_restore(transfer_id):
 @app.route("/admin/transfers/<int:transfer_id>/unlink", methods=["POST"])
 @admin_required
 def admin_transfer_unlink(transfer_id):
+    with _ETRANSFER_CONFIRMATION_EFFECTS_LOCK:
+        return _run_admin_transfer_unlink(transfer_id)
+
+
+def _run_admin_transfer_unlink(transfer_id):
     """Retire one booking link without leaving reusable payment ownership.
 
     Financial links are reversible only when the ledger row, processed email,
