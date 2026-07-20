@@ -138,7 +138,8 @@ def test_csp_allows_recaptcha_script_and_frame_hosts(client):
 
     # Google Ads conversion/remarketing beacons must not be blocked after checkout.
     connect_clause = next((p for p in csp.split(";") if p.strip().startswith("connect-src")), "")
-    assert "https://ad.doubleclick.net" in connect_clause, f"connect-src missing ad.doubleclick.net: {connect_clause}"
+    assert "https://ad.doubleclick.net" in connect_clause
+    assert "https://stats.g.doubleclick.net" in connect_clause, f"connect-src missing ad.doubleclick.net: {connect_clause}"
 
 
 def test_healthz_returns_ok(client):
