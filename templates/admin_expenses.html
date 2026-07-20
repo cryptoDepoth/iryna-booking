@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expenses · Pashynska Photography</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/admin-shell.css?v=2">
+  <style>
+    :root {
+      --bg:#f5f5f7; --surface:#fff; --border:#e4e7ec; --text:#1d1d1f;
+      --text-2:#6e6e73; --text-3:#9ca3af; --accent:#0071e3;
+      --green:#16a34a; --blue:#2563eb; --red:#dc2626; --radius:12px;
+      --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,sans-serif;font-size:14px}
+    .page{max-width:1180px;margin:0 auto;padding:28px 24px 60px}
+    .header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+    h1{font-size:24px;margin:0;letter-spacing:-.02em} h2{font-size:16px;margin:0 0 12px}
+    .muted{color:var(--text-2);font-size:13px;margin-top:4px}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+    .stat{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:15px;box-shadow:var(--shadow)}
+    .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:800}
+    .stat .v{font-size:24px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums}
+    .v.green{color:var(--green)} .v.red{color:var(--red)} .v.blue{color:var(--blue)}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);background:#f9fafb;text-align:left;padding:10px 12px;border-bottom:1px solid var(--border)}
+    td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+    tr:last-child td{border-bottom:0}
+    .num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+    th.num{text-align:right}
+    .cat{display:inline-block;font-size:11px;font-weight:700;padding:4px 10px;border-radius:980px;background:#f0f0f3;color:#4b5563}
+    .cat.ads_meta{background:#e7f0ff;color:#1d4ed8} .cat.ads_google{background:#fef3c7;color:#92400e}
+    .src{font-size:11px;color:var(--text-3)}
+    .btn{height:38px;border:0;border-radius:980px;background:var(--accent);color:#fff;padding:0 16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;text-decoration:none;font-size:13px}
+    .btn.secondary{background:#fff;color:#374151;border:1px solid var(--border)}
+    .btn.danger{background:#fee2e2;color:#991b1b}
+    .field{display:flex;flex-direction:column;gap:5px}
+    label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
+    input,select{height:38px;border:1px solid var(--border);border-radius:10px;padding:0 10px;font:inherit;background:#fff;min-width:0}
+    input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px #eaf3ff}
+    .addform{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}
+    .months a{display:block;text-decoration:none;color:inherit}
+    .mrow{display:grid;grid-template-columns:90px 1fr 1fr 1fr;gap:8px;padding:9px 10px;border-radius:10px;font-variant-numeric:tabular-nums}
+    .mrow:hover{background:#f6f7f9}
+    .mrow.head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);font-weight:800}
+    .mrow.active{background:#eaf3ff}
+    .mrow .n{text-align:right;font-weight:700}
+    .empty{text-align:center;color:var(--text-2);padding:26px}
+    .grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:18px}
+    @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+    @media(max-width:640px){.page{padding:20px 12px}.table-wrap{overflow:auto}}
+  </style>
+</head>
+<body>
+{% include '_admin_shell.html' %}
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>💰 Expenses & profit</h1>
+      <div class="muted">Income = paid bookings by session month (CAD). Meta Ads spend imports automatically; anything else — add below.</div>
+    </div>
+    <form method="get" action="/admin/expenses" style="display:flex;gap:8px;align-items:end;">
+      <div class="field"><label>Month</label><input type="month" name="month" value="{{ month }}"></div>
+      <button class="btn secondary" type="submit">Show</button>
+    </form>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">{{ month }} · Income</div><div class="v green">${{ '%.2f'|format(cur.income) }}</div></div>
+    <div class="stat"><div class="k">{{ month }} · Expenses</div><div class="v red">${{ '%.2f'|format(cur.expenses) }}</div></div>
+    <div class="stat"><div class="k">{{ month }} · Net</div><div class="v {{ 'green' if cur.net >= 0 else 'red' }}">${{ '%.2f'|format(cur.net) }}</div></div>
+    <div class="stat"><div class="k">{{ month[:4] }} YTD · Net</div><div class="v blue">${{ '%.2f'|format(ytd.net) }}</div></div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="panel">
+        <h2>Add expense</h2>
+        <form method="post" action="/admin/expenses/add" enctype="multipart/form-data" class="addform">
+          <div class="field"><label>Date</label><input type="date" name="date" required value="{{ month }}-01"></div>
+          <div class="field"><label>Amount (CAD)</label><input type="number" name="amount" step="0.01" min="0.01" required placeholder="49.99"></div>
+          <div class="field"><label>Category</label>
+            <select name="category">{% for c in categories %}<option value="{{ c }}">{{ c.replace('_',' ') }}</option>{% endfor %}</select>
+          </div>
+          <div class="field"><label>Vendor</label><input name="vendor" placeholder="Meta, Adobe, Amazon…"></div>
+          <div class="field"><label>Description</label><input name="description" placeholder="What was it for"></div>
+          <div class="field"><label>Invoice (PDF/photo)</label><input type="file" name="invoice" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"></div>
+          <button class="btn" type="submit">Add</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>{{ month }} — expense entries</h2>
+        {% if rows %}
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Category</th><th>Vendor / description</th><th class="num">Amount</th><th></th></tr></thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td>{{ r.date }}</td>
+              <td><span class="cat {{ r.category }}">{{ r.category.replace('_',' ') }}</span><div class="src">{{ r.source }}</div></td>
+              <td><b>{{ r.vendor or '—' }}</b><div class="src">{{ r.description }}</div></td>
+              <td class="num">${{ '%.2f'|format(r.amount) }}</td>
+              <td style="white-space:nowrap;text-align:right;">
+                {% if r.invoice_file %}<a class="btn secondary" style="height:30px;padding:0 10px;" href="/admin/expenses/invoice/{{ r.id }}" target="_blank">🧾</a>{% endif %}
+                <form method="post" action="/admin/expenses/delete" style="display:inline" onsubmit="return confirm('Delete this expense?')">
+                  <input type="hidden" name="id" value="{{ r.id }}">
+                  <button class="btn danger" style="height:30px;padding:0 10px;" type="submit">✕</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="empty">No expenses recorded for {{ month }} yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel months">
+      <h2>Month by month</h2>
+      <div class="mrow head"><span>Month</span><span class="n">Income</span><span class="n">Expenses</span><span class="n">Net</span></div>
+      {% for s in summary %}
+      <a href="/admin/expenses?month={{ s.month }}">
+        <div class="mrow {{ 'active' if s.month == month else '' }}">
+          <span><b>{{ s.month }}</b></span>
+          <span class="n" style="color:var(--green)">${{ '%.0f'|format(s.income) }}</span>
+          <span class="n" style="color:var(--red)">${{ '%.0f'|format(s.expenses) }}</span>
+          <span class="n">${{ '%.0f'|format(s.net) }}</span>
+        </div>
+      </a>
+      {% endfor %}
+      <div class="muted" style="margin-top:10px;">Invoice originals also live on the Mac: <code>Iryna-Master/05-Finances/Invoices-Originals/</code></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

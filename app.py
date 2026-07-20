@@ -14205,6 +14205,255 @@ def telegram_webhook():
 _start_global_watcher()
 
 # ===== RUN =====
+
+import uuid
+
+
+# ===== BUSINESS EXPENSES (admin-only) ==========================================
+# Monthly income vs expenses. Manual entries + idempotent imports (e.g. Meta Ads
+# monthly spend pushed by scripts/meta_expenses_sync.py). Invoices stored under
+# <data dir>/invoices (Fly volume /data in production, so covered by snapshots).
+EXPENSE_CATEGORIES = [
+    "ads_meta", "ads_google", "software", "equipment", "props",
+    "travel", "education", "fees", "other",
+]
+INVOICE_ALLOWED_EXT = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic"}
+INVOICE_MAX_BYTES = 15 * 1024 * 1024
+
+
+def _invoice_dir():
+    d = os.path.join(os.path.dirname(DB_PATH), "invoices")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _ensure_expenses_table():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'other',
+            vendor TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            amount REAL NOT NULL,
+            currency TEXT DEFAULT 'CAD',
+            source TEXT DEFAULT 'manual',
+            external_id TEXT DEFAULT '',
+            invoice_file TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    c.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_source_ext
+        ON expenses(source, external_id) WHERE external_id != ''
+    """)
+    conn.commit()
+    conn.close()
+
+
+def _expenses_month_summary(months=14):
+    """[{month, income, income_count, expenses, net}] newest first."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT substr(date, 1, 7) AS m,
+               SUM(COALESCE(paid_amount, 0)) AS income,
+               COUNT(*) AS cnt
+        FROM bookings
+        WHERE COALESCE(paid_amount, 0) > 0
+        GROUP BY m
+    """)
+    income = {r["m"]: (r["income"] or 0.0, r["cnt"]) for r in c.fetchall()}
+    c.execute("""
+        SELECT substr(date, 1, 7) AS m, SUM(amount) AS spent
+        FROM expenses GROUP BY m
+    """)
+    spent = {r["m"]: (r["spent"] or 0.0) for r in c.fetchall()}
+    conn.close()
+    keys = sorted(set(income) | set(spent), reverse=True)[:months]
+    out = []
+    for m in keys:
+        inc, cnt = income.get(m, (0.0, 0))
+        exp = spent.get(m, 0.0)
+        out.append({
+            "month": m, "income": round(inc, 2), "income_count": cnt,
+            "expenses": round(exp, 2), "net": round(inc - exp, 2),
+        })
+    return out
+
+
+@app.route("/admin/expenses")
+@admin_required
+def admin_expenses():
+    _ensure_expenses_table()
+    month = (request.args.get("month") or "").strip()
+    if not re.match(r"^\d{4}-\d{2}$", month):
+        month = _local_now().strftime("%Y-%m")
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        "SELECT * FROM expenses WHERE substr(date,1,7)=? ORDER BY date DESC, id DESC",
+        (month,),
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    summary = _expenses_month_summary()
+    cur = next((s for s in summary if s["month"] == month), None)
+    if cur is None:
+        cur = {"month": month, "income": 0.0, "income_count": 0, "expenses": 0.0, "net": 0.0}
+    year = month[:4]
+    ytd = {
+        "income": round(sum(s["income"] for s in summary if s["month"][:4] == year), 2),
+        "expenses": round(sum(s["expenses"] for s in summary if s["month"][:4] == year), 2),
+    }
+    ytd["net"] = round(ytd["income"] - ytd["expenses"], 2)
+    return render_template(
+        "admin_expenses.html", month=month, rows=rows, summary=summary,
+        cur=cur, ytd=ytd, categories=EXPENSE_CATEGORIES,
+    )
+
+
+@app.route("/admin/expenses/add", methods=["POST"])
+@admin_required
+def admin_expenses_add():
+    _ensure_expenses_table()
+    date = (request.form.get("date") or "").strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        return jsonify({"error": "Invalid date"}), 400
+    try:
+        amount = round(float(request.form.get("amount") or "0"), 2)
+    except ValueError:
+        return jsonify({"error": "Invalid amount"}), 400
+    if amount <= 0:
+        return jsonify({"error": "Amount must be positive"}), 400
+    category = (request.form.get("category") or "other").strip()
+    if category not in EXPENSE_CATEGORIES:
+        category = "other"
+    vendor = _safe_text(request.form.get("vendor"), 120) or ""
+    description = _safe_text(request.form.get("description"), 300) or ""
+    invoice_name = ""
+    f = request.files.get("invoice")
+    if f and f.filename:
+        ext = os.path.splitext(f.filename)[1].lower()
+        if ext not in INVOICE_ALLOWED_EXT:
+            return jsonify({"error": "Invoice must be PDF or image"}), 400
+        blob = f.read(INVOICE_MAX_BYTES + 1)
+        if len(blob) > INVOICE_MAX_BYTES:
+            return jsonify({"error": "Invoice file too large (max 15 MB)"}), 400
+        safe_base = re.sub(r"[^A-Za-z0-9._-]+", "_", os.path.basename(f.filename))[:80]
+        invoice_name = f"{date}_{uuid.uuid4().hex[:8]}_{safe_base}"
+        with open(os.path.join(_invoice_dir(), invoice_name), "wb") as fh:
+            fh.write(blob)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT INTO expenses (date, category, vendor, description, amount, source, invoice_file)"
+        " VALUES (?,?,?,?,?,'manual',?)",
+        (date, category, vendor, description, amount, invoice_name),
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for("admin_expenses", month=date[:7]))
+
+
+@app.route("/admin/expenses/delete", methods=["POST"])
+@admin_required
+def admin_expenses_delete():
+    _ensure_expenses_table()
+    try:
+        eid = int(request.form.get("id") or request.json.get("id"))
+    except (TypeError, ValueError, AttributeError):
+        return jsonify({"error": "Invalid id"}), 400
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT invoice_file, date FROM expenses WHERE id=?", (eid,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+    c.execute("DELETE FROM expenses WHERE id=?", (eid,))
+    conn.commit()
+    conn.close()
+    if row["invoice_file"]:
+        try:
+            os.remove(os.path.join(_invoice_dir(), row["invoice_file"]))
+        except OSError:
+            pass
+    return redirect(url_for("admin_expenses", month=(row["date"] or "")[:7]))
+
+
+@app.route("/admin/expenses/invoice/<int:eid>")
+@admin_required
+def admin_expenses_invoice(eid):
+    _ensure_expenses_table()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT invoice_file FROM expenses WHERE id=?", (eid,))
+    row = c.fetchone()
+    conn.close()
+    if not row or not row["invoice_file"]:
+        return jsonify({"error": "No invoice"}), 404
+    name = os.path.basename(row["invoice_file"])
+    path = os.path.join(_invoice_dir(), name)
+    if not os.path.isfile(path):
+        return jsonify({"error": "File missing"}), 404
+    return send_file(path, as_attachment=False, download_name=name)
+
+
+@app.route("/admin/api/expenses/import", methods=["POST"])
+@admin_required
+def admin_expenses_import():
+    """Idempotent bulk upsert keyed by (source, external_id). For automation
+    (e.g. monthly Meta Ads spend). Rows without external_id are rejected."""
+    _ensure_expenses_table()
+    data = request.get_json(silent=True) or {}
+    rows = data.get("rows") or []
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"error": "rows required"}), 400
+    inserted = updated = skipped = 0
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    for r in rows[:500]:
+        try:
+            date = str(r.get("date") or "")
+            amount = round(float(r.get("amount")), 2)
+            source = _safe_text(r.get("source"), 40) or "import"
+            ext = _safe_text(r.get("external_id"), 120) or ""
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date) or amount < 0 or not ext:
+            skipped += 1
+            continue
+        category = r.get("category") if r.get("category") in EXPENSE_CATEGORIES else "other"
+        vendor = _safe_text(r.get("vendor"), 120) or ""
+        desc = _safe_text(r.get("description"), 300) or ""
+        c.execute("SELECT id FROM expenses WHERE source=? AND external_id=?", (source, ext))
+        hit = c.fetchone()
+        if hit:
+            c.execute(
+                "UPDATE expenses SET date=?, category=?, vendor=?, description=?, amount=? WHERE id=?",
+                (date, category, vendor, desc, amount, hit[0]),
+            )
+            updated += 1
+        else:
+            c.execute(
+                "INSERT INTO expenses (date, category, vendor, description, amount, source, external_id)"
+                " VALUES (?,?,?,?,?,?,?)",
+                (date, category, vendor, desc, amount, source, ext),
+            )
+            inserted += 1
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "inserted": inserted, "updated": updated, "skipped": skipped})
+# ===== END BUSINESS EXPENSES ===================================================
+
+
 if __name__ == "__main__":
     # Werkzeug debugger = remote code execution if ever exposed (this binds
     # to 0.0.0.0 for LAN/tunnel testing!). Debug is opt-in via FLASK_DEBUG=1.
