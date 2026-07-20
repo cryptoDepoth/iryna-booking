@@ -11983,7 +11983,9 @@ def _link_transfer_to_booking(transfer_id, booking_id):
             return False, "Booking payment state changed; reload and try again"
         claim = conn.execute("""
             UPDATE etransfers
-               SET matched_booking_id=?, status='matched'
+               SET matched_booking_id=?,
+                   status='matched',
+                   payment_mutation='manual'
              WHERE id=?
                AND LOWER(COALESCE(direction, 'in'))='in'
                AND status='unmatched'
@@ -12043,7 +12045,9 @@ def _auto_link_etransfers():
             cursor = conn.execute(
                 """
                 UPDATE etransfers
-                   SET matched_booking_id=?, status='matched'
+                   SET matched_booking_id=?,
+                       status='matched',
+                       payment_mutation='name_only'
                  WHERE id=?
                    AND direction='in'
                    AND matched_booking_id IS NULL
@@ -12231,7 +12235,7 @@ def _run_admin_transfer_unlink(transfer_id):
         conn.execute("BEGIN IMMEDIATE")
         transfer = conn.execute(
             """
-            SELECT id, message_id, amount, direction, matched_booking_id,
+            SELECT id, message_id, sender_name, amount, direction, matched_booking_id,
                    matched_gift_code, status, payment_mutation,
                    prior_booking_status, prior_booking_confirmed,
                    prior_booking_paid, prior_booking_paid_amount
@@ -12259,7 +12263,7 @@ def _run_admin_transfer_unlink(transfer_id):
         booking_id = transfer["matched_booking_id"]
         booking = conn.execute(
             """
-            SELECT id, status, confirmed, paid, paid_amount,
+            SELECT id, name, status, confirmed, paid, paid_amount,
                    calendar_event_id
               FROM bookings
              WHERE id=?
@@ -12298,24 +12302,92 @@ def _run_admin_transfer_unlink(transfer_id):
             """,
             (booking_id,),
         ).fetchone()[0]
+        mutation = transfer["payment_mutation"]
+        has_processed_financial_owner = (
+            processed is not None
+            and processed["booking_id"] is not None
+        )
+        sender_tokens = {
+            token
+            for token in re.split(
+                r"[^a-z]+",
+                (transfer["sender_name"] or "").lower(),
+            )
+            if len(token) >= 2
+        }
+        booking_tokens = {
+            token
+            for token in re.split(
+                r"[^a-z]+",
+                (booking["name"] or "").lower(),
+            )
+            if len(token) >= 2
+        }
         try:
             current_paid_amount = float(booking["paid_amount"] or 0)
         except (TypeError, ValueError):
             current_paid_amount = None
-        if ledger_owners != 1 or ledger_booking_owners != 1:
+        other_exact_financial_owners = 0
+        if current_paid_amount is not None:
+            other_exact_financial_owners = conn.execute(
+                """
+                SELECT COUNT(*)
+                  FROM etransfers e
+                  JOIN processed_emails p
+                    ON p.message_id=e.message_id
+                   AND p.booking_id=?
+                 WHERE e.id<>?
+                   AND e.matched_booking_id=?
+                   AND e.status='matched'
+                   AND COALESCE(e.direction, 'in')='in'
+                   AND COALESCE(e.matched_gift_code, '')=''
+                   AND e.payment_mutation IN ('confirm', 'partial', 'reconcile')
+                   AND ABS(COALESCE(e.amount, -1) - COALESCE(p.amount, -2)) < 0.01
+                   AND ABS(COALESCE(p.amount, -1) - ?) < 0.01
+                """,
+                (
+                    booking_id,
+                    transfer_id,
+                    booking_id,
+                    current_paid_amount,
+                ),
+            ).fetchone()[0]
+        legacy_unpaid_booking = (
+            booking["status"] in {"reserved", "pending_payment"}
+            and booking["confirmed"] == 0
+            and booking["paid"] == 0
+            and current_paid_amount == 0
+        )
+        legacy_name_only_link = (
+            mutation is None
+            and not has_processed_financial_owner
+            and len(sender_tokens) >= 2
+            and len(sender_tokens & booking_tokens) >= 2
+            and (
+                legacy_unpaid_booking
+                or other_exact_financial_owners >= 1
+            )
+        )
+        no_financial_mutation = (
+            not has_processed_financial_owner
+            and (
+                mutation == "name_only"
+                or legacy_name_only_link
+            )
+        )
+        if (
+            ledger_owners != 1
+            or (
+                not no_financial_mutation
+                and ledger_booking_owners != 1
+            )
+        ):
             conn.rollback()
             return jsonify({
                 "success": False,
                 "error": "Transfer payment ownership cannot be safely reversed",
             }), 409
 
-        no_financial_mutation = (
-            booking["status"] in {"reserved", "pending_payment"}
-            and booking["confirmed"] == 0
-            and booking["paid"] == 0
-            and current_paid_amount == 0
-            and processed is None
-        )
         financial_reversal = False
         if not no_financial_mutation:
             try:
@@ -12349,7 +12421,6 @@ def _run_admin_transfer_unlink(transfer_id):
                 }), 409
             financial_reversal = True
 
-        mutation = transfer["payment_mutation"]
         prior_status = transfer["prior_booking_status"]
         prior_confirmed = transfer["prior_booking_confirmed"]
         prior_paid = transfer["prior_booking_paid"]
