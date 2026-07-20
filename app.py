@@ -10609,6 +10609,38 @@ def _write_events_yaml_doc(data):
                 os.remove(temp_path)
             except FileNotFoundError:
                 pass
+        return original_yaml, original_revision
+
+
+def _restore_events_yaml_state(original_yaml, original_revision):
+    """Atomically restore one pre-write events YAML and revision snapshot."""
+    with _EVENTS_YAML_LOCK:
+        target_path = os.path.abspath(EVENTS_YAML_PATH)
+        revision_path = _events_revision_state_path(target_path)
+        try:
+            if original_yaml is None:
+                try:
+                    os.remove(target_path)
+                except FileNotFoundError:
+                    pass
+            else:
+                _atomic_write_bytes(target_path, original_yaml)
+
+            if original_revision is None:
+                try:
+                    os.remove(revision_path)
+                except FileNotFoundError:
+                    pass
+            else:
+                _atomic_write_bytes(revision_path, original_revision)
+        except OSError as rollback_error:
+            log.critical(
+                "[events] Could not restore YAML after database commit failure: %s",
+                rollback_error,
+            )
+            raise RuntimeError(
+                "Database commit failed and event compensation was incomplete"
+            ) from rollback_error
 
 def _event_yaml_record(data, event_id):
     for ev_data in data.get("events", []):
@@ -13063,6 +13095,7 @@ def api_private_session():
     paid_amount = price if paid else 0.0
     token = secrets.token_urlsafe(16)
     conn = db_conn()
+    event_persistence_snapshot = None
     try:
         c = conn.cursor()
         c.execute("BEGIN IMMEDIATE")
@@ -13092,9 +13125,13 @@ def api_private_session():
         with _EVENTS_YAML_LOCK:
             events_data = _load_events_yaml_doc()
             events_data.setdefault("events", []).append(event)
-            _write_events_yaml_doc(events_data)
-
-        conn.commit()
+            event_persistence_snapshot = _write_events_yaml_doc(events_data)
+            try:
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                _restore_events_yaml_state(*event_persistence_snapshot)
+                raise
     except Exception as e:
         conn.rollback()
         log.exception(f"[private-session] creation failed: {e}")

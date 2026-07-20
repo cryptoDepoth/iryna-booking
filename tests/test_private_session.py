@@ -14,6 +14,7 @@ These tests pin down:
 3. Validation rejects bad input (missing fields, end<=start).
 """
 import os
+import sqlite3
 import tempfile
 from pathlib import Path
 
@@ -229,6 +230,97 @@ def test_private_session_event_persistence_failure_rolls_back_booking(
         assert not revision_path.exists()
     else:
         assert revision_path.read_bytes() == original_revision
+    assert sent_emails == []
+    assert admin_notifications == []
+    assert admin_client.sync_client_calls == []
+
+
+def test_private_session_commit_failure_restores_event_and_revision(
+    admin_client, monkeypatch
+):
+    events_path = Path(admin_client.events_file)
+    revision_path = Path(f"{admin_client.events_file}.revision.json")
+    booking_app._sync_events_revision_state(str(events_path))
+    original_yaml = events_path.read_bytes()
+    original_revision = revision_path.read_bytes()
+    original_db_conn = booking_app.db_conn
+    original_write = booking_app._write_events_yaml_doc
+    persistence_completed = []
+    commit_attempts = []
+    rollbacks = []
+    sent_emails = []
+    admin_notifications = []
+
+    def observe_event_persistence(events_data):
+        result = original_write(events_data)
+        persistence_completed.append(True)
+        assert events_path.read_bytes() != original_yaml
+        assert revision_path.read_bytes() != original_revision
+        return result
+
+    class CommitFailConnection:
+        def __init__(self, connection):
+            self._connection = connection
+
+        def __getattr__(self, name):
+            return getattr(self._connection, name)
+
+        def commit(self):
+            commit_attempts.append(True)
+            assert persistence_completed == [True]
+            raise sqlite3.OperationalError("simulated commit failure")
+
+        def rollback(self):
+            rollbacks.append(True)
+            return self._connection.rollback()
+
+    monkeypatch.setattr(
+        booking_app,
+        "_write_events_yaml_doc",
+        observe_event_persistence,
+    )
+    monkeypatch.setattr(
+        booking_app,
+        "db_conn",
+        lambda: CommitFailConnection(original_db_conn()),
+    )
+    monkeypatch.setattr(
+        booking_app,
+        "_send_private_payment_email",
+        lambda **_kwargs: sent_emails.append(_kwargs) or True,
+    )
+    monkeypatch.setattr(
+        booking_app,
+        "_notify_admin",
+        lambda message, **_kwargs: admin_notifications.append(message),
+    )
+
+    response = admin_client.post(
+        "/admin/api/private-session",
+        json={
+            "date": "2026-08-19",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "client_name": "Commit Failure",
+            "email": "commit-failure@example.com",
+            "price": "300",
+            "send_email": True,
+            "already_paid": False,
+        },
+        headers=_hdrs(),
+    )
+
+    assert response.status_code == 500
+    assert persistence_completed == [True]
+    assert commit_attempts == [True]
+    assert rollbacks
+    conn = original_db_conn()
+    assert conn.execute(
+        "SELECT COUNT(*) FROM bookings WHERE email='commit-failure@example.com'"
+    ).fetchone()[0] == 0
+    conn.close()
+    assert events_path.read_bytes() == original_yaml
+    assert revision_path.read_bytes() == original_revision
     assert sent_emails == []
     assert admin_notifications == []
     assert admin_client.sync_client_calls == []
