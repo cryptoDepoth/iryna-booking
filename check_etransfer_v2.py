@@ -410,6 +410,7 @@ def _apply_booking_payment_transaction(
     *,
     allow_existing_orphan=False,
     ledger_id=None,
+    confirmation_details=None,
 ):
     """Commit ledger ownership, message ownership, and one booking mutation."""
     conn = get_db()
@@ -421,17 +422,20 @@ def _apply_booking_payment_transaction(
         if ledger_id is None:
             conn.rollback()
             return False
-        prior_booking = conn.execute(
+        prior_booking_row = conn.execute(
             """
-            SELECT status, confirmed, paid, paid_amount
+            SELECT id, name, status, confirmed, paid, paid_amount, session_type,
+                   reserved_until, created_at, event_id, deposit_amount,
+                   full_price
               FROM bookings
              WHERE id=?
             """,
             (booking_id,),
         ).fetchone()
-        if prior_booking is None:
+        if prior_booking_row is None:
             conn.rollback()
             return False
+        prior_booking = dict(prior_booking_row)
         if not _claim_etransfer_booking(
             conn,
             ledger_id,
@@ -453,6 +457,25 @@ def _apply_booking_payment_transaction(
             return False
 
         if mutation == "confirm":
+            if not _booking_is_pending_candidate(prior_booking, _utc_now()):
+                conn.rollback()
+                return False
+            expected = _get_expected_amount_for_booking_record(
+                prior_booking,
+                booking_id=booking_id,
+            )
+            live_match_type = (
+                _classify_amount_against_pricing(
+                    amount,
+                    expected,
+                    prior_booking,
+                )
+                if expected is not None
+                else None
+            )
+            if live_match_type not in ("exact", "overpaid"):
+                conn.rollback()
+                return False
             cursor = conn.execute(
                 """
                 UPDATE bookings
@@ -495,6 +518,14 @@ def _apply_booking_payment_transaction(
             conn.rollback()
             return False
         conn.commit()
+        if mutation == "confirm" and confirmation_details is not None:
+            confirmation_details.update(
+                {
+                    "booking": prior_booking,
+                    "expected": expected,
+                    "match_type": live_match_type,
+                }
+            )
         return True
     except Exception:
         conn.rollback()
@@ -1143,8 +1174,8 @@ def record_etransfer(reference_number=None, message_id=None, sender_name=None, a
         conn.close()
 
 
-def get_expected_amount_for_booking(booking_id):
-    """Get expected deposit amount for a specific booking.
+def _get_expected_amount_for_booking_record(booking, *, booking_id=None):
+    """Resolve expected deposit from one current booking record.
 
     Priority:
     1. bookings.deposit_amount column (stored at reserve time — most reliable)
@@ -1155,19 +1186,12 @@ def get_expected_amount_for_booking(booking_id):
     events that default could silently confirm the wrong booking, so an
     unknown deposit now logs a warning and excludes the booking instead.
     """
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT event_id, deposit_amount FROM bookings WHERE id=?", (booking_id,))
-    row = c.fetchone()
-    conn.close()
+    booking = booking or {}
+    stored = booking.get("deposit_amount")
+    if stored is not None:
+        return float(stored)
 
-    if row:
-        # Best case: amount was stored at booking time
-        stored = row["deposit_amount"]
-        if stored is not None:
-            return float(stored)
-
-    event_id = row["event_id"] if row else None
+    event_id = booking.get("event_id")
 
     try:
         import yaml
@@ -1186,6 +1210,53 @@ def get_expected_amount_for_booking(booking_id):
     print(f"   ⚠️ No deposit amount for booking #{booking_id} "
           f"(event_id={event_id!r} not in events.yaml) — excluded from amount matching")
     return None
+
+
+def get_expected_amount_for_booking(booking_id):
+    """Get expected deposit amount for a specific booking."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT event_id, deposit_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    return _get_expected_amount_for_booking_record(
+        dict(row) if row else None,
+        booking_id=booking_id,
+    )
+
+
+def _booking_is_pending_candidate(
+    booking,
+    now,
+    *,
+    pending_payment_hours=24,
+    private_days=45,
+):
+    """Apply the existing pending-booking candidate window to one live row."""
+    if now.tzinfo is not None:
+        now = now.astimezone(timezone.utc).replace(tzinfo=None)
+    status = booking.get("status")
+    session_type = booking.get("session_type") or ""
+    created_at = _parse_db_datetime(booking.get("created_at"))
+    if created_at is None:
+        return False
+    if session_type == "private":
+        return (
+            status in ("reserved", "pending_payment")
+            and created_at > now - timedelta(days=private_days)
+        )
+    if status == "reserved":
+        reserved_until = _parse_db_datetime(booking.get("reserved_until"))
+        return (
+            created_at > now - timedelta(hours=pending_payment_hours)
+            and reserved_until is not None
+            and reserved_until > now
+        )
+    return (
+        status == "pending_payment"
+        and created_at > now - timedelta(hours=pending_payment_hours)
+    )
 
 
 def get_pending_bookings(within_minutes=30, pending_payment_hours=24, private_days=45):
@@ -1245,14 +1316,16 @@ def get_pending_bookings(within_minutes=30, pending_payment_hours=24, private_da
     conn.close()
 
     # reserved_until may carry a timezone offset — compare instants in Python.
-    eligible = []
-    for row in rows:
-        if row.get("status") == "reserved" and (row.get("session_type") or "") != "private":
-            reserved_until = _parse_db_datetime(row.get("reserved_until"))
-            if reserved_until is None or reserved_until <= now:
-                continue
-        eligible.append(row)
-    return eligible
+    return [
+        row
+        for row in rows
+        if _booking_is_pending_candidate(
+            row,
+            now,
+            pending_payment_hours=pending_payment_hours,
+            private_days=private_days,
+        )
+    ]
 
 
 def get_reconciliation_bookings(within_days=45):
@@ -1309,6 +1382,20 @@ def _get_booking_full_price(booking):
     except Exception:
         pass
     return 190.0
+
+
+def _classify_amount_against_pricing(amount, expected, booking):
+    """Classify one amount with the existing expected/full-price rules."""
+    diff = amount - expected
+    if abs(diff) < 0.01:
+        return "exact"
+    if diff > 0:
+        full = _get_booking_full_price(booking)
+        cap = full if full > expected else expected * 2
+        return "overpaid" if amount <= cap + 1.0 else None
+    if amount >= expected * 0.3:
+        return "underpaid"
+    return None
 
 
 def match_by_amount_only(amount, bookings):
@@ -1376,6 +1463,7 @@ def confirm_booking(
     message_id=None,
     *,
     ledger_id=None,
+    confirmation_details=None,
 ):
     """Confirm booking in DB.
 
@@ -1391,6 +1479,7 @@ def confirm_booking(
             paid_amount,
             "confirm",
             ledger_id=ledger_id,
+            confirmation_details=confirmation_details,
         )
     conn = get_db()
     c = conn.cursor()
@@ -1588,16 +1677,7 @@ def _classify_amount_for_booking(amount, booking):
     expected = get_expected_amount_for_booking(booking["id"])
     if expected is None:
         return None
-    diff = amount - expected
-    if abs(diff) < 0.01:
-        return "exact"
-    if diff > 0:
-        full = _get_booking_full_price(booking)
-        cap = full if full > expected else expected * 2
-        return "overpaid" if amount <= cap + 1.0 else None
-    if amount >= expected * 0.3:
-        return "underpaid"
-    return None
+    return _classify_amount_against_pricing(amount, expected, booking)
 
 
 def _notify_admin_ambiguity(amount, candidates):
@@ -2035,15 +2115,25 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
         # Auto-confirm with the ACTUAL amount received (balance = full_price - amount).
         if archived_at_payment_boundary():
             return None, None
+        confirmation_details = {}
         if confirm_booking(
             matched["id"],
             amount,
             msg_id,
             ledger_id=ledger_id,
+            confirmation_details=confirmation_details,
         ):
-            if match_type == 'overpaid':
-                _notify_admin_overpaid(matched, expected, amount)
-            print(f"   ✅ CONFIRMED Booking #{matched['id']} — ${amount:.2f} ({match_type})")
+            live_match_type = confirmation_details["match_type"]
+            if live_match_type == 'overpaid':
+                _notify_admin_overpaid(
+                    confirmation_details["booking"],
+                    confirmation_details["expected"],
+                    amount,
+                )
+            print(
+                f"   ✅ CONFIRMED Booking #{matched['id']} — "
+                f"${amount:.2f} ({live_match_type})"
+            )
             return matched["id"], None
         print(f"   ❌ DB update failed for #{matched['id']}")
         return None, None

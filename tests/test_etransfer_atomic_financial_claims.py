@@ -306,6 +306,281 @@ def test_cancel_or_expire_during_body_read_rolls_back_confirmation_claims(
     assert processed is None
 
 
+def test_reserved_deadline_elapsing_during_body_read_rolls_back_confirmation_claims(
+    atomic_env,
+    monkeypatch,
+):
+    db_path, _, _ = atomic_env
+    message_id = "deadline-elapsed-during-body-read"
+    clock = {"now": datetime(2026, 7, 19, 12, 0, 0)}
+    monkeypatch.setattr(checker, "_utc_now", lambda: clock["now"])
+    booking_id = _insert_booking(db_path, status="reserved")
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        UPDATE bookings
+           SET created_at='2026-07-19 11:55:00',
+               reserved_until='2026-07-19T06:01:00-06:00'
+         WHERE id=?
+        """,
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+    _insert_transfer(db_path, message_id, 120.50)
+
+    stale_pending = checker.get_pending_bookings(within_minutes=30)
+    assert [booking["id"] for booking in stale_pending] == [booking_id]
+
+    def advance_past_deadline(_message_id):
+        clock["now"] = datetime(2026, 7, 19, 12, 2, 0)
+        return "You've received $120.50 from Atomic Client"
+
+    monkeypatch.setattr(checker, "read_message_body", advance_past_deadline)
+    monkeypatch.setattr(
+        checker,
+        "try_confirm_gift_etransfer",
+        lambda *args, **kwargs: False,
+    )
+    effects = []
+    monkeypatch.setattr(
+        booking_app,
+        "_after_auto_payment_confirmed",
+        lambda confirmed_id: effects.append(confirmed_id),
+    )
+
+    confirmed_ids = booking_app._process_etransfer_email_batch(
+        [
+            {
+                "id": message_id,
+                "date": "2026-07-19T12:00:00+00:00",
+                "subject": "Interac e-Transfer: You've received $120.50",
+                "from": {"addr": "notify@payments.interac.ca"},
+            }
+        ],
+        stale_pending,
+        [],
+    )
+    for confirmed_id in confirmed_ids:
+        booking_app._after_auto_payment_confirmed(confirmed_id)
+
+    assert confirmed_ids == []
+    assert effects == []
+    assert _booking_state(db_path, booking_id) == (
+        "reserved",
+        0,
+        0,
+        0.0,
+    )
+    ledger, processed = _ownership_state(db_path, message_id)
+    assert ledger == ("unmatched", None, None, None)
+    assert processed is None
+
+
+def test_full_price_change_during_body_read_rolls_back_confirmation_claims(
+    atomic_env,
+    monkeypatch,
+):
+    db_path, _, _ = atomic_env
+    message_id = "full-price-changed-during-body-read"
+    amount = 200.00
+    booking_id = _insert_booking(
+        db_path,
+        deposit_amount=120.50,
+        full_price=241.00,
+    )
+    _insert_transfer(db_path, message_id, amount)
+    stale_pending = checker.get_pending_bookings(within_minutes=30)
+    assert [booking["id"] for booking in stale_pending] == [booking_id]
+
+    def reprice_during_body_read(_message_id):
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "UPDATE bookings SET full_price=150.00 WHERE id=?",
+            (booking_id,),
+        )
+        conn.commit()
+        conn.close()
+        return f"You've received ${amount:.2f} from Atomic Client"
+
+    monkeypatch.setattr(
+        checker,
+        "read_message_body",
+        reprice_during_body_read,
+    )
+    monkeypatch.setattr(
+        checker,
+        "try_confirm_gift_etransfer",
+        lambda *args, **kwargs: False,
+    )
+    overpaid_alerts = []
+    monkeypatch.setattr(
+        checker,
+        "_notify_admin_overpaid",
+        lambda *args, **kwargs: overpaid_alerts.append((args, kwargs)),
+    )
+    effects = []
+    monkeypatch.setattr(
+        booking_app,
+        "_after_auto_payment_confirmed",
+        lambda confirmed_id: effects.append(confirmed_id),
+    )
+
+    confirmed_ids = booking_app._process_etransfer_email_batch(
+        [
+            {
+                "id": message_id,
+                "date": datetime.now(timezone.utc).isoformat(),
+                "subject": f"Interac e-Transfer: You've received ${amount:.2f}",
+                "from": {"addr": "notify@payments.interac.ca"},
+            }
+        ],
+        stale_pending,
+        [],
+    )
+    for confirmed_id in confirmed_ids:
+        booking_app._after_auto_payment_confirmed(confirmed_id)
+
+    assert confirmed_ids == []
+    assert effects == []
+    assert overpaid_alerts == []
+    assert _booking_state(db_path, booking_id) == (
+        "pending_payment",
+        0,
+        0,
+        0.0,
+    )
+    ledger, processed = _ownership_state(db_path, message_id)
+    assert ledger == ("unmatched", None, None, None)
+    assert processed is None
+
+
+def test_accepted_full_price_change_uses_live_notification_balance(
+    atomic_env,
+    monkeypatch,
+):
+    db_path, _, _ = atomic_env
+    message_id = "accepted-full-price-change"
+    booking_id = _insert_booking(
+        db_path,
+        deposit_amount=120.50,
+        full_price=241.00,
+    )
+    _insert_transfer(db_path, message_id, 200.00)
+    stale_pending = checker.get_pending_bookings(within_minutes=30)
+
+    def reprice_during_body_read(_message_id):
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "UPDATE bookings SET full_price=300.00 WHERE id=?",
+            (booking_id,),
+        )
+        conn.commit()
+        conn.close()
+        return "You've received $200.00 from Atomic Client"
+
+    monkeypatch.setattr(checker, "read_message_body", reprice_during_body_read)
+    monkeypatch.setattr(
+        checker,
+        "try_confirm_gift_etransfer",
+        lambda *args, **kwargs: False,
+    )
+    notifications = []
+    monkeypatch.setattr(
+        booking_app,
+        "_notify_admin",
+        lambda text: notifications.append(text),
+    )
+
+    result = checker.check_single_email(
+        {
+            "id": message_id,
+            "date": datetime.now(timezone.utc).isoformat(),
+        },
+        stale_pending,
+    )
+
+    assert result == (booking_id, None)
+    assert len(notifications) == 1
+    assert "Expected: $120.50" in notifications[0]
+    assert "Remaining balance: $100.00" in notifications[0]
+
+
+@pytest.mark.parametrize(
+    ("amount", "updated_deposit", "expected_match_type"),
+    [
+        (120.50, 100.00, "overpaid"),
+        (150.00, 150.00, "exact"),
+    ],
+)
+def test_confirmation_uses_live_pricing_band_for_notification(
+    atomic_env,
+    monkeypatch,
+    amount,
+    updated_deposit,
+    expected_match_type,
+):
+    db_path, _, _ = atomic_env
+    message_id = f"live-pricing-band-{expected_match_type}"
+    booking_id = _insert_booking(
+        db_path,
+        deposit_amount=120.50,
+        full_price=241.00,
+    )
+    _insert_transfer(db_path, message_id, amount)
+    monkeypatch.setattr(
+        checker,
+        "read_message_body",
+        lambda _message_id: (
+            f"You've received ${amount:.2f} from Atomic Client"
+        ),
+    )
+    monkeypatch.setattr(
+        checker,
+        "try_confirm_gift_etransfer",
+        lambda *args, **kwargs: False,
+    )
+    real_confirm_booking = checker.confirm_booking
+
+    def reprice_before_transaction(*args, **kwargs):
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "UPDATE bookings SET deposit_amount=? WHERE id=?",
+            (updated_deposit, booking_id),
+        )
+        conn.commit()
+        conn.close()
+        return real_confirm_booking(*args, **kwargs)
+
+    monkeypatch.setattr(
+        checker,
+        "confirm_booking",
+        reprice_before_transaction,
+    )
+    alerts = []
+    monkeypatch.setattr(
+        checker,
+        "_notify_admin_overpaid",
+        lambda booking, expected, actual: alerts.append(
+            (booking["deposit_amount"], expected, actual)
+        ),
+    )
+
+    result = checker.check_single_email(
+        {
+            "id": message_id,
+            "date": datetime.now(timezone.utc).isoformat(),
+        },
+        checker.get_pending_bookings(within_minutes=30),
+    )
+
+    assert result == (booking_id, None)
+    if expected_match_type == "overpaid":
+        assert alerts == [(100.00, 100.00, 120.50)]
+    else:
+        assert alerts == []
+
+
 @pytest.mark.parametrize("previously_processed", [False, True])
 def test_archive_wins_before_both_reconciliation_mutations(
     atomic_env,
@@ -554,6 +829,98 @@ def test_atomic_confirmation_rejects_already_paid_unconfirmed_booking(
         0,
         1,
         120.50,
+    )
+    ledger, processed = _ownership_state(db_path, message_id)
+    assert ledger == ("unmatched", None, None, None)
+    assert processed is None
+
+
+def test_atomic_confirmation_revalidates_current_expected_amount(
+    atomic_env,
+):
+    db_path, _, _ = atomic_env
+    message_id = "expected-amount-repriced"
+    booking_id = _insert_booking(
+        db_path,
+        deposit_amount=120.50,
+        full_price=600.00,
+    )
+    _insert_transfer(db_path, message_id, 120.50)
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "UPDATE bookings SET deposit_amount=500.00 WHERE id=?",
+        (booking_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    committed = checker._apply_booking_payment_transaction(
+        message_id,
+        booking_id,
+        120.50,
+        "confirm",
+    )
+
+    assert committed is False
+    assert _booking_state(db_path, booking_id) == (
+        "pending_payment",
+        0,
+        0,
+        0.0,
+    )
+    ledger, processed = _ownership_state(db_path, message_id)
+    assert ledger == ("unmatched", None, None, None)
+    assert processed is None
+
+
+@pytest.mark.parametrize(
+    ("session_type", "created_at"),
+    [
+        ("mini", datetime(2026, 7, 18, 11, 59, 59)),
+        ("private", datetime(2026, 6, 4, 11, 59, 59)),
+    ],
+)
+def test_atomic_confirmation_revalidates_candidate_age_windows(
+    atomic_env,
+    monkeypatch,
+    session_type,
+    created_at,
+):
+    db_path, _, _ = atomic_env
+    message_id = f"candidate-window-{session_type}"
+    now = datetime(2026, 7, 19, 12, 0, 0)
+    monkeypatch.setattr(checker, "_utc_now", lambda: now)
+    booking_id = _insert_booking(db_path, status="pending_payment")
+    _insert_transfer(db_path, message_id, 120.50)
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        UPDATE bookings
+           SET session_type=?, created_at=?
+         WHERE id=?
+        """,
+        (
+            session_type,
+            created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            booking_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    committed = checker._apply_booking_payment_transaction(
+        message_id,
+        booking_id,
+        120.50,
+        "confirm",
+    )
+
+    assert committed is False
+    assert _booking_state(db_path, booking_id) == (
+        "pending_payment",
+        0,
+        0,
+        0.0,
     )
     ledger, processed = _ownership_state(db_path, message_id)
     assert ledger == ("unmatched", None, None, None)

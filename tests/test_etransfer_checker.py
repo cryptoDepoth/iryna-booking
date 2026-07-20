@@ -163,10 +163,13 @@ def test_check_single_email_confirms_reserved_booking_by_amount(tmp_path, monkey
         "test-event",
     ))
     booking_id = cur.lastrowid
+    conn.execute(
+        "UPDATE bookings SET deposit_amount=3.00 WHERE id=?",
+        (booking_id,),
+    )
     conn.commit(); conn.close()
 
     monkeypatch.setattr(checker, "DB_PATH", str(db_path))
-    monkeypatch.setattr(checker, "get_expected_amount_for_booking", lambda booking_id: 3.00)
     monkeypatch.setattr(checker, "read_message_body", lambda message_id: "You've received $3.00 from andhon")
 
     pending = checker.get_pending_bookings(within_minutes=30)
@@ -320,6 +323,10 @@ def test_check_single_email_disambiguates_same_amount_with_name_date_and_time(tm
             "mountains-mini-session-2026-06-20",
         ))
         ids[name] = cur.lastrowid
+        conn.execute(
+            "UPDATE bookings SET deposit_amount=120.75 WHERE id=?",
+            (cur.lastrowid,),
+        )
     conn.commit()
     conn.close()
 
@@ -329,7 +336,6 @@ def test_check_single_email_disambiguates_same_amount_with_name_date_and_time(tm
     Sent From: Anna Lafleche
     """
     monkeypatch.setattr(checker, "DB_PATH", str(db_path))
-    monkeypatch.setattr(checker, "get_expected_amount_for_booking", lambda booking_id: 120.75)
     monkeypatch.setattr(checker, "read_message_body", lambda message_id: body)
     monkeypatch.setattr(checker, "_notify_admin_ambiguity", lambda amount, candidates: None)
 
