@@ -11880,12 +11880,11 @@ def _transfer_booking_options(limit=250):
 
 
 def _link_transfer_to_booking(transfer_id, booking_id):
-    """Manual admin link: attach one distinct transfer and raise paid_amount.
+    """Manual admin link: attach transfer and raise paid_amount safely.
 
     - Never lowers paid_amount.
-    - Accumulates each active inbound ledger row exactly once.
-    - If cumulative payment >= expected deposit: mark confirmed/paid.
-    - If cumulative payment < expected deposit: mark partial_payment.
+    - If amount >= expected deposit: mark confirmed/paid.
+    - If amount < expected deposit: mark partial_payment, not confirmed.
     """
     conn = db_conn()
     conn.row_factory = sqlite3.Row
@@ -11907,7 +11906,7 @@ def _link_transfer_to_booking(transfer_id, booking_id):
             return False, "Transfer must be active, inbound, unmatched, and unlinked"
         amount = float(transfer["amount"] or 0)
         current_paid = float(booking["paid_amount"] or 0)
-        new_paid = current_paid if amount <= 0 else round(current_paid + amount, 2)
+        new_paid = max(current_paid, amount)
         deposit = float(booking["deposit_amount"] or 0)
         if deposit <= 0:
             ev = get_event_by_id(booking["event_id"]) if booking["event_id"] else None

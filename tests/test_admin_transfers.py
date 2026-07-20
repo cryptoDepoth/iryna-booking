@@ -129,6 +129,26 @@ def _forbid_payment_hooks(monkeypatch, app, *, include_link=True):
     return calls
 
 
+def _forbid_manual_link_confirmation_effects(monkeypatch, app):
+    calls = []
+
+    def forbidden(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError(
+            "manual transfer linking must not emit confirmation side effects"
+        )
+
+    for name in (
+        "_after_auto_payment_confirmed",
+        "notify_payment_confirmed",
+        "create_calendar_event_for_booking",
+        "_send_client_email",
+        "_notify_admin",
+    ):
+        monkeypatch.setattr(app, name, forbidden)
+    return calls
+
+
 def test_etransfer_archive_migration_is_idempotent(monkeypatch, tmp_path):
     db_path = str(tmp_path / "legacy.db")
     conn = sqlite3.connect(db_path)
@@ -249,9 +269,10 @@ def test_admin_transfers_page_imports_csv_and_renders(client):
     assert "unmatched" in html
 
 
-def test_admin_transfer_link_updates_booking_paid_amount(client):
+def test_admin_transfer_link_updates_booking_paid_amount(client, monkeypatch):
     c, app, _, _ = client
     _login(c)
+    confirmation_effects = _forbid_manual_link_confirmation_effects(monkeypatch, app)
     with app.app.app_context():
         import app as booking_app
         conn = booking_app.db_conn()
@@ -285,11 +306,13 @@ def test_admin_transfer_link_updates_booking_paid_amount(client):
     assert b["status"] == "confirmed"
     assert t["matched_booking_id"] == booking_id
     assert t["status"] == "matched"
+    assert confirmation_effects == []
 
 
-def test_admin_transfer_link_accumulates_distinct_partial_transfers_once(client):
+def test_admin_transfer_link_uses_max_for_distinct_partial_transfers(client, monkeypatch):
     c, app, _, _ = client
     _login(c)
+    confirmation_effects = _forbid_manual_link_confirmation_effects(monkeypatch, app)
     conn = app.db_conn()
     conn.execute(
         """
@@ -382,7 +405,7 @@ def test_admin_transfer_link_accumulates_distinct_partial_transfers_once(client)
     ).fetchall()
     conn.close()
 
-    assert booking == (100.0, 1, 1, "confirmed")
+    assert booking == (80.0, 0, 0, "partial_payment")
     assert [
         (row["id"], row["matched_booking_id"], row["status"])
         for row in transfers
@@ -390,6 +413,79 @@ def test_admin_transfer_link_accumulates_distinct_partial_transfers_once(client)
         (transfer_ids[0], booking_id, "matched"),
         (transfer_ids[1], booking_id, "matched"),
     ]
+    assert confirmation_effects == []
+
+
+def test_admin_transfer_link_does_not_double_count_existing_paid_amount(
+    client,
+    monkeypatch,
+):
+    c, app, _, _ = client
+    _login(c)
+    confirmation_effects = _forbid_manual_link_confirmation_effects(monkeypatch, app)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type,
+            status, confirmed, paid, paid_amount, deposit_amount, full_price,
+            event_id
+        ) VALUES (
+            '2026-08-20', '11:20', 'Existing Payment Client',
+            'existing-payment@example.com', '4035550399', '', 'Mission Mini',
+            'partial_payment', 0, 0, 80.00, 100.00, 200.00, 'mission-mini-20'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    cursor = conn.execute(
+        """
+        INSERT INTO etransfers (
+            reference_number, message_id, sender_name, amount, direction,
+            email_date, status, source
+        ) VALUES (
+            'existing-payment-ref', 'existing-payment-message',
+            'Existing Payment Sender', 80.00, 'in',
+            '2026-07-20 10:15:00', 'unmatched', 'csv'
+        )
+        """
+    )
+    transfer_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    response = c.post(
+        f"/admin/transfers/{transfer_id}/link",
+        json={"booking_id": booking_id},
+    )
+
+    assert response.status_code == 200
+    conn = app.db_conn()
+    booking = tuple(
+        conn.execute(
+            """
+            SELECT paid_amount, confirmed, paid, status
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+    )
+    transfer = tuple(
+        conn.execute(
+            """
+            SELECT matched_booking_id, status
+              FROM etransfers
+             WHERE id=?
+            """,
+            (transfer_id,),
+        ).fetchone()
+    )
+    conn.close()
+
+    assert booking == (80.0, 0, 0, "partial_payment")
+    assert transfer == (booking_id, "matched")
+    assert confirmation_effects == []
 
 
 def test_admin_transfer_link_rolls_back_when_atomic_ledger_claim_loses(client):
@@ -470,7 +566,7 @@ def test_admin_transfer_link_rolls_back_when_atomic_ledger_claim_loses(client):
     assert transfer == (None, "unmatched")
 
 
-def test_admin_transfer_link_accumulates_without_unconfirming_booking(client):
+def test_admin_transfer_link_uses_max_without_unconfirming_booking(client):
     c, app, _, _ = client
     _login(c)
     conn = app.db_conn()
@@ -534,7 +630,7 @@ def test_admin_transfer_link_accumulates_without_unconfirming_booking(client):
     )
     conn.close()
 
-    assert booking == (60.0, 1, 1, "confirmed")
+    assert booking == (40.0, 1, 1, "confirmed")
     assert transfer == (booking_id, "matched")
 
 
