@@ -2447,7 +2447,6 @@ def _run_after_auto_payment_confirmed(booking_id, *, message_id):
                    AND b.confirmed=1
                    AND b.paid=1
                    AND ABS(COALESCE(e.amount, -1) - COALESCE(p.amount, -2)) < 0.01
-                   AND ABS(COALESCE(e.amount, -1) - COALESCE(b.paid_amount, -2)) < 0.01
                  LIMIT 2
                 """,
                 (str(message_id or ""), booking_id),

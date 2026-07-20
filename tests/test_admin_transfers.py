@@ -1460,6 +1460,90 @@ def test_confirmation_callback_preserves_effects_for_current_payment_owner(
     assert transfer_state == ("matched", booking_id)
 
 
+def test_confirmation_callback_fires_after_legitimate_paid_amount_change(
+    client,
+    monkeypatch,
+):
+    """A valid original confirming owner must still run its delayed side
+    effects even when the booking's aggregate paid_amount legitimately changes
+    afterwards (e.g. an admin amount correction, reconciliation, or a separate
+    manual transfer). Ownership is proven by the matched confirm ledger row and
+    its processed_emails owner, NOT by the current aggregate paid_amount.
+    """
+    _, app, db_path, _ = client
+    message_id = "paid-amount-change-callback-message"
+    booking_id, transfer_id = _insert_confirmed_auto_payment(
+        app,
+        message_id=message_id,
+        reference_number="paid-amount-change-callback-ref",
+    )
+    # A legitimate later change: the booking's paid_amount no longer equals the
+    # original confirming transfer amount, but ledger/processed-email ownership
+    # is unchanged.
+    conn = app.db_conn()
+    conn.execute(
+        "UPDATE bookings SET paid_amount=? WHERE id=?",
+        (241.00, booking_id),
+    )
+    conn.commit()
+    conn.close()
+
+    effects = []
+    monkeypatch.setattr(
+        app,
+        "create_calendar_event_for_booking",
+        lambda target: effects.append(("calendar", target)) or "calendar-url",
+    )
+    monkeypatch.setattr(
+        app,
+        "sync_to_notion",
+        lambda target: effects.append(("notion", target)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_send_client_email",
+        lambda **kwargs: effects.append(("email", kwargs["booking_id"])),
+    )
+    monkeypatch.setattr(
+        app,
+        "notify_payment_confirmed",
+        lambda target, amount=None: effects.append(("telegram", target, amount)),
+    )
+    monkeypatch.setattr(
+        app,
+        "_record_booking_funnel_event",
+        lambda booking, event, details=None: effects.append(
+            ("funnel", booking["id"], event)
+        ),
+    )
+    monkeypatch.setattr(
+        app,
+        "get_event_by_id",
+        lambda event_id: {
+            "id": event_id,
+            "date": "2026-08-10",
+            "title": "Mission Mini",
+        },
+    )
+
+    app._after_auto_payment_confirmed(booking_id, message_id=message_id)
+
+    assert effects == [
+        ("calendar", booking_id),
+        ("notion", booking_id),
+        ("email", booking_id),
+        ("telegram", booking_id, 241.00),
+        ("funnel", booking_id, "booking_confirmed"),
+    ]
+    conn = sqlite3.connect(db_path)
+    booking_state = conn.execute(
+        "SELECT status, confirmed, paid, paid_amount FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    assert booking_state == ("confirmed", 1, 1, 241.00)
+
+
 def test_unlink_waits_for_valid_callback_then_reconciles_its_effects(
     client,
     monkeypatch,
