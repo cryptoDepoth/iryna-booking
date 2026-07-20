@@ -282,6 +282,257 @@ def test_admin_transfer_link_updates_booking_paid_amount(client):
     assert t["status"] == "matched"
 
 
+def test_admin_transfer_link_accumulates_distinct_partial_transfers_once(client):
+    c, app, _, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type,
+            status, confirmed, paid, paid_amount, deposit_amount, full_price,
+            event_id
+        ) VALUES (
+            '2026-08-20', '11:00', 'Cumulative Partial Client',
+            'cumulative@example.com', '4035550300', '', 'Mission Mini',
+            'pending_payment', 0, 0, 0, 100.00, 200.00, 'mission-mini-20'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    transfer_ids = []
+    for reference, message_id, amount in (
+        ("cumulative-partial-80", "cumulative-partial-message-80", 80.00),
+        ("cumulative-partial-20", "cumulative-partial-message-20", 20.00),
+    ):
+        cursor = conn.execute(
+            """
+            INSERT INTO etransfers (
+                reference_number, message_id, sender_name, amount, direction,
+                email_date, status, source
+            ) VALUES (?, ?, 'Cumulative Partial Sender', ?, 'in',
+                      '2026-07-20 10:00:00', 'unmatched', 'email')
+            """,
+            (reference, message_id, amount),
+        )
+        transfer_ids.append(cursor.lastrowid)
+    conn.commit()
+    conn.close()
+
+    first = c.post(
+        f"/admin/transfers/{transfer_ids[0]}/link",
+        json={"booking_id": booking_id},
+    )
+    assert first.status_code == 200
+    conn = app.db_conn()
+    after_first = tuple(
+        conn.execute(
+            """
+            SELECT paid_amount, confirmed, paid, status
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+    )
+    conn.close()
+    assert after_first == (80.0, 0, 0, "partial_payment")
+
+    second = c.post(
+        f"/admin/transfers/{transfer_ids[1]}/link",
+        json={"booking_id": booking_id},
+    )
+    assert second.status_code == 200
+
+    repeated_first = c.post(
+        f"/admin/transfers/{transfer_ids[0]}/link",
+        json={"booking_id": booking_id},
+    )
+    repeated_second = c.post(
+        f"/admin/transfers/{transfer_ids[1]}/link",
+        json={"booking_id": booking_id},
+    )
+    assert repeated_first.status_code == 400
+    assert repeated_second.status_code == 400
+
+    conn = app.db_conn()
+    booking = tuple(
+        conn.execute(
+            """
+            SELECT paid_amount, confirmed, paid, status
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+    )
+    transfers = conn.execute(
+        """
+        SELECT id, matched_booking_id, status
+          FROM etransfers
+         WHERE id IN (?, ?)
+         ORDER BY id
+        """,
+        transfer_ids,
+    ).fetchall()
+    conn.close()
+
+    assert booking == (100.0, 1, 1, "confirmed")
+    assert [
+        (row["id"], row["matched_booking_id"], row["status"])
+        for row in transfers
+    ] == [
+        (transfer_ids[0], booking_id, "matched"),
+        (transfer_ids[1], booking_id, "matched"),
+    ]
+
+
+def test_admin_transfer_link_rolls_back_when_atomic_ledger_claim_loses(client):
+    c, app, _, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type,
+            status, confirmed, paid, paid_amount, deposit_amount, full_price,
+            event_id
+        ) VALUES (
+            '2026-08-20', '11:30', 'Claim Conflict Client',
+            'claim-conflict@example.com', '4035550301', '', 'Mission Mini',
+            'partial_payment', 0, 0, 25.00, 100.00, 200.00, 'mission-mini-20'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    cursor = conn.execute(
+        """
+        INSERT INTO etransfers (
+            reference_number, message_id, sender_name, amount, direction,
+            email_date, status, source
+        ) VALUES (
+            'claim-conflict-ref', 'claim-conflict-message',
+            'Claim Conflict Sender', 50.00, 'in',
+            '2026-07-20 10:30:00', 'unmatched', 'email'
+        )
+        """
+    )
+    transfer_id = cursor.lastrowid
+    conn.execute(
+        f"""
+        CREATE TRIGGER simulate_manual_link_claim_conflict
+        BEFORE UPDATE OF paid_amount ON bookings
+        WHEN NEW.id={booking_id}
+        BEGIN
+            UPDATE etransfers SET status='ignored' WHERE id={transfer_id};
+        END
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    response = c.post(
+        f"/admin/transfers/{transfer_id}/link",
+        json={"booking_id": booking_id},
+    )
+
+    assert response.status_code == 400
+    assert "changed" in response.get_json()["error"].lower()
+    conn = app.db_conn()
+    booking = tuple(
+        conn.execute(
+            """
+            SELECT paid_amount, confirmed, paid, status
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+    )
+    transfer = tuple(
+        conn.execute(
+            """
+            SELECT matched_booking_id, status
+              FROM etransfers
+             WHERE id=?
+            """,
+            (transfer_id,),
+        ).fetchone()
+    )
+    conn.close()
+
+    assert booking == (25.0, 0, 0, "partial_payment")
+    assert transfer == (None, "unmatched")
+
+
+def test_admin_transfer_link_accumulates_without_unconfirming_booking(client):
+    c, app, _, _ = client
+    _login(c)
+    conn = app.db_conn()
+    conn.execute(
+        """
+        INSERT INTO bookings (
+            date, time, name, email, phone, instagram, session_type,
+            status, confirmed, paid, paid_amount, deposit_amount, full_price,
+            event_id
+        ) VALUES (
+            '2026-08-20', '12:00', 'Confirmed Cumulative Client',
+            'confirmed-cumulative@example.com', '4035550302', '',
+            'Mission Mini', 'confirmed', 1, 1, 40.00, 120.50, 241.00,
+            'mission-mini-20'
+        )
+        """
+    )
+    booking_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    cursor = conn.execute(
+        """
+        INSERT INTO etransfers (
+            reference_number, message_id, sender_name, amount, direction,
+            email_date, status, source
+        ) VALUES (
+            'confirmed-cumulative-ref', 'confirmed-cumulative-message',
+            'Confirmed Cumulative Sender', 20.00, 'in',
+            '2026-07-20 11:00:00', 'unmatched', 'email'
+        )
+        """
+    )
+    transfer_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    response = c.post(
+        f"/admin/transfers/{transfer_id}/link",
+        json={"booking_id": booking_id},
+    )
+
+    assert response.status_code == 200
+    conn = app.db_conn()
+    booking = tuple(
+        conn.execute(
+            """
+            SELECT paid_amount, confirmed, paid, status
+              FROM bookings
+             WHERE id=?
+            """,
+            (booking_id,),
+        ).fetchone()
+    )
+    transfer = tuple(
+        conn.execute(
+            """
+            SELECT matched_booking_id, status
+              FROM etransfers
+             WHERE id=?
+            """,
+            (transfer_id,),
+        ).fetchone()
+    )
+    conn.close()
+
+    assert booking == (60.0, 1, 1, "confirmed")
+    assert transfer == (booking_id, "matched")
+
+
 def test_archive_persists_filters_active_queue_and_keeps_auditable_history(client):
     c, app, db_path, _ = client
     _login(c)
