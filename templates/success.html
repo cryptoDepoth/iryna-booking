@@ -42,6 +42,17 @@
         'currency': 'CAD',
         'transaction_id': '{{ booking.id if booking else '' }}'
     });
+    gtag('event', 'purchase', {
+        'transaction_id': '{{ booking.id if booking else '' }}',
+        'value': {{ (amount_due_today or price or 0)|float }},
+        'currency': 'CAD',
+        'items': [{
+            'item_id': {{ (event_id or '')|tojson }},
+            'item_name': {{ (event_title or 'Photography session')|tojson }},
+            'price': {{ (amount_due_today or price or 0)|float }},
+            'quantity': 1
+        }]
+    });
   </script>
   {% endif %}
   <!-- End Google tag -->

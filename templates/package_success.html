@@ -22,6 +22,16 @@
       currency: 'CAD',
       transaction_id: {{ purchase_event_id|tojson }}
     });
+    gtag('event', 'purchase', {
+      transaction_id: {{ purchase_event_id|tojson }},
+      value: {{ purchase_value|tojson }},
+      currency: 'CAD',
+      items: [{
+        item_name: {{ (pkg.name if pkg else 'Photography package')|tojson }},
+        price: {{ purchase_value|tojson }},
+        quantity: 1
+      }]
+    });
     {% endif %}
   </script>
   <script>

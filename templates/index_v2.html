@@ -1403,6 +1403,21 @@ function trackBookingEvent(eventName, eventId, metadata) {
       if (metadata && metadata.booking_id) gxData.transaction_id = metadata.booking_id;
       window.gtag('event', gx.event, gxData);
       console.log('[GoogleAds] event sent:', gx.event, gxData);
+      if (eventName === 'booking_confirmed' || eventName === 'purchase') {
+        const ga4Purchase = {
+          transaction_id: metadata?.booking_id || '',
+          value: gxData.value || 0,
+          currency: 'CAD',
+          items: [{
+            item_id: payload.event_id || '',
+            item_name: payload.event_id || 'Photography session',
+            price: gxData.value || 0,
+            quantity: 1
+          }]
+        };
+        window.gtag('event', 'purchase', ga4Purchase);
+        console.log('[GA4] purchase sent:', ga4Purchase);
+      }
     }
   }
   /* ── End Google Ads ── */

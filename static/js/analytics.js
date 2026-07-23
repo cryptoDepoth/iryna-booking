@@ -70,6 +70,15 @@ window.trackBookingEvent = function(eventName, params = {}) {
       }
       gtag('event', mapping.event, send);
       console.log('[Analytics] gtag conversion:', mapping.event, send);
+      if (eventName === 'booking_confirmed' || eventName === 'purchase') {
+        var ga4Purchase = {
+          transaction_id: params.booking_id || params.transaction_id || '',
+          value: params.amount || params.value || 0,
+          currency: 'CAD'
+        };
+        gtag('event', 'purchase', ga4Purchase);
+        console.log('[Analytics] GA4 purchase:', ga4Purchase);
+      }
     } else {
       gtag('event', eventName, params);
     }

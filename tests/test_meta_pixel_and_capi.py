@@ -54,11 +54,15 @@ def test_session_browser_renders_pixel_and_view_content():
 def test_payment_and_success_pages_carry_the_pixel_and_their_funnel_event():
     payment = (TEMPLATES / "payment.html").read_text()
     success = (TEMPLATES / "success.html").read_text()
+    package_success = (TEMPLATES / "package_success.html").read_text()
     assert "InitiateCheckout" in payment
     assert "gtag('event', 'begin_checkout'" in payment
     assert "AW-610866068/DNSFCPCKxr8cEJSnpKMC" not in payment
     assert "'Purchase'" in success
     assert "google_ads_booking_send_to" in success
+    assert "gtag('event', 'purchase'" in success
+    assert "gtag('event', 'purchase'" in package_success
+    assert "transaction_id" in package_success
     # Browser Purchase must be deduped against the server CAPI event.
     assert "eventID" in success
 
@@ -82,10 +86,13 @@ def test_google_ads_configuration_is_centralized_and_book_page_is_tagged():
 
 def test_async_confirmation_sends_deduplicated_google_purchase():
     homepage = (TEMPLATES / "index_v2.html").read_text()
+    analytics = (TEMPLATES.parent / "static" / "js" / "analytics.js").read_text()
     confirmed_branch = homepage.split("if (data.confirmed) {", 1)[1].split("} else if", 1)[0]
     assert "trackBookingEvent('booking_confirmed'" in confirmed_branch
     assert "booking_id: bookingId" in confirmed_branch
     assert "amount: paidAmount" in confirmed_branch
+    assert "window.gtag('event', 'purchase', ga4Purchase)" in homepage
+    assert "gtag('event', 'purchase', ga4Purchase)" in analytics
 
 
 # ── 2. Conversions API (server-side Purchase) ──────────────────────────────────

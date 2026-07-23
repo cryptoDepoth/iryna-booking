@@ -92,7 +92,8 @@
 
     /* FILTERS */
     .filters{max-width:1200px;margin:34px auto 14px;padding:0 28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .filters .chip{padding:8px 16px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:all .15s}
+    .filters .chip{padding:8px 16px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:background-color .15s,border-color .15s,color .15s}
+    .filters .chip:focus,.filters .chip:focus-visible{outline:3px solid var(--rose-deep);outline-offset:3px}
     .filters .chip:hover{border-color:var(--rose);color:var(--rose)}
     .filters .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
     .filters .count{margin-left:auto;font-size:.82rem;color:var(--ink-3)}

@@ -1,7 +1,7 @@
 {
   "templates/index_v2.html": {
-    "lastmod": "2026-07-19",
-    "sha256": "95f91dead4a059b48f741a3809ecb431f336cfac2fa026d7feee17821b0a2a35"
+    "lastmod": "2026-07-23",
+    "sha256": "251662d01de0e650cfdc992ec9486885a9df2f7d61df4a837ed665df2a989cf2"
   },
   "static/css/booking-glass.css": {
     "lastmod": "2026-07-19",
@@ -16,8 +16,8 @@
     "sha256": "a0f7454afcdcfc04ec474b9e04630fa640354941d1da4a1607c579c11ea0d2f7"
   },
   "templates/events_landing.html": {
-    "lastmod": "2026-07-19",
-    "sha256": "05f63a0a65853a40ac0add11326b8e7d54947c0db0342795a6bfa0cb16a798d6"
+    "lastmod": "2026-07-23",
+    "sha256": "bdce75374bd6d7078fc46a8eb23a1c214bbb0a33fdd64bbb1befa562921ae18b"
   },
   "templates/landing_wedding_v5.html": {
     "lastmod": "2026-07-11",
