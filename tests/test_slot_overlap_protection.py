@@ -36,7 +36,7 @@ def _event():
     return {
         "id": "overlap-regression-event",
         "title": "Overlap Regression Session",
-        "date": "2026-08-01",
+        "date": "2099-08-01",
         "start_time": "14:00",
         "end_time": "16:00",
         "session_length": 30,
@@ -117,7 +117,7 @@ def test_paid_traffic_landing_never_features_a_false_last_slot(
     available = sold_out | {
         "id": "actually-bookable-event",
         "title": "Actually Bookable Event",
-        "date": "2026-08-02",
+            "date": "2099-08-02",
     }
     monkeypatch.setattr(booking_app, "EVENTS", [sold_out, available])
 

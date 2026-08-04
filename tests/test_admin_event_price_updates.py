@@ -42,7 +42,7 @@ def test_admin_event_price_update_survives_meta_save_and_public_events_api(admin
         json={
             "title": "Updated Price Event",
             "subtitle": "Updated subtitle",
-            "date": "2026-08-01",
+            "date": "2099-08-01",
             "featured": True,
             "included": ["Updated include"],
         },

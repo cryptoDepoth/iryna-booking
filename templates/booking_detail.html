@@ -434,7 +434,13 @@
                value="{{ (booking.wfolio_url|e) if booking.wfolio_url else '' }}">
         <button class="btn btn-accent" type="button" onclick="sendGallery()">Save &amp; email</button>
       </div>
-      <p class="hint">Must start with <code>https://</code> · wfolio.com / pic-time.com / pixieset.com / smugmug.com preferred.</p>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-outline" type="button" onclick="markGalleryDelivered()">✓ Already emailed — mark delivered</button>
+        {% if booking.gallery_email_sent_at %}
+          <span class="helper success">Delivered {{ booking.gallery_email_sent_at[:10] }}</span>
+        {% endif %}
+      </div>
+      <p class="hint">Paste the private gallery URL, then choose <strong>Save &amp; email</strong> or mark it delivered if you already emailed it yourself. The automatic review request waits until at least 14 days after the session and at least 3 days after delivery.</p>
     </section>
 
     <!-- REVIEW -->
@@ -653,6 +659,21 @@
     if (!r) return;
     if (r.ok && r.data && (r.data.success || r.data.wfolio_url)) showToast('Gallery saved + emailed ✓', 'ok');
     else showToast((r.data && r.data.error) || 'Failed to save gallery', 'err');
+  }
+
+  async function markGalleryDelivered() {
+    const url = (document.getElementById('wfolioUrl').value || '').trim();
+    if (!url) { showToast('Please paste the gallery URL first', 'err'); return; }
+    if (!confirm('Confirm that this gallery link was already emailed to the client. This will not send another email.')) return;
+    showToast('Marking gallery delivered…');
+    const r = await adminPost('/mark-gallery-delivered', { wfolio_url: url });
+    if (!r) return;
+    if (r.ok && r.data && r.data.success) {
+      showToast('Gallery marked delivered — no duplicate email sent ✓', 'ok');
+      setTimeout(() => location.reload(), 700);
+    } else {
+      showToast((r.data && r.data.error) || 'Failed to mark gallery delivered', 'err');
+    }
   }
 
   async function sendReview() {

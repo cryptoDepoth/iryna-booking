@@ -210,12 +210,84 @@ def test_admin_wfolio_update_and_email(admin_client, monkeypatch):
     assert resp.status_code == 200
     # Verify DB was updated
     conn = sqlite3.connect(booking_app.DB_PATH)
-    row = conn.execute("SELECT wfolio_url FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    row = conn.execute(
+        "SELECT wfolio_url, gallery_email_sent_at FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
     conn.close()
     assert row and row[0] == wfolio_url
+    assert row[1], "successful gallery delivery must be timestamped"
     assert captured.get("called") is True
     assert captured.get("url") == wfolio_url
     assert captured["booking"].get("id") == booking_id
+
+
+def test_admin_wfolio_failed_email_does_not_mark_gallery_delivered(admin_client, monkeypatch):
+    """A saved URL is not delivery proof when the gallery email fails."""
+    monkeypatch.setattr(booking_app, "_send_gallery_email", lambda *a, **k: False, raising=False)
+    booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
+
+    resp = admin_client.post(
+        f"/admin/booking/{booking_id}/wfolio",
+        json={"wfolio_url": "https://pashynska.wfolio.com/gallery/retry123"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is False
+    conn = sqlite3.connect(booking_app.DB_PATH)
+    row = conn.execute(
+        "SELECT wfolio_url, gallery_email_sent_at FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    assert row[0].endswith("/gallery/retry123")
+    assert row[1] is None
+
+
+def test_admin_can_mark_manually_emailed_gallery_delivered(admin_client, monkeypatch):
+    """Manual Gmail delivery can be recorded without sending a duplicate email."""
+    monkeypatch.setattr(
+        booking_app,
+        "_send_gallery_email",
+        lambda *a, **k: pytest.fail("mark-delivered must not send another email"),
+        raising=False,
+    )
+    booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
+    wfolio_url = "https://pashynska.wfolio.com/gallery/already-emailed"
+
+    resp = admin_client.post(
+        f"/admin/booking/{booking_id}/mark-gallery-delivered",
+        json={"wfolio_url": wfolio_url},
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+    conn = sqlite3.connect(booking_app.DB_PATH)
+    row = conn.execute(
+        "SELECT wfolio_url, gallery_email_sent_at FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    assert row[0] == wfolio_url
+    assert row[1]
+
+
+def test_mark_gallery_delivered_requires_valid_url(admin_client, monkeypatch):
+    booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
+
+    resp = admin_client.post(
+        f"/admin/booking/{booking_id}/mark-gallery-delivered",
+        json={"wfolio_url": ""},
+    )
+
+    assert resp.status_code == 400
+    conn = sqlite3.connect(booking_app.DB_PATH)
+    row = conn.execute(
+        "SELECT gallery_email_sent_at FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    assert row[0] is None
 
 
 # 7. Google Review email

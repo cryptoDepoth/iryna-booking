@@ -2256,7 +2256,7 @@ def _send_24h_reminder_email(booking):
 
 
 def _send_review_email(booking):
-    """Send post-session review request email (7 days after session)."""
+    """Send a review request after the client has received their gallery."""
     name = booking.get("name", "there")
     email = booking.get("email", "")
     event_id = booking.get("event_id")
@@ -2275,11 +2275,12 @@ def _send_review_email(booking):
         )
     safe_name = _html_escape(name or "there")
 
-    subject = "How were your photos? 🌸"
+    subject = "How are you enjoying your gallery? 🌸"
 
     plain = (
         f"Hi {name},\n\n"
-        f"I hope you've had a chance to look through your photos and love them as much as I do!\n\n"
+        f"Now that your gallery has arrived, I hope you've had time to look through your photos "
+        f"and love them as much as I do!\n\n"
         f"If you enjoyed your session, a quick review means the absolute world to a small business like mine. "
         f"It takes just 30 seconds:\n\n"
         f"⭐ Google review: {google_review_url}\n"
@@ -2297,14 +2298,14 @@ def _send_review_email(booking):
 <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.12);">
   <tr><td style="background:linear-gradient(135deg,#f2c9bf 0%,#c4857a 100%);padding:36px 40px;text-align:center;">
     <p style="margin:0 0 8px;font-size:36px;">⭐</p>
-    <h1 style="margin:0;color:#fff;font-size:24px;font-weight:400;letter-spacing:-.01em;">How were your photos?</h1>
+    <h1 style="margin:0;color:#fff;font-size:24px;font-weight:400;letter-spacing:-.01em;">How are you enjoying your gallery?</h1>
     <p style="margin:8px 0 0;color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.04em;">Pashynska Photography · Calgary</p>
   </td></tr>
   <tr><td style="padding:36px 40px 28px;">
     <p style="margin:0 0 16px;font-size:16px;color:#5a3d4a;line-height:1.6;">Hi <strong>{safe_name}</strong>! 🌸</p>
     <p style="margin:0 0 20px;font-size:15px;color:#7a5a6a;line-height:1.7;">
-      I hope you've had a chance to look through your photos and love them as much as I do!
-      It was such a pleasure photographing you.
+      Now that your gallery has arrived, I hope you've had time to look through your photos
+      and love them as much as I do. It was such a pleasure photographing you.
     </p>
     <p style="margin:0 0 28px;font-size:15px;color:#7a5a6a;line-height:1.7;">
       If you enjoyed your session, a quick review means the absolute world to a small business like mine — it helps other families and couples find me. It takes just 30 seconds! ✨
@@ -4515,6 +4516,7 @@ def init_db():
         ("bookings",  "reminder_24h_email_sent","ALTER TABLE bookings ADD COLUMN reminder_24h_email_sent TEXT"),
         ("bookings",  "review_email_sent",     "ALTER TABLE bookings ADD COLUMN review_email_sent TEXT"),
         ("bookings",  "wfolio_url",            "ALTER TABLE bookings ADD COLUMN wfolio_url TEXT"),
+        ("bookings",  "gallery_email_sent_at", "ALTER TABLE bookings ADD COLUMN gallery_email_sent_at TEXT"),
         # first_booking_at / last_booking_at for clients table
         ("clients",   "first_booking_at",  "ALTER TABLE clients ADD COLUMN first_booking_at TEXT"),
         ("clients",   "last_booking_at",   "ALTER TABLE clients ADD COLUMN last_booking_at TEXT"),
@@ -4643,7 +4645,7 @@ init_db()
 #  Runs every 5 minutes in a daemon thread. Handles:
 #    1. Abandoned booking recovery  (2h after expiry)
 #    2. Pre-session reminder         (48h before session)
-#    3. Post-session review request  (5 days after session)
+#    3. Post-gallery review request  (14+ days after session and 3+ days after delivery)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _run_email_scheduler():
@@ -4844,24 +4846,78 @@ def _process_24h_reminder_emails():
             log.error(f"[scheduler] 24h reminder failed for #{b['id']}: {e}")
 
 
+def _review_request_min_session_days():
+    """Minimum session age before an automatic review request can be sent."""
+    try:
+        return max(1, int(os.environ.get("REVIEW_REQUEST_MIN_SESSION_DAYS", "14")))
+    except (TypeError, ValueError):
+        return 14
+
+
+def _review_request_gallery_delay_days():
+    """Time clients get to view a delivered gallery before the review request."""
+    try:
+        return max(0, int(os.environ.get("REVIEW_REQUEST_GALLERY_DELAY_DAYS", "3")))
+    except (TypeError, ValueError):
+        return 3
+
+
+def _is_due_for_review_email(booking, now=None):
+    """Return True only after both the session and delivered gallery are old enough.
+
+    Review requests used to be sent as early as six days after the session,
+    even when no gallery existed.  The gallery delivery timestamp is now the
+    hard safety gate; legacy rows without that timestamp are intentionally not
+    backfilled or auto-sent, which avoids a surprise review-email flood.
+    """
+    if booking.get("status") != "confirmed" or booking.get("confirmed") not in (1, True, "1"):
+        return False
+    if booking.get("review_email_sent"):
+        return False
+    if not str(booking.get("email") or "").strip():
+        return False
+    if not str(booking.get("wfolio_url") or "").strip():
+        return False
+
+    now = now or _local_now()
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=_tz)
+    session_dt = _booking_session_local_datetime(booking)
+    gallery_sent = _parse_iso_datetime(booking.get("gallery_email_sent_at"))
+    if not session_dt or not gallery_sent:
+        return False
+    if gallery_sent.tzinfo is None and getattr(now, "tzinfo", None) is not None:
+        gallery_sent = gallery_sent.replace(tzinfo=now.tzinfo)
+
+    return (
+        session_dt <= now - timedelta(days=_review_request_min_session_days())
+        and gallery_sent <= now - timedelta(days=_review_request_gallery_delay_days())
+    )
+
+
 def _process_review_emails():
-    """Send review request emails 7 days after a confirmed session."""
+    """Send review requests only after a confirmed gallery delivery.
+
+    Default timing: at least 14 days after the session and at least 3 days
+    after the gallery email was accepted by the mail transport.
+    """
     now = _local_now()
-    # Sessions that happened between 6 and 8 days ago (target: day 7;
-    # 3-day window tolerates scheduler downtime without double-sends)
-    date_from = (now - timedelta(days=8)).strftime("%Y-%m-%d")
-    date_to   = (now - timedelta(days=6)).strftime("%Y-%m-%d")
+    session_cutoff = (now - timedelta(days=_review_request_min_session_days())).strftime("%Y-%m-%d")
     conn = db_conn()
     rows = conn.execute("""
         SELECT * FROM bookings
         WHERE status = 'confirmed' AND confirmed = 1
           AND review_email_sent IS NULL
-          AND date BETWEEN ? AND ?
+          AND date <= ?
           AND email IS NOT NULL AND email != ''
-    """, (date_from, date_to)).fetchall()
+          AND wfolio_url IS NOT NULL AND TRIM(wfolio_url) != ''
+          AND gallery_email_sent_at IS NOT NULL
+    """, (session_cutoff,)).fetchall()
     conn.close()
     for row in rows:
         b = dict(row)
+        if not _is_due_for_review_email(b, now):
+            continue
         try:
             ok = _send_review_email(b)
             if not ok:
@@ -4889,7 +4945,7 @@ else:
     import threading as _bg_thread
     _sched = _bg_thread.Thread(target=_run_email_scheduler, daemon=True, name="email-scheduler")
     _sched.start()
-    log.info("[scheduler] Email scheduler started (abandoned / 48h reminder / 24h reminder / review)")
+    log.info("[scheduler] Email scheduler started (abandoned / 48h reminder / 24h reminder / post-gallery review)")
 
 
 def db_conn():
@@ -10234,17 +10290,73 @@ def admin_booking_wfolio(booking_id):
     if not ok:
         return jsonify({"error": err}), 400
     conn = db_conn()
-    conn.execute("UPDATE bookings SET wfolio_url=? WHERE id=?", (wfolio_url, booking_id))
+    # A changed/resubmitted URL is not considered delivered until the mail
+    # transport accepts the new gallery email.
+    conn.execute(
+        "UPDATE bookings SET wfolio_url=?, gallery_email_sent_at=NULL WHERE id=?",
+        (wfolio_url, booking_id),
+    )
     conn.commit()
     conn.close()
     sent = _send_gallery_email(dict(booking), wfolio_url)
+    gallery_sent_at = None
+    if sent:
+        gallery_sent_at = _local_now().isoformat()
+        conn = db_conn()
+        conn.execute(
+            "UPDATE bookings SET gallery_email_sent_at=? WHERE id=?",
+            (gallery_sent_at, booking_id),
+        )
+        conn.commit()
+        conn.close()
     _emit_n8n_event(
         "gallery.wfolio_sent",
         booking=dict(booking),
         wfolio_url=wfolio_url,
         email_sent=bool(sent),
+        gallery_sent_at=gallery_sent_at,
     )
     return jsonify({"success": bool(sent), "wfolio_url": wfolio_url})
+
+
+@app.route("/admin/booking/<int:booking_id>/mark-gallery-delivered", methods=["POST"])
+@admin_required
+def admin_booking_mark_gallery_delivered(booking_id):
+    """Record a gallery that Iryna already delivered outside this app.
+
+    This supports the real manual-Gmail workflow without sending a duplicate
+    gallery email.  A valid gallery URL remains mandatory so the review
+    scheduler never treats an unsupported checkbox as delivery proof.
+    """
+    booking = _admin_booking_row_or_404(booking_id)
+    if not booking:
+        return jsonify({"error": "Booking not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    wfolio_url = str(data.get("wfolio_url") or booking.get("wfolio_url") or "").strip()
+    ok, err = _validate_gallery_url(wfolio_url)
+    if not ok:
+        return jsonify({"error": err}), 400
+
+    gallery_sent_at = _local_now().isoformat()
+    conn = db_conn()
+    conn.execute(
+        "UPDATE bookings SET wfolio_url=?, gallery_email_sent_at=? WHERE id=?",
+        (wfolio_url, gallery_sent_at, booking_id),
+    )
+    conn.commit()
+    conn.close()
+    _emit_n8n_event(
+        "gallery.delivery_marked",
+        booking=dict(booking),
+        wfolio_url=wfolio_url,
+        gallery_sent_at=gallery_sent_at,
+    )
+    return jsonify({
+        "success": True,
+        "wfolio_url": wfolio_url,
+        "gallery_sent_at": gallery_sent_at,
+    })
 
 
 @app.route("/admin/booking/<int:booking_id>/send-review", methods=["POST"])

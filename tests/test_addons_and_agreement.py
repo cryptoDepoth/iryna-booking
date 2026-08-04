@@ -14,7 +14,7 @@ def _event(**overrides):
     ev = {
         "id": "test-mini-2026-08-01",
         "title": "Test Mini Session",
-        "date": "2026-08-01",
+        "date": "2099-08-01",
         "start_time": "10:00",
         "end_time": "11:00",
         "session_length": 20,
@@ -66,7 +66,7 @@ def client(monkeypatch):
 def _reserve(c, event_id="test-mini-2026-08-01", time="10:00", **extra):
     payload = {
         "event_id": event_id,
-        "date": "2026-08-01",
+        "date": "2099-08-01",
         "time": time,
         "name": "Addon Client",
         "email": "addon@example.com",
