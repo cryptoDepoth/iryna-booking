@@ -417,9 +417,19 @@
           <span class="key" data-i18n="summary_time">Time</span>
           <span>{{ booking.time }}</span>
         </div>
+        {% if location %}
+        <div class="summary-row">
+          <span class="key" data-i18n="summary_location">Location</span>
+          <span>{{ location|e }}</span>
+        </div>
+        {% endif %}
         <div class="summary-row">
           <span class="key" data-i18n="summary_includes">Includes</span>
-          <span data-i18n="summary_includes_value">{{ includes_text or '15 edited photos + all originals' }}</span>
+          <span>
+            {% for item in included_items %}
+              <span style="display:block;{% if not loop.last %}margin-bottom:4px;{% endif %}">{{ item|e }}</span>
+            {% endfor %}
+          </span>
         </div>
         {% if selected_addons %}
         <div class="summary-row">
@@ -848,8 +858,8 @@
       summary_session_value: 'Mini Photo Session ({{ session_length }} min)',
       summary_date:      'Date',
       summary_time:      'Time',
+      summary_location:  'Location',
       summary_includes:  'Includes',
-      summary_includes_value: '15 edited photos + all originals',
       summary_selected_addons: 'Selected add-ons',
       summary_addons_total: 'Selected add-ons total',
       summary_balance:   'Remaining balance',
@@ -898,8 +908,8 @@
       summary_session_value: 'Мини-фотосессия ({{ session_length }} мин)',
       summary_date:      'Дата',
       summary_time:      'Время',
+      summary_location:  'Локация',
       summary_includes:  'Включено',
-      summary_includes_value: '15 отредактированных фото + все оригиналы',
       summary_selected_addons: 'Выбранные дополнения',
       summary_addons_total: 'Сумма дополнений',
       summary_balance:   'Остаток к оплате',
@@ -948,8 +958,8 @@
       summary_session_value: 'मिनी फोटो सेशन ({{ session_length }} मिनट)',
       summary_date:      'तारीख',
       summary_time:      'समय',
+      summary_location:  'लोकेशन',
       summary_includes:  'शामिल है',
-      summary_includes_value: '15 एडिटेड फोटो + सभी ओरिजिनल',
       summary_selected_addons: 'चुने गए add-ons',
       summary_addons_total: 'Add-ons कुल',
       summary_balance:   'बाकी भुगतान',
@@ -998,8 +1008,8 @@
       summary_session_value: 'Міні-фотосесія ({{ session_length }} хв)',
       summary_date:      'Дата',
       summary_time:      'Час',
+      summary_location:  'Локація',
       summary_includes:  'Включено',
-      summary_includes_value: '15 відредагованих фото + усі оригінали',
       summary_selected_addons: 'Обрані додатки',
       summary_addons_total: 'Сума додатків',
       summary_balance:   'Залишок до оплати',

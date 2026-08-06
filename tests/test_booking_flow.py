@@ -140,6 +140,49 @@ def test_public_pages_link_to_privacy_without_cookie_consent_friction(client):
     assert "Reject cookies" not in success_html
 
 
+def test_payment_summary_preserves_event_included_items_and_location(client, monkeypatch):
+    """Regression 2026-08-05: payment JS replaced every offer with 15 photos."""
+    c, _ = client
+    event = {
+        "id": "exact-offer-regression",
+        "title": "One Hour Family Session",
+        "date": "2099-08-05",
+        "start_time": "10:00",
+        "end_time": "11:00",
+        "session_length": 60,
+        "break_length": 0,
+        "slot_interval": 60,
+        "deposit": 100.0,
+        "full_price": 340.0,
+        "location": "Fish Creek Provincial Park",
+        "session_type": "individual",
+        "booking_type": "fixed_slots",
+        "status": "active",
+        "included": [
+            "60 minute family session",
+            "42 professionally edited photos",
+            "All original photos included",
+        ],
+        "photos": ["/static/images/placeholder.jpg"],
+    }
+    monkeypatch.setattr(booking_app, "EVENTS", [event])
+
+    reserve = _reserve(c, "10:00", event["id"], email="exact-public@test.com")
+    assert reserve.status_code == 200, reserve.get_data(as_text=True)
+    data = reserve.get_json()
+
+    payment = c.get(
+        f"/payment?booking_id={data['booking_id']}&token={data['confirmation_token']}"
+    )
+
+    assert payment.status_code == 200
+    html = payment.get_data(as_text=True)
+    assert "42 professionally edited photos" in html
+    assert "All original photos included" in html
+    assert "Fish Creek Provincial Park" in html
+    assert "15 edited photos + all originals" not in html
+
+
 def test_success_page_requires_confirmation_token(client):
     """Booking details must not be visible from booking_id alone."""
     c, client_db = client

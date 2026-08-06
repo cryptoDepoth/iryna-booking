@@ -6913,10 +6913,19 @@ def payment():
     amount_due_today = _money(booking.get("deposit_amount") or ev.get("deposit") or SESSION_PRICE)
     remaining_balance = _booking_balance_due(booking, ev)
 
-    # Includes text based on session type
+    # The event's Included list is the client's contract. Never replace an
+    # admin-entered photo count with a generic 15-photo marketing fallback.
     is_private = booking.get("session_type") == "private"
-    edited_photos = ev.get("edited_photos") or (25 if is_private else 15)
-    includes_text = f"{edited_photos} edited photos + all originals"
+    included_items = [
+        str(item).strip() for item in (ev.get("included") or []) if str(item).strip()
+    ]
+    if not included_items:
+        edited_photos = ev.get("edited_photos") or (25 if is_private else 15)
+        included_items = [
+            f"{edited_photos} professionally edited photos",
+            "All original photos included",
+        ]
+    location_text = str(ev.get("location") or "").strip()
 
     # Server-computed countdown (client clocks/timezones can't be trusted).
     # None => no timer: private sessions and pending_payment have no short
@@ -6947,8 +6956,8 @@ def payment():
         session_length=ev.get("session_length", SESSION_LENGTH),
         event_title=ev.get("title", "Mini Session"),
         email=EMAIL,
-        includes_text=includes_text,
-        edited_photos=edited_photos,
+        included_items=included_items,
+        location=location_text,
         # Legacy static Payment Link (kept for backward compat — ignored if stripe_enabled)
         stripe_payment_link=ev.get("stripe_payment_link", ""),
         # New: dynamic Stripe Checkout — enabled when secret key is configured
@@ -7668,7 +7677,8 @@ def _send_balance_request_email(to_email, client_name, event_title, event_date, 
 def _send_private_payment_email(to_email, client_name, event_title, event_date,
                                 start_time, end_time, session_minutes, price,
                                 booking_id, payment_url, interac_email=None,
-                                deposit=None, balance=None):
+                                deposit=None, balance=None, location=None,
+                                included_items=None):
     """Email the client a private-session payment link (same /payment page as
     the deposit flow: Interac e-Transfer with auto-confirmation OR Stripe).
     When deposit < price, also shows remaining balance and a balance pay link."""
@@ -7681,6 +7691,24 @@ def _send_private_payment_email(to_email, client_name, event_title, event_date,
     subject = f"Your Individual Photoshoot — {event_date} · Booking & Payment"
     safe_name = _html_escape(client_name or "Client")
     time_range = f"{start_time}–{end_time}"
+    location = str(location or "").strip()
+    safe_location = _html_escape(location)
+    included_items = [
+        str(item).strip() for item in (included_items or []) if str(item).strip()
+    ]
+    included_plain = ""
+    included_html = ""
+    if included_items:
+        included_plain = "Included:\n" + "\n".join(f"• {item}" for item in included_items) + "\n"
+        included_html = (
+            '<div style="margin:12px 0 0;padding-top:12px;border-top:1px solid #ead8d0;">'
+            '<p style="margin:0 0 6px;font-size:12px;color:#a8918e;text-transform:uppercase;letter-spacing:.08em;">Included</p>'
+            + "".join(
+                f'<p style="margin:4px 0;font-size:13px;line-height:1.5;color:#5a3d4a;">✓ {_html_escape(item)}</p>'
+                for item in included_items
+            )
+            + "</div>"
+        )
 
     # Build balance section for email
     balance_section_plain = ""
@@ -7705,6 +7733,8 @@ def _send_private_payment_email(to_email, client_name, event_title, event_date,
         f"Your individual photoshoot with Iryna Pashynska is reserved!\n\n"
         f"Date: {event_date}\n"
         f"Time: {time_range} ({session_minutes} min)\n"
+        f"Location: {location or 'Exact location will be confirmed by Iryna'}\n"
+        f"{included_plain}"
         f"Total price: ${price:.2f} CAD\n"
         f"{balance_section_plain}"
         f"Booking ID: #{booking_id}\n\n"
@@ -7730,7 +7760,9 @@ def _send_private_payment_email(to_email, client_name, event_title, event_date,
 <div style="background:#fdf6f0;border-radius:14px;padding:20px;margin:0 0 22px;">
 <p style="margin:0 0 8px;font-size:13px;color:#a8918e;text-transform:uppercase;letter-spacing:.08em;">Session details</p>
 <p style="margin:0;font-size:15px;line-height:1.8;color:#5a3d4a;"><strong>{_html_escape(event_title or "Individual Photoshoot")}</strong><br>
-📅 {_html_escape(event_date)} · 🕐 {_html_escape(time_range)} ({session_minutes} min)</p>
+📅 {_html_escape(event_date)} · 🕐 {_html_escape(time_range)} ({session_minutes} min)<br>
+📍 {safe_location or 'Exact location will be confirmed by Iryna'}</p>
+{included_html}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 0;">
 <tr><td style="padding:6px 0;color:#a8918e;font-size:13px;">Total price</td>
 <td style="padding:6px 0;text-align:right;color:#5a3d4a;font-size:14px;font-weight:700;">${price:.2f} CAD</td></tr>
@@ -13743,6 +13775,11 @@ def api_private_session():
     if "instagram.com/" in instagram:
         instagram = instagram.split("instagram.com/", 1)[1].split("?", 1)[0].split("#", 1)[0]
     instagram = instagram.strip().strip("/").lstrip("@")[:80]
+    location = str(data.get("location") or "").strip()
+    if len(location) > 300:
+        return jsonify({"error": "Локация слишком длинная (максимум 300 символов)"}), 400
+    if not location:
+        location = "Calgary — exact spot sent after booking"
     payment_link = (data.get("payment_link") or "").strip()
     send_email = bool(data.get("send_email"))
     already_paid = data.get("already_paid")  # None => legacy: paid when no payment_link
@@ -13775,8 +13812,14 @@ def api_private_session():
     deposit = min(max(deposit, 0), price)  # clamp to [0, price]
     balance = round(price - deposit, 2)
 
-    # Number of edited photos (default 25 for private sessions)
-    edited_photos = int(data.get("photos") or 25)
+    # Number of edited photos (default 25 for private sessions). Keep the
+    # exact admin-entered value all the way through payment and confirmation.
+    try:
+        edited_photos = int(data.get("photos") or 25)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Количество фотографий должно быть числом"}), 400
+    if not (1 <= edited_photos <= 1000):
+        return jsonify({"error": "Количество фотографий должно быть от 1 до 1000"}), 400
 
     session_minutes = max(
         15,
@@ -13800,7 +13843,7 @@ def api_private_session():
         # e-Transfer expected-amount matching.
         "deposit": deposit,
         "full_price": price,
-        "location": "Calgary — exact spot sent after booking",
+        "location": location,
         "session_type": "private",
         "edited_photos": edited_photos,
         "featured": False,
@@ -13898,6 +13941,8 @@ def api_private_session():
                 payment_url=payment_url,
                 deposit=deposit,
                 balance=balance,
+                location=location,
+                included_items=event["included"],
             ))
         except Exception as e:
             log.error(f"[private-session] payment email failed for #{booking_id}: {e}")
@@ -13908,6 +13953,8 @@ def api_private_session():
             f"👤 {_tg_escape(client_name)}\n"
             + (f"📸 @{_tg_escape(instagram)}\n" if instagram else "")
             + f"📅 {date} · {start_time}–{end_time}\n"
+            + f"📍 {_tg_escape(location)}\n"
+            + f"🖼 {edited_photos} edited photos + all originals\n"
             + f"💰 ${price:.2f} CAD · "
             + ("✅ already paid" if paid else ("✉️ payment link emailed to client" if email_sent else "🔗 link ready (email not sent)"))
             + f"\n🆔 Booking #{booking_id}"
@@ -13927,6 +13974,8 @@ def api_private_session():
         "payment_url": None if paid else payment_url,
         "email_sent": email_sent,
         "booking_url": f"/admin/booking/{booking_id}",
+        "location": location,
+        "edited_photos": edited_photos,
     })
 
 

@@ -82,6 +82,8 @@ def test_private_session_creates_booking(admin_client):
         "email": "jane@example.com",
         "instagram": "@jane.doe",
         "price": "275",
+        "photos": 31,
+        "location": "Bowness Park, Calgary",
         "payment_link": "",  # no link => recorded as paid/confirmed
     }
     resp = admin_client.post("/admin/api/private-session", json=payload, headers=_hdrs())
@@ -112,6 +114,21 @@ def test_private_session_creates_booking(admin_client):
     assert private_event["title"] == "Individual Photoshoot — Jane Doe"
     assert "individual photoshoot" in private_event["included"][0]
     assert "private session" not in private_event["included"][0].lower()
+    assert private_event["included"][1] == "31 professionally edited photos"
+    assert private_event["location"] == "Bowness Park, Calgary"
+
+
+def test_both_admin_versions_collect_private_session_location():
+    root = Path(__file__).resolve().parents[1]
+    for template_name in ("admin.html", "admin_pro.html"):
+        html = (root / "templates" / template_name).read_text(encoding="utf-8")
+        assert 'id="private-location"' in html
+        assert html.count('id="private-price"') == 1
+        assert "location:f.location" in html or "location: f.location" in html
+
+    pro_css = (root / "static" / "css" / "admin-pro.css").read_text(encoding="utf-8")
+    assert "@media(max-width:520px)" in pro_css
+    assert ".fgrid{grid-template-columns:minmax(0,1fr)}" in pro_css
 
 
 def test_private_session_with_payment_link_is_unpaid(admin_client):

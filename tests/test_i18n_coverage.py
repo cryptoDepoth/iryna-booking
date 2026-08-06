@@ -37,7 +37,7 @@ def test_payment_page_visible_copy_is_i18n_wrapped():
 
     required_keys = [
         "summary_session", "summary_session_value", "summary_date", "summary_time",
-        "summary_includes", "summary_includes_value", "summary_balance", "summary_deposit",
+        "summary_location", "summary_includes", "summary_balance", "summary_deposit",
         "summary_selected_addons", "summary_addons_total",
         "currency_label", "bank_msg_title", "bank_msg_desc", "bank_msg_deposit_for",
         "how_step1", "how_step2", "how_step3", "how_step4", "how_step5", "how_step6",
@@ -53,6 +53,9 @@ def test_payment_page_visible_copy_is_i18n_wrapped():
     assert 'data-i18n="how_step1"' in html
     assert 'data-i18n="summary_selected_addons"' in html
     assert 'data-i18n="summary_addons_total"' in html
+    assert 'data-i18n="summary_location"' in html
+    assert 'data-i18n="summary_includes_value"' not in html
+    assert "summary_includes_value:" not in html
     assert "No password needed! This is an auto-deposit enabled email" not in html
     assert "Questions? <a" not in html
     assert 'data-i18n="privacy_link"' in html

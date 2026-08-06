@@ -229,6 +229,7 @@
         <div class="fld"><label>Edited photos</label><input type="number" id="private-photos" min="1" step="1" value="25"></div>
         <div class="fld"><label>Начало</label><input type="time" id="private-start-time" step="60" required></div>
         <div class="fld"><label>Конец</label><input type="time" id="private-end-time" step="60" required></div>
+        <div class="fld full"><label>Локация</label><input type="text" id="private-location" maxlength="300" placeholder="Например: Fish Creek Provincial Park или точный адрес"><span style="display:block;margin-top:5px;color:var(--text-3);font-size:12px">Будет показана клиенту на странице оплаты, в подтверждении и напоминаниях.</span></div>
       </div></div>
       <div class="fsec"><div class="fsec-t">Клиент</div><div class="fgrid">
         <div class="fld"><label>Имя</label><input type="text" id="private-firstname" placeholder="Иван" required></div>
@@ -287,7 +288,7 @@ function setDepositPreset(val){const price=parseFloat(document.getElementById('p
 function setDepositFull(){const price=parseFloat(document.getElementById('private-price').value)||0;document.getElementById('private-deposit').value=price.toFixed(2);updateDepositCalc()}
 function _pvTimes(){const s=document.getElementById('private-start-time').value,e=document.getElementById('private-end-time').value;if(!s||!e)return null;if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(s)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(e))return null;return{start:s,end:e}}
 function _pvCollect(){
-  const firstname=document.getElementById('private-firstname').value.trim(),lastname=document.getElementById('private-lastname').value.trim(),email=document.getElementById('private-email').value.trim(),instagram=document.getElementById('private-instagram').value.trim();
+  const firstname=document.getElementById('private-firstname').value.trim(),lastname=document.getElementById('private-lastname').value.trim(),email=document.getElementById('private-email').value.trim(),instagram=document.getElementById('private-instagram').value.trim(),location=document.getElementById('private-location').value.trim();
   const price=parseFloat(document.getElementById('private-price').value)||0,deposit=parseFloat(document.getElementById('private-deposit').value)||0,photos=parseInt(document.getElementById('private-photos').value)||25,date=document.getElementById('private-date').value;
   const alreadyPaid=document.getElementById('private-already-paid').checked,sendEmail=!alreadyPaid&&document.getElementById('private-send-email').checked,t=_pvTimes();
   if(!firstname||!lastname||!price||!date||!t){_pvStatus('Заполните все поля (имя, фамилия, дата, время, цена).','error');return null}
@@ -296,14 +297,14 @@ function _pvCollect(){
   if(!email&&!alreadyPaid){_pvStatus('Email обязателен — на него уйдёт ссылка на оплату.','error');return null}
   if(t.end<=t.start){_pvStatus('Время окончания должно быть позже начала.','error');return null}
   if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){_pvStatus('Проверьте email — формат некорректный.','error');return null}
-  return{firstname,lastname,email,price,deposit,photos,date,startTime:t.start,endTime:t.end,instagram,alreadyPaid,sendEmail}
+  return{firstname,lastname,email,location,price,deposit,photos,date,startTime:t.start,endTime:t.end,instagram,alreadyPaid,sendEmail}
 }
 function togglePrivatePaid(){const paid=document.getElementById('private-already-paid').checked,sb=document.getElementById('private-send-email');sb.disabled=paid;sb.checked=!paid}
 async function copyPaymentLink(){const link=document.getElementById('private-payment-link').value;if(!link){_pvStatus('Сначала создайте сессию — ссылка появится автоматически.','error');return}try{await navigator.clipboard.writeText(link);_pvStatus('📋 Ссылка скопирована.','success')}catch(e){const ta=document.getElementById('private-payment-link');ta.focus();ta.select();document.execCommand('copy');_pvStatus('📋 Ссылка скопирована.','success')}}
 function openPrivateSessionModal(){
   const now=new Date(),today=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().split('T')[0];
   document.getElementById('private-date').value=today;document.getElementById('private-date').min=today;
-  ['private-firstname','private-lastname','private-email','private-instagram'].forEach(id=>document.getElementById(id).value='');
+  ['private-firstname','private-lastname','private-email','private-instagram','private-location'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('private-start-time').value='10:00';document.getElementById('private-end-time').value='11:00';
   document.getElementById('private-price').value='300';document.getElementById('private-photos').value='25';document.getElementById('private-deposit').value='300';
   document.getElementById('private-payment-link').value='';document.getElementById('private-link-row').style.display='none';
@@ -319,7 +320,7 @@ async function submitPrivateSession(){
   try{
     const r=await fetch('/admin/api/private-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       date:f.date,start_time:f.startTime,end_time:f.endTime,client_name:`${f.firstname} ${f.lastname}`,email:f.email,instagram:f.instagram,
-      price:f.price,deposit:f.deposit,photos:f.photos,send_email:f.sendEmail,already_paid:f.alreadyPaid})});
+      location:f.location,price:f.price,deposit:f.deposit,photos:f.photos,send_email:f.sendEmail,already_paid:f.alreadyPaid})});
     const data=await r.json();
     if(r.ok&&data.success){
       let note=data.paid?'✅ Сессия записана как оплаченная.':data.email_sent?'✉️ Письмо со ссылкой на оплату отправлено клиенту.':(f.sendEmail?'⚠️ Сессия создана, но письмо не ушло — отправьте ссылку ниже вручную.':'🔗 Сессия создана — отправьте клиенту ссылку ниже.');

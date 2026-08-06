@@ -68,7 +68,8 @@ def _create(client, **overrides):
     payload = {
         "date": "2026-09-20", "start_time": "14:00", "end_time": "15:30",
         "client_name": "Jane Privat", "email": "jane.privat@example.com",
-        "price": "350", "send_email": True, "already_paid": False,
+        "price": "350", "photos": 25, "location": "Fish Creek Provincial Park",
+        "send_email": True, "already_paid": False,
     }
     payload.update(overrides)
     return client.post("/admin/api/private-session", json=payload, headers=_hdrs())
@@ -104,6 +105,8 @@ def test_create_unpaid_emails_payment_link(env):
     assert "private photo session" not in sent[0]["plain"].lower()
     assert data["payment_url"] in sent[0]["plain"]
     assert "350.00" in sent[0]["plain"]
+    assert "Fish Creek Provincial Park" in sent[0]["plain"]
+    assert "25 professionally edited photos" in sent[0]["plain"]
 
 
 def test_already_paid_records_settled_session(env):
@@ -159,6 +162,37 @@ def test_payment_page_private_no_timer_full_price(env):
     assert "350.00" in body                  # full price due today
     assert "TIMER_SECONDS = null" in body
     assert "Individual Photoshoot — Jane Privat" in body
+    assert "25 professionally edited photos" in body
+    assert "All original photos included" in body
+    assert "Fish Creek Provincial Park" in body
+    assert "15 edited photos + all originals" not in body
+
+
+def test_payment_page_uses_exact_custom_photo_count_and_location(env):
+    client, _ = env
+    data = _create(
+        client,
+        photos=37,
+        location="Reader Rock Garden, Calgary",
+        email="exact-offer@example.com",
+    ).get_json()
+
+    resp = client.get(_payment_path(data))
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "37 professionally edited photos" in body
+    assert "Reader Rock Garden, Calgary" in body
+    assert "15 edited photos + all originals" not in body
+
+
+def test_private_session_rejects_invalid_photo_count(env):
+    client, _ = env
+
+    response = _create(client, photos="not-a-number", email="bad-count@example.com")
+
+    assert response.status_code == 400
+    assert "должно быть числом" in response.get_json()["error"]
 
 
 def test_payment_page_normal_booking_has_timer(env):

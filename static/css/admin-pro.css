@@ -289,3 +289,14 @@ tr:hover .row-act{opacity:1}
 .modal-foot{display:flex;justify-content:flex-end;gap:9px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
 #stripe-result{display:none}#stripe-result.show{display:block;margin-top:14px}
 #private-status{display:none;margin-top:12px;border-radius:10px;font-size:13px;line-height:1.5;padding:11px 13px}
+
+@media(max-width:520px){
+  .modal-ov{padding:14px 8px}
+  .modal-box{max-width:100%}
+  .modal-head{padding:18px 18px 0}
+  .modal-body{padding:14px 18px 20px}
+  .fgrid{grid-template-columns:minmax(0,1fr)}
+  .fld{min-width:0}
+  .fld.full{grid-column:auto}
+  .fld input{box-sizing:border-box;min-width:0;width:100%}
+}
