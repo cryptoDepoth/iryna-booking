@@ -88,7 +88,7 @@
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       min-height: 100vh;
-      transition: background 0.8s ease;
+      transition: background-color 360ms cubic-bezier(.23,1,.32,1);
     }
     body.confirmed-bg { background: linear-gradient(160deg, #f0f8f3 0%, #faf7f5 60%); }
 
@@ -117,77 +117,12 @@
       padding: 4px 9px; border-radius: 16px; border: none;
       font-family: var(--font-b); font-size: 11px; font-weight: 600;
       cursor: pointer; background: transparent; color: var(--ink-3);
-      transition: all 0.2s; line-height: 1;
+      transition: color 160ms cubic-bezier(.23,1,.32,1), background-color 160ms cubic-bezier(.23,1,.32,1), box-shadow 160ms cubic-bezier(.23,1,.32,1); line-height: 1;
     }
     .lang-btn:hover { color: var(--rose); }
     .lang-btn.active {
       background: white; color: var(--rose);
       box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-    }
-
-    /* ── PETAL CANVAS ── */
-    #petal-canvas {
-      position: fixed; inset: 0;
-      pointer-events: none; z-index: 999;
-      overflow: hidden; display: none;
-    }
-    .petal {
-      position: absolute;
-      font-size: 18px; line-height: 1;
-      animation: petal-fall linear forwards;
-      pointer-events: none; user-select: none;
-    }
-    @keyframes petal-fall {
-      0%   { transform: translateY(-30px) rotate(0deg) scale(1);   opacity: 1; }
-      80%  { opacity: 1; }
-      100% { transform: translateY(110vh) rotate(900deg) scale(0.6); opacity: 0; }
-    }
-    .spark {
-      position: absolute;
-      width: 6px; height: 6px; border-radius: 50%;
-      animation: spark-burst ease-out forwards;
-    }
-    @keyframes spark-burst {
-      0%   { transform: translate(0,0) scale(1); opacity: 1; }
-      100% { transform: var(--tx, 80px) var(--ty, -80px) scale(0); opacity: 0; }
-    }
-
-    /* ── CAMERA FLASH ── */
-    #camera-flash {
-      position: fixed; inset: 0;
-      background: #fff;
-      z-index: 10000;
-      pointer-events: none;
-      opacity: 0;
-    }
-    #camera-flash.active {
-      animation: flash-bang 0.55s ease-out forwards;
-    }
-    @keyframes flash-bang {
-      0%   { opacity: 0.85; }
-      100% { opacity: 0; }
-    }
-
-    /* ── FILM STRIP ── */
-    .film-strip {
-      display: flex; gap: 10px; justify-content: center;
-      margin: 20px auto 8px; max-width: 320px;
-      opacity: 0; transform: translateY(10px);
-    }
-    .film-strip.show {
-      animation: film-in 0.5s ease 0.6s forwards;
-    }
-    @keyframes film-in {
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .film-frame {
-      width: 56px; height: 44px;
-      border: 2px solid var(--ink-5);
-      border-radius: 5px;
-      background: var(--surface);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.4rem;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
     }
 
     /* ── CALENDAR CTA ── */
@@ -206,21 +141,18 @@
     }
     .calendar-panel.show {
       display: block;
-      animation: calendar-pop 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation: calendar-pop 380ms cubic-bezier(.23,1,.32,1) both;
     }
     .calendar-panel::before {
       content: '✨';
       position: absolute;
       right: 18px; top: 14px;
       font-size: 1.35rem;
-      animation: twinkle 1.8s ease-in-out infinite;
     }
     @keyframes calendar-pop {
-      0% { opacity: 0; transform: translateY(18px) scale(0.96); }
-      70% { opacity: 1; transform: translateY(-2px) scale(1.01); }
-      100% { opacity: 1; transform: translateY(0) scale(1); }
+      0% { opacity: 0; transform: translateY(12px); }
+      100% { opacity: 1; transform: translateY(0); }
     }
-    @keyframes twinkle { 0%,100% { transform: scale(1) rotate(0deg); opacity: .65; } 50% { transform: scale(1.22) rotate(12deg); opacity: 1; } }
     .calendar-kicker {
       display: inline-flex; align-items: center; gap: 7px;
       font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
@@ -258,22 +190,18 @@
       opacity: 0; transition: opacity 0.18s ease;
       background: linear-gradient(120deg, rgba(196,133,122,0.55), rgba(61,107,79,0.45));
     }
-    .calendar-btn:hover { transform: translateY(-2px); }
-    .calendar-btn:hover::after { opacity: 1; }
     .calendar-btn.google {
       background: #fff; color: #1f2937; border: 1px solid rgba(66,133,244,0.35);
       box-shadow: 0 10px 24px rgba(66,133,244,0.14);
-      animation: cta-pulse 2.6s ease-in-out infinite;
     }
     .calendar-btn.apple {
       background: var(--ink); color: #fff; border: 1px solid var(--ink);
       box-shadow: 0 10px 24px rgba(28,25,23,0.16);
-      animation: cta-pulse 2.6s ease-in-out 0.35s infinite;
     }
     .calendar-icon { font-size: 1.35rem; line-height: 1; }
-    @keyframes cta-pulse {
-      0%, 100% { box-shadow: 0 10px 24px rgba(61,107,79,0.12); }
-      50% { box-shadow: 0 14px 34px rgba(196,133,122,0.28); }
+    @media (hover:hover) and (pointer:fine) {
+      .calendar-btn:hover { transform: translateY(-2px); }
+      .calendar-btn:hover::after { opacity: 1; }
     }
     @media (max-width: 430px) {
       .calendar-actions { grid-template-columns: 1fr; }
@@ -322,7 +250,7 @@
       position: absolute; inset: 6px;
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 2.4rem; transition: all 0.5s cubic-bezier(0.4,0,0.2,1);
+      font-size: 2.4rem; transition: background-color 240ms cubic-bezier(.23,1,.32,1), transform 240ms cubic-bezier(.23,1,.32,1);
     }
     .icon-inner.pending   { background: var(--amber-bg); }
     .icon-inner.confirmed { background: var(--green-bg); animation: icon-pop 0.5s cubic-bezier(0.4,0,0.2,1) both; }
@@ -348,18 +276,18 @@
       font-family: var(--font-d);
       font-size: 2.1rem; font-weight: 400;
       color: var(--ink); margin-bottom: 8px;
-      transition: all 0.4s ease;
+      transition: color 240ms cubic-bezier(.23,1,.32,1), opacity 240ms cubic-bezier(.23,1,.32,1);
     }
     .status-sub {
       font-size: 0.9rem; color: var(--ink-3);
       max-width: 340px; margin: 0 auto;
-      transition: all 0.4s ease;
+      transition: color 240ms cubic-bezier(.23,1,.32,1), opacity 240ms cubic-bezier(.23,1,.32,1);
     }
     .status-badge {
       display: inline-flex; align-items: center; gap: 7px;
       padding: 6px 16px; border-radius: 20px;
       font-size: 0.82rem; font-weight: 600;
-      margin-top: 16px; transition: all 0.4s ease;
+      margin-top: 16px; transition: color 240ms cubic-bezier(.23,1,.32,1), background-color 240ms cubic-bezier(.23,1,.32,1);
     }
     .status-badge.pending  { background: var(--amber-bg); color: var(--amber); }
     .status-badge.confirmed{ background: var(--green-bg); color: var(--green); }
@@ -408,7 +336,7 @@
       padding: 14px 18px; margin-bottom: 14px;
       font-size: 0.875rem; line-height: 1.6;
       border-left: 3px solid;
-      transition: all 0.4s ease;
+      transition: background-color 240ms cubic-bezier(.23,1,.32,1), border-color 240ms cubic-bezier(.23,1,.32,1), color 240ms cubic-bezier(.23,1,.32,1);
     }
     .msg.info    { background: #eef4fb; border-color: #5b9bd5; color: #1e3a5f; }
     .msg.warning { background: var(--amber-bg); border-color: var(--amber); color: #5c4516; }
@@ -452,12 +380,7 @@
       100%{ opacity:1; transform: none; }
     }
     .confirmed-banner.show { display: block; }
-    .banner-emoji { font-size: 3rem; margin-bottom: 10px; animation: bounce-in 0.6s ease 0.3s both; }
-    @keyframes bounce-in {
-      0%  { transform: scale(0) rotate(-30deg); opacity:0; }
-      60% { transform: scale(1.2) rotate(10deg); }
-      100%{ transform: scale(1) rotate(0deg); opacity:1; }
-    }
+    .banner-kicker { font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--green); font-weight:600; margin-bottom:6px; }
     .banner-title {
       font-family: var(--font-d);
       font-size: 2.2rem; font-weight: 500;
@@ -518,7 +441,9 @@
       color: var(--ink);
       box-shadow: 0 6px 16px rgba(0,0,0,0.06);
     }
-    .loc-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.1); }
+    @media (hover:hover) and (pointer:fine) {
+      .loc-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.1); }
+    }
     .loc-btn .loc-icon { font-size: 1.25rem; }
 
     /* ── IG CTA ── */
@@ -541,15 +466,9 @@
     }
     footer a { color: var(--rose); text-decoration: none; font-weight: 500; }
   </style>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=craft-3">
 </head>
 <body{% if booking and booking.confirmed %} class="confirmed-bg"{% endif %}>
-
-  <!-- Camera flash overlay -->
-  <div id="camera-flash"></div>
-
-  <!-- Petal / confetti layer -->
-  <div id="petal-canvas"></div>
 
   <!-- Top bar -->
   <div class="top-bar">
@@ -607,11 +526,11 @@
       </div>
     </div>
 
-    <!-- Confirmed banner -->
+    <!-- Confirmed session summary -->
     <div class="confirmed-banner{% if booking and booking.confirmed %} show{% endif %}" id="confirmed-banner">
-      <div class="banner-emoji">🌸</div>
-      <div class="banner-title" data-i18n="confirmed_title">You're Confirmed!</div>
-      <div class="banner-sub" data-i18n="confirmed_sub">Payment received. See you at the session!</div>
+      <div class="banner-kicker">Session confirmed</div>
+      <div class="banner-title">{{ event_title|default('Photography Session') }}</div>
+      <div class="banner-sub">{{ date }} · {{ time }}</div>
     </div>
 
     <!-- Getting There / Location -->
@@ -633,15 +552,6 @@
         </a>
       </div>
       {% endif %}
-    </div>
-
-    <!-- Film strip -->
-    <div class="film-strip{% if booking and booking.confirmed %} show{% endif %}" id="film-strip">
-      <div class="film-frame">📸</div>
-      <div class="film-frame">📷</div>
-      <div class="film-frame">✨</div>
-      <div class="film-frame">📸</div>
-      <div class="film-frame">🪻</div>
     </div>
 
     <!-- Booking details -->
@@ -1071,75 +981,6 @@
   }
 
   /* ════════════════════════════════════════════════════
-     ANIMATIONS
-  ════════════════════════════════════════════════════ */
-  const PETALS = ['🌸','🌺','🌷','🪻','✿','❀','🌼','💜','🩷'];
-  const SPARKS = ['#c4857a','#3d6b4f','#ffc107','#7c3aed','#60a5fa','#f97316'];
-
-  function launchPetals() {
-    const canvas = document.getElementById('petal-canvas');
-    canvas.style.display = 'block';
-
-    // Wave 1 — immediate burst. Keep this light on mobile: enough to feel
-    // celebratory without making the confirmation page sluggish.
-    for (let i = 0; i < 28; i++) {
-      const p = document.createElement('div');
-      p.className = 'petal';
-      p.textContent = PETALS[Math.floor(Math.random() * PETALS.length)];
-      p.style.left   = (Math.random() * 110 - 5) + '%';
-      p.style.top    = '-30px';
-      p.style.fontSize = (14 + Math.random() * 16) + 'px';
-      p.style.animationDuration = (2.5 + Math.random() * 3.5) + 's';
-      p.style.animationDelay   = (Math.random() * 1.2) + 's';
-      canvas.appendChild(p);
-    }
-
-    // Wave 2 — delayed second burst
-    setTimeout(() => {
-      for (let i = 0; i < 14; i++) {
-        const p = document.createElement('div');
-        p.className = 'petal';
-        p.textContent = PETALS[Math.floor(Math.random() * PETALS.length)];
-        p.style.left   = (Math.random() * 110 - 5) + '%';
-        p.style.top    = '-30px';
-        p.style.fontSize = (12 + Math.random() * 14) + 'px';
-        p.style.animationDuration = (3 + Math.random() * 3) + 's';
-        p.style.animationDelay   = (Math.random() * 0.8) + 's';
-        canvas.appendChild(p);
-      }
-    }, 1400);
-
-    // Spark burst around checkmark
-    const iconRect = document.getElementById('icon-wrap').getBoundingClientRect();
-    const cx = iconRect.left + iconRect.width / 2;
-    const cy = iconRect.top + iconRect.height / 2;
-    for (let i = 0; i < 18; i++) {
-      const spark = document.createElement('div');
-      spark.className = 'spark';
-      const angle = (i / 18) * Math.PI * 2;
-      const dist  = 60 + Math.random() * 60;
-      spark.style.cssText = `
-        left:${cx}px; top:${cy}px; position:fixed;
-        background:${SPARKS[Math.floor(Math.random() * SPARKS.length)]};
-        width:${5 + Math.random() * 5}px; height:${5 + Math.random() * 5}px;
-        border-radius:50%;
-        --tx:${Math.cos(angle) * dist}px;
-        --ty:${Math.sin(angle) * dist}px;
-        animation:spark-burst 0.7s ease-out ${Math.random() * 0.2}s forwards;
-        z-index:9999;
-      `;
-      document.body.appendChild(spark);
-      setTimeout(() => spark.remove(), 1000);
-    }
-
-    // Auto-remove petals
-    setTimeout(() => {
-      canvas.style.display = 'none';
-      canvas.innerHTML = '';
-    }, 8000);
-  }
-
-  /* ════════════════════════════════════════════════════
      STATUS POLLING
   ════════════════════════════════════════════════════ */
   (function () {
@@ -1261,20 +1102,7 @@
         // Page title
         document.title = '✅ ' + t('confirmed_title') + ' | Pashynska Photography';
 
-        // Camera flash
-        const flash = document.getElementById('camera-flash');
-        if (flash) { flash.classList.add('active'); setTimeout(() => flash.classList.remove('active'), 600); }
-
-        // Animations
-        launchPetals();
-
-        // Film strip
-        setTimeout(() => {
-          const strip = document.getElementById('film-strip');
-          if (strip) strip.classList.add('show');
-        }, 800);
-
-        // Calendar links + animated CTA
+        // Calendar links
         setupCalendarLinks();
 
         stopPolling();
@@ -1321,27 +1149,13 @@
       // ── Already confirmed: launch everything immediately ──
       document.title = '✅ ' + t('confirmed_title') + ' | Pashynska Photography';
 
-      // Camera flash
-      const flash = document.getElementById('camera-flash');
-      flash.classList.add('active');
-      setTimeout(() => flash.classList.remove('active'), 600);
-
-      // Petals + sparks
-      launchPetals();
-
-      // Film strip
-      setTimeout(() => {
-        const strip = document.getElementById('film-strip');
-        if (strip) strip.classList.add('show');
-      }, 800);
-
       // Card entrance
       document.querySelectorAll('.card, .prep-card').forEach((el, i) => {
         el.style.animationDelay = (i * 0.08) + 's';
         el.classList.add('animate-in');
       });
 
-      // Calendar links + animated CTA
+      // Calendar links
       showLocationCard();
       setupCalendarLinks();
 

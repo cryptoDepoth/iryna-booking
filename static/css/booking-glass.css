@@ -291,3 +291,33 @@ footer {
 .proof span strong {
   color: var(--ink);
 }
+
+/* Pointer-aware interaction: touch users never get stuck in hover states. */
+@media (hover: none), (pointer: coarse) {
+  .event-card:hover,
+  .hero-cta:hover,
+  .event-card .price-bar .cta:hover { transform: none; }
+}
+
+:where(.hero-cta, .event-card .price-bar .cta, .drawer .btn, .filters .chip):active {
+  transform: scale(.97);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body.glass-loaded::before { display: none; }
+  .nav,
+  .hero-card,
+  .event-card,
+  .drawer,
+  .filters .chip,
+  .how .step,
+  .faq details,
+  .transfer-box,
+  .how-to,
+  .assistant-panel,
+  footer {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #fffdf8 !important;
+  }
+}

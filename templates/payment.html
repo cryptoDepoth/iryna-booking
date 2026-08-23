@@ -120,7 +120,6 @@
     .timer-box.warning {
       background: var(--red-bg);
       border-color: rgba(139,53,53,0.2);
-      animation: pulse 1s ease-in-out infinite;
     }
     .timer-label { font-size: 0.85rem; color: var(--amber); font-weight: 500; }
     .timer-count {
@@ -187,7 +186,7 @@
       border: 1.5px dashed rgba(196,133,122,0.45);
       border-radius: 11px; padding: 13px 14px;
       cursor: pointer; margin-bottom: 8px;
-      transition: all 0.2s;
+      transition: border-color 0.2s, background-color 0.2s;
     }
     .email-copy:hover { border-style: solid; background: #fdf7f6; }
     .email-copy-label {
@@ -296,7 +295,7 @@
       padding: 4px 9px; border-radius: 16px; border: none;
       font-family: var(--font-b); font-size: 11px; font-weight: 600;
       cursor: pointer; background: transparent; color: var(--ink-3);
-      transition: all 0.2s; line-height: 1;
+      transition: color 0.2s, background-color 0.2s, box-shadow 0.2s; line-height: 1;
     }
     .lang-btn:hover { color: var(--rose); }
     .lang-btn.active { background: white; color: var(--rose); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
@@ -336,7 +335,7 @@
       width: 22px; height: 22px; border-radius: 50%;
       border: 2px solid var(--ink-5); background: white;
       display: flex; align-items: center; justify-content: center;
-      transition: all 0.2s; font-size: 12px; color: white;
+      transition: border-color 0.2s, background-color 0.2s, color 0.2s; font-size: 12px; color: white;
     }
     .addon-card.selected .addon-check {
       background: var(--rose); border-color: var(--rose);
@@ -367,7 +366,7 @@
     }
     .agreement-label a { color: var(--rose); text-decoration: underline; }
   </style>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=craft-3">
 </head>
 <body>
 

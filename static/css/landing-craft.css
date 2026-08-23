@@ -1,0 +1,135 @@
+/* Interaction and accessibility polish shared by the three editorial landings.
+   The page-specific palette and composition remain in each template. */
+:root {
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+  --ease-in-out: cubic-bezier(.77, 0, .175, 1);
+}
+
+html { scroll-padding-top: 84px; }
+body { font-optical-sizing: auto; }
+:where(a, button, summary) { -webkit-tap-highlight-color: transparent; }
+:where(a, button, summary):focus-visible {
+  outline: 3px solid var(--gold-deep);
+  outline-offset: 3px;
+}
+
+/* Navigation should feel immediate and never hide its label on touch. */
+.pn-logo,
+.pill,
+.m-nav .ghost,
+.m-nav .gift,
+.cta-primary,
+.cta-secondary,
+.card-btn {
+  touch-action: manipulation;
+  transition:
+    color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    box-shadow 200ms var(--ease-out),
+    transform 140ms var(--ease-out);
+}
+.pill .circle,
+.pill .lbl .b { display: none; }
+.pill .lbl { height: auto; overflow: visible; }
+.pill .lbl span { transform: none !important; transition: none; }
+
+/* A still photograph keeps attention on the family and the offer. */
+.hero-media,
+.hero-media img { will-change: auto; }
+.hero-media img { animation: none !important; transform: scale(1.02); }
+.hero-scroll { display: none; }
+
+/* Key information arrives quickly; the CTA is visible in well under a second. */
+.hi { animation-duration: 420ms; animation-timing-function: var(--ease-out); }
+.hi-1 { animation-delay: 30ms; }
+.hi-2 { animation-delay: 70ms; }
+.hi-3 { animation-delay: 110ms; }
+.hi-4 { animation-delay: 150ms; }
+.hi-5 { animation-delay: 190ms; }
+.hi-6 { animation-delay: 230ms; }
+.rv { transition-duration: 460ms; transition-timing-function: var(--ease-out); }
+.gline { transform: none; transition: none; }
+
+/* Replace looping shine with a single, user-initiated glint. */
+.cta-primary::after {
+  left: 0;
+  width: 42%;
+  animation: none !important;
+  transform: translateX(-140%) skewX(-18deg);
+  transition: transform 260ms var(--ease-out);
+}
+
+/* The proof strip remains readable without continuously pulling focus. */
+.marquee {
+  overflow: hidden;
+}
+.marquee .track {
+  animation: none !important;
+  will-change: auto;
+  padding-inline: 6px;
+}
+.marquee .track span:nth-of-type(n + 9),
+.marquee .track i:nth-of-type(n + 9) { display: none; }
+
+/* Existing hover lifts only run on devices that actually have a precise pointer. */
+@media (hover: hover) and (pointer: fine) {
+  .pn-logo:hover { transform: translateY(-1px); }
+  .cta-primary:hover { transform: translateY(-2px); }
+  .cta-primary:hover::after,
+  .cta-primary:focus-visible::after { transform: translateX(300%) skewX(-18deg); }
+  .card:hover { transform: translateY(-4px); }
+}
+
+.pn-logo:active,
+.pill:active,
+.m-nav .ghost:active,
+.m-nav .gift:active,
+.cta-primary:active,
+.cta-secondary:active,
+.card-btn:active { transform: scale(.97); }
+
+@media (max-width: 720px) {
+  .m-nav .ghost,
+  .m-nav .gift { min-height: 44px; display: inline-flex; align-items: center; }
+  .hi { animation-duration: 320ms; }
+  .hi-1 { animation-delay: 0ms; }
+  .hi-2 { animation-delay: 30ms; }
+  .hi-3 { animation-delay: 60ms; }
+  .hi-4 { animation-delay: 90ms; }
+  .hi-5 { animation-delay: 120ms; }
+  .hi-6 { animation-delay: 150ms; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .hi,
+  .rv { animation: none !important; opacity: 1; transform: none; }
+  .igss-stage img,
+  .igss-dots i { animation: none !important; }
+  .cta-primary::after { display: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .pn-logo,
+  .pill,
+  .m-nav,
+  .m-nav .ghost,
+  .glass-panel { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .pn-logo,
+  .pill,
+  .m-nav .ghost { background: #fff !important; }
+  .m-nav { background: var(--bg) !important; }
+  .glass-panel { background: rgba(255, 253, 248, .96) !important; }
+}
+
+@media (prefers-contrast: more) {
+  .pn-logo,
+  .pill,
+  .cta-secondary,
+  .card,
+  .faq-item { border-color: currentColor !important; }
+  .hero-sub,
+  .hero-trust,
+  .hero-question { color: var(--ink) !important; }
+}

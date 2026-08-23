@@ -15,6 +15,8 @@
   --premium-glow-lilac: rgba(201, 162, 75, 0.13);
   --premium-glass: rgba(255, 255, 255, 0.78);
   --premium-border: rgba(255, 255, 255, 0.72);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 html { scroll-behavior: smooth; }
@@ -83,7 +85,7 @@ body::after {
 }
 
 :where(.event-card, .how .step, .faq details, .card) {
-  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: box-shadow 180ms var(--ease-out), border-color 180ms var(--ease-out);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -137,17 +139,27 @@ body::after {
   inset: 0;
   transform: translateX(-120%);
   background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.28) 42%, transparent 72%);
-  animation: premium-shimmer 4.8s ease-in-out infinite;
+  transition: transform 260ms var(--ease-out);
   pointer-events: none;
 }
 
-@keyframes premium-shimmer {
-  0%, 58% { transform: translateX(-120%); }
-  74%, 100% { transform: translateX(120%); }
+@media (hover: hover) and (pointer: fine) {
+  :where(.hero-cta, .event-card .price-bar .cta, .drawer .btn, .btn-primary, .calendar-btn):hover {
+    transform: translateY(-2px);
+  }
+  :where(.hero-cta, .event-card .price-bar .cta, .drawer .btn, .btn-primary, .calendar-btn):hover::before,
+  :where(.hero-cta, .event-card .price-bar .cta, .drawer .btn, .btn-primary, .calendar-btn):focus-visible::before {
+    transform: translateX(120%);
+  }
 }
 
-:where(.hero-cta, .event-card .price-bar .cta, .drawer .btn, .btn-primary, .calendar-btn):hover {
-  transform: translateY(-2px);
+:where(.hero-cta, .event-card .price-bar .cta, .drawer .btn, .btn-primary, .copy-pill, .calendar-btn):active {
+  transform: scale(.97);
+}
+
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 3px solid #76511A;
+  outline-offset: 3px;
 }
 
 /* Softer chips/pills inspired by 21st side nav/category chips */
@@ -183,7 +195,28 @@ body::after {
   }
 }
 
+@media (prefers-reduced-transparency: reduce) {
+  .nav,
+  .top-bar,
+  :where(.hero-card, .card, .event-card, .how .step, .faq details, .transfer-box, .drawer) {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: #fffdf8 !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :where(.hero-card, .card, .event-card, .how .step, .faq details, .timer-box, .summary, .transfer-box, .drawer) {
+    border-color: currentColor !important;
+  }
+}
+
 @media (max-width: 640px) {
+  .back-btn { width: 44px !important; height: 44px !important; }
+  .lang-btn,
+  .lbtn { min-width: 36px; min-height: 36px; }
+  .copy-pill { min-width: 56px; min-height: 40px; }
+  .nav-gift { min-height: 44px; }
   body::before { background-size: 18px 18px, 72px 72px, 72px 72px; }
   body::after { opacity: 0.38; }
   :where(.hero-card, .card, .event-card, .how .step, .faq details, .transfer-box) {

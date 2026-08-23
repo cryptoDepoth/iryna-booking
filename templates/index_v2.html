@@ -362,7 +362,7 @@ img,picture,video{max-width:100%;height:auto;display:block}
 /* ── FILTERS ── */
 .filters{max-width:1200px;margin:0 auto 14px;padding:0 20px;display:flex;gap:8px;align-items:center;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .filters::-webkit-scrollbar{display:none}
-.filters .chip{flex-shrink:0;padding:8px 14px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.filters .chip{flex-shrink:0;padding:8px 14px;border:1px solid var(--ink-5);border-radius:22px;background:#fff;font:500 13px var(--font-b);color:var(--ink-2);cursor:pointer;transition:border-color .15s,color .15s,background-color .15s,transform .12s;white-space:nowrap}
 .filters .chip:hover{border-color:var(--rose);color:var(--rose)}
 .filters .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
 .filters .count{margin-left:auto;font-size:.82rem;color:var(--ink-3);flex-shrink:0;white-space:nowrap}
@@ -411,7 +411,7 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .tmt-marquee::after{right:0;background:linear-gradient(270deg,var(--bg) 8%,rgba(250,247,245,0));margin-left:-74px}
 .tmt-track{display:flex;align-items:center;gap:32px;width:max-content;will-change:transform;perspective:900px}
 .tmt-swipe-hint{display:flex;align-items:center;justify-content:center;gap:7px;margin:-4px 20px 0;color:var(--ink-3);font-size:.76rem;letter-spacing:.03em}
-.tmt-swipe-hint .hand{display:inline-block;font-size:1rem;animation:tmt-hand-swipe 1.8s ease-in-out infinite;transform-origin:70% 80%}
+.tmt-swipe-hint .hand{display:inline-block;font-size:1rem;animation:tmt-hand-swipe 1.8s ease-in-out 3;transform-origin:70% 80%}
 @keyframes tmt-hand-swipe{0%,100%{transform:translateX(-5px) rotate(-8deg);opacity:.72}45%{transform:translateX(7px) rotate(8deg);opacity:1}}
 .tmt-card{width:286px;height:206px;background:rgba(255,255,255,.72);border:1px solid rgba(93,55,47,.10);border-radius:22px;padding:15px 16px 14px;display:flex;flex-direction:column;gap:7px;box-shadow:0 1px 2px rgba(46,25,20,.03),0 10px 24px rgba(93,55,47,.06);white-space:normal;scroll-snap-align:center;transform:translateY(28px) scale(.78) rotateY(3deg);transform-origin:center center;opacity:0;filter:saturate(.78) blur(.15px);transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .34s ease,filter .34s ease,box-shadow .34s ease,border-color .34s ease,background-color .34s ease;position:relative;pointer-events:none}
 .tmt-card.is-active{z-index:5;transform:translateY(-18px) scale(1.12) rotateY(0);opacity:1;filter:saturate(1.06);background:rgba(255,255,255,.97);border-color:rgba(176,93,111,.28);box-shadow:0 14px 34px rgba(93,55,47,.14),0 34px 72px rgba(176,93,111,.18);pointer-events:auto}
@@ -463,7 +463,7 @@ img,picture,video{max-width:100%;height:auto;display:block}
 .js-anim .tmt-grid .reveal:nth-child(3){transition-delay:.24s}
 .proof .cu{font-variant-numeric:tabular-nums}
 .hero-cta:not(.outline),.event-card .price-bar .cta,.cta-shimmer{position:relative;overflow:hidden}
-.hero-cta:not(.outline)::after,.event-card .price-bar .cta::after,.cta-shimmer::after{content:"";position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);transform:translateX(-130%);animation:cta-sheen 3.6s ease-in-out infinite;pointer-events:none}
+.hero-cta:not(.outline)::after,.event-card .price-bar .cta::after,.cta-shimmer::after{content:"";position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);transform:translateX(-130%);pointer-events:none}
 @keyframes cta-sheen{0%{transform:translateX(-130%)}55%,100%{transform:translateX(130%)}}
 @keyframes slot-pop{0%{transform:translateY(-1px) scale(1)}45%{transform:translateY(-1px) scale(1.11)}100%{transform:translateY(-1px) scale(1)}}
 
@@ -582,7 +582,7 @@ body[data-ab-booking-flow="one_step"] .drawer .ab-preview{display:block}
 /* ── Confirmed — animated checkmark in big ring ── */
 .confirm-ring{width:96px;height:96px;border-radius:50%;background:var(--green-bg);margin:0 auto 18px;display:flex;align-items:center;justify-content:center;position:relative;animation:ring-pop .7s cubic-bezier(.34,1.56,.64,1)}
 .confirm-ring::before{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--green);opacity:0;animation:ring-wave 1.6s .35s ease-out 2}
-@keyframes ring-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
+@keyframes ring-pop{0%{transform:scale(.88);opacity:0}70%{transform:scale(1.04);opacity:1}100%{transform:scale(1);opacity:1}}
 @keyframes ring-wave{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.6);opacity:0}}
 .confirm-ring svg{width:48px;height:48px}
 .confirm-ring svg path{
@@ -632,11 +632,11 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
 .toast{position:fixed;bottom:24px;right:24px;background:#1c1917;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px);transition:opacity .25s,transform .25s,visibility 0s linear .25s;z-index:99}
 .toast.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);transition:opacity .25s,transform .25s}
 
-.assistant-launch{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--rose) 0%,#8F6A24 100%);color:#fff;box-shadow:0 6px 24px rgba(176,132,40,.35),0 2px 8px rgba(0,0,0,.12);z-index:70;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s,background .18s;animation:assistantPulse 3s ease-in-out infinite}
+.assistant-launch{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--rose) 0%,#8F6A24 100%);color:#fff;box-shadow:0 6px 24px rgba(176,132,40,.35),0 2px 8px rgba(0,0,0,.12);z-index:70;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s,background .18s;animation:assistantPulse 3s ease-in-out 2}
 .assistant-launch:hover{transform:translateY(-3px) scale(1.06);box-shadow:0 10px 36px rgba(196,133,122,.45),0 4px 12px rgba(0,0,0,.15)}
 .assistant-launch:active{transform:scale(.95)}
 .assistant-launch svg{width:26px;height:26px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
-.assistant-launch .dot{position:absolute;right:5px;top:5px;width:13px;height:13px;border-radius:50%;background:#fff;border:2.5px solid var(--rose);animation:dotBounce 2.4s ease-in-out infinite}
+.assistant-launch .dot{position:absolute;right:5px;top:5px;width:13px;height:13px;border-radius:50%;background:#fff;border:2.5px solid var(--rose);animation:dotBounce 2.4s ease-in-out 2}
 @keyframes assistantPulse{0%,100%{box-shadow:0 6px 24px rgba(176,132,40,.35),0 2px 8px rgba(0,0,0,.12)}50%{box-shadow:0 6px 24px rgba(176,132,40,.35),0 2px 8px rgba(0,0,0,.12),0 0 0 8px rgba(196,133,122,.12)}}
 @keyframes dotBounce{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 .assistant-panel{position:fixed;right:22px;bottom:90px;width:min(380px,calc(100vw - 32px));max-height:min(620px,calc(100vh - 118px));background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.22);z-index:75;display:none;overflow:hidden;flex-direction:column}
@@ -730,8 +730,8 @@ footer a{color:var(--rose);text-decoration:none;font-weight:500}
   .direct-callout-cta{align-self:stretch;text-align:center}
 }
 </style>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-glass.css') }}?v=glass-2">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=21st-1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-glass.css') }}?v=glass-3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/booking-premium.css') }}?v=craft-3">
 {% if initial_events %}
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
@@ -824,10 +824,10 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
        title="Recent work — full portfolio">Portfolio ↗</a>
   </div>
   <style>@media(min-width:900px){.nav-services{display:flex !important}}
-    .nav-gift{display:inline-flex;align-items:center;gap:6px;margin-left:auto;text-decoration:none;font-family:inherit;font-weight:700;font-size:12.5px;letter-spacing:.2px;color:#3a2a05;padding:8px 15px;border-radius:30px;position:relative;overflow:hidden;background:linear-gradient(135deg,#F6E3B0,#E8C45F 45%,#C4973A);border:1px solid rgba(255,255,255,.55);white-space:nowrap;animation:navGiftPulse 2.8s ease-out infinite}
+    .nav-gift{display:inline-flex;align-items:center;gap:6px;margin-left:auto;text-decoration:none;font-family:inherit;font-weight:700;font-size:12.5px;letter-spacing:.2px;color:#3a2a05;padding:8px 15px;border-radius:30px;position:relative;overflow:hidden;background:linear-gradient(135deg,#F6E3B0,#E8C45F 45%,#C4973A);border:1px solid rgba(255,255,255,.55);white-space:nowrap}
     .nav-gift:hover{filter:brightness(1.06)}
     .nav-gift .ng-ico{font-size:14px;line-height:1}
-    .nav-gift::after{content:"";position:absolute;top:0;left:-60%;width:38%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.8),transparent);transform:skewX(-18deg);animation:navGiftShine 3.8s ease-in-out infinite}
+    .nav-gift::after{content:"";position:absolute;top:0;left:-60%;width:38%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.8),transparent);transform:skewX(-18deg)}
     @keyframes navGiftShine{0%{left:-60%}55%{left:135%}100%{left:135%}}
     @keyframes navGiftPulse{0%{box-shadow:0 3px 12px rgba(196,151,58,.45),0 0 0 0 rgba(196,151,58,.5)}70%{box-shadow:0 3px 12px rgba(196,151,58,.45),0 0 0 10px rgba(196,151,58,0)}100%{box-shadow:0 3px 12px rgba(196,151,58,.45),0 0 0 0 rgba(196,151,58,0)}}
     @media(max-width:600px){.nav-gift{padding:7px 12px;font-size:12px}}
@@ -1092,10 +1092,10 @@ src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"
   <p style="margin-top:10px;display:flex;justify-content:center;align-items:center;gap:8px;font-size:.8rem;color:var(--ink-4)">
     <span>Language:</span>
   <span id="lang-sw" style="display:inline-flex;gap:3px;background:rgba(0,0,0,0.05);border-radius:20px;padding:3px;vertical-align:middle;">
-    <button class="lbtn active" onclick="setLang('en')" data-lang="en" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:white;color:var(--rose);box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all .2s;font-family:inherit;">EN</button>
-    <button class="lbtn" onclick="setLang('ru')" data-lang="ru" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:all .2s;font-family:inherit;">РУ</button>
-    <button class="lbtn" onclick="setLang('hi')" data-lang="hi" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:all .2s;font-family:inherit;">हिं</button>
-    <button class="lbtn" onclick="setLang('uk')" data-lang="uk" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:all .2s;font-family:inherit;">УК</button>
+    <button class="lbtn active" onclick="setLang('en')" data-lang="en" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:white;color:var(--rose);box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:color .2s,background-color .2s,box-shadow .2s;font-family:inherit;">EN</button>
+    <button class="lbtn" onclick="setLang('ru')" data-lang="ru" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:color .2s,background-color .2s,box-shadow .2s;font-family:inherit;">РУ</button>
+    <button class="lbtn" onclick="setLang('hi')" data-lang="hi" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:color .2s,background-color .2s,box-shadow .2s;font-family:inherit;">हिं</button>
+    <button class="lbtn" onclick="setLang('uk')" data-lang="uk" style="padding:3px 8px;border-radius:16px;border:none;font-size:10.5px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink-3);transition:color .2s,background-color .2s,box-shadow .2s;font-family:inherit;">УК</button>
   </span></p>
   <!-- Hidden admin access: tiny dot in footer -->
   <a href="/backstage" class="admin-hint" title="Admin access">·</a>
