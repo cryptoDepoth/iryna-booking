@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Clients · Pashynska Studio Admin</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}?v=craft-4">
 <!-- admin_clients_pro.html — redesigned CRM (P3). Rendered by /admin/clients?v=2.
      Pure client-side over existing JSON APIs: /admin/api/clients, /<id>, /<id>/note, /<id>/tag. Paginated in JS. -->
 </head>
@@ -32,6 +32,13 @@
     </nav>
     <div class="side-foot"><div class="avatar">IP</div><div class="who">Pashynska Photography<small>Admin</small></div></div>
   </aside>
+
+  <nav class="mobile-dock" aria-label="Admin sections">
+    <a href="/admin?v=2"><span class="mi">▦</span><span>Dashboard</span></a>
+    <a href="/admin?v=2#sessions"><span class="mi">▤</span><span>Sessions</span></a>
+    <a class="active" href="/admin/clients?v=2" aria-current="page"><span class="mi">♙</span><span>Clients</span></a>
+    <a href="/admin/transfers"><span class="mi">$</span><span>Interac</span></a>
+  </nav>
 
   <div class="main">
     <div class="topbar">

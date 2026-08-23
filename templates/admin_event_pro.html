@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ event.title }} · Session · Pashynska Studio</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}?v=craft-4">
 <!-- admin_event_pro.html — redesigned session detail (P2). Rendered by /admin/event/<id>?v=2.
      Photo uploader wired to real routes: upload-batch / upload / delete. Board+roster from /admin/api/event/<id>/slots. -->
 </head>
@@ -33,6 +33,13 @@
     <div class="side-foot"><div class="avatar">IP</div><div class="who">Pashynska Photography<small>Admin</small></div></div>
   </aside>
 
+  <nav class="mobile-dock" aria-label="Admin sections">
+    <a href="/admin?v=2"><span class="mi">▦</span><span>Dashboard</span></a>
+    <a class="active" href="/admin?v=2#sessions" aria-current="page"><span class="mi">▤</span><span>Sessions</span></a>
+    <a href="/admin/clients?v=2"><span class="mi">♙</span><span>Clients</span></a>
+    <a href="/admin/transfers"><span class="mi">$</span><span>Interac</span></a>
+  </nav>
+
   <div class="main">
     <div class="topbar">
       <a class="btn ghost" href="/admin?v=2">← Dashboard</a>
@@ -56,7 +63,7 @@
         </div>
       </div>
 
-      <div class="kpis" style="grid-template-columns:repeat(5,1fr)">
+      <div class="kpis event-kpis">
         <div class="kpi"><div class="v" id="kBooked">—</div><div class="d">Booked</div></div>
         <div class="kpi"><div class="v" style="color:var(--green-text)" id="kPaid">—</div><div class="d">Paid</div></div>
         <div class="kpi"><div class="v" style="color:var(--amber-text)" id="kPending">—</div><div class="d">Pending</div></div>

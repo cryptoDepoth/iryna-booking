@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard · Pashynska Studio Admin</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-pro.css') }}?v=craft-4">
 <!--
   admin_pro.html — NEW admin dashboard (P1 of the approved redesign).
   Rendered by /admin when ?v=2 is passed. Uses the SAME context as the legacy
@@ -23,7 +23,7 @@
         <div class="lbl">Main</div>
         <a class="nav-item active" href="/admin?v=2"><span class="ic">▦</span> Dashboard</a>
         <a class="nav-item" href="#sessions"><span class="ic">📷</span> Sessions <span class="badge dim">{{ event_summaries|length }}</span></a>
-        <a class="nav-item" href="/admin/clients"><span class="ic">👥</span> Clients</a>
+        <a class="nav-item" href="/admin/clients?v=2"><span class="ic">👥</span> Clients</a>
       </div>
       <div class="nav-group">
         <div class="lbl">Needs action</div>
@@ -47,6 +47,13 @@
       <div class="who">Pashynska Photography<small>Admin</small></div>
     </div>
   </aside>
+
+  <nav class="mobile-dock" aria-label="Admin sections">
+    <a class="active" href="/admin?v=2" aria-current="page"><span class="mi">▦</span><span>Dashboard</span></a>
+    <a href="/admin?v=2#sessions"><span class="mi">▤</span><span>Sessions</span></a>
+    <a href="/admin/clients?v=2"><span class="mi">♙</span><span>Clients</span></a>
+    <a href="/admin/transfers"><span class="mi">$</span><span>Interac</span></a>
+  </nav>
 
   <!-- MAIN -->
   <div class="main">
@@ -75,7 +82,7 @@
           <button class="btn ghost" type="button" onclick="openPrivateSessionModal()">✦ Индивидуальная фотосессия</button>
           <button class="btn ghost" type="button" onclick="openCreateModal()">✦ Новое событие</button>
           <a class="btn ghost" href="/admin?legacy=1#events-section">✏️ Редактировать события</a>
-          <a class="btn primary" href="{% if next_event %}/admin/event/{{ next_event.id }}{% else %}/admin?legacy=1#events-section{% endif %}">{% if next_event %}Open next session{% else %}Create session{% endif %}</a>
+          <a class="btn primary" href="{% if next_event %}/admin/event/{{ next_event.id }}?v=2{% else %}/admin?legacy=1#events-section{% endif %}">{% if next_event %}Open next session{% else %}Create session{% endif %}</a>
         </div>
       </div>
 
@@ -109,7 +116,7 @@
         <div class="section-head"><h2>⚠ Needs attention</h2></div>
         <div class="sessions">
           {% for ev in attn %}
-          <a class="s-card" href="/admin/event/{{ ev.id }}" style="display:block">
+          <a class="s-card" href="/admin/event/{{ ev.id }}?v=2" style="display:block">
             <div class="s-attn" style="margin:0 0 10px">⚠ {{ ev.attention_count }} client{{ '' if ev.attention_count == 1 else 's' }} awaiting payment or follow-up</div>
             <h3>{{ ev.title }}</h3>
             <div class="s-meta"><span>📅 {{ ev.date or 'No date' }}</span>{% if ev.location %}<span>📍 {{ ev.location.split(',')[0] }}</span>{% endif %}</div>
@@ -125,7 +132,7 @@
         {% if event_summaries %}
         <div class="sessions">
           {% for ev in event_summaries %}
-          <div class="s-card {% if next_event and ev.id == next_event.id %}next{% endif %}" onclick="location.href='/admin/event/{{ ev.id }}'">
+          <div class="s-card {% if next_event and ev.id == next_event.id %}next{% endif %}" onclick="location.href='/admin/event/{{ ev.id }}?v=2'">
             {% if next_event and ev.id == next_event.id %}<div class="ribbon">Next up</div>{% endif %}
             <h3>{{ ev.title }}</h3>
             <div class="s-meta">
@@ -140,7 +147,7 @@
             </div>
             <div class="bar"><i style="width:{{ ev.occupancy or 0 }}%"></i></div>
             <div class="s-actions">
-              <a class="btn primary sm" href="/admin/event/{{ ev.id }}" onclick="event.stopPropagation()">Open session</a>
+              <a class="btn primary sm" href="/admin/event/{{ ev.id }}?v=2" onclick="event.stopPropagation()">Open session</a>
               <a class="btn ghost sm" href="/?event={{ ev.id }}" target="_blank" onclick="event.stopPropagation()">View</a>
             </div>
           </div>
