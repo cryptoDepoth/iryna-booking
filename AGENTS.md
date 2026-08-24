@@ -19,7 +19,7 @@ Production mini-session photography booking platform for Pashynska Photography (
 - GBP prices use CAD; Products need photos
 - Interac CSV/payment history stays OUT of Git/Docker — use admin import/reconciliation UI
 - Minis stay fast/no questionnaire by default; optional post-confirmation
-- Add-ons v1: 10 edited images $50, BTS reel $50
+- Add-ons v1: 10 edited images $50, short highlight video up to 2 minutes $99
 - Timezone: `America/Edmonton` (MT/MST) — `_local_now()` / `_local_today()` in app.py
 
 ## Work Guidance

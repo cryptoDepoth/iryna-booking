@@ -591,6 +591,10 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
     first_event = event_lines[0][2:] if event_lines and event_lines[0].startswith("- ") else ""
 
     is_ru = lang in {"ru", "uk"} or re.search(r"[А-Яа-яІіЇїЄєҐґ]", message)
+    delivery_intent = any(
+        k in lower
+        for k in ["ready", "delivery", "gallery", "retouch", "готов", "галере", "ретуш"]
+    )
 
     if any(k in lower for k in ["price", "cost", "deposit", "payment", "сколько", "цена", "депозит", "оплат"]):
         slots = facts.get("available_slots", "")
@@ -610,7 +614,7 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
             f"To book, just click the session card on the site and choose your time."
         )
 
-    if any(k in lower for k in ["book", "reserve", "забронировать", "бронь", "записаться", "slot", "time", "время", "сегодня", "завтра", "когда"]):
+    if not delivery_intent and any(k in lower for k in ["book", "reserve", "забронировать", "бронь", "записаться", "slot", "time", "время", "сегодня", "завтра", "когда"]):
         slots = facts.get("available_slots", "")
         if is_ru:
             return (
@@ -653,13 +657,13 @@ def _fallback_answer(message: str, context: dict[str, Any], lang: str) -> str:
             f"All current sessions with available slots are shown on the site — just pick the one that fits you."
         )
 
-    if any(k in lower for k in ["ready", "delivery", "gallery", "retouch", "photo", "готов", "галере", "ретуш"]):
+    if delivery_intent:
         return (
-            "Для мини-сессий обычно включены отретушированные фото и все оригиналы, а точные сроки указаны в карточке выбранной сессии. "
-            "После съемки Ирина отправит личную галерею и инструкции по выбору фото."
+            "Все оригинальные фотографии будут готовы в течение 6–7 рабочих дней после съёмки. "
+            "После того как вы выберете и отправите фотографии для ретуши, готовые отретушированные кадры будут готовы ещё в течение 6–7 рабочих дней."
             if is_ru else
-            "Mini sessions usually include retouched photos plus all original images, with delivery timing shown on the selected session card. "
-            "After the shoot, Iryna sends a private gallery and instructions for choosing photos."
+            "All original photos are delivered within 6–7 business days after your session. "
+            "After you choose and submit the photos you want retouched, the professionally retouched images are delivered within an additional 6–7 business days."
         )
 
     # NEW: portfolio / photo viewing requests

@@ -16,6 +16,8 @@ Pins down the new flow:
 """
 import os
 import tempfile
+import json
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -166,6 +168,88 @@ def test_payment_page_private_no_timer_full_price(env):
     assert "All original photos included" in body
     assert "Fish Creek Provincial Park" in body
     assert "15 edited photos + all originals" not in body
+    assert "Short Vertical Highlight Video — Up to 2 Minutes" in body
+    assert "up to 2 minutes" in body
+    assert "$99.00" in body
+
+
+def test_private_payment_addons_are_persisted_and_idempotent_before_payment(env):
+    client, _ = env
+    data = _create(client).get_json()
+    token = parse_qs(urlsplit(data["payment_url"]).query)["token"][0]
+    payload = {
+        "booking_id": data["booking_id"],
+        "confirmation_token": token,
+        "addons": ["bts_reel"],
+    }
+
+    first = client.post("/booking/addons", json=payload)
+    repeated = client.post("/booking/addons", json=payload)
+
+    assert first.status_code == 200
+    assert repeated.status_code == 200
+    assert first.get_json()["addons_total"] == 99.0
+    assert first.get_json()["amount_due_today"] == 449.0
+    assert repeated.get_json()["amount_due_today"] == 449.0
+    conn = booking_app.db_conn()
+    row = conn.execute(
+        "SELECT deposit_amount, full_price, addons_total, selected_addons_json "
+        "FROM bookings WHERE id=?",
+        (data["booking_id"],),
+    ).fetchone()
+    conn.close()
+    selected = json.loads(row["selected_addons_json"])
+    assert row["deposit_amount"] == 449.0
+    assert row["full_price"] == 449.0
+    assert row["addons_total"] == 99.0
+    assert selected[0]["title"] == "Short Vertical Highlight Video — Up to 2 Minutes"
+    assert selected[0]["price"] == 99.0
+
+    reloaded = client.get(_payment_path(data)).get_data(as_text=True)
+    assert 'initialAddonIds = ["short-vertical-reel"]' in reloaded
+    assert "449.00" in reloaded
+
+    removed = client.post(
+        "/booking/addons",
+        json={**payload, "addons": []},
+    )
+    assert removed.status_code == 200
+    assert removed.get_json()["amount_due_today"] == 350.0
+    conn = booking_app.db_conn()
+    restored = conn.execute(
+        "SELECT deposit_amount, full_price, addons_total, selected_addons_json "
+        "FROM bookings WHERE id=?",
+        (data["booking_id"],),
+    ).fetchone()
+    conn.close()
+    assert restored["deposit_amount"] == 350.0
+    assert restored["full_price"] == 350.0
+    assert restored["addons_total"] == 0.0
+    assert restored["selected_addons_json"] is None
+
+
+def test_private_payment_addons_require_token_and_stop_after_payment_submission(env):
+    client, _ = env
+    data = _create(client).get_json()
+    token = parse_qs(urlsplit(data["payment_url"]).query)["token"][0]
+
+    denied = client.post("/booking/addons", json={
+        "booking_id": data["booking_id"],
+        "confirmation_token": "wrong-token",
+        "addons": ["bts_reel"],
+    })
+    assert denied.status_code == 404
+
+    client.post("/confirm", json={
+        "booking_id": data["booking_id"],
+        "confirmation_token": token,
+    })
+    late = client.post("/booking/addons", json={
+        "booking_id": data["booking_id"],
+        "confirmation_token": token,
+        "addons": ["bts_reel"],
+    })
+    assert late.status_code == 409
 
 
 def test_payment_page_uses_exact_custom_photo_count_and_location(env):

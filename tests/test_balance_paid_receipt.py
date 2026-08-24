@@ -74,18 +74,24 @@ def _booking_payment_state(db_path, booking_id):
     return row
 
 
-def test_delivery_promise_uses_event_copy_and_safe_default():
+def test_delivery_promise_keeps_canonical_two_stage_timeline():
     mini = booking_app._delivery_promise(
         {"included": ["Quick turnaround within 48 hours"]}
     )
     assert mini["preview"] == ""
-    assert mini["gallery"] == "within 48 hours"
-    assert mini["summary"] == "Your complete gallery arrives within 48 hours."
+    assert mini["originals"] == "within 6–7 business days after your session"
+    assert mini["gallery"] == mini["originals"]
+    assert mini["retouch"] == "within an additional 6–7 business days after you submit your retouch selections"
+    assert "All original photos are delivered" in mini["summary"]
+    assert "professionally retouched images" in mini["summary"]
 
-    standard = booking_app._delivery_promise({})
-    assert standard["preview"] == "within 48 hours"
-    assert standard["gallery"] == "within 14 calendar days"
-    assert "Preview within 48 hours" in standard["invoice"]
+    with_preview = booking_app._delivery_promise(
+        {"included": ["Priority preview within 48 hours"]}
+    )
+    assert with_preview["preview"] == "within 48 hours"
+    assert with_preview["originals"] == mini["originals"]
+    assert with_preview["retouch"] == mini["retouch"]
+    assert "All original photos:" in with_preview["invoice"]
 
 
 def test_paid_in_full_receipt_is_branded_and_sent_exactly_once(
@@ -116,7 +122,8 @@ def test_paid_in_full_receipt_is_branded_and_sent_exactly_once(
     _to, _name, subject, plain, html = captured[0]
     assert subject == "Payment received — your session is paid in full"
     assert "Balance remaining: $0.00 CAD" in plain
-    assert "complete gallery within 14 calendar days" in plain
+    assert "All original photos are delivered within 6–7 business days after your session" in plain
+    assert "professionally retouched images are delivered within an additional 6–7 business days" in plain
     assert "#9A7628" in html or "#A77C25" in html
     assert "<script" not in html.lower()
     state = _booking_payment_state(receipt_env, booking_id)

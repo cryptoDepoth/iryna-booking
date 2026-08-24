@@ -364,7 +364,7 @@ async function submitPrivateSession(){
         <div class="fgrid">
           <div class="fld"><label>10 доп. фото — цена</label><input type="number" id="new-addon-extra-price" value="50" min="0" step="5"></div>
           <label class="check"><input type="checkbox" id="new-addon-extra-active" checked><span>Активно</span></label>
-          <div class="fld"><label>Reel (BTS) — цена</label><input type="number" id="new-addon-reel-price" value="50" min="0" step="5"></div>
+          <div class="fld"><label>Mini highlight video (up to 2 min) — цена</label><input type="number" id="new-addon-reel-price" value="99" min="0" step="1"></div>
           <label class="check"><input type="checkbox" id="new-addon-reel-active" checked><span>Активно</span></label>
         </div>
         <div id="new-custom-addons" style="margin-top:10px"></div>
@@ -384,7 +384,8 @@ async function submitPrivateSession(){
           <button type="button" class="preset-btn" onclick="addPresetIncluded('new','📸 All original photos included')">📸 All originals</button>
           <button type="button" class="preset-btn" onclick="addPresetIncluded('new','🎨 Beautiful boho-style setup &amp; decorations')">🎨 Boho setup</button>
           <button type="button" class="preset-btn" onclick="addPresetIncluded('new','✨ Assistance with posing')">✨ Posing</button>
-          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','⚡ Quick turnaround (within 48 hours)')">⚡ 48h</button>
+          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','All original photos within 6–7 business days after the session')">📷 Originals 6–7 days</button>
+          <button type="button" class="preset-btn" onclick="addPresetIncluded('new','Retouched selections within an additional 6–7 business days after selection')">✨ Retouch 6–7 days</button>
         </div>
         <div id="new-included-list">
           <div class="included-row" style="display:flex;gap:8px;margin-bottom:8px"><input type="text" class="included-input" value="🖼 15 professionally edited photos" style="flex:1;height:38px;border:1px solid var(--border);border-radius:8px;padding:0 11px"><button type="button" onclick="removeIncludedRow(this)" class="btn subtle sm">✕</button></div>
@@ -416,7 +417,7 @@ function removeIncludedRow(btn){btn.closest('.included-row').remove()}
 function collectNewAddons(){
   const addons=[
     {id:'extra-10-edited-images',title:'10 Extra Edited Images',price:parseFloat(document.getElementById('new-addon-extra-price')?.value||'50'),active:!!document.getElementById('new-addon-extra-active')?.checked},
-    {id:'short-vertical-reel',title:'Short Vertical Behind-the-Scenes Reel',price:parseFloat(document.getElementById('new-addon-reel-price')?.value||'50'),active:!!document.getElementById('new-addon-reel-active')?.checked},
+    {id:'short-vertical-reel',title:'Short Vertical Highlight Video — Up to 2 Minutes',price:99,active:!!document.getElementById('new-addon-reel-active')?.checked},
   ];
   document.querySelectorAll('#new-custom-addons .addon-custom-row').forEach((row,idx)=>{
     const title=row.querySelector('.addon-title')?.value.trim()||'';

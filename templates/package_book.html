@@ -58,6 +58,8 @@
     .rowline.due{background:linear-gradient(135deg,#FFFBF2,#FCF3DD);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px;gap:12px;align-items:center}
     .rowline.due b{color:var(--gold-deep);font-family:var(--serif);font-size:1.35rem}
     .note{font-size:.8rem;color:var(--muted);margin-top:10px}
+    .delivery{margin-top:16px;padding:15px 16px;border:1px solid var(--line);border-radius:12px;background:#FFF8E7;color:#6a5d4a;font-size:.84rem;line-height:1.55}
+    .delivery strong{display:block;color:var(--gold-deep);margin-bottom:5px}
     .form{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px 24px;box-shadow:0 10px 34px -22px rgba(90,70,40,.4)}
     .form h2{font-family:var(--serif);font-weight:600;font-size:1.4rem;margin-bottom:16px}
     label{display:block;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
@@ -97,6 +99,7 @@
         <div class="rowline total"><span>Total</span><b>${{ '%.2f'|format(total) }} CAD</b></div>
         <div class="rowline due"><span>Due today — reservation deposit</span><b>${{ '%.0f'|format(pkg.deposit) }}</b></div>
         <p class="note">The deposit reserves your date and is applied to the total. The balance is due on the session day (card or e-Transfer). Iryna personally confirms your date within 24 hours.</p>
+        <div class="delivery"><strong>Photo delivery timeline</strong>All original photos are delivered within 6–7 business days after the session. After you choose and submit the photos you want retouched, the professionally retouched images are delivered within an additional 6–7 business days.</div>
       </div>
     </div>
 

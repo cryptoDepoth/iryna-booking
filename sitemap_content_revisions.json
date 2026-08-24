@@ -1,7 +1,7 @@
 {
   "templates/index_v2.html": {
     "lastmod": "2026-08-23",
-    "sha256": "c964630c6bc0d4be3f304a08137ea1913c88384236d330fe7706662fadcb098d"
+    "sha256": "ac856031ba1394e08f3760e387327833892da14dad9721a0922fb585c653d592"
   },
   "static/css/booking-glass.css": {
     "lastmod": "2026-08-23",
@@ -17,27 +17,27 @@
   },
   "templates/events_landing.html": {
     "lastmod": "2026-08-23",
-    "sha256": "b01676bcbb06a8f668b367a0aa0772b8f8917a14687a8812f253f0ba2d13e58b"
+    "sha256": "b9e459a4aacd9d38923f6d815000565db2ac72ebe85060274353a7fc089cadf5"
   },
   "templates/landing_wedding_v5.html": {
     "lastmod": "2026-08-23",
-    "sha256": "9b52840418ebd9aa0f0892cdbd707797d8cbace217addaaeadf90b59d96b86c9"
+    "sha256": "3fd0488fde2fe68042b610ad0cb6082c9284d6589b8474d20c8a6b120557e1ee"
   },
   "templates/landing_family_v2.html": {
     "lastmod": "2026-08-23",
-    "sha256": "4d8d2b45973bb47f2d066607276de8ac1a0cbdff512911db8168f92397fd1bd0"
+    "sha256": "899c1d39b0e53cfd0aed72516f86e5607b465f4adfdbf9bab849593193ac4e82"
   },
   "templates/landing_maternity_v2.html": {
     "lastmod": "2026-08-23",
-    "sha256": "2b34bb3a777681876d4785bab0d63648f05a6cc8a6d6538358ecc79f28e5ef55"
+    "sha256": "bb1a3cad5e6a9e067abc2c3a3ec46ab48bb9ae2adca8cf25799bfbb66245c443"
   },
   "templates/privacy.html": {
     "lastmod": "2026-07-10",
     "sha256": "6f2566412bdcbd53be18e7e3a1f06d20e3952b4a932e3ae2cd4a887bd6a76294"
   },
   "events.yaml": {
-    "lastmod": "2026-06-15",
-    "sha256": "633926920baa3cdee54c18086b20c07e788284ed05ccd150a9ff807ddd55eaab",
+    "lastmod": "2026-08-23",
+    "sha256": "68bfef0f0908937f8a22dfcfe8e60fdac9e5b877202127990bfce4b4eef363d8",
     "digest_format": "normalized-yaml"
   }
 }

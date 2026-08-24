@@ -1866,7 +1866,8 @@
                         <button onclick="addPresetIncluded('{{ ev.id }}','🌿 Cozy natural atmosphere')" class="preset-chip">🌿 Natural vibe</button>
                         <button onclick="addPresetIncluded('{{ ev.id }}','👗 Outfit change included')" class="preset-chip">👗 Outfit change</button>
                         <button onclick="addPresetIncluded('{{ ev.id }}','🖥 Private online gallery')" class="preset-chip">🖥 Online gallery</button>
-                        <button onclick="addPresetIncluded('{{ ev.id }}','⚡ Quick turnaround (within 48 hours)')" class="preset-chip">⚡ 48h delivery</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','All original photos within 6–7 business days after the session')" class="preset-chip">📷 Originals 6–7 days</button>
+                        <button onclick="addPresetIncluded('{{ ev.id }}','Retouched selections within an additional 6–7 business days after selection')" class="preset-chip">✨ Retouch 6–7 days</button>
                         <button onclick="addPresetIncluded('{{ ev.id }}','🖨 Print release included')" class="preset-chip">🖨 Print release</button>
                         <button onclick="addPresetIncluded('{{ ev.id }}','🎞 High-resolution digital files')" class="preset-chip">🎞 High-res files</button>
                         <button onclick="addPresetIncluded('{{ ev.id }}','📍 Location scouting included')" class="preset-chip">📍 Location scout</button>
@@ -1891,7 +1892,7 @@
             <!-- ── TAB: ADD-ONS ── -->
             <div id="tab-addons-{{ ev.id }}" class="ev-tab-panel" style="display:none;">
                 {% set extra = namespace(active=false, price=50) %}
-                {% set reel = namespace(active=false, price=50) %}
+                {% set reel = namespace(active=false, price=99) %}
                 {% for addon in (ev.addons or []) %}
                     {% if addon.id == 'extra-10-edited-images' %}
                         {% set extra.active = addon.active %}
@@ -1916,11 +1917,11 @@
                     <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:var(--surface);">
                         <label style="display:flex;align-items:center;gap:10px;font-weight:700;margin-bottom:10px;">
                             <input type="checkbox" id="addon-reel-active-{{ ev.id }}" {% if reel.active %}checked{% endif %} style="width:16px;height:16px;accent-color:var(--accent);">
-                            Short Vertical Behind-the-Scenes Reel
+                            Short Vertical Highlight Video — up to 2 minutes
                         </label>
                         <div class="form-group" style="max-width:180px;margin:0;">
                             <label>Price CAD</label>
-                            <input type="number" id="addon-reel-price-{{ ev.id }}" value="{{ reel.price|default(50) }}" min="0" step="5">
+                            <input type="number" id="addon-reel-price-{{ ev.id }}" value="99" min="0" step="1">
                         </div>
                     </div>
                 </div>
@@ -2119,9 +2120,9 @@
                     <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--surface);">
                         <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:8px;">
                             <input type="checkbox" id="new-addon-reel-active" checked style="width:15px;height:15px;accent-color:var(--accent);">
-                            Short Vertical Behind-the-Scenes Reel
+                            Short Vertical Highlight Video — up to 2 minutes
                         </label>
-                        <input type="number" id="new-addon-reel-price" value="50" min="0" step="5" placeholder="Price CAD">
+                        <input type="number" id="new-addon-reel-price" value="99" min="0" step="1" placeholder="Price CAD">
                     </div>
                 </div>
                 <div id="new-custom-addons" style="margin-top:10px;"></div>
@@ -2179,7 +2180,8 @@
                     <button onclick="addPresetIncluded('new','🌿 Cozy natural atmosphere')" class="preset-chip">🌿 Natural vibe</button>
                     <button onclick="addPresetIncluded('new','👗 Outfit change included')" class="preset-chip">👗 Outfit change</button>
                     <button onclick="addPresetIncluded('new','🖥 Private online gallery')" class="preset-chip">🖥 Online gallery</button>
-                    <button onclick="addPresetIncluded('new','⚡ Quick turnaround (within 48 hours)')" class="preset-chip">⚡ 48h delivery</button>
+                    <button onclick="addPresetIncluded('new','All original photos within 6–7 business days after the session')" class="preset-chip">📷 Originals 6–7 days</button>
+                    <button onclick="addPresetIncluded('new','Retouched selections within an additional 6–7 business days after selection')" class="preset-chip">✨ Retouch 6–7 days</button>
                     <button onclick="addPresetIncluded('new','🖨 Print release included')" class="preset-chip">🖨 Print release</button>
                     <button onclick="addPresetIncluded('new','🎞 High-resolution digital files')" class="preset-chip">🎞 High-res files</button>
                     <button onclick="addPresetIncluded('new','📍 Location scouting included')" class="preset-chip">📍 Location scout</button>
@@ -2918,8 +2920,8 @@
             },
             {
                 id: 'short-vertical-reel',
-                title: 'Short Vertical Behind-the-Scenes Reel',
-                price: parseFloat(document.getElementById(`addon-reel-price-${eventId}`)?.value || '50'),
+                title: 'Short Vertical Highlight Video — Up to 2 Minutes',
+                price: 99,
                 active: !!document.getElementById(`addon-reel-active-${eventId}`)?.checked,
             },
         ];
@@ -2962,8 +2964,8 @@
             },
             {
                 id: 'short-vertical-reel',
-                title: 'Short Vertical Behind-the-Scenes Reel',
-                price: parseFloat(document.getElementById('new-addon-reel-price')?.value || '50'),
+                title: 'Short Vertical Highlight Video — Up to 2 Minutes',
+                price: 99,
                 active: !!document.getElementById('new-addon-reel-active')?.checked,
             },
         ];
@@ -3059,7 +3061,7 @@
         row.className = 'included-row';
         row.style.cssText = 'display:flex; gap:8px; margin-bottom:8px;';
         row.innerHTML = `
-            <input type="text" class="included-input" placeholder="e.g. Quick turnaround (within 48 hours)"
+            <input type="text" class="included-input" placeholder="e.g. Originals in 6–7 business days"
                    style="flex:1; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px;">
             <button onclick="removeIncludedRow(this)" style="background:var(--red-light);color:var(--red-text);border:1px solid #fca5a5;border-radius:var(--radius);padding:7px 12px;font-size:13px;cursor:pointer;">✕</button>
         `;

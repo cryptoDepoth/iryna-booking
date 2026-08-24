@@ -158,7 +158,7 @@
           <div class="fsec"><div class="fsec-t">Add-ons</div><div class="fgrid">
             <div class="fld"><label>10 доп. фото — цена</label><input type="number" id="e-extra-price" value="{{ extra.price if extra else 50 }}" min="0" step="5"></div>
             <label class="check"><input type="checkbox" id="e-extra-active" {% if (not extra) or extra.active %}checked{% endif %}><span>Активно</span></label>
-            <div class="fld"><label>Reel (BTS) — цена</label><input type="number" id="e-reel-price" value="{{ reel.price if reel else 50 }}" min="0" step="5"></div>
+            <div class="fld"><label>Mini highlight video (up to 2 min) — цена</label><input type="number" id="e-reel-price" value="99" min="0" step="1"></div>
             <label class="check"><input type="checkbox" id="e-reel-active" {% if (not reel) or reel.active %}checked{% endif %}><span>Активно</span></label>
           </div>
           <div id="e-custom-addons" style="margin-top:10px">
@@ -326,7 +326,7 @@ function _val(id){return document.getElementById(id).value}
 function collectEditAddons(){
   const addons=[
     {id:'extra-10-edited-images',title:'10 Extra Edited Images',price:parseFloat(document.getElementById('e-extra-price')?.value||'50'),active:!!document.getElementById('e-extra-active')?.checked},
-    {id:'short-vertical-reel',title:'Short Vertical Behind-the-Scenes Reel',price:parseFloat(document.getElementById('e-reel-price')?.value||'50'),active:!!document.getElementById('e-reel-active')?.checked},
+    {id:'short-vertical-reel',title:'Short Vertical Highlight Video — Up to 2 Minutes',price:99,active:!!document.getElementById('e-reel-active')?.checked},
   ];
   document.querySelectorAll('#e-custom-addons .addon-custom-row').forEach((row,idx)=>{
     const title=row.querySelector('.addon-title')?.value.trim()||'';

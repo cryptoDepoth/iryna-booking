@@ -1245,25 +1245,22 @@ _DELIVERY_DURATION_RE = re.compile(
 
 
 def _delivery_promise(event=None, booking=None):
-    """Return one customer-facing delivery promise for every surface.
+    """Return the canonical two-stage delivery promise for every surface.
 
-    Event-specific copy wins: for example, an included item that says
-    ``Quick turnaround within 48 hours`` remains a 48-hour complete-gallery
-    promise.  When an event has no explicit timeline, use the promise already
-    published on the current family, maternity, and wedding landings: preview
-    within 48 hours and complete gallery within 14 calendar days.
+    All original photos are delivered first. Retouching starts only after the
+    client submits their selections, so its turnaround is a separate clock.
+    A package-specific preview may arrive earlier, but it never replaces these
+    two service commitments.
     """
     event = event or {}
     booking = booking or {}
     preview = ""
-    gallery = ""
+    originals = "within 6–7 business days after your session"
+    retouch = "within an additional 6–7 business days after you submit your retouch selections"
 
     explicit = event.get("delivery_timeline") or event.get("delivery")
     if isinstance(explicit, dict):
         preview = str(explicit.get("preview") or "").strip()
-        gallery = str(explicit.get("gallery") or explicit.get("full") or "").strip()
-    elif explicit:
-        gallery = str(explicit).strip()
 
     included = " · ".join(
         str(item).strip() for item in (event.get("included") or []) if str(item).strip()
@@ -1285,32 +1282,26 @@ def _delivery_promise(event=None, booking=None):
             r"(?:priority\s+)?preview[^.;·]*(?:within|in)\s+\d+(?:\s*[–-]\s*\d+)?\s*"
             r"(?:business\s+days?|calendar\s+days?|hours?|days?|weeks?)"
         )
-    if not gallery:
-        gallery = _duration_after(
-            r"(?:quick\s+turnaround|full\s+gallery|gallery\s+delivery|final\s+gallery|delivery)"
-            r"[^.;·]*(?:within|in)\s+\d+(?:\s*[–-]\s*\d+)?\s*"
-            r"(?:business\s+days?|calendar\s+days?|hours?|days?|weeks?)"
-        )
-
-    if not preview and not gallery:
-        preview = "within 48 hours"
-        gallery = "within 14 calendar days"
-    elif preview and not gallery:
-        gallery = "within 14 calendar days"
-
-    if preview and gallery:
-        summary = f"Your preview arrives {preview}, and your complete gallery {gallery}."
-        invoice = f"Preview {preview}; complete gallery {gallery}."
-    else:
-        summary = f"Your complete gallery arrives {gallery}."
-        invoice = f"Complete gallery {gallery}."
+    preview_sentence = f"Your package preview arrives {preview}. " if preview else ""
+    summary = (
+        f"{preview_sentence}All original photos are delivered {originals}. "
+        "After you choose and submit the photos you want retouched, your professionally "
+        f"retouched images are delivered {retouch}."
+    )
+    invoice = (
+        f"All original photos: {originals}. Retouched selections: {retouch}."
+    )
 
     return {
         "preview": preview,
-        "gallery": gallery,
+        "originals": originals,
+        "retouch": retouch,
+        # Backward-compatible key for older callers; this now refers to the
+        # originals gallery, not a completed retouch gallery.
+        "gallery": originals,
         "summary": summary,
         "invoice": invoice,
-        "source": "event" if explicit or included else "default",
+        "source": "canonical_two_stage",
     }
 
 
@@ -1427,8 +1418,10 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         safe_booking = _html_escape(str(booking_id))
         safe_questionnaire_url = _html_escape(str(questionnaire_url or ""))
         delivery_promise = delivery_promise or _delivery_promise()
-        delivery_summary = str(delivery_promise.get("summary") or "").strip()
-        safe_delivery_summary = _html_escape(delivery_summary)
+        originals_timeline = str(delivery_promise.get("originals") or "within 6–7 business days after your session")
+        retouch_timeline = str(delivery_promise.get("retouch") or "within an additional 6–7 business days after you submit your retouch selections")
+        safe_originals_timeline = _html_escape(originals_timeline)
+        safe_retouch_timeline = _html_escape(retouch_timeline)
 
         # Initialize balance_url and balance_due (passed from admin_confirm)
         balance_url = balance_url or None
@@ -1558,8 +1551,9 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
             f"1. We meet for your photo session: {meeting_line}\n"
             f"2. after the photo session, I will send the request for the remaining balance. You can pay by Interac e-Transfer or Stripe card / Apple Pay / Google Pay.\n"
             f"3. I review the photos with you and confirm which images will be professionally edited.\n"
-            f"4. You receive all original photos from the session — unedited, full resolution.\n"
-            f"5. {delivery_summary} You receive a private Wfolio gallery link with your photos. Please download everything — the gallery is normally kept online for 1–2 months.\n\n"
+            f"4. You receive all original photos from the session — unedited, full resolution — {originals_timeline}.\n"
+            f"5. Choose and submit the photos you want retouched. Your professionally retouched images are delivered {retouch_timeline}.\n"
+            f"Your photos arrive in a private Wfolio gallery. Please download everything — the gallery is normally kept online for 1–2 months.\n\n"
             f"If you need to reschedule or have questions, DM me on Instagram @pashynska.photo.\n\n"
             f"Warmly,\nIryna Pashynska\n@pashynska.photo"
         )
@@ -1625,8 +1619,8 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#C9A24B;color:#2B241B;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">1</span></td><td style=\"padding:0 0 18px;color:#75684F;font-size:14px;line-height:1.65;\"><strong style=\"color:#2B241B;\">We meet for your session.</strong><br>{safe_date} at {safe_time}. {('Location: ' + safe_location + '.') if location_text else 'Exact location will be sent closer to the session date.'}</td></tr>
         <tr class="timeline-step"><td width="34" valign="top" style="padding:0 0 18px;"><span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:#d9aaa0;color:#fff;text-align:center;line-height:26px;font-size:13px;font-weight:700;">2</span></td><td style="padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;"><strong style="color:#4b2f38;">Pay the remaining balance.</strong><br>You can pay now or after the session. Payment is required to receive all photos.<br><br>{balance_button_html}</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#e7c7bf;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">3</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">We review and confirm the images for editing.</strong><br>I prepare the photos and confirm with you which images will be professionally edited.</td></tr>
-        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#f0ded7;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">4</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">You receive all original photos from the session.</strong><br>Unedited, full-resolution images delivered as-is — no retouching, no filters, every frame I captured.</td></tr>
-        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#FFF3CF;color:#76591C;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">5</span></td><td style=\"padding:0;color:#75684F;font-size:14px;line-height:1.65;\"><strong style=\"color:#2B241B;\">You receive your private Wfolio gallery link.</strong><br>{safe_delivery_summary} Please download your photos when the link arrives. Galleries are normally kept online for 1–2 months.</td></tr>
+        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#f0ded7;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">4</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">All original photos are delivered {safe_originals_timeline}.</strong><br>You receive every original image in full resolution through your private Wfolio gallery.</td></tr>
+        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#FFF3CF;color:#76591C;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">5</span></td><td style=\"padding:0;color:#75684F;font-size:14px;line-height:1.65;\"><strong style=\"color:#2B241B;\">Select the photos you want professionally retouched.</strong><br>After you submit your selections, the finished retouches are delivered {safe_retouch_timeline}. Please download everything when it arrives; galleries are normally kept online for 1–2 months.</td></tr>
       </table>
     </div>
 
@@ -1810,7 +1804,8 @@ def _send_gallery_email(booking, wfolio_url):
         f"What happens next:\n"
         f"1. Click the link above to view your photos.\n"
         f"2. Favourite the images you would like retouched (if retouching is included).\n"
-        f"3. Download your favourites — galleries are usually kept online for 1–2 months.\n\n"
+        f"3. Submit your selections. Your professionally retouched images will be ready within 6–7 business days after you submit them.\n"
+        f"4. Download your photos — galleries are usually kept online for 1–2 months.\n\n"
         f"If the link does not open, copy and paste it into your browser.\n\n"
         f"Have a question? Reply to this email or DM me on Instagram @pashynska.photo.\n\n"
         f"Warmly,\nIryna Pashynska\nPashynska Photography · Calgary\n@pashynska.photo"
@@ -1843,7 +1838,8 @@ def _send_gallery_email(booking, wfolio_url):
         <p style="margin:0 0 12px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#b08479;font-weight:700;">Next steps</p>
         <p style="margin:0 0 8px;color:#6d4d55;font-size:14px;line-height:1.65;">1. Open the gallery and browse your photos.</p>
         <p style="margin:0 0 8px;color:#6d4d55;font-size:14px;line-height:1.65;">2. Favourite the images you want retouched (if retouching is included in your package).</p>
-        <p style="margin:0;color:#6d4d55;font-size:14px;line-height:1.65;">3. Download your favourites — galleries are usually kept online for 1–2 months.</p>
+        <p style="margin:0 0 8px;color:#6d4d55;font-size:14px;line-height:1.65;">3. Submit your selections. Your professionally retouched images will be ready within 6–7 business days after you submit them.</p>
+        <p style="margin:0;color:#6d4d55;font-size:14px;line-height:1.65;">4. Download your photos — galleries are usually kept online for 1–2 months.</p>
       </td></tr>
     </table>
 
@@ -4128,12 +4124,12 @@ BUILTIN_ADDONS = {
     },
     "short-vertical-reel": {
         "id": "short-vertical-reel",
-        "title": "Short Vertical Behind-the-Scenes Reel",
+        "title": "Short Vertical Highlight Video — Up to 2 Minutes",
         "description": (
-            "Add a short vertical video up to 1 minute from your session, perfect for "
-            "Instagram Reels, Stories, or family memories."
+            "Add a short mini highlight video up to 2 minutes from your session, perfect "
+            "for Instagram Reels, Stories, or a family keepsake."
         ),
-        "price": 50.0,
+        "price": 99.0,
         "active": False,
     },
 }
@@ -4179,13 +4175,23 @@ def _event_active_addons(event):
         addon_id = str(addon.get("id") or "").strip()
         if not addon_id or addon.get("active") is not True:
             continue
-        title = str(addon.get("title") or BUILTIN_ADDONS.get(addon_id, {}).get("title") or addon_id).strip()
-        description = str(addon.get("description") or BUILTIN_ADDONS.get(addon_id, {}).get("description") or "").strip()
+        builtin = BUILTIN_ADDONS.get(addon_id, {})
+        if addon_id == "short-vertical-reel":
+            # The video product is globally fixed at $99 / up to 2 minutes.
+            # Normalize older event rows that may still store the former $50,
+            # one-minute copy so no public checkout can expose stale terms.
+            title = str(builtin.get("title") or addon_id).strip()
+            description = str(builtin.get("description") or "").strip()
+            price = _money(builtin.get("price"), 99.0)
+        else:
+            title = str(addon.get("title") or builtin.get("title") or addon_id).strip()
+            description = str(addon.get("description") or builtin.get("description") or "").strip()
+            price = _money(addon.get("price"), 0.0)
         out.append({
             "id": addon_id[:80],
             "title": title[:120],
             "description": description[:500],
-            "price": _money(addon.get("price"), 0.0),
+            "price": price,
             "active": True,
         })
     return out
@@ -4290,15 +4296,21 @@ def _sanitize_event_addons(raw_addons):
         if addon_id in seen:
             continue
         default = BUILTIN_ADDONS.get(addon_id, {})
-        title = _strip_tags(raw_title or default.get("title") or addon_id)[:120]
-        description = _strip_tags(raw.get("description") or default.get("description") or "")[:500]
+        if addon_id == "short-vertical-reel":
+            title = _strip_tags(default.get("title") or addon_id)[:120]
+            description = _strip_tags(default.get("description") or "")[:500]
+            price = _money(default.get("price"), 99.0)
+        else:
+            title = _strip_tags(raw_title or default.get("title") or addon_id)[:120]
+            description = _strip_tags(raw.get("description") or default.get("description") or "")[:500]
+            price = _money(raw.get("price"), default.get("price", 0.0))
         if title.lower() == "full gallery upgrade" or addon_id == "full-gallery-upgrade":
             continue
         cleaned.append({
             "id": addon_id[:80],
             "title": title,
             "description": description,
-            "price": _money(raw.get("price"), default.get("price", 0.0)),
+            "price": price,
             "active": True,
         })
         seen.add(addon_id)
@@ -6056,7 +6068,7 @@ PACKAGES = {
         "name": "Full Day Premium — 8 hours", "type": "wedding", "price": 2600.0, "deposit": 300.0,
         "duration": "8 hours",
         "includes": ["8 hours — prep to party", "200+ edited photos", "All original unedited images",
-                     "Unlimited locations", "Priority preview in 24 hours", "Rush delivery included"]},
+                     "Unlimited locations", "Priority preview in 24 hours", "Private gallery download access"]},
     "engagement": {
         "name": "Engagement Session", "type": "wedding", "price": 320.0, "deposit": 100.0,
         "duration": "1 hour",
@@ -7050,9 +7062,99 @@ def payment():
         # New: dynamic Stripe Checkout — enabled when secret key is configured
         stripe_enabled=bool(STRIPE_SECRET_KEY),
         # Private session extras: add-ons + agreement
-        show_addons=is_private,
+        show_addons=is_private and status_now == "reserved",
         show_agreement=is_private,
     )
+
+
+@app.route("/booking/addons", methods=["POST"])
+def update_private_booking_addons():
+    """Persist private-session add-ons before Interac or Stripe payment.
+
+    The private payment page historically changed only the browser total. This
+    endpoint makes the displayed amount authoritative in the booking ledger so
+    e-Transfer matching, Stripe Checkout, receipts, and admin views all use the
+    same snapshot. Repeating the same request is idempotent.
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        booking_id = int(data.get("booking_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid booking"}), 400
+    token = str(data.get("confirmation_token") or data.get("token") or "").strip()
+    raw_keys = data.get("addons") or []
+    if not token or not isinstance(raw_keys, list):
+        return jsonify({"error": "Booking token and add-ons list are required"}), 400
+
+    key_to_id = {
+        "extra_photos": "extra-10-edited-images",
+        "extra-10-edited-images": "extra-10-edited-images",
+        "bts_reel": "short-vertical-reel",
+        "short-vertical-reel": "short-vertical-reel",
+    }
+    selected_ids = []
+    for raw_key in raw_keys:
+        addon_id = key_to_id.get(str(raw_key or "").strip())
+        if not addon_id:
+            return jsonify({"error": "Unknown add-on"}), 400
+        if addon_id not in selected_ids:
+            selected_ids.append(addon_id)
+    selected = [{
+        "id": addon_id,
+        "title": BUILTIN_ADDONS[addon_id]["title"],
+        "description": BUILTIN_ADDONS[addon_id]["description"],
+        "price": _money(BUILTIN_ADDONS[addon_id]["price"]),
+    } for addon_id in selected_ids]
+    new_addons_total = round(sum(addon["price"] for addon in selected), 2)
+
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        if not row or not hmac.compare_digest(str(row["confirmation_token"] or ""), token):
+            conn.rollback()
+            return jsonify({"error": "Booking not found"}), 404
+        booking = dict(row)
+        if booking.get("session_type") != "private":
+            conn.rollback()
+            return jsonify({"error": "Add-ons can only be changed for a private session"}), 400
+        if booking.get("status") != "reserved" or booking.get("confirmed"):
+            conn.rollback()
+            return jsonify({"error": "Add-ons can no longer be changed after payment is submitted"}), 409
+
+        previous_addons_total = _booking_addons_total(booking)
+        base_full_price = max(0.0, _money(booking.get("full_price")) - previous_addons_total)
+        base_deposit = max(0.0, _money(booking.get("deposit_amount")) - previous_addons_total)
+        new_full_price = round(base_full_price + new_addons_total, 2)
+        # Private-session add-ons are selected on the payment page and paid now.
+        new_deposit = round(min(new_full_price, base_deposit + new_addons_total), 2)
+        conn.execute(
+            """UPDATE bookings
+                  SET selected_addons_json=?, addons_total=?, full_price=?, deposit_amount=?
+                WHERE id=?""",
+            (
+                json.dumps(selected, ensure_ascii=False) if selected else None,
+                new_addons_total,
+                new_full_price,
+                new_deposit,
+                booking_id,
+            ),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return jsonify({
+        "success": True,
+        "selected_addons": selected,
+        "addons_total": new_addons_total,
+        "full_price": new_full_price,
+        "amount_due_today": new_deposit,
+    })
 
 
 @app.route("/pay-balance")
@@ -8108,7 +8210,8 @@ def stripe_create_checkout():
     includes = ev.get("included", [
         "20-minute photo session",
         "15 professionally edited photos",
-        "Quick turnaround (within 48 hours)",
+        "All original photos within 6–7 business days",
+        "Retouched selections within an additional 6–7 business days",
     ])
     description = " · ".join(includes[:3]) if includes else f"Mini session on {date_nice}"
 
@@ -8806,6 +8909,9 @@ def stripe_webhook():
                         + (f" (you asked for {p_date})" if p_date else "") + ".\n"
                         f"- The remaining balance is due on the session day.\n"
                         f"- You'll get a styling guide and location ideas after the date is set.\n\n"
+                        f"After the session, all original photos are delivered within 6–7 business days. "
+                        f"After you submit the photos you want retouched, the professionally retouched images "
+                        f"are delivered within an additional 6–7 business days.\n\n"
                         f"Questions? Just reply to this email.\n\n"
                         f"Warmly,\nIryna\n@pashynska.photo"
                     )

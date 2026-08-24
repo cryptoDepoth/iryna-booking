@@ -69,8 +69,12 @@ def test_confirmation_email_uses_current_default_delivery_promise(monkeypatch):
     email = _capture_confirmation_email_default(monkeypatch)
 
     assert "Quick turnaround (within 48 hours)" not in email
-    assert "preview arrives within 48 hours" in email
-    assert "complete gallery within 14 calendar days" in email
+    assert "All original photos" in email
+    assert "within 6–7 business days after your session" in email
+    assert "Select the photos you want professionally retouched" in email
+    assert "After you submit your selections" in email
+    assert "within an additional 6–7 business days" in email
+    assert "complete gallery within 14 calendar days" not in email
 
 
 def test_confirmation_email_has_email_safe_21st_inspired_blocks(monkeypatch):

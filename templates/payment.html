@@ -455,6 +455,11 @@
       </div>
     </div>
 
+    <div class="card" id="delivery-timeline-card">
+      <div class="card-title" data-i18n="delivery_title">Photo delivery timeline</div>
+      <p data-i18n="delivery_copy" style="margin:0;color:var(--ink-3);font-size:.88rem;line-height:1.65;">All original photos are delivered within <strong>6–7 business days after the session</strong>. After you choose and submit the photos you want retouched, the professionally retouched images are delivered within an <strong>additional 6–7 business days</strong>.</p>
+    </div>
+
     <!-- ── ADD-ONS ── -->
     {% if show_addons %}
     <div class="card" id="addons-card">
@@ -475,10 +480,10 @@
         <div class="addon-check" id="addon-check-bts_reel">✓</div>
         <div class="addon-top">
           <div>
-            <div class="addon-title">Short Vertical Behind-the-Scenes Reel</div>
-            <div class="addon-desc">Add a short vertical video up to 1 minute from your session, perfect for Instagram Reels, Stories, or family memories.</div>
+            <div class="addon-title">Short Vertical Highlight Video — Up to 2 Minutes</div>
+            <div class="addon-desc">Add a short mini highlight video up to 2 minutes from your session, perfect for Instagram Reels, Stories, or a family keepsake.</div>
           </div>
-          <div class="addon-price">$50.00</div>
+          <div class="addon-price">$99.00</div>
         </div>
       </div>
 
@@ -606,10 +611,12 @@
 
   <script>
     // ── Add-Ons Logic ──
-    const ADDON_PRICES = { extra_photos: 50, bts_reel: 50 };
-    const ADDON_TITLES = { extra_photos: '10 Extra Edited Images', bts_reel: 'Short Vertical BTS Reel' };
-    let activeAddons = new Set();
-    const baseAmountDue = {{ amount_due_today | tojson }};
+    const ADDON_PRICES = { extra_photos: 50, bts_reel: 99 };
+    const ADDON_TITLES = { extra_photos: '10 Extra Edited Images', bts_reel: 'Short Vertical Highlight Video — Up to 2 Minutes' };
+    const ADDON_IDS_TO_KEYS = { 'extra-10-edited-images': 'extra_photos', 'short-vertical-reel': 'bts_reel' };
+    const initialAddonIds = {{ (selected_addons | default([]) | map(attribute='id') | list) | tojson }};
+    let activeAddons = new Set(initialAddonIds.map(id => ADDON_IDS_TO_KEYS[id]).filter(Boolean));
+    const baseAmountDue = {{ ((amount_due_today or 0) - (addons_total or 0)) | tojson }};
     const showAgreement = {{ show_agreement | tojson }};
 
     function toggleAddon(key) {
@@ -630,10 +637,10 @@
       activeAddons.forEach(k => total += ADDON_PRICES[k]);
       const row = document.getElementById('addons-total-row');
       const display = document.getElementById('addons-total-display');
-      if (total > 0) {
+      if (total > 0 && row && display) {
         row.style.display = 'flex';
         display.textContent = '$' + total.toFixed(2);
-      } else {
+      } else if (row) {
         row.style.display = 'none';
       }
       // Update hidden field
@@ -652,6 +659,22 @@
       if (stripeText) stripeText.textContent = 'Pay $' + newTotal.toFixed(2) + ' CAD — Card · Apple Pay · Google Pay';
     }
 
+    async function saveAddons() {
+      if (!document.getElementById('addons-card')) return null;
+      const res = await fetch('/booking/addons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          booking_id: {{ booking.id | tojson }},
+          confirmation_token: {{ booking.confirmation_token | tojson }},
+          addons: Array.from(activeAddons),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Could not save add-ons');
+      return data;
+    }
+
     function updateConfirmBtn() {
       const btn = document.getElementById('confirm-btn');
       const checkbox = document.getElementById('agreement-checkbox');
@@ -661,7 +684,12 @@
       }
     }
 
-    // Initialize agreement state
+    // Initialize selected add-ons and agreement state.
+    activeAddons.forEach(key => {
+      const card = document.getElementById('addon-' + (key === 'extra_photos' ? 'extra-photos' : 'bts-reel'));
+      if (card) card.classList.add('selected');
+    });
+    updateAddonTotals();
     updateConfirmBtn();
 
     // ── Populate hidden fields from URL params (fallback) ──
@@ -772,6 +800,7 @@
       btn.style.opacity   = '0.7';
 
       try {
+        await saveAddons();
         const res = await fetch('/stripe/create-checkout', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -812,6 +841,7 @@
       };
 
       try {
+        await saveAddons();
         const res = await fetch('/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -844,6 +874,8 @@
       complete_booking: 'Complete Your Booking',
       slot_reserved_for:'Slot reserved for',
       booking_summary:  'Booking Summary',
+      delivery_title:   'Photo delivery timeline',
+      delivery_copy:    'All original photos are delivered within <strong>6–7 business days after the session</strong>. After you choose and submit the photos you want retouched, the professionally retouched images are delivered within an <strong>additional 6–7 business days</strong>.',
       send_via:         'Send via Interac e-Transfer',
       send_to:          'Send to',
       auto_deposit:     'Auto-deposit enabled · no password needed',
@@ -894,6 +926,8 @@
       complete_booking: 'Оформите бронирование',
       slot_reserved_for:'Слот удерживается',
       booking_summary:  'Детали бронирования',
+      delivery_title:   'Сроки готовности фотографий',
+      delivery_copy:    'Все оригинальные фотографии будут готовы в течение <strong>6–7 рабочих дней после съёмки</strong>. После того как вы выберете и отправите фотографии для ретуши, готовые отретушированные кадры будут готовы ещё в течение <strong>6–7 рабочих дней</strong>.',
       send_via:         'Отправить через Interac e-Transfer',
       send_to:          'Отправить на',
       auto_deposit:     'Автодепозит включён · пароль не нужен',
@@ -944,6 +978,8 @@
       complete_booking: 'अपनी बुकिंग पूरी करें',
       slot_reserved_for:'स्लॉट रिज़र्व है',
       booking_summary:  'बुकिंग सारांश',
+      delivery_title:   'फ़ोटो डिलीवरी का समय',
+      delivery_copy:    'सेशन के बाद सभी मूल फ़ोटो <strong>6–7 कार्य दिवसों</strong> में मिलेंगे। रीटच के लिए फ़ोटो चुनकर भेजने के बाद, तैयार रीटच फ़ोटो <strong>अतिरिक्त 6–7 कार्य दिवसों</strong> में मिलेंगे।',
       send_via:         'Interac e-Transfer से भेजें',
       send_to:          'इस पते पर भेजें',
       auto_deposit:     'ऑटो-डिपॉज़िट चालू है · पासवर्ड की ज़रूरत नहीं',
@@ -994,6 +1030,8 @@
       complete_booking: 'Завершити бронювання',
       slot_reserved_for:'Слот утримується',
       booking_summary:  'Підсумок бронювання',
+      delivery_title:   'Строки готовності фотографій',
+      delivery_copy:    'Усі оригінальні фотографії будуть готові протягом <strong>6–7 робочих днів після зйомки</strong>. Після того як ви оберете та надішлете фотографії для ретуші, готові відретушовані кадри будуть готові ще протягом <strong>6–7 робочих днів</strong>.',
       send_via:         'Надіслати через Interac e-Transfer',
       send_to:          'Надіслати на',
       auto_deposit:     'Автодепозит увімкнено · пароль не потрібен',

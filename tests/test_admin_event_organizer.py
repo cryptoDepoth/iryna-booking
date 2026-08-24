@@ -409,7 +409,9 @@ def test_admin_event_update_saves_builtin_and_custom_addons(admin_client, monkey
         "short-vertical-reel",
         "custom-reel-note",
     ]
-    assert saved["addons"][1]["price"] == 75.0
+    assert saved["addons"][1]["price"] == 99.0
+    assert saved["addons"][1]["title"] == "Short Vertical Highlight Video — Up to 2 Minutes"
+    assert "up to 2 minutes" in saved["addons"][1]["description"]
     assert saved["addons"][2]["title"] == "Custom Keepsake"
     assert "<script>" not in saved["addons"][2]["description"]
 
@@ -469,4 +471,5 @@ def test_admin_event_create_persists_addons(admin_client, monkeypatch, tmp_path)
     saved = yaml.safe_load(path.read_text(encoding="utf-8"))["events"][0]
     assert saved["session_type"] == "individual"
     assert saved["addons"][0]["id"] == "short-vertical-reel"
-    assert saved["addons"][0]["price"] == 125.0
+    assert saved["addons"][0]["price"] == 99.0
+    assert saved["addons"][0]["title"] == "Short Vertical Highlight Video — Up to 2 Minutes"

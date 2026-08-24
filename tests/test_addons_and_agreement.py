@@ -90,6 +90,38 @@ def test_event_active_addons_filters_inactive_and_defaults_missing():
     assert booking_app._event_active_addons(_event()) == []
 
 
+def test_legacy_video_addon_is_normalized_to_current_product():
+    ev = _event(addons=[{
+        "id": "short-vertical-reel",
+        "title": "Short Vertical Behind-the-Scenes Reel",
+        "description": "A short vertical video up to 1 minute.",
+        "price": 50,
+        "active": True,
+    }])
+
+    active = booking_app._event_active_addons(ev)
+
+    assert active == [{
+        "id": "short-vertical-reel",
+        "title": "Short Vertical Highlight Video — Up to 2 Minutes",
+        "description": (
+            "Add a short mini highlight video up to 2 minutes from your session, "
+            "perfect for Instagram Reels, Stories, or a family keepsake."
+        ),
+        "price": 99.0,
+        "active": True,
+    }]
+
+
+def test_default_mini_video_addon_is_up_to_two_minutes_for_99():
+    addons = {addon["id"]: addon for addon in booking_app._default_mini_addons()}
+
+    video = addons["short-vertical-reel"]
+    assert video["price"] == 99.0
+    assert "Up to 2 Minutes" in video["title"]
+    assert "up to 2 minutes" in video["description"]
+
+
 def test_validate_selected_addons_rejects_unknown_and_inactive():
     ev = _event(addons=[
         {"id": "extra-10-edited-images", "title": "10 Extra Edited Images", "price": 50, "active": True},
@@ -186,6 +218,33 @@ def test_reserve_stores_valid_addons_and_price_snapshot(client, monkeypatch):
     assert row["full_price"] == 300.0
     assert row["deposit_amount"] == 100.0
     assert selected[0]["id"] == "extra-10-edited-images"
+
+
+def test_reserve_video_addon_uses_current_price_even_with_legacy_event_data(client, monkeypatch):
+    c, db_path = client
+    monkeypatch.setattr(booking_app, "EVENTS", [_event(addons=[{
+        "id": "short-vertical-reel",
+        "title": "Old one-minute reel",
+        "description": "Old product copy",
+        "price": 50,
+        "active": True,
+    }])])
+
+    res = _reserve(c, addons=["short-vertical-reel"])
+
+    assert res.status_code == 200
+    booking_id = res.get_json()["booking_id"]
+    conn = sqlite3.connect(db_path)
+    row = conn.execute(
+        "SELECT full_price, addons_total, selected_addons_json FROM bookings WHERE id=?",
+        (booking_id,),
+    ).fetchone()
+    conn.close()
+    selected = json.loads(row[2])
+    assert row[0] == 349.0
+    assert row[1] == 99.0
+    assert selected[0]["title"] == "Short Vertical Highlight Video — Up to 2 Minutes"
+    assert selected[0]["price"] == 99.0
 
 
 def test_reserve_rejects_unknown_addon(client, monkeypatch):
