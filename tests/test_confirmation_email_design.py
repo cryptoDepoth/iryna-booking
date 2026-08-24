@@ -65,11 +65,12 @@ def test_confirmation_email_uses_premium_card_timeline_design(monkeypatch):
     assert "Deposit confirmed" in email
 
 
-def test_confirmation_email_removes_old_48_hour_turnaround_copy(monkeypatch):
+def test_confirmation_email_uses_current_default_delivery_promise(monkeypatch):
     email = _capture_confirmation_email_default(monkeypatch)
 
     assert "Quick turnaround (within 48 hours)" not in email
-    assert "within 48 hours" not in email
+    assert "preview arrives within 48 hours" in email
+    assert "complete gallery within 14 calendar days" in email
 
 
 def test_confirmation_email_has_email_safe_21st_inspired_blocks(monkeypatch):

@@ -511,6 +511,27 @@ def _apply_booking_payment_transaction(
                 """,
                 (amount, booking_id, amount - 0.009),
             )
+        elif mutation == "balance":
+            current_paid = float(prior_booking.get("paid_amount") or 0)
+            full_price = _get_booking_full_price(prior_booking)
+            discount = float(prior_booking.get("referral_discount") or 0)
+            payable_total = round(max(full_price - discount, 0.0), 2)
+            outstanding = round(max(payable_total - current_paid, 0.0), 2)
+            if amount <= 0 or outstanding <= 0 or amount > outstanding + 1.0:
+                conn.rollback()
+                return False
+            new_paid_total = round(min(current_paid + amount, payable_total), 2)
+            cursor = conn.execute(
+                """
+                UPDATE bookings
+                   SET paid=1, paid_amount=?
+                 WHERE id=?
+                   AND confirmed=1
+                   AND status='confirmed'
+                   AND ABS(COALESCE(paid_amount, 0) - ?) < 0.01
+                """,
+                (new_paid_total, booking_id, current_paid),
+            )
         else:
             raise ValueError(f"Unknown booking payment mutation: {mutation}")
 
@@ -1533,6 +1554,44 @@ def reconcile_confirmed_payment(
     return updated > 0
 
 
+def apply_confirmed_balance_payment(
+    booking_id,
+    payment_amount,
+    message_id,
+    *,
+    allow_existing_orphan=False,
+    ledger_id=None,
+):
+    """Add one explicit final-balance Interac transfer to a confirmed booking.
+
+    This is deliberately separate from ``reconcile_confirmed_payment``:
+    reconciliation corrects a previously recorded cumulative value, while a
+    balance transfer is a new payment that must be added to the deposit.
+    """
+    applied = _apply_booking_payment_transaction(
+        message_id,
+        booking_id,
+        payment_amount,
+        "balance",
+        allow_existing_orphan=allow_existing_orphan,
+        ledger_id=ledger_id,
+    )
+    if not applied:
+        return False
+    try:
+        from app import _maybe_send_balance_paid_email
+        _maybe_send_balance_paid_email(
+            booking_id,
+            amount_received=payment_amount,
+            payment_method="Interac e-Transfer",
+        )
+    except Exception as exc:
+        # The ledger/payment commit is durable. A failed receipt claim is safe
+        # to retry independently and must never roll money back.
+        print(f"   [email] Balance receipt failed for booking #{booking_id}: {exc}")
+    return True
+
+
 _MONTHS = {
     1: ("jan", "january"),
     2: ("feb", "february"),
@@ -1612,6 +1671,52 @@ def _body_has_booking_name(body, booking):
     if not tokens:
         return False
     return sum(1 for token in tokens if token in text.split()) >= min(2, len(tokens))
+
+
+_BALANCE_BOOKING_ID_RE = re.compile(
+    r"\bbalance(?:\s+payment)?\s+(?:for\s+)?booking\s*#?\s*(\d+)\b",
+    re.I,
+)
+
+
+def match_balance_payment(amount, bookings, body):
+    """Match an explicitly labelled balance payment without deposit confusion."""
+    text = body or ""
+    explicit_id = _BALANCE_BOOKING_ID_RE.search(text)
+    if not explicit_id and not re.search(r"\bbalance\b", text, re.I):
+        return None, []
+
+    candidates = []
+    for booking in bookings:
+        try:
+            current_paid = float(booking.get("paid_amount") or 0)
+            discount = float(booking.get("referral_discount") or 0)
+        except (TypeError, ValueError):
+            continue
+        payable_total = max(_get_booking_full_price(booking) - discount, 0.0)
+        outstanding = round(max(payable_total - current_paid, 0.0), 2)
+        if outstanding <= 0 or amount <= 0 or amount > outstanding + 1.0:
+            continue
+        if explicit_id:
+            if str(booking.get("id")) == explicit_id.group(1):
+                return booking, []
+            continue
+        score = sum([
+            _body_has_booking_name(text, booking),
+            _body_has_booking_date(text, booking),
+            _body_has_booking_time(text, booking),
+        ])
+        # Without a booking number, require strong identity plus the expected
+        # outstanding amount. This keeps generic Interac emails conservative.
+        if score >= 2 and abs(amount - outstanding) <= 1.0:
+            candidates.append((score, booking))
+
+    if not candidates:
+        return None, []
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    best_score = candidates[0][0]
+    best = [booking for score, booking in candidates if score == best_score]
+    return (best[0], []) if len(best) == 1 else (None, best)
 
 
 def match_reconciliation_payment(amount, bookings, body):
@@ -1840,6 +1945,28 @@ def _notify_admin_reconciled(booking, previous, actual):
         print(f"[admin] Failed to send reconciliation alert: {e}")
 
 
+def _notify_admin_balance(booking, previous, received):
+    """Notify admins that a new Interac balance was added to the deposit."""
+    try:
+        from app import _notify_admin
+        discount = float(booking.get("referral_discount") or 0)
+        payable_total = max(_get_booking_full_price(booking) - discount, 0.0)
+        new_total = min(previous + received, payable_total)
+        remaining = max(payable_total - new_total, 0.0)
+        receipt_note = "sent when paid in full" if remaining <= 0.009 else "not sent (balance remains)"
+        _notify_admin("\n".join([
+            "💸 **Interac balance payment received**",
+            "",
+            f"Booking #{booking['id']} — {booking.get('name', '?')}",
+            f"Received now: ${received:.2f}",
+            f"Recorded paid: ${previous:.2f} → ${new_total:.2f}",
+            f"Remaining balance: ${remaining:.2f}",
+            f"Client receipt: {receipt_note}",
+        ]))
+    except Exception as exc:
+        print(f"[admin] Failed to send balance alert: {exc}")
+
+
 def _parse_email_datetime(value):
     """Parse Himalaya envelope date to naive UTC datetime.
 
@@ -2004,6 +2131,32 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
             mark_message_processed(msg_id, None, amount)
             return None, None
 
+        # An explicit "Balance for booking #123" memo must win before the
+        # amount-only deposit matcher; another pending client can legitimately
+        # owe the same dollar amount.
+        balance_candidates = _filter_bookings_created_before_email(
+            email, reconciliation_bookings, body
+        )
+        balance_booking, balance_ambiguous = match_balance_payment(
+            amount, balance_candidates, body
+        )
+        if balance_ambiguous:
+            _notify_admin_ambiguity(amount, balance_ambiguous)
+            return None, balance_ambiguous
+        if balance_booking is not None:
+            previous = float(balance_booking.get("paid_amount") or 0)
+            if archived_at_payment_boundary():
+                return None, None
+            if apply_confirmed_balance_payment(
+                balance_booking["id"], amount, msg_id, ledger_id=ledger_id
+            ):
+                _notify_admin_balance(balance_booking, previous, amount)
+                print(
+                    f"   ✅ BALANCE Booking #{balance_booking['id']} "
+                    f"${previous:.2f} + ${amount:.2f}"
+                )
+            return None, None
+
     if processed:
         # Do not re-confirm/re-run side effects. The one safe exception is
         # money reconciliation: an earlier run may have recorded the Interac
@@ -2015,6 +2168,29 @@ def check_single_email(email, bookings, reconciliation_bookings=None):
                 b for b in recon_candidates
                 if str(b.get("id")) == str(processed_booking_id)
             ]
+        balance_booking, balance_ambiguous = match_balance_payment(
+            amount, recon_candidates, body
+        )
+        if balance_ambiguous:
+            _notify_admin_ambiguity(amount, balance_ambiguous)
+            return None, balance_ambiguous
+        if balance_booking is not None:
+            previous = float(balance_booking.get("paid_amount") or 0)
+            if archived_at_payment_boundary():
+                return None, None
+            if apply_confirmed_balance_payment(
+                balance_booking["id"],
+                amount,
+                msg_id,
+                allow_existing_orphan=True,
+                ledger_id=ledger_id,
+            ):
+                _notify_admin_balance(balance_booking, previous, amount)
+                print(
+                    f"   ✅ BALANCE processed message {msg_id}: "
+                    f"Booking #{balance_booking['id']} +${amount:.2f}"
+                )
+            return None, None
         reconciled, recon_ambiguous = match_reconciliation_payment(amount, recon_candidates, body)
         if recon_ambiguous:
             print(f"   ⚠️ Reconciliation ambiguity: ${amount:.2f} matches {len(recon_ambiguous)} confirmed bookings")

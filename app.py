@@ -1237,6 +1237,83 @@ def _questionnaire_url_for_booking(booking, event):
     return f"{base}/questionnaire?{urlencode({'booking_id': booking.get('id'), 'token': token})}"
 
 
+_DELIVERY_DURATION_RE = re.compile(
+    r"(?:within|in)\s+(\d+(?:\s*[–-]\s*\d+)?)\s*"
+    r"(business\s+days?|calendar\s+days?|hours?|days?|weeks?)",
+    re.I,
+)
+
+
+def _delivery_promise(event=None, booking=None):
+    """Return one customer-facing delivery promise for every surface.
+
+    Event-specific copy wins: for example, an included item that says
+    ``Quick turnaround within 48 hours`` remains a 48-hour complete-gallery
+    promise.  When an event has no explicit timeline, use the promise already
+    published on the current family, maternity, and wedding landings: preview
+    within 48 hours and complete gallery within 14 calendar days.
+    """
+    event = event or {}
+    booking = booking or {}
+    preview = ""
+    gallery = ""
+
+    explicit = event.get("delivery_timeline") or event.get("delivery")
+    if isinstance(explicit, dict):
+        preview = str(explicit.get("preview") or "").strip()
+        gallery = str(explicit.get("gallery") or explicit.get("full") or "").strip()
+    elif explicit:
+        gallery = str(explicit).strip()
+
+    included = " · ".join(
+        str(item).strip() for item in (event.get("included") or []) if str(item).strip()
+    )
+
+    def _duration_after(pattern):
+        match = re.search(pattern, included, re.I)
+        if not match:
+            return ""
+        duration = _DELIVERY_DURATION_RE.search(match.group(0))
+        if not duration:
+            return ""
+        amount = re.sub(r"\s+", "", duration.group(1)).replace("-", "–")
+        unit = re.sub(r"\s+", " ", duration.group(2).lower()).strip()
+        return f"within {amount} {unit}"
+
+    if not preview:
+        preview = _duration_after(
+            r"(?:priority\s+)?preview[^.;·]*(?:within|in)\s+\d+(?:\s*[–-]\s*\d+)?\s*"
+            r"(?:business\s+days?|calendar\s+days?|hours?|days?|weeks?)"
+        )
+    if not gallery:
+        gallery = _duration_after(
+            r"(?:quick\s+turnaround|full\s+gallery|gallery\s+delivery|final\s+gallery|delivery)"
+            r"[^.;·]*(?:within|in)\s+\d+(?:\s*[–-]\s*\d+)?\s*"
+            r"(?:business\s+days?|calendar\s+days?|hours?|days?|weeks?)"
+        )
+
+    if not preview and not gallery:
+        preview = "within 48 hours"
+        gallery = "within 14 calendar days"
+    elif preview and not gallery:
+        gallery = "within 14 calendar days"
+
+    if preview and gallery:
+        summary = f"Your preview arrives {preview}, and your complete gallery {gallery}."
+        invoice = f"Preview {preview}; complete gallery {gallery}."
+    else:
+        summary = f"Your complete gallery arrives {gallery}."
+        invoice = f"Complete gallery {gallery}."
+
+    return {
+        "preview": preview,
+        "gallery": gallery,
+        "summary": summary,
+        "invoice": invoice,
+        "source": "event" if explicit or included else "default",
+    }
+
+
 def _client_email_context(booking, event):
     booking = booking or {}
     event = event or {}
@@ -1249,6 +1326,7 @@ def _client_email_context(booking, event):
         "remaining_balance": remaining,
         "marketing_consent": booking.get("marketing_consent"),
         "questionnaire_url": _questionnaire_url_for_booking(booking, event),
+        "delivery_promise": _delivery_promise(event, booking),
         # Durable balance link in the confirmation email — works whenever the
         # client settles up after the shoot (e-Transfer or card), unlike a
         # one-time Stripe Checkout URL. The email only renders the button when
@@ -1312,7 +1390,8 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
                        location=None, location_url=None, selected_addons=None,
                        addons_total=0.0, total_price=None, amount_due_today=None,
                        remaining_balance=None, marketing_consent=None,
-                       questionnaire_url=None, balance_url=None, balance_due=None):
+                       questionnaire_url=None, balance_url=None, balance_due=None,
+                       delivery_promise=None):
     """Send premium HTML confirmation email to client via Himalaya CLI.
 
     Returns True only when SMTP/Himalaya accepts the message. This is used by
@@ -1347,6 +1426,9 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
         safe_time = _html_escape(str(slot_time or ""))
         safe_booking = _html_escape(str(booking_id))
         safe_questionnaire_url = _html_escape(str(questionnaire_url or ""))
+        delivery_promise = delivery_promise or _delivery_promise()
+        delivery_summary = str(delivery_promise.get("summary") or "").strip()
+        safe_delivery_summary = _html_escape(delivery_summary)
 
         # Initialize balance_url and balance_due (passed from admin_confirm)
         balance_url = balance_url or None
@@ -1477,7 +1559,7 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
             f"2. after the photo session, I will send the request for the remaining balance. You can pay by Interac e-Transfer or Stripe card / Apple Pay / Google Pay.\n"
             f"3. I review the photos with you and confirm which images will be professionally edited.\n"
             f"4. You receive all original photos from the session — unedited, full resolution.\n"
-            f"5. You receive a private Wfolio gallery link with your photos. Please download everything — the gallery is normally kept online for 1–2 months.\n\n"
+            f"5. {delivery_summary} You receive a private Wfolio gallery link with your photos. Please download everything — the gallery is normally kept online for 1–2 months.\n\n"
             f"If you need to reschedule or have questions, DM me on Instagram @pashynska.photo.\n\n"
             f"Warmly,\nIryna Pashynska\n@pashynska.photo"
         )
@@ -1490,11 +1572,11 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
 
         html = f"""<!DOCTYPE html>
 <html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>
-<body style=\"margin:0;padding:0;background:#f7efe9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#3f2d33;\">
-<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:34px 14px;\">
+<body style=\"margin:0;padding:0;background:#FBF7F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#2B241B;\">
+<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:linear-gradient(180deg,#FFFCF7 0%,#FBF7F0 100%);padding:34px 14px;\">
 <tr><td align=\"center\">
-<table width=\"640\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;width:100%;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.14);\" class=\"confirmation-card\">
-  <tr><td style=\"background:linear-gradient(135deg,#f2c9bf 0%,#c4857a 52%,#7e4f46 100%);padding:42px 34px;text-align:center;color:#fff;\">
+<table width=\"640\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;width:100%;background:#FFFCF7;border:1px solid #E8DCC6;border-radius:24px;overflow:hidden;box-shadow:0 2px 8px rgba(46,36,27,.04),0 16px 42px rgba(67,52,28,.13);\" class=\"confirmation-card\">
+  <tr><td style=\"background:linear-gradient(135deg,#2B241B 0%,#5C4826 62%,#A77C25 100%);padding:42px 34px;text-align:center;color:#FFF9EC;\">
     <p style=\"margin:0 0 10px;font-size:34px;line-height:1;\">✦</p>
     <p style=\"margin:0 0 8px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.88;\">Deposit confirmed</p>
     <h1 style=\"margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.15;font-weight:400;letter-spacing:-.02em;\">Your photo session is booked</h1>
@@ -1540,11 +1622,11 @@ def _send_client_email(to_email, client_name, event_date, slot_time, event_title
     <div class=\"timeline-card\" style=\"background:#ffffff;border:1px solid #ead8d0;border-radius:24px;padding:24px 22px;margin:0 0 24px;box-shadow:0 1px 0 rgba(255,255,255,.8) inset,0 10px 26px rgba(102,63,53,.08);\">
       <h2 style=\"margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;font-weight:400;color:#4b2f38;\">What happens next</h2>
       <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">
-        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#c4857a;color:#fff;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">1</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">We meet for your session.</strong><br>{safe_date} at {safe_time}. {('Location: ' + safe_location + '.') if location_text else 'Exact location will be sent closer to the session date.'}</td></tr>
+        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#C9A24B;color:#2B241B;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">1</span></td><td style=\"padding:0 0 18px;color:#75684F;font-size:14px;line-height:1.65;\"><strong style=\"color:#2B241B;\">We meet for your session.</strong><br>{safe_date} at {safe_time}. {('Location: ' + safe_location + '.') if location_text else 'Exact location will be sent closer to the session date.'}</td></tr>
         <tr class="timeline-step"><td width="34" valign="top" style="padding:0 0 18px;"><span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:#d9aaa0;color:#fff;text-align:center;line-height:26px;font-size:13px;font-weight:700;">2</span></td><td style="padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;"><strong style="color:#4b2f38;">Pay the remaining balance.</strong><br>You can pay now or after the session. Payment is required to receive all photos.<br><br>{balance_button_html}</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#e7c7bf;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">3</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">We review and confirm the images for editing.</strong><br>I prepare the photos and confirm with you which images will be professionally edited.</td></tr>
         <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0 0 18px;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#f0ded7;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">4</span></td><td style=\"padding:0 0 18px;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">You receive all original photos from the session.</strong><br>Unedited, full-resolution images delivered as-is — no retouching, no filters, every frame I captured.</td></tr>
-        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#fff1ec;color:#7e4f46;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">5</span></td><td style=\"padding:0;color:#6d4d55;font-size:14px;line-height:1.65;\"><strong style=\"color:#4b2f38;\">You receive your private Wfolio gallery link.</strong><br>Please download your photos when the link arrives. Galleries are normally kept online for 1–2 months.</td></tr>
+        <tr class=\"timeline-step\"><td width=\"34\" valign=\"top\" style=\"padding:0;\"><span style=\"display:inline-block;width:26px;height:26px;border-radius:50%;background:#FFF3CF;color:#76591C;text-align:center;line-height:26px;font-size:13px;font-weight:700;\">5</span></td><td style=\"padding:0;color:#75684F;font-size:14px;line-height:1.65;\"><strong style=\"color:#2B241B;\">You receive your private Wfolio gallery link.</strong><br>{safe_delivery_summary} Please download your photos when the link arrives. Galleries are normally kept online for 1–2 months.</td></tr>
       </table>
     </div>
 
@@ -1736,11 +1818,11 @@ def _send_gallery_email(booking, wfolio_url):
 
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f7efe9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#3f2d33;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#fff7f1 0%,#f7efe9 100%);padding:34px 14px;">
+<body style="margin:0;padding:0;background:#FBF7F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#2B241B;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#FFFCF7 0%,#FBF7F0 100%);padding:34px 14px;">
 <tr><td align="center">
-<table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 2px 8px rgba(46,25,20,.04),0 16px 42px rgba(93,55,47,.14);">
-  <tr><td style="background:linear-gradient(135deg,#f2c9bf 0%,#c4857a 52%,#7e4f46 100%);padding:42px 34px;text-align:center;color:#fff;">
+<table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#FFFCF7;border:1px solid #E8DCC6;border-radius:24px;overflow:hidden;box-shadow:0 2px 8px rgba(46,36,27,.04),0 16px 42px rgba(67,52,28,.13);">
+  <tr><td style="background:linear-gradient(135deg,#2B241B 0%,#5C4826 62%,#A77C25 100%);padding:42px 34px;text-align:center;color:#FFF9EC;">
     <p style="margin:0 0 10px;font-size:34px;line-height:1;">📸</p>
     <p style="margin:0 0 8px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.88;">Gallery ready</p>
     <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.15;font-weight:400;letter-spacing:-.02em;">Your photos are here</h1>
@@ -1752,7 +1834,7 @@ def _send_gallery_email(booking, wfolio_url):
 
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
       <tr><td style="text-align:center;padding:20px 0;">
-        <a href="{safe_url}" style="display:inline-block;background:#4b2f38;color:#ffffff;text-decoration:none;border-radius:14px;padding:18px 32px;font-size:16px;font-weight:700;letter-spacing:.02em;">🖼️ Open My Gallery</a>
+        <a href="{safe_url}" style="display:inline-block;background:#C9A24B;color:#2B241B;text-decoration:none;border-radius:14px;padding:18px 32px;font-size:16px;font-weight:800;letter-spacing:.02em;">🖼️ Open My Gallery</a>
       </td></tr>
     </table>
 
@@ -4517,6 +4599,11 @@ def init_db():
         ("bookings",  "review_email_sent",     "ALTER TABLE bookings ADD COLUMN review_email_sent TEXT"),
         ("bookings",  "wfolio_url",            "ALTER TABLE bookings ADD COLUMN wfolio_url TEXT"),
         ("bookings",  "gallery_email_sent_at", "ALTER TABLE bookings ADD COLUMN gallery_email_sent_at TEXT"),
+        # Final-balance receipt lifecycle. The short-lived claim prevents two
+        # payment webhooks/workers from sending the same client receipt twice.
+        ("bookings",  "balance_receipt_claimed_at", "ALTER TABLE bookings ADD COLUMN balance_receipt_claimed_at TEXT"),
+        ("bookings",  "balance_receipt_sent_at", "ALTER TABLE bookings ADD COLUMN balance_receipt_sent_at TEXT"),
+        ("bookings",  "paid_in_full_at", "ALTER TABLE bookings ADD COLUMN paid_in_full_at TEXT"),
         # first_booking_at / last_booking_at for clients table
         ("clients",   "first_booking_at",  "ALTER TABLE clients ADD COLUMN first_booking_at TEXT"),
         ("clients",   "last_booking_at",   "ALTER TABLE clients ADD COLUMN last_booking_at TEXT"),
@@ -7618,11 +7705,14 @@ def _create_balance_checkout_url(booking, event, balance_due):
 
 def _send_balance_request_email(to_email, client_name, event_title, event_date, slot_time,
                                 booking_id, total_price, paid_amount, balance_due,
-                                stripe_url=None, interac_email=None):
+                                stripe_url=None, interac_email=None,
+                                delivery_promise=None):
     """Email client a remaining-balance payment request with Interac + Stripe options."""
     if not to_email:
         return False
     interac_email = interac_email or EMAIL or "iryna.pashynska@gmail.com"
+    delivery_promise = delivery_promise or _delivery_promise()
+    delivery_summary = str(delivery_promise.get("summary") or "").strip()
     subject = f"Remaining Balance for Your Photo Session — ${balance_due:.2f} CAD"
     safe_name = _html_escape(client_name or "Client")
     safe_title = _html_escape(event_title or "Photo Session")
@@ -7630,7 +7720,7 @@ def _send_balance_request_email(to_email, client_name, event_title, event_date, 
     date_line = f"{event_date} at {slot_time}".strip()
     stripe_plain = f"\nPay by card / Apple Pay / Google Pay: {stripe_url}\n" if stripe_url else "\nCard payment link is temporarily unavailable — please use Interac e-Transfer.\n"
     stripe_html = (
-        f'<p style="margin:18px 0 0;"><a href="{stripe_url}" style="display:inline-block;background:#c4857a;color:#fff;text-decoration:none;padding:13px 22px;border-radius:999px;font-weight:600;">Pay ${balance_due:.2f} by card / Apple Pay / Google Pay</a></p>'
+        f'<p style="margin:18px 0 0;"><a href="{stripe_url}" style="display:inline-block;background:#C9A24B;color:#2B241B;text-decoration:none;padding:13px 22px;border-radius:999px;font-weight:700;">Pay ${balance_due:.2f} by card / Apple Pay / Google Pay</a></p>'
         if stripe_url else
         '<p style="margin:18px 0 0;color:#8a6f6a;">Card payment link is temporarily unavailable — Interac e-Transfer is available.</p>'
     )
@@ -7646,21 +7736,22 @@ def _send_balance_request_email(to_email, client_name, event_title, event_date, 
         f"   Amount: ${balance_due:.2f} CAD\n"
         f"   Message: Balance for booking #{booking_id}\n"
         f"2){stripe_plain}\n"
+        f"After payment: {delivery_summary}\n\n"
         f"Already paid? Just reply to this email or DM @pashynska.photo.\n\n"
         f"Warmly,\nIryna Pashynska\n@pashynska.photo"
     )
-    html = f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#fdf6f0;font-family:Georgia,serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf6f0;padding:40px 18px;"><tr><td align="center">
-<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 8px 32px rgba(70,40,35,.10);">
-<tr><td style="background:linear-gradient(135deg,#c4857a,#a3685e);padding:34px;text-align:center;color:#fff;">
+    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#FBF7F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FBF7F0;padding:32px 12px;"><tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#FFFCF7;border:1px solid #E8DCC6;border-radius:22px;overflow:hidden;box-shadow:0 14px 40px rgba(67,52,28,.10);">
+<tr><td style="background:linear-gradient(135deg,#2B241B,#5C4826 65%,#A77C25);padding:36px 28px;text-align:center;color:#FFF9EC;">
 <h1 style="margin:0;font-size:25px;font-weight:400;">Remaining Balance</h1><p style="margin:8px 0 0;opacity:.9;">Pashynska Photography</p>
 </td></tr>
-<tr><td style="padding:34px 38px;color:#5a3d4a;">
+<tr><td style="padding:32px 28px;color:#2B241B;">
 <p style="font-size:16px;line-height:1.65;margin:0 0 18px;">Hi <strong>{safe_name}</strong>,</p>
 <p style="font-size:15px;line-height:1.7;margin:0 0 22px;color:#7a5a6a;">Thank you for your session. The deposit has been applied; the remaining balance is ready to pay below.</p>
-<div style="background:#fdf6f0;border-radius:14px;padding:20px;margin:0 0 22px;">
+<div style="background:#FFF8E7;border:1px solid #E8D7A8;border-radius:16px;padding:20px;margin:0 0 22px;">
 <p style="margin:0 0 8px;font-size:13px;color:#a8918e;text-transform:uppercase;letter-spacing:.08em;">Amount due</p>
-<p style="margin:0;font-size:32px;color:#c4857a;">${balance_due:.2f} CAD</p>
+<p style="margin:0;font-size:32px;color:#8A6B25;font-weight:700;">${balance_due:.2f} CAD</p>
 <p style="margin:12px 0 0;font-size:14px;color:#7a5a6a;">Total: ${total_price:.2f} · Paid: ${paid_amount:.2f} · Booking #{booking_id}</p>
 <p style="margin:8px 0 0;font-size:14px;color:#7a5a6a;">{safe_title} · {_html_escape(date_line)}</p>
 </div>
@@ -7669,9 +7760,188 @@ def _send_balance_request_email(to_email, client_name, event_title, event_date, 
 <h2 style="font-size:16px;margin:22px 0 10px;color:#5a3d4a;">Option 2 — Stripe</h2>
 <p style="font-size:15px;line-height:1.7;color:#7a5a6a;margin:0;">Pay securely by card, Apple Pay, or Google Pay.</p>
 {stripe_html}
+<div style="background:#FFF8E7;border:1px solid #E8D7A8;border-radius:14px;padding:18px 20px;margin:24px 0 0;">
+<p style="margin:0 0 7px;font-size:12px;color:#8A6B25;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">After payment</p>
+<p style="margin:0;color:#5E523D;font-size:14px;line-height:1.65;">{_html_escape(delivery_summary)} A separate private-gallery email will arrive when your photos are ready.</p>
+</div>
 <p style="font-size:13px;line-height:1.6;color:#a8918e;margin:26px 0 0;">Already paid? Reply to this email or DM <a href="https://instagram.com/pashynska.photo" style="color:#c4857a;">@pashynska.photo</a>.</p>
 </td></tr></table></td></tr></table></body></html>"""
     return _send_email_raw(to_email, client_name or "Client", subject, plain, html)
+
+
+def _send_balance_paid_email(booking, event, *, amount_received=None,
+                             payment_method="payment"):
+    """Send a premium paid-in-full receipt with the exact delivery promise."""
+    booking = booking or {}
+    event = event or {}
+    to_email = str(booking.get("email") or "").strip()
+    if not to_email:
+        return False
+
+    client_name = str(booking.get("name") or "Client").strip()
+    event_title = str(event.get("title") or booking.get("session_type") or "Photo Session").strip()
+    event_date = str(event.get("date") or booking.get("date") or "").strip()
+    slot_time = str(booking.get("time") or "").strip()
+    try:
+        date_nice = datetime.strptime(event_date, "%Y-%m-%d").strftime("%B %d, %Y")
+    except (TypeError, ValueError):
+        date_nice = event_date or "Date confirmed separately"
+
+    promise = _delivery_promise(event, booking)
+    delivery_summary = str(promise.get("summary") or "").strip()
+    total_price = _booking_total_price(booking, event)
+    referral_discount = _money(booking.get("referral_discount"), 0.0)
+    paid_amount = _booking_paid_amount(booking, event)
+    amount_received = _money(amount_received, 0.0) if amount_received is not None else None
+    method = str(payment_method or "payment").strip()
+    subject = "Payment received — your session is paid in full"
+
+    received_line = (
+        f"Final payment received: ${amount_received:.2f} CAD via {method}\n"
+        if amount_received is not None else
+        f"Payment method: {method}\n"
+    )
+    plain = (
+        f"Hi {client_name},\n\n"
+        "Thank you — your payment has been received and your photo session is now paid in full.\n\n"
+        f"{received_line}"
+        f"Session: {event_title}\n"
+        f"Date/time: {date_nice}{' at ' + slot_time if slot_time else ''}\n"
+        f"Booking ID: #{booking.get('id')}\n"
+        f"Total paid: ${paid_amount:.2f} CAD"
+        + (f" (after a ${referral_discount:.2f} referral credit)" if referral_discount else "")
+        + "\nBalance remaining: $0.00 CAD\n\n"
+        f"What happens next: {delivery_summary}\n"
+        "When your photos are ready, you will receive a separate email with your private Wfolio gallery link. "
+        "Please download everything; galleries are normally kept online for 1–2 months.\n\n"
+        "Questions? Reply to this email or DM @pashynska.photo.\n\n"
+        "Warmly,\nIryna Pashynska\n@pashynska.photo"
+    )
+
+    safe = {key: _html_escape(str(value)) for key, value in {
+        "name": client_name,
+        "title": event_title,
+        "date": date_nice,
+        "time": slot_time,
+        "id": booking.get("id", ""),
+        "method": method,
+        "delivery": delivery_summary,
+    }.items()}
+    received_html = (
+        f'<tr><td style="padding:10px 0;color:#75684F;font-size:13px;">Final payment</td>'
+        f'<td style="padding:10px 0;text-align:right;color:#2B241B;font-size:14px;font-weight:700;">${amount_received:.2f} CAD · {safe["method"]}</td></tr>'
+        if amount_received is not None else ""
+    )
+    discount_html = (
+        f'<tr><td style="padding:10px 0;border-top:1px solid #EFE5CE;color:#75684F;font-size:13px;">Referral credit</td>'
+        f'<td style="padding:10px 0;border-top:1px solid #EFE5CE;text-align:right;color:#76591C;font-size:14px;font-weight:700;">−${referral_discount:.2f} CAD</td></tr>'
+        if referral_discount else ""
+    )
+    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#FBF7F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#2B241B;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FBF7F0;padding:32px 12px;"><tr><td align="center">
+<table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;background:#FFFCF7;border:1px solid #E8DCC6;border-radius:24px;overflow:hidden;box-shadow:0 14px 40px rgba(67,52,28,.10);">
+<tr><td style="background:linear-gradient(135deg,#2B241B 0%,#5C4826 62%,#A77C25 100%);padding:40px 28px;text-align:center;color:#FFF9EC;">
+<p style="margin:0 0 10px;font-size:34px;line-height:1;">✓</p><p style="margin:0 0 8px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#F2D984;font-weight:700;">Payment complete</p>
+<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:29px;line-height:1.18;font-weight:400;">Your session is paid in full</h1>
+<p style="margin:12px 0 0;font-size:13px;color:#F4E9CE;">Pashynska Photography · Calgary</p></td></tr>
+<tr><td style="padding:32px 28px 8px;"><p style="margin:0 0 14px;font-size:16px;line-height:1.65;">Hi <strong>{safe['name']}</strong>,</p>
+<p style="margin:0 0 24px;color:#75684F;font-size:15px;line-height:1.7;">Thank you — your final payment has been received. There is nothing else to pay for this booking.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8E7;border:1px solid #E8D7A8;border-radius:18px;margin:0 0 22px;"><tr><td style="padding:20px 22px;">
+<table width="100%" cellpadding="0" cellspacing="0">{received_html}
+<tr><td style="padding:10px 0;border-top:1px solid #EFE5CE;color:#75684F;font-size:13px;">Session</td><td style="padding:10px 0;border-top:1px solid #EFE5CE;text-align:right;color:#2B241B;font-size:14px;font-weight:700;">{safe['title']}</td></tr>
+<tr><td style="padding:10px 0;border-top:1px solid #EFE5CE;color:#75684F;font-size:13px;">Date &amp; time</td><td style="padding:10px 0;border-top:1px solid #EFE5CE;text-align:right;color:#2B241B;font-size:14px;font-weight:700;">{safe['date']}{' · ' + safe['time'] if slot_time else ''}</td></tr>
+<tr><td style="padding:10px 0;border-top:1px solid #EFE5CE;color:#75684F;font-size:13px;">Booking</td><td style="padding:10px 0;border-top:1px solid #EFE5CE;text-align:right;color:#2B241B;font-size:14px;font-weight:700;">#{safe['id']}</td></tr>
+{discount_html}<tr><td style="padding:12px 0;border-top:2px solid #D8BB70;color:#2B241B;font-size:14px;font-weight:700;">Total paid</td><td style="padding:12px 0;border-top:2px solid #D8BB70;text-align:right;color:#76591C;font-size:18px;font-weight:800;">${paid_amount:.2f} CAD</td></tr>
+</table></td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border:1px solid #E8DCC6;border-radius:18px;margin:0 0 22px;"><tr><td style="padding:21px 22px;">
+<p style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9A7628;font-weight:700;">What happens next</p>
+<p style="margin:0;color:#5E523D;font-size:15px;line-height:1.7;"><strong style="color:#2B241B;">{safe['delivery']}</strong> When the photos are ready, a separate email will bring your private Wfolio gallery link.</p>
+</td></tr></table>
+<p style="margin:0 0 24px;color:#75684F;font-size:13px;line-height:1.65;">Please download your photos after delivery; private galleries are normally kept online for 1–2 months. Questions? Reply to this email or message <a href="https://instagram.com/pashynska.photo" style="color:#8A6B25;font-weight:700;text-decoration:none;">@pashynska.photo</a>.</p>
+</td></tr><tr><td style="padding:0 28px 32px;"><p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:18px;">Thank you for trusting me with your memories.</p><p style="margin:8px 0 0;color:#8C7C60;font-size:14px;"><strong>Iryna Pashynska</strong><br>@pashynska.photo</p></td></tr>
+<tr><td style="background:#F5EEDF;border-top:1px solid #E8DCC6;padding:18px 28px;text-align:center;color:#958569;font-size:11px;line-height:1.6;">Pashynska Photography · Calgary, AB · book.pashynskaphoto.com</td></tr>
+</table></td></tr></table></body></html>"""
+    return _send_email_raw(to_email, client_name, subject, plain, html)
+
+
+def _maybe_send_balance_paid_email(booking_id, *, amount_received=None,
+                                   payment_method="payment"):
+    """Send a final-payment receipt once, even under concurrent callbacks."""
+    conn = db_conn()
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    if not row:
+        conn.close()
+        return "booking_not_found"
+    booking = dict(row)
+    event = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
+    event = event or {}
+    if booking.get("status") != "confirmed" and not booking.get("confirmed"):
+        conn.close()
+        return "not_confirmed"
+    if _booking_balance_due(booking, event) > 0.009:
+        conn.close()
+        return "not_paid_in_full"
+    if booking.get("balance_receipt_sent_at"):
+        conn.close()
+        return "already_sent"
+    if not str(booking.get("email") or "").strip():
+        conn.close()
+        return "no_email"
+
+    claim = conn.execute(
+        """
+        UPDATE bookings
+           SET balance_receipt_claimed_at=CURRENT_TIMESTAMP
+         WHERE id=?
+           AND balance_receipt_sent_at IS NULL
+           AND (
+                balance_receipt_claimed_at IS NULL
+                OR balance_receipt_claimed_at < datetime('now', '-15 minutes')
+           )
+        """,
+        (booking_id,),
+    )
+    conn.commit()
+    if claim.rowcount != 1:
+        conn.close()
+        return "claimed"
+    conn.close()
+
+    sent = False
+    try:
+        sent = _send_balance_paid_email(
+            booking,
+            event,
+            amount_received=amount_received,
+            payment_method=payment_method,
+        )
+    except Exception as exc:
+        log.error(f"[balance-receipt] Send failed for booking #{booking_id}: {exc}")
+
+    conn = db_conn()
+    if sent:
+        conn.execute(
+            """
+            UPDATE bookings
+               SET balance_receipt_sent_at=CURRENT_TIMESTAMP,
+                   paid_in_full_at=COALESCE(paid_in_full_at, CURRENT_TIMESTAMP),
+                   balance_receipt_claimed_at=NULL
+             WHERE id=? AND balance_receipt_sent_at IS NULL
+            """,
+            (booking_id,),
+        )
+        status = "sent"
+    else:
+        conn.execute(
+            "UPDATE bookings SET balance_receipt_claimed_at=NULL WHERE id=?",
+            (booking_id,),
+        )
+        status = "failed"
+    conn.commit()
+    conn.close()
+    return status
 
 
 def _send_private_payment_email(to_email, client_name, event_title, event_date,
@@ -8591,8 +8861,9 @@ def stripe_webhook():
             amount_paid = amount_received_cents / 100.0
             ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
             total_price = _booking_total_price(booking, ev or {})
+            payable_total = round(max(total_price - _money(booking.get("referral_discount"), 0.0), 0.0), 2)
             current_paid = float(booking.get("paid_amount") or booking.get("deposit_amount") or (ev or {}).get("deposit") or SESSION_PRICE or 0)
-            new_paid_total = round(min(current_paid + amount_paid, total_price or current_paid + amount_paid), 2)
+            new_paid_total = round(min(current_paid + amount_paid, payable_total or current_paid + amount_paid), 2)
             conn.execute(
                 "UPDATE bookings SET paid=1, paid_amount=? WHERE id=?",
                 (new_paid_total, booking_id)
@@ -8603,6 +8874,11 @@ def stripe_webhook():
                 sync_to_notion(booking_id)
             except Exception as e:
                 log.error(f"[stripe-webhook] Notion balance sync error for #{booking_id}: {e}")
+            receipt_status = _maybe_send_balance_paid_email(
+                booking_id,
+                amount_received=amount_paid,
+                payment_method="Stripe",
+            )
             try:
                 _notify_admin(
                     f"💸 <b>Stripe Balance Paid</b>\n\n"
@@ -8610,7 +8886,8 @@ def stripe_webhook():
                     f"📧 {booking.get('email', '?')}\n"
                     f"🆔 Booking #{booking_id}\n"
                     f"💰 Balance payment: <b>${amount_paid:.2f} CAD</b>\n"
-                    f"📊 Total recorded paid: <b>${new_paid_total:.2f} CAD</b>"
+                    f"📊 Total recorded paid: <b>${new_paid_total:.2f} CAD</b>\n"
+                    f"✉️ Client receipt: <b>{_tg_escape(receipt_status)}</b>"
                 )
             except Exception as e:
                 log.error(f"[stripe-webhook] Telegram balance notify error for #{booking_id}: {e}")
@@ -9796,19 +10073,18 @@ def _admin_booking_row_or_404(booking_id):
 
 # Brand constants for the invoice — keep here so any future PDF (receipts,
 # gallery delivery memos, etc.) can reuse the same palette + footer.
-_INVOICE_ROSE       = "#a3685e"   # rose-deep — section headings + rules
-_INVOICE_ROSE_SOFT  = "#e8c8c0"   # blush — table header background
-_INVOICE_PAGE_BG    = "#faf5f2"   # whisper-cream — page background tint
-_INVOICE_INK        = "#1c1917"   # near-black — body text
-_INVOICE_INK_2      = "#57534e"   # warm grey — labels, secondary
-_INVOICE_INK_3      = "#a8a29e"   # light grey — footnotes
+_INVOICE_ROSE       = "#9A7628"   # brand gold — section headings + rules
+_INVOICE_ROSE_SOFT  = "#E8D7A8"   # champagne — table rules
+_INVOICE_PAGE_BG    = "#FBF7F0"   # warm cream — page background tint
+_INVOICE_INK        = "#2B241B"   # espresso — body text
+_INVOICE_INK_2      = "#665B47"   # warm stone — labels, secondary
+_INVOICE_INK_3      = "#9B8C70"   # light stone — footnotes
 _INVOICE_FOOTER     = "iryna.pashynska@gmail.com · +1 (368) 997-7903 · book.pashynskaphoto.com"
 _INVOICE_BRAND      = "Pashynska Photography"
 _INVOICE_TAGLINE    = "Iryna Pashynska — Portrait & Lifestyle Photographer"
 _INVOICE_TERMS = (
     "Terms: The deposit is non-refundable. Rescheduling is subject to availability. "
-    "Late arrival will reduce the session time; overtime is not guaranteed. "
-    "Delivery within 5–7 business days after the session."
+    "Late arrival will reduce the session time; overtime is not guaranteed."
 )
 
 
@@ -9841,6 +10117,7 @@ def _admin_invoice_pdf_bytes(booking):
     session_time = booking.get("time") or "—"
     session_location = (event.get("location") if event else "") or "Location confirmed after booking"
     included_items = list((event or {}).get("included") or [])
+    invoice_terms = f"{_INVOICE_TERMS} {_delivery_promise(event or {}, booking)['invoice']}"
 
     # Money: GST 5% on the session fee. booking.full_price is source of truth.
     # Falls back to event.full_price, then inferred from paid_amount.
@@ -9855,7 +10132,9 @@ def _admin_invoice_pdf_bytes(booking):
     else:
         session_fee_pre_tax = gst_amount = total_due = 0.0
 
-    remaining = max(0.0, round(total_due - paid_amount, 2))
+    referral_discount = max(0.0, float(booking.get("referral_discount") or 0))
+    payable_total = max(0.0, round(total_due - referral_discount, 2))
+    remaining = max(0.0, round(payable_total - paid_amount, 2))
 
     # Try ReportLab first; if unavailable, fall back to a minimal valid PDF
     # so the route still returns 200 in stripped-down test sandboxes.
@@ -10002,10 +10281,18 @@ def _admin_invoice_pdf_bytes(booking):
         ["Session fee",        f"$ {session_fee_pre_tax:,.2f}"],
         ["GST (5%)",           f"$ {gst_amount:,.2f}"],
         ["Total amount",       f"$ {total_due:,.2f}"],
-        ["",                   ""],
-        ["Deposit (paid)",     f"$ {paid_amount:,.2f}"],
-        ["Remaining balance",  f"$ {remaining:,.2f}"],
     ]
+    if referral_discount > 0:
+        money_rows.extend([
+            ["Referral credit", f"−$ {referral_discount:,.2f}"],
+            ["Amount after credit", f"$ {payable_total:,.2f}"],
+        ])
+    money_rows.extend([
+        ["",                   ""],
+        ["Paid",               f"$ {paid_amount:,.2f}"],
+        ["Remaining balance",  f"$ {remaining:,.2f}"],
+    ])
+    remaining_row = len(money_rows) - 1
     pay_tbl = Table(money_rows, colWidths=[doc.width * 0.7, doc.width * 0.3])
     pay_tbl.setStyle(TableStyle([
         ("FONTNAME",   (0, 0), (-1, -1), invoice_font),
@@ -10020,11 +10307,11 @@ def _admin_invoice_pdf_bytes(booking):
         ("FONTNAME",  (0, 2), (-1, 2), invoice_font_bold),
         ("TEXTCOLOR", (0, 2), (-1, 2), ink),
         # Remaining-balance row: strong rule + rose accent
-        ("LINEABOVE", (0, 5), (-1, 5), 0.8, rose),
-        ("FONTNAME",  (0, 5), (-1, 5), invoice_font_bold),
-        ("TEXTCOLOR", (0, 5), (1, 5), rose if remaining > 0 else ink),
-        ("FONTSIZE",  (0, 5), (-1, 5), 9.8),
-        ("TOPPADDING", (0, 5), (-1, 5), 4),
+        ("LINEABOVE", (0, remaining_row), (-1, remaining_row), 0.8, rose),
+        ("FONTNAME",  (0, remaining_row), (-1, remaining_row), invoice_font_bold),
+        ("TEXTCOLOR", (0, remaining_row), (1, remaining_row), rose if remaining > 0 else ink),
+        ("FONTSIZE",  (0, remaining_row), (-1, remaining_row), 9.8),
+        ("TOPPADDING", (0, remaining_row), (-1, remaining_row), 4),
     ]))
     elems.append(pay_tbl)
 
@@ -10038,7 +10325,7 @@ def _admin_invoice_pdf_bytes(booking):
     ))
 
     # ── Terms
-    elems.append(Paragraph(_INVOICE_TERMS, style_terms))
+    elems.append(Paragraph(invoice_terms, style_terms))
 
     # Bottom rule + footer
     rule2 = Table([[""]], colWidths=[doc.width])
@@ -10652,6 +10939,7 @@ def admin_request_balance():
         balance_due=balance_due,
         stripe_url=stripe_url,
         interac_email=EMAIL,
+        delivery_promise=_delivery_promise(event, booking),
     )
     if not sent:
         return jsonify({"error": "Failed to send balance request email"}), 500
@@ -10713,7 +11001,7 @@ def admin_cancel():
 def admin_mark_paid():
     """Manually update paid amount for a confirmed booking (e.g., cash, e-Transfer after session).
 
-    Does NOT send email — only updates DB and syncs Notion.
+    Sends the paid-in-full receipt only when this update clears the balance.
     """
     data = request.get_json(silent=True) or {}
     booking_id = data.get("booking_id")
@@ -10738,9 +11026,11 @@ def admin_mark_paid():
         return jsonify({"error": "Booking must be confirmed"}), 400
 
     event = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
-    total_price = float((event or {}).get("full_price") or SESSION_TOTAL or 0)
+    total_price = _booking_total_price(booking, event or {})
+    payable_total = round(max(total_price - _money(booking.get("referral_discount"), 0.0), 0.0), 2)
+    previous_paid = _booking_paid_amount(booking, event or {})
     # Cap paid_amount at total_price to prevent overpayment
-    paid_amount = max(0.0, min(paid_amount, total_price))
+    paid_amount = max(0.0, min(paid_amount, payable_total))
 
     conn.execute(
         "UPDATE bookings SET paid=1, paid_amount=? WHERE id=?",
@@ -10753,24 +11043,41 @@ def admin_mark_paid():
         sync_to_notion(booking_id)
     except Exception as e:
         log.error(f"[admin-mark-paid] Notion sync error for #{booking_id}: {e}")
+    received_now = round(max(paid_amount - previous_paid, 0.0), 2)
+    receipt_status = _maybe_send_balance_paid_email(
+        booking_id,
+        amount_received=received_now if received_now > 0 else None,
+        payment_method="manual payment",
+    )
+    balance_due = round(max(payable_total - paid_amount, 0.0), 2)
     try:
         _notify_admin(
             f"💰 <b>Manual Payment Marked</b>\n\n"
             f"👤 {_tg_escape(booking.get('name', '?'))}\n"
             f"📧 {_tg_escape(booking.get('email', '?'))}\n"
             f"🆔 Booking #{booking_id}\n"
-            f"💵 Total recorded paid: <b>${paid_amount:.2f} CAD</b>"
+            f"💵 Total recorded paid: <b>${paid_amount:.2f} CAD</b>\n"
+            f"✉️ Client receipt: <b>{_tg_escape(receipt_status)}</b>"
         )
     except Exception as e:
         log.error(f"[admin-mark-paid] Telegram notify error for #{booking_id}: {e}")
 
-    _emit_n8n_event("payment.marked_paid", booking=booking, paid_amount=paid_amount, total_price=total_price)
+    _emit_n8n_event(
+        "payment.marked_paid",
+        booking=booking,
+        paid_amount=paid_amount,
+        total_price=total_price,
+        balance_due=balance_due,
+        receipt_status=receipt_status,
+    )
 
     log.info(f"[admin-mark-paid] Booking #{booking_id} marked paid: ${paid_amount:.2f}")
     return jsonify({
         "success": True,
         "booking_id": int(booking_id),
         "paid_amount": round(paid_amount, 2),
+        "balance_due": balance_due,
+        "receipt_status": receipt_status,
     })
 
 
@@ -12407,7 +12714,9 @@ def _run_admin_transfer_unlink(transfer_id):
         booking = conn.execute(
             """
             SELECT id, name, status, confirmed, paid, paid_amount,
-                   calendar_event_id
+                   calendar_event_id, event_id, deposit_amount, full_price,
+                   referral_discount,
+                   balance_receipt_sent_at
               FROM bookings
              WHERE id=?
             """,
@@ -12484,7 +12793,7 @@ def _run_admin_transfer_unlink(transfer_id):
                    AND e.status='matched'
                    AND COALESCE(e.direction, 'in')='in'
                    AND COALESCE(e.matched_gift_code, '')=''
-                   AND e.payment_mutation IN ('confirm', 'partial', 'reconcile')
+                   AND e.payment_mutation IN ('confirm', 'partial', 'reconcile', 'balance')
                    AND ABS(COALESCE(e.amount, -1) - COALESCE(p.amount, -2)) < 0.01
                    AND ABS(COALESCE(p.amount, -1) - ?) < 0.01
                 """,
@@ -12522,6 +12831,7 @@ def _run_admin_transfer_unlink(transfer_id):
             ledger_owners != 1
             or (
                 not no_financial_mutation
+                and mutation != "balance"
                 and ledger_booking_owners != 1
             )
         ):
@@ -12545,6 +12855,31 @@ def _run_admin_transfer_unlink(transfer_id):
                 "SELECT COUNT(*) FROM processed_emails WHERE booking_id=?",
                 (booking_id,),
             ).fetchone()[0]
+            prior_paid_for_balance = transfer["prior_booking_paid_amount"]
+            try:
+                prior_paid_for_balance = float(prior_paid_for_balance or 0)
+                booking_for_total = dict(booking)
+                balance_event = (
+                    get_event_by_id(booking["event_id"])
+                    if booking["event_id"] else get_active_event()
+                )
+                payable_total_for_balance = max(
+                    _booking_total_price(booking_for_total, balance_event or {})
+                    - float(booking["referral_discount"] or 0),
+                    0.0,
+                )
+                expected_balance_total = min(
+                    prior_paid_for_balance + transfer_amount,
+                    payable_total_for_balance,
+                )
+            except (TypeError, ValueError):
+                expected_balance_total = None
+            balance_has_exact_ownership = (
+                mutation == "balance"
+                and expected_balance_total is not None
+                and booking_paid_amount is not None
+                and abs(booking_paid_amount - expected_balance_total) < 0.01
+            )
             has_exact_ownership = (
                 bool(message_id)
                 and transfer_amount is not None
@@ -12553,8 +12888,13 @@ def _run_admin_transfer_unlink(transfer_id):
                 and processed_amount is not None
                 and abs(processed_amount - transfer_amount) < 0.01
                 and booking_paid_amount is not None
-                and abs(booking_paid_amount - transfer_amount) < 0.01
-                and processed_owners == 1
+                and (
+                    balance_has_exact_ownership
+                    or (
+                        abs(booking_paid_amount - transfer_amount) < 0.01
+                        and processed_owners == 1
+                    )
+                )
             )
             if not has_exact_ownership:
                 conn.rollback()
@@ -12685,6 +13025,43 @@ def _run_admin_transfer_unlink(transfer_id):
                     transfer_amount,
                 ),
             )
+        elif (
+            financial_reversal
+            and mutation == "balance"
+            and prior_status == "confirmed"
+            and prior_confirmed == 1
+            and prior_paid == 1
+            and prior_paid_amount_valid
+            and booking["status"] == "confirmed"
+            and booking["confirmed"] == 1
+            and booking["paid"] == 1
+            and expected_balance_total is not None
+        ):
+            booking_cursor = conn.execute(
+                """
+                UPDATE bookings
+                   SET status=?,
+                       confirmed=?,
+                       paid=?,
+                       paid_amount=?,
+                       balance_receipt_claimed_at=NULL,
+                       balance_receipt_sent_at=NULL,
+                       paid_in_full_at=NULL
+                 WHERE id=?
+                   AND status='confirmed'
+                   AND confirmed=1
+                   AND paid=1
+                   AND ABS(COALESCE(paid_amount, -1) - ?) < 0.01
+                """,
+                (
+                    prior_status,
+                    prior_confirmed,
+                    prior_paid,
+                    prior_paid_amount,
+                    booking_id,
+                    expected_balance_total,
+                ),
+            )
         elif financial_reversal:
             conn.rollback()
             return jsonify({
@@ -12801,15 +13178,26 @@ def _run_admin_transfer_unlink(transfer_id):
                 },
             }
         else:
+            receipt_was_sent = (
+                mutation == "balance" and bool(booking["balance_receipt_sent_at"])
+            )
             external_reconciliation = {
                 "status": "not_required",
                 "calendar": {"status": "not_applicable"},
                 "notion": {"status": "not_applicable"},
                 "notifications": {
-                    "client_email": "not_applicable",
+                    "client_email": (
+                        "possibly_sent_irreversible"
+                        if receipt_was_sent else "not_applicable"
+                    ),
                     "admin_telegram": "not_applicable",
                 },
             }
+            if receipt_was_sent:
+                external_reconciliation["operator_alert"] = (
+                    "The paid-in-full email may already be in the client's inbox; "
+                    "unlinking cannot recall it. Contact the client if this payment was incorrect."
+                )
     except Exception:
         conn.rollback()
         log.exception("[transfers] unlink ownership reversal failed")
