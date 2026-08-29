@@ -600,7 +600,7 @@
       }
       const data = await res.json().catch(() => null);
       if (res.ok && data && data.success) {
-        const linkNote = data.stripe_url ? ' Stripe link created.' : ' Interac only.';
+        const linkNote = data.stripe_url ? ' Secure payment page included.' : ' Interac only.';
         showToast('Balance request sent ✓' + linkNote, 'ok');
       } else {
         showToast((data && data.error) || 'Failed to send balance request', 'err');

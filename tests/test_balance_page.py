@@ -9,7 +9,10 @@ page surface the link only when a balance is actually due.
 """
 import os
 import sqlite3
+import sys
 import tempfile
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -111,6 +114,57 @@ def test_balance_checkout_creates_session_when_stripe_on(client, monkeypatch):
     r = c.post("/pay-balance/checkout", json={"booking_id": bid, "confirmation_token": "bal-token"})
     assert r.status_code == 200
     assert r.get_json()["checkout_url"] == "https://checkout.stripe.test/sess"
+
+
+def test_balance_checkout_rejects_cancelled_booking(client, monkeypatch):
+    c, db_path = client
+    monkeypatch.setattr(booking_app, "STRIPE_SECRET_KEY", "sk_test_x")
+    bid, _ = _insert(db_path, paid_amount=250.0, status="cancelled")
+    r = c.post("/pay-balance/checkout", json={"booking_id": bid, "confirmation_token": "bal-token"})
+    assert r.status_code == 409
+    assert "no longer eligible" in r.get_json()["error"]
+
+
+def test_balance_checkout_idempotency_key_rotates_after_fifteen_minutes():
+    booking = {"id": 307, "event_id": "mountains", "email": "client@example.com"}
+    start = datetime(2026, 8, 29, 18, 1, tzinfo=timezone.utc)
+    first = booking_app._stripe_balance_idempotency_key(booking, 170.75, now=start)
+    retry = booking_app._stripe_balance_idempotency_key(booking, 170.75, now=start + timedelta(minutes=5))
+    later = booking_app._stripe_balance_idempotency_key(booking, 170.75, now=start + timedelta(minutes=20))
+
+    assert retry == first
+    assert later != first
+
+
+def test_balance_checkout_cancel_returns_to_durable_payment_page(monkeypatch):
+    captured = {}
+
+    def create_session(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(url="https://checkout.stripe.test/fresh")
+
+    fake_stripe = SimpleNamespace(
+        checkout=SimpleNamespace(Session=SimpleNamespace(create=create_session))
+    )
+    monkeypatch.setitem(sys.modules, "stripe", fake_stripe)
+    monkeypatch.setattr(booking_app, "STRIPE_SECRET_KEY", "sk_test_x")
+    monkeypatch.setattr(booking_app, "BASE_URL", "https://book.test")
+    booking = {
+        "id": 307,
+        "event_id": "mountains",
+        "email": "client@example.com",
+        "name": "Balance Client",
+        "time": "17:40",
+        "confirmation_token": "balance-token",
+    }
+
+    url = booking_app._create_balance_checkout_url(booking, {"title": "Mountains Mini"}, 170.75)
+
+    assert url == "https://checkout.stripe.test/fresh"
+    assert captured["cancel_url"] == (
+        "https://book.test/pay-balance?booking_id=307&token=balance-token"
+    )
+    assert captured["idempotency_key"].startswith("balance-307-17075-")
 
 
 # ── Email + success wiring ───────────────────────────────────────────────────

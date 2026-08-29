@@ -67,12 +67,12 @@ def _reserve_test_booking(monkeypatch, client):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('''
-        INSERT INTO bookings (date, time, name, email, phone, instagram, session_type, status, paid, confirmed, event_id, deposit_amount, paid_amount, review_email_sent)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO bookings (date, time, name, email, phone, instagram, session_type, status, paid, confirmed, event_id, deposit_amount, paid_amount, review_email_sent, confirmation_token)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         "2026-06-07", "15:00", "Test Detail",
         "test_detail@example.com", "403-555-1234", "", "mini",
-        "confirmed", 1, 1, "lilac-jun7", 250.0, 250.0, None
+        "confirmed", 1, 1, "lilac-jun7", 250.0, 250.0, None, "test-confirmation-token"
     ))
     booking_id = c.lastrowid
     conn.commit()
@@ -387,9 +387,10 @@ def test_admin_invoice_patch_updates_amounts(admin_client, monkeypatch):
     assert row == (640.0, 250.0, 250.0)
 
 
-# 10. Balance request uses booking.full_price and returns copyable link if email succeeds
+# 10. Balance request uses booking.full_price and returns durable link if email succeeds
 def test_admin_request_balance_uses_booking_full_price_and_returns_link(admin_client, monkeypatch):
     """RED: remaining balance = booking.full_price - paid_amount, not stale event defaults."""
+    monkeypatch.setattr(booking_app, "BASE_URL", "https://book.test")
     booking_id, _ = _reserve_test_booking(monkeypatch, admin_client)
     conn = sqlite3.connect(booking_app.DB_PATH)
     conn.execute("UPDATE bookings SET full_price=?, paid_amount=?, deposit_amount=? WHERE id=?", (700.0, 250.0, 250.0, booking_id))
@@ -401,7 +402,13 @@ def test_admin_request_balance_uses_booking_full_price_and_returns_link(admin_cl
         captured.update(kwargs)
         return True
     monkeypatch.setattr(booking_app, "_send_balance_request_email", fake_balance_email, raising=False)
-    monkeypatch.setattr(booking_app, "_create_balance_checkout_url", lambda booking, event, balance_due: "https://buy.stripe.com/test_balance", raising=False)
+    monkeypatch.setattr(booking_app, "STRIPE_SECRET_KEY", "sk_test_x")
+    monkeypatch.setattr(
+        booking_app,
+        "_create_balance_checkout_url",
+        lambda *args, **kwargs: pytest.fail("admin request must not create an expiring Stripe session"),
+        raising=False,
+    )
     monkeypatch.setattr(booking_app, "_notify_admin", lambda *a, **k: True, raising=False)
     monkeypatch.setattr(booking_app, "_emit_n8n_event", lambda *a, **k: True, raising=False)
 
@@ -412,7 +419,7 @@ def test_admin_request_balance_uses_booking_full_price_and_returns_link(admin_cl
     assert data["total_price"] == 700.0
     assert data["paid_amount"] == 250.0
     assert data["balance_due"] == 450.0
-    assert data["stripe_url"] == "https://buy.stripe.com/test_balance"
+    assert data["stripe_url"] == f"https://book.test/pay-balance?booking_id={booking_id}&token=test-confirmation-token"
     assert captured["total_price"] == 700.0
     assert captured["paid_amount"] == 250.0
     assert captured["balance_due"] == 450.0

@@ -7229,6 +7229,8 @@ def pay_balance_checkout():
         return jsonify({"error": "Booking not found"}), 404
 
     booking = dict(row)
+    if booking.get("status") in ("expired", "cancelled"):
+        return jsonify({"error": "This booking is no longer eligible for payment."}), 409
     ev = get_event_by_id(booking.get("event_id")) if booking.get("event_id") else get_active_event()
     ev = ev or {}
     balance_due = _booking_balance_due(booking, ev)
@@ -7691,16 +7693,24 @@ def _stripe_checkout_idempotency_key(booking):
     return f"checkout-{booking_id}-{digest}"
 
 
-def _stripe_balance_idempotency_key(booking, balance_due):
-    """Stable idempotency key for admin-created balance checkout sessions."""
+def _stripe_balance_idempotency_key(booking, balance_due, now=None):
+    """Short-lived idempotency key for an on-demand balance checkout.
+
+    Repeated taps in the same 15-minute window reuse one Checkout Session, while
+    a later attempt receives a new session instead of Stripe returning a stale
+    or expired session for the lifetime of the booking.
+    """
     booking_id = str(booking.get("id") or "unknown")
     cents = int(round(float(balance_due or 0) * 100))
+    checkout_time = now or _local_now()
+    time_bucket = int(checkout_time.timestamp() // (15 * 60))
     raw = "|".join([
         "balance",
         booking_id,
         str(booking.get("event_id") or ""),
         str(booking.get("email") or "").strip().lower(),
         str(cents),
+        str(time_bucket),
     ])
     digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
     return f"balance-{booking_id}-{cents}-{digest}"
@@ -7754,7 +7764,7 @@ def _booking_balance_due(booking, event):
 
 
 def _create_balance_checkout_url(booking, event, balance_due):
-    """Create a Stripe Checkout Session for the remaining balance."""
+    """Create a fresh, on-demand Stripe Checkout Session for the balance."""
     if not STRIPE_SECRET_KEY:
         return None
     try:
@@ -7790,7 +7800,7 @@ def _create_balance_checkout_url(booking, event, balance_due):
             absolute_base=base_url,
             balance_paid=1,
         ),
-        cancel_url=f"{base_url}/admin",
+        cancel_url=_balance_page_url(booking, absolute_base=base_url) or f"{base_url}/",
         metadata={
             "booking_id": str(booking.get("id")),
             "payment_type": "balance",
@@ -11027,11 +11037,11 @@ def admin_request_balance():
     if balance_due <= 0:
         return jsonify({"error": "No balance due for this booking"}), 400
 
-    stripe_url = None
-    try:
-        stripe_url = _create_balance_checkout_url(booking, event, balance_due)
-    except Exception as e:
-        log.error(f"[admin-balance] Stripe checkout link failed for #{booking_id}: {e}")
+    # Email the durable, branded payment page. A short-lived Stripe Checkout
+    # Session is created only when the client chooses card payment on that page.
+    # Sending a direct Checkout URL here caused requests opened days later to
+    # show Stripe's "session timed out" page.
+    stripe_url = _balance_page_url(booking) if STRIPE_SECRET_KEY else None
 
     sent = _send_balance_request_email(
         to_email=booking.get("email", ""),

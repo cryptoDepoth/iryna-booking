@@ -2,7 +2,7 @@
 
 Feature: after a client has paid the deposit and the booking is confirmed, admin
 can request the remaining balance by email with Interac instructions and an
-optional Stripe Checkout link.
+optional durable card-payment page.
 """
 import os
 import sqlite3
@@ -89,17 +89,18 @@ def test_admin_request_balance_requires_auth(client):
     assert response.status_code in (302, 401, 403)
 
 
-def test_admin_request_balance_sends_email_with_interac_and_stripe_link(client, monkeypatch):
+def test_admin_request_balance_sends_email_with_interac_and_durable_payment_link(client, monkeypatch):
     c, db_path = client
     ev_deposit = booking_app.EVENTS[0].get("deposit", 95.0)
     booking_id, ev = _insert_confirmed_booking(db_path, paid_amount=ev_deposit)
     expected_balance = float(ev.get("full_price", 190.0)) - float(ev_deposit)
 
     sent = {}
+    monkeypatch.setattr(booking_app, "STRIPE_SECRET_KEY", "sk_test_x")
     monkeypatch.setattr(
         booking_app,
         "_create_balance_checkout_url",
-        lambda booking, event, balance_due: "https://checkout.stripe.test/balance",
+        lambda *args, **kwargs: pytest.fail("admin request must not create an expiring Stripe session"),
         raising=False,
     )
     monkeypatch.setattr(
@@ -119,10 +120,11 @@ def test_admin_request_balance_sends_email_with_interac_and_stripe_link(client, 
     data = response.get_json()
     assert data["success"] is True
     assert data["balance_due"] == round(expected_balance, 2)
-    assert data["stripe_url"] == "https://checkout.stripe.test/balance"
+    expected_url = f"https://book.test/pay-balance?booking_id={booking_id}&token=balance-token"
+    assert data["stripe_url"] == expected_url
     assert sent["to_email"] == "balance@example.com"
     assert sent["balance_due"] == round(expected_balance, 2)
-    assert sent["stripe_url"] == "https://checkout.stripe.test/balance"
+    assert sent["stripe_url"] == expected_url
 
 
 def test_admin_request_balance_rejects_unconfirmed_booking(client):
